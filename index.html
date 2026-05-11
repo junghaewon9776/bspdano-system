@@ -1701,8 +1701,23 @@ function dApstat(){
 
   // 주석 (개최지역 거주자 / 기초지자체)
   var jnTot=regTotal['전라남도']||{명:0,팀:0};
+  // 영광군 집계 (주소 컬럼에서 "영광" 포함 여부)
+  var iAddr=-1; ["주소","주소지","거주지","지역"].forEach(function(nm){ if(iAddr<0){ for(var j=0;j<H.length;j++){ if(String(H[j]||"").indexOf(nm)>=0){iAddr=j;break;} } } });
+  var ygCnt={명:0,팀:0};
+  R.forEach(function(r){
+    var rg=iReg>=0?_normRegion(r[iReg]):"";
+    if(rg!=="전라남도") return;
+    var addr=iAddr>=0?String(r[iAddr]||""):"";
+    if(/영광/.test(addr)){
+      var g=iGT>=0?gtype(r[iGT]):"개인";
+      if(g==="팀") ygCnt.팀++; else ygCnt.명++;
+    }
+  });
   h+='<div style="margin-top:10px;padding:10px 12px;background:#fffbeb;border:1px solid #fde68a;border-radius:6px;font-size:12px;color:#78350f;line-height:1.7">';
   h+='<div>○ 참가인원 중, 개최지역 거주자 수 : <b>전남 '+(jnTot.명+jnTot.팀)+'건</b>(개인 '+jnTot.명+'명 + 단체 '+jnTot.팀+'팀)</div>';
+  if(ygCnt.명+ygCnt.팀>0){
+    h+='<div style="margin-left:16px">└ 영광군 : <b>'+(ygCnt.명+ygCnt.팀)+'건</b>(개인 '+ygCnt.명+'명 + 단체 '+ygCnt.팀+'팀)</div>';
+  }
   h+='<div style="color:#a16207">※ 기초지자체 기준</div>';
   h+='</div>';
 
