@@ -60,6 +60,15 @@ function loadEvtData(evtId) {
           data[n] = Object.values(data[n]);
         }
         if (!data[n]) data[n] = [];
+        // Firebase 전각 키 → 원래 키로 복원
+        if (Array.isArray(data[n])) {
+          data[n] = data[n].map(function(r) {
+            if (!r || typeof r !== 'object') return r;
+            var out = {};
+            Object.keys(r).forEach(function(k) { out[_fbRestoreKey(k)] = r[k]; });
+            return out;
+          });
+        }
       });
       // Config는 key-value 배열
       if (data.Config && Array.isArray(data.Config)) {
@@ -84,7 +93,11 @@ function saveEvtNode(evtId, nodeName, data) {
 
 // 메인 데이터 저장
 function saveMainNode(nodeName, data) {
-  return fbDb.ref('/main/' + nodeName).set(data);
+  var d = data;
+  if (Array.isArray(d)) {
+    d = d.map(function(r) { return _fbSafeRow(r); });
+  }
+  return fbDb.ref('/main/' + nodeName).set(d);
 }
 
 // ───────── Firebase Auth ─────────
@@ -544,7 +557,7 @@ function _apiBulkAdd(p, nodeName) {
       if (!r.id) r.id = uid();
       if (!r.createdAt) r.createdAt = now_();
       r.evtId = evtId;
-      arr.push(r);
+      arr.push(_fbSafeRow(r));
     });
     return saveEvtNode(evtId, nodeName, arr).then(function() {
       _evtCaches[evtId][nodeName] = arr;
@@ -557,9 +570,10 @@ function _apiBulkReplace(p, nodeName) {
   var evtId = _getEvtId(p);
   if (!evtId) return Promise.resolve({ok:false, err:"행사 미선택"});
   var newRows = p.rows || [];
-  newRows.forEach(function(r) {
+  newRows = newRows.map(function(r) {
     if (!r.id) r.id = uid();
     r.evtId = evtId;
+    return _fbSafeRow(r);
   });
   return saveEvtNode(evtId, nodeName, newRows).then(function() {
     _evtCaches[evtId][nodeName] = newRows;
@@ -593,8 +607,9 @@ function _apiBulkUpsert(p, nodeName) {
           if (arr[i].id === r.id) { idx = i; break; }
         }
       }
-      if (idx >= 0) { Object.assign(arr[idx], r); updated++; }
-      else { if (!r.id) r.id = uid(); arr.push(r); added++; }
+      var sr = _fbSafeRow(r);
+      if (idx >= 0) { Object.assign(arr[idx], sr); updated++; }
+      else { if (!sr.id) sr.id = uid(); arr.push(sr); added++; }
     });
     return saveEvtNode(evtId, nodeName, arr).then(function() {
       _evtCaches[evtId][nodeName] = arr;
@@ -1000,7 +1015,7 @@ function _apiBulkAddMain(p, nodeName) {
   newRows.forEach(function(r) {
     if (!r.id) r.id = uid();
     if (!r.createdAt) r.createdAt = now_();
-    arr.push(r);
+    arr.push(_fbSafeRow(r));
   });
   return saveMainNode(nodeName, arr).then(function() {
     _cache[nodeName] = arr;
@@ -1054,13 +1069,13 @@ function _apiBulkReplaceMems(p) {
         if (!r.id) r.id = uid();
         if (!r.createdAt) r.createdAt = now_();
         r.evtId = evtId;
-        arr.push(r);
+        arr.push(_fbSafeRow(r));
       });
     } else {
       arr = newRows.map(function(r) {
         if (!r.id) r.id = uid();
         r.evtId = evtId;
-        return r;
+        return _fbSafeRow(r);
       });
     }
     return saveEvtNode(evtId, "Mems", arr).then(function() {
