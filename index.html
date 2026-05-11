@@ -999,6 +999,7 @@ function mkTabs(){
   var c1=[];
   if(isA() && HM("apply"))  c1.push({k:"apply",l:"참가자 관리"});
   if(isA() && HM("apply"))  c1.push({k:"apstat",l:"참가자 현황"});
+  if(isA() && HM("apply"))  c1.push({k:"apform",l:"신청폼"});
   if(c1.length) cats.push({id:"apply",label:"👥 참가자",items:c1});
 
   // ── 재정 ──
@@ -1109,7 +1110,7 @@ function _isEvtAdmin(){
 // 특정 탭이 현재 행사의 modules 에서 허용되는지
 function _tabAllowedByEvt(tab){
   switch(tab){
-    case "apply": case "apstat":   return _hasModule("apply");
+    case "apply": case "apstat": case "apform":   return _hasModule("apply");
     case "pur":                    return _hasModule("purchase");
     case "inc": case "exp":        return _hasModule("budget");
     case "act":                    return _hasModule("act");
@@ -1870,27 +1871,32 @@ function dApstat(){
   fm+='<div class="card" style="position:sticky;top:60px">';
   fm+='<div style="background:#fff;border-radius:14px;padding:24px;border:1px solid #e2e8f0;box-shadow:0 2px 8px rgba(0,0,0,0.04)">';
   fm+='<h2 style="font-size:18px;margin-bottom:16px;text-align:center;color:#1e293b">📝 참가 신청</h2>';
-  fm+='<label style="display:block;color:#64748b;font-size:12px;margin:0 0 4px;font-weight:600">구분</label>';
+  fm+='<label style="display:block;color:#64748b;font-size:12px;margin:0 0 4px;font-weight:600">구분 <span style="color:#ef4444">*</span></label>';
   fm+='<select id="apf_cat" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px">';
   fm+='<option value="">선택</option>';
-  _getApplyCats().forEach(function(c){fm+='<option>'+c+'</option>'});
+  _getApplyCats().forEach(function(c){fm+='<option>'+esc(c)+'</option>'});
   fm+='</select>';
-  fm+='<label style="display:block;color:#64748b;font-size:12px;margin:12px 0 4px;font-weight:600">참가구분</label>';
-  fm+='<select id="apf_div" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px">';
+  fm+='<label style="display:block;color:#64748b;font-size:12px;margin:12px 0 4px;font-weight:600">참가구분 <span style="color:#ef4444">*</span></label>';
+  fm+='<select id="apf_div" onchange="apfDivChg()" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px">';
   fm+='<option value="">선택</option>';
   ["학생부","신인부","일반부"].forEach(function(d){fm+='<option>'+d+'</option>'});
   fm+='</select>';
+  fm+='<div id="apf_teamWrap" style="display:none">';
   fm+='<label style="display:block;color:#64748b;font-size:12px;margin:12px 0 4px;font-weight:600">신청유형</label>';
   fm+='<select id="apf_gtype" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px">';
   fm+='<option value="개인(명)">개인(명)</option><option value="단체(팀)">단체(팀)</option>';
   fm+='</select>';
   fm+='<div style="display:flex;gap:8px;margin-top:12px">';
   fm+='<div style="flex:1"><label style="display:block;color:#64748b;font-size:12px;margin:0 0 4px;font-weight:600">팀명</label>';
-  fm+='<input id="apf_team" type="text" placeholder="개인이면 비워두세요" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px"></div>';
-  fm+='<div style="flex:1"><label style="display:block;color:#64748b;font-size:12px;margin:0 0 4px;font-weight:600">대표자/이름</label>';
-  fm+='<input id="apf_name" type="text" placeholder="이름" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px"></div>';
+  fm+='<input id="apf_team" type="text" placeholder="팀명 입력" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px"></div>';
+  fm+='<div style="flex:1"><label style="display:block;color:#64748b;font-size:12px;margin:0 0 4px;font-weight:600">대표자 <span style="color:#ef4444">*</span></label>';
+  fm+='<input id="apf_name" type="text" placeholder="대표자 이름" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px"></div>';
+  fm+='</div></div>';
+  fm+='<div id="apf_soloWrap" style="display:none">';
+  fm+='<label style="display:block;color:#64748b;font-size:12px;margin:12px 0 4px;font-weight:600">이름 <span style="color:#ef4444">*</span></label>';
+  fm+='<input id="apf_name2" type="text" placeholder="이름" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px">';
   fm+='</div>';
-  fm+='<label style="display:block;color:#64748b;font-size:12px;margin:12px 0 4px;font-weight:600">연락처</label>';
+  fm+='<label style="display:block;color:#64748b;font-size:12px;margin:12px 0 4px;font-weight:600">연락처 <span style="color:#ef4444">*</span></label>';
   fm+='<input id="apf_phone" type="tel" placeholder="010-0000-0000" maxlength="13" oninput="(function(el){var v=el.value.replace(/[^0-9]/g,\'\');if(v.length<=3)el.value=v;else if(v.length<=7)el.value=v.slice(0,3)+\'-\'+v.slice(3);else el.value=v.slice(0,3)+\'-\'+v.slice(3,7)+\'-\'+v.slice(7,11)})(this)" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px">';
   fm+='<div style="display:flex;gap:8px;margin-top:12px">';
   fm+='<div style="flex:1"><label style="display:block;color:#64748b;font-size:12px;margin:0 0 4px;font-weight:600">시도</label>';
@@ -1912,35 +1918,150 @@ function dApstat(){
     +'</div>';
 }
 
+// ===== 신청폼 독립 탭 =====
+function dApform(){
+  var evtNm=(CUR_EVT&&CUR_EVT.nm)||"행사";
+  var evtId=(CUR_EVT&&CUR_EVT.evtId)||"";
+  var cats=_getApplyCats();
+
+  var h='<div style="max-width:520px;margin:0 auto;padding:16px 0">';
+
+  // 링크 복사 영역 (관리자용)
+  if(isA()){
+    var baseUrl=location.href.split("?")[0].split("#")[0];
+    var formLink=baseUrl+"?p=applyform"+(evtId?"&evtId="+encodeURIComponent(evtId):"");
+    h+='<div class="card" style="background:#eff6ff;border:1px solid #bfdbfe;padding:10px 14px;margin-bottom:12px">';
+    h+='<div style="font-weight:600;margin-bottom:6px">🔗 공개 신청폼 링크 <span class="mut" style="font-weight:400;font-size:12px">(카톡/문자 공유용)</span></div>';
+    h+='<div style="display:flex;gap:6px;align-items:center">';
+    h+='<input id="apformLink" type="text" readonly value="'+esc(formLink)+'" onclick="this.select()" style="flex:1;padding:6px 8px;border:1px solid #bfdbfe;border-radius:6px;background:#fff;font-size:12px;font-family:monospace">';
+    h+='<button class="btn" style="padding:6px 10px;font-size:12px" onclick="cpApformLink()">📋 복사</button>';
+    h+='</div></div>';
+  }
+
+  h+='<div class="card">';
+  h+='<div style="background:#fff;border-radius:14px;padding:24px;border:1px solid #e2e8f0;box-shadow:0 2px 8px rgba(0,0,0,0.04)">';
+  h+='<h2 style="font-size:20px;margin-bottom:4px;text-align:center;color:#1e293b">📝 참가 신청</h2>';
+  h+='<p style="text-align:center;color:#64748b;font-size:13px;margin-bottom:20px">'+esc(evtNm)+'</p>';
+
+  h+='<label style="display:block;color:#64748b;font-size:12px;margin:0 0 4px;font-weight:600">구분 <span style="color:#ef4444">*</span></label>';
+  h+='<select id="apf_cat" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px">';
+  h+='<option value="">선택</option>';
+  cats.forEach(function(c){h+='<option>'+esc(c)+'</option>'});
+  h+='</select>';
+
+  h+='<label style="display:block;color:#64748b;font-size:12px;margin:12px 0 4px;font-weight:600">참가구분 <span style="color:#ef4444">*</span></label>';
+  h+='<select id="apf_div" onchange="apfDivChg()" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px">';
+  h+='<option value="">선택</option>';
+  ["학생부","신인부","일반부"].forEach(function(d){h+='<option>'+d+'</option>'});
+  h+='</select>';
+  h+='<div id="apf_teamWrap" style="display:none">';
+  h+='<label style="display:block;color:#64748b;font-size:12px;margin:12px 0 4px;font-weight:600">신청유형</label>';
+  h+='<select id="apf_gtype" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px">';
+  h+='<option value="개인(명)">개인(명)</option><option value="단체(팀)">단체(팀)</option>';
+  h+='</select>';
+  h+='<div style="display:flex;gap:8px;margin-top:12px">';
+  h+='<div style="flex:1"><label style="display:block;color:#64748b;font-size:12px;margin:0 0 4px;font-weight:600">팀명</label>';
+  h+='<input id="apf_team" type="text" placeholder="팀명 입력" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px"></div>';
+  h+='<div style="flex:1"><label style="display:block;color:#64748b;font-size:12px;margin:0 0 4px;font-weight:600">대표자 <span style="color:#ef4444">*</span></label>';
+  h+='<input id="apf_name" type="text" placeholder="대표자 이름" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px"></div>';
+  h+='</div></div>';
+  h+='<div id="apf_soloWrap" style="display:none">';
+  h+='<label style="display:block;color:#64748b;font-size:12px;margin:12px 0 4px;font-weight:600">이름 <span style="color:#ef4444">*</span></label>';
+  h+='<input id="apf_name2" type="text" placeholder="이름" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px">';
+  h+='</div>';
+
+  h+='<label style="display:block;color:#64748b;font-size:12px;margin:12px 0 4px;font-weight:600">연락처 <span style="color:#ef4444">*</span></label>';
+  h+='<input id="apf_phone" type="tel" placeholder="010-0000-0000" maxlength="13" oninput="(function(el){var v=el.value.replace(/[^0-9]/g,\'\');if(v.length<=3)el.value=v;else if(v.length<=7)el.value=v.slice(0,3)+\'-\'+v.slice(3);else el.value=v.slice(0,3)+\'-\'+v.slice(3,7)+\'-\'+v.slice(7,11)})(this)" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px">';
+
+  h+='<div style="display:flex;gap:8px;margin-top:12px">';
+  h+='<div style="flex:1"><label style="display:block;color:#64748b;font-size:12px;margin:0 0 4px;font-weight:600">시도</label>';
+  h+='<select id="apf_region" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px">';
+  h+='<option value="">선택</option>';
+  APSTAT_REGIONS.forEach(function(rg){h+='<option>'+esc(rg)+'</option>'});
+  h+='</select></div>';
+  h+='<div style="flex:1"><label style="display:block;color:#64748b;font-size:12px;margin:0 0 4px;font-weight:600">지역(시군구)</label>';
+  h+='<input id="apf_area" type="text" placeholder="예: 영광군" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px"></div>';
+  h+='</div>';
+
+  // 파일 첨부
+  h+='<label style="display:block;color:#64748b;font-size:12px;margin:12px 0 4px;font-weight:600">참가신청서 첨부</label>';
+  h+='<input id="apf_file1" type="file" accept=".hwp,.pdf,.jpg,.jpeg,.png,.doc,.docx" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;background:#f8fafc">';
+  h+='<label style="display:block;color:#64748b;font-size:12px;margin:12px 0 4px;font-weight:600">통장사본 첨부</label>';
+  h+='<input id="apf_file2" type="file" accept=".jpg,.jpeg,.png,.pdf" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;background:#f8fafc">';
+  h+='<div class="mut" style="font-size:11px;margin-top:4px">· HWP, PDF, JPG, PNG 가능 · 파일당 최대 5MB</div>';
+
+  h+='<label style="display:block;color:#64748b;font-size:12px;margin:12px 0 4px;font-weight:600">비고</label>';
+  h+='<textarea id="apf_memo" placeholder="기타 사항" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px;height:60px;resize:vertical"></textarea>';
+
+  h+='<button onclick="submitApplyForm()" style="width:100%;padding:14px;border:none;border-radius:10px;background:#3b82f6;color:#fff;font-size:15px;font-weight:700;cursor:pointer;margin-top:16px">신청하기</button>';
+  h+='</div></div>';
+  h+='</div>';
+  return h;
+}
+
+function cpApformLink(){
+  var el=document.getElementById("apformLink"); if(!el) return;
+  el.select();
+  try{
+    if(navigator.clipboard&&navigator.clipboard.writeText){
+      navigator.clipboard.writeText(el.value).then(function(){toast("URL 복사됨")},function(){document.execCommand("copy");toast("URL 복사됨")});
+    } else { document.execCommand("copy"); toast("URL 복사됨"); }
+  }catch(e){toast("복사 실패",true);}
+}
+
+function apfDivChg(){
+  var v=(document.getElementById('apf_div')||{}).value||"";
+  var tw=document.getElementById('apf_teamWrap');
+  var sw=document.getElementById('apf_soloWrap');
+  if(v==="신인부"){
+    if(tw)tw.style.display="";
+    if(sw)sw.style.display="none";
+  } else if(v){
+    if(tw)tw.style.display="none";
+    if(sw)sw.style.display="";
+  } else {
+    if(tw)tw.style.display="none";
+    if(sw)sw.style.display="none";
+  }
+}
+
 function submitApplyForm(){
   var cat=document.getElementById('apf_cat').value;
   var div=document.getElementById('apf_div').value;
-  var gtype=document.getElementById('apf_gtype').value;
-  var team=document.getElementById('apf_team').value.trim();
-  var name=document.getElementById('apf_name').value.trim();
+  if(!cat){ alert('구분을 선택하세요'); return; }
+  if(!div){ alert('참가구분을 선택하세요'); return; }
+  var gtype="개인(명)", team="", name="";
+  if(div==="신인부"){
+    gtype=(document.getElementById('apf_gtype')||{}).value||"개인(명)";
+    team=(document.getElementById('apf_team')||{}).value.trim();
+    name=(document.getElementById('apf_name')||{}).value.trim();
+    if(!name){ alert('대표자 이름을 입력하세요'); return; }
+  } else {
+    name=(document.getElementById('apf_name2')||{}).value.trim();
+    if(!name){ alert('이름을 입력하세요'); return; }
+  }
   var phone=document.getElementById('apf_phone').value.trim();
   var region=document.getElementById('apf_region').value;
   var area=document.getElementById('apf_area').value.trim();
   var memo=document.getElementById('apf_memo').value.trim();
-  if(!cat){ alert('구분을 선택하세요'); return; }
-  if(!div){ alert('참가구분을 선택하세요'); return; }
-  if(!name){ alert('이름을 입력하세요'); return; }
   if(!phone){ alert('연락처를 입력하세요'); return; }
   var row={
     "구분":cat, "참가구분":div, "신청유형(명/팀)":gtype,
     "팀명":team, "대표자":name, "성명":name,
     "연락처":phone, "시도별":region, "주소":area, "비고":memo
   };
-  var btn=document.querySelector('#apf_cat').closest('.card').querySelector('button');
+  var btn=document.querySelector('#apf_cat').closest('.card').querySelector('button[onclick*="submitApplyForm"]');
+  if(!btn) btn=document.querySelector('#apf_cat').closest('.card').querySelector('button');
   if(btn){btn.disabled=true;btn.textContent='처리 중...';}
   api("addApply",Object.assign({id:CID},row)).then(function(r){
     if(r&&r.ok){
       toast('접수순번 '+r.seq+'번으로 신청되었습니다');
-      ['apf_cat','apf_div','apf_team','apf_name','apf_phone','apf_region','apf_area','apf_memo'].forEach(function(id){
+      ['apf_cat','apf_div','apf_team','apf_name','apf_name2','apf_phone','apf_region','apf_area','apf_memo'].forEach(function(id){
         var el=document.getElementById(id);
         if(el) el.tagName==='SELECT'?el.selectedIndex=0:el.value='';
       });
-      document.getElementById('apf_gtype').selectedIndex=0;
+      var gt=document.getElementById('apf_gtype'); if(gt) gt.selectedIndex=0;
+      apfDivChg();
       APPLY=null; draw();
     } else {
       alert('신청 실패: '+(r&&r.err||'오류'));
@@ -2476,28 +2597,24 @@ function applyConfigOpen(){
     h+='<div class="mut" style="margin-top:3px">오늘: '+esc(r.today||"")+' · 누적 접수: '+esc(String(r.count||0))+'건</div>';
     h+='</div>';
 
-    // 🔗 신청폼 URL (행사별 자동 조합: webappUrl + ?evtId=현재행사)
+    // 🔗 신청폼 URL
     var evtId = (CUR_EVT && CUR_EVT.evtId) || "";
     var webapp = String(r.webappUrl || "").trim();
-    var fullFormUrl = webapp ? (webapp + (webapp.indexOf("?")>=0 ? "&" : "?") + "evtId=" + encodeURIComponent(evtId)) : "";
+    var baseUrl = location.href.split("?")[0].split("#")[0];
+    var builtinLink = baseUrl+"?p=applyform"+(evtId?"&evtId="+encodeURIComponent(evtId):"");
+    var displayUrl = webapp || builtinLink;
     h+='<div class="card" style="background:#eff6ff;border:1px solid #bfdbfe;padding:10px 14px;margin-bottom:14px">';
-    h+='<div style="font-weight:600;margin-bottom:6px">🔗 이 행사 신청폼 URL <span class="mut" style="font-weight:400;font-size:12px">(카톡/문자로 공유)</span></div>';
-    if (webapp){
-      h+='<div style="display:flex;gap:6px;align-items:center">';
-      h+='<input id="cfgFormLink" type="text" readonly value="'+esc(fullFormUrl)+'" onclick="this.select()" style="flex:1;padding:6px 8px;border:1px solid #bfdbfe;border-radius:6px;background:#fff;font-size:12px;font-family:monospace">';
-      h+='<button type="button" class="btn btn-b" onclick="applyConfigCopyLink()" style="white-space:nowrap;padding:6px 10px;font-size:12px">📋 복사</button>';
-      h+='</div>';
-      h+='<div class="mut" style="font-size:11px;margin-top:4px">· 행사마다 <code>?evtId='+esc(evtId)+'</code> 가 자동으로 붙어서 해당 행사 스프레드시트로 접수됨 · 새 행사 만들면 자동으로 새 URL</div>';
-      h+='<div style="margin-top:8px"><a href="#" onclick="applyConfigToggleWebapp();return false;" style="font-size:11px;color:#2563eb">· 웹앱 배포 URL 변경하기</a></div>';
-      h+='<div id="cfgWebappBox" style="display:none;margin-top:6px">';
-      h+='<input id="cfgWebappUrl" type="text" value="'+esc(webapp)+'" placeholder="https://script.google.com/macros/s/.../exec" style="width:100%;padding:6px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px;font-family:monospace">';
-      h+='<div class="mut" style="font-size:11px;margin-top:3px">· 신청폼 Apps Script 의 웹앱 배포 URL (모든 행사 공용, 한번만 설정)</div>';
-      h+='</div>';
-    } else {
-      h+='<div class="mut" style="font-size:12px;margin-bottom:6px">신청폼 웹앱 배포 URL 을 먼저 등록하세요. 한번만 설정하면 모든 행사에 자동 적용됩니다.</div>';
-      h+='<input id="cfgWebappUrl" type="text" value="" placeholder="https://script.google.com/macros/s/.../exec" style="width:100%;padding:6px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px;font-family:monospace">';
-      h+='<div class="mut" style="font-size:11px;margin-top:3px">· 신청폼 Apps Script → 배포 → 웹앱 → URL 복사해서 붙여넣기</div>';
-    }
+    h+='<div style="font-weight:600;margin-bottom:6px">🔗 신청폼 URL <span class="mut" style="font-weight:400;font-size:12px">(카톡/문자로 공유)</span></div>';
+    h+='<div style="display:flex;gap:6px;align-items:center">';
+    h+='<input id="cfgFormLink" type="text" readonly value="'+esc(displayUrl)+'" onclick="this.select()" style="flex:1;padding:6px 8px;border:1px solid #bfdbfe;border-radius:6px;background:#fff;font-size:12px;font-family:monospace">';
+    h+='<button type="button" class="btn btn-b" onclick="applyConfigCopyLink()" style="white-space:nowrap;padding:6px 10px;font-size:12px">📋 복사</button>';
+    h+='</div>';
+    h+='<div class="mut" style="font-size:11px;margin-top:4px">· 기본: 내장 신청폼 탭 링크 · 외부 URL 입력 시 해당 URL로 대체</div>';
+    h+='<div style="margin-top:8px">';
+    h+='<label style="font-size:11px;color:#64748b;font-weight:600">외부 신청폼 URL (선택)</label>';
+    h+='<input id="cfgWebappUrl" type="text" value="'+esc(webapp)+'" placeholder="비워두면 내장 신청폼 사용" style="width:100%;padding:6px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px;font-family:monospace;margin-top:4px">';
+    h+='<div class="mut" style="font-size:11px;margin-top:3px">· 외부 폼(Apps Script 등) URL을 붙여넣으면 그 URL이 공유 링크가 됩니다 · 비워두면 시스템 내장 신청폼 탭 사용</div>';
+    h+='</div>';
     h+='</div>';
 
     h+='<label style="font-weight:600;display:block;margin-top:10px">📅 접수 시작일 <span class="mut" style="font-weight:400">(비우면 즉시 시작)</span></label>';
@@ -3798,6 +3915,7 @@ function draw(){
   var el=document.getElementById("mc");
   if(CTAB=="apply")el.innerHTML=dApply();
   else if(CTAB=="apstat")el.innerHTML=dApstat();
+  else if(CTAB=="apform")el.innerHTML=dApform();
   else if(CTAB=="dash")el.innerHTML=dDash();
   else if(CTAB=="act")el.innerHTML=dAct();
   else if(CTAB=="pur")el.innerHTML=dPur();
