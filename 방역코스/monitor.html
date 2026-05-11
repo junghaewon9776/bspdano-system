@@ -158,15 +158,10 @@ let map, logMarkers = [], logTrack, selectedLogIdx = null;
 window.onAuthSuccess = () => onDataReady(loadKakaoMap);
 window.onDataChanged = () => { if (map) { render(); renderCourseQuickList(); renderPubMonConfig(); renderAllAnchorsAlwaysOn(); renderComplaintsAndNoSpray(); } };
 
-// 단오시스템 로그인 게이트 → 통과 후 기존 인증 시도
+// 단오시스템 로그인 게이트 → 통과하면 바로 데이터 로드 (Firebase Auth 이메일 로그인 불필요)
 danoAuthGate(function() {
-  checkAdminAuth().then(function(ok) {
-    if (ok) onDataReady(loadKakaoMap);
-    else {
-      initFirebaseSync();
-      onDataReady(loadKakaoMap);
-    }
-  });
+  initFirebaseSync();
+  onDataReady(loadKakaoMap);
 });
 
 let __kakaoLoadAttempt = 0;

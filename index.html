@@ -28,7 +28,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Malgun Gothic','Apple SD Goth
 .topBar .userArea{display:flex;align-items:center;gap:10px}
 .topBar .badge2{background:rgba(255,255,255,.2);padding:4px 10px;border-radius:6px;font-size:12px}
 .logoutBtn{background:transparent;border:1px solid rgba(255,255,255,.4);color:#fff;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:11px}
-.evtBar{background:linear-gradient(180deg,#eef2ff,#f8fafc);border-bottom:1px solid #c7d2fe;padding:8px 20px;display:flex;align-items:center;gap:10px;position:sticky;top:52px;z-index:45;flex-wrap:wrap;font-size:13px}
+.evtBar{background:linear-gradient(180deg,#eef2ff,#f8fafc);border-bottom:1px solid #c7d2fe;padding:8px 20px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:13px}
 .evtBar .evtLabel{color:#4338ca;font-weight:700}
 .evtBar select.evtSel{border:1px solid #818cf8;background:#fff;padding:5px 10px;border-radius:6px;font-size:13px;font-weight:600;color:#1e293b;cursor:pointer;font-family:inherit;min-width:220px}
 .evtBar select.evtSel:focus{outline:2px solid #6366f1;outline-offset:1px}
@@ -39,7 +39,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Malgun Gothic','Apple SD Goth
 .evtBar .evtMods{color:#64748b;font-size:11px;margin-left:auto}
 .evtBar .evtMgrBtn{background:#4f46e5;color:#fff;border:none;padding:5px 10px;border-radius:6px;font-size:11px;cursor:pointer;font-family:inherit;font-weight:600}
 .evtBar .evtMgrBtn:hover{background:#4338ca}
-.tabs{background:#fff;border-bottom:1px solid #ddd;padding:0 16px;position:sticky;top:94px;z-index:40;scrollbar-width:thin}
+.tabs{background:#fff;border-bottom:1px solid #ddd;padding:0 16px;position:sticky;top:52px;z-index:40;scrollbar-width:thin}
 .tabs::-webkit-scrollbar{height:3px}
 .cat-row{display:flex;overflow-x:auto;gap:2px;padding:4px 0;border-bottom:1px solid #eee}
 .cat-btn{background:#f1f5f9;border:none;padding:8px 16px;font-size:12px;color:#64748b;cursor:pointer;border-radius:8px;white-space:nowrap;font-family:inherit;font-weight:700;transition:all .15s}
@@ -51,8 +51,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Malgun Gothic','Apple SD Goth
 .sub-row button:hover{background:#e2e8f0}
 .sub-row button.on{background:#3b82f6;color:#fff;border-color:#3b82f6}
 .sub-row button.ext{background:#f0fdf4;border-color:#86efac;color:#15803d}
-.tabs button{background:none;border:none;padding:8px 14px;font-size:12px;color:#777;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;font-family:inherit;border-radius:6px 6px 0 0}
-.tabs button.on{color:#2563eb;font-weight:700;border-bottom-color:#2563eb;background:#eef2ff}
+.tabs>.sub-row button{background:none;border:none;padding:8px 14px;font-size:12px;color:#777;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;font-family:inherit;border-radius:6px 6px 0 0}
+.tabs>.sub-row button.on{color:#2563eb;font-weight:700;border-bottom-color:#2563eb;background:#eef2ff}
 #mc{padding:16px 20px;max-width:1200px;margin:0 auto}
 
 .card{background:#fff;border-radius:10px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,.08);margin-bottom:12px}
@@ -160,7 +160,7 @@ label{display:block;font-size:10px;color:#999;margin-bottom:3px}
   .g4,.g2,.g3,.fr3,.fr2,.fr4{grid-template-columns:1fr}
   .card{padding:13px}
   .popup-box{padding:18px;border-radius:10px}
-  .tabs button{padding:8px 12px;font-size:11px}
+  .tabs>.sub-row button{padding:8px 12px;font-size:11px}
   .cat-btn{padding:6px 12px;font-size:11px}
   table{font-size:11px}
   th,td{padding:6px 4px}
@@ -376,6 +376,8 @@ var APPLY=null;                              // {headers:[], rows:[[]], sheetUrl
 var APPLY_Q="";                              // 검색어
 var APPLY_F={cat:"",div:"",region:"",pre:"",fin:"",awd:"",att:"",abs:""};  // 필터: 구분/참가구분/시도별/예선합격/최종합격/수상/첨부파일유무/불참
 var APPLY_SORT={col:-1,asc:true};            // 정렬 (기본: 접수순번 오름차순 — loadApply_ 에서 세팅)
+var APPLY_CATS=null;                         // 동적 카테고리 (null이면 기본값 사용)
+var APPLY_CATS_DEFAULT=["기악","판소리","무용","고법"];
 var APPLY_VIEW="compact";                    // "compact" | "full"
 // 컴팩트 모드에서 표시할 컬럼 (헤더 이름 기준, 해당 컬럼이 있을 때만 표시)
 var APPLY_KEYCOLS=["접수순번","접수일시","구분","참가구분","팀명","대표자","이름","연락처","시도별","지역","예선합격","최종합격","수상","불참","다회참가자"];
@@ -1224,7 +1226,7 @@ function dApply(){
     h0+='<strong style="font-size:16px">참가자 관리</strong>';
     h0+='<span class="mut">(0건)</span>';
     h0+='<span style="flex:1"></span>';
-    h0+='<button class="btn" style="background:#10b981;color:#fff;font-weight:700" onclick="openSheet(\'Apply\')" title="참가자 데이터를 시트 형태로 보기/편집">📊 시트 열기</button>';
+    if(isSuper()) h0+='<button class="btn" style="background:#10b981;color:#fff;font-weight:700" onclick="openSheet(\'Apply\')" title="참가자 데이터를 시트 형태로 보기/편집">📊 시트 열기</button>';
     h0+='<button class="btn" style="background:#f59e0b;color:#fff" onclick="applyConfigOpen()" title="신청기간/마감/양식 설정">⚙️ 신청 설정</button>';
     h0+='<button class="btn" style="background:#ea580c;color:#fff;font-weight:700" onclick="awardsManage()" title="수상 종류 추가/수정/삭제">🏆 상 관리</button>';
     h0+='<button class="btn" style="background:#8b5cf6;color:#fff;font-weight:700" onclick="applyImpTmpl()" title="엑셀 양식 다운로드">📋 양식</button>';
@@ -1335,7 +1337,7 @@ function dApply(){
   h+='<button class="btn" style="border-radius:0;border:none;background:'+(APPLY_VIEW==="full"?"#2563eb":"#e2e8f0")+';color:'+(APPLY_VIEW==="full"?"#fff":"#334155")+'" onclick="applyView(\'full\')">상세</button>';
   h+='<button class="btn" style="border-radius:0;border:none;background:'+(APPLY_VIEW==="judge"?"#16a34a":"#e2e8f0")+';color:'+(APPLY_VIEW==="judge"?"#fff":"#334155")+';font-weight:700" onclick="applyView(\'judge\')">📱 심사</button>';
   h+='</div>';
-  h+='<button class="btn" style="background:#10b981;color:#fff;font-weight:700" onclick="openSheet(\'Apply\')" title="참가자 데이터를 시트 형태로 보기/편집">📊 시트 열기</button>';
+  if(isSuper()) h+='<button class="btn" style="background:#10b981;color:#fff;font-weight:700" onclick="openSheet(\'Apply\')" title="참가자 데이터를 시트 형태로 보기/편집">📊 시트 열기</button>';
   h+='<button class="btn" style="background:#f59e0b;color:#fff" onclick="applyConfigOpen()" title="신청기간/마감/양식 설정">⚙️ 신청 설정</button>';
   h+='<button class="btn" style="background:#ea580c;color:#fff;font-weight:700" onclick="awardsManage()" title="수상 종류 추가/수정/삭제">🏆 상 관리</button>';
   h+='<button class="btn btn-b" onclick="applyXLSX()">⬇ 엑셀 내보내기</button>';
@@ -1597,7 +1599,7 @@ function dApstat(){
     return true;
   });
 
-  var CATS=["기악","판소리","무용","고법"];
+  var CATS=_getApplyCats();
   var DIVS=["학생부","신인부","일반부"];
   function gtype(v){
     var s=String(v||"").trim();
@@ -1862,7 +1864,89 @@ function dApstat(){
     h+='</div>';
   }
   h+='</div>';  // card end
-  return _top + h;
+
+  // 오른쪽: 참가신청폼
+  var fm='';
+  fm+='<div class="card" style="position:sticky;top:60px">';
+  fm+='<div style="background:#fff;border-radius:14px;padding:24px;border:1px solid #e2e8f0;box-shadow:0 2px 8px rgba(0,0,0,0.04)">';
+  fm+='<h2 style="font-size:18px;margin-bottom:16px;text-align:center;color:#1e293b">📝 참가 신청</h2>';
+  fm+='<label style="display:block;color:#64748b;font-size:12px;margin:0 0 4px;font-weight:600">구분</label>';
+  fm+='<select id="apf_cat" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px">';
+  fm+='<option value="">선택</option>';
+  _getApplyCats().forEach(function(c){fm+='<option>'+c+'</option>'});
+  fm+='</select>';
+  fm+='<label style="display:block;color:#64748b;font-size:12px;margin:12px 0 4px;font-weight:600">참가구분</label>';
+  fm+='<select id="apf_div" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px">';
+  fm+='<option value="">선택</option>';
+  ["학생부","신인부","일반부"].forEach(function(d){fm+='<option>'+d+'</option>'});
+  fm+='</select>';
+  fm+='<label style="display:block;color:#64748b;font-size:12px;margin:12px 0 4px;font-weight:600">신청유형</label>';
+  fm+='<select id="apf_gtype" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px">';
+  fm+='<option value="개인(명)">개인(명)</option><option value="단체(팀)">단체(팀)</option>';
+  fm+='</select>';
+  fm+='<div style="display:flex;gap:8px;margin-top:12px">';
+  fm+='<div style="flex:1"><label style="display:block;color:#64748b;font-size:12px;margin:0 0 4px;font-weight:600">팀명</label>';
+  fm+='<input id="apf_team" type="text" placeholder="개인이면 비워두세요" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px"></div>';
+  fm+='<div style="flex:1"><label style="display:block;color:#64748b;font-size:12px;margin:0 0 4px;font-weight:600">대표자/이름</label>';
+  fm+='<input id="apf_name" type="text" placeholder="이름" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px"></div>';
+  fm+='</div>';
+  fm+='<label style="display:block;color:#64748b;font-size:12px;margin:12px 0 4px;font-weight:600">연락처</label>';
+  fm+='<input id="apf_phone" type="tel" placeholder="010-0000-0000" maxlength="13" oninput="(function(el){var v=el.value.replace(/[^0-9]/g,\'\');if(v.length<=3)el.value=v;else if(v.length<=7)el.value=v.slice(0,3)+\'-\'+v.slice(3);else el.value=v.slice(0,3)+\'-\'+v.slice(3,7)+\'-\'+v.slice(7,11)})(this)" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px">';
+  fm+='<div style="display:flex;gap:8px;margin-top:12px">';
+  fm+='<div style="flex:1"><label style="display:block;color:#64748b;font-size:12px;margin:0 0 4px;font-weight:600">시도</label>';
+  fm+='<select id="apf_region" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px">';
+  fm+='<option value="">선택</option>';
+  APSTAT_REGIONS.forEach(function(rg){fm+='<option>'+esc(rg)+'</option>'});
+  fm+='</select></div>';
+  fm+='<div style="flex:1"><label style="display:block;color:#64748b;font-size:12px;margin:0 0 4px;font-weight:600">지역(시군구)</label>';
+  fm+='<input id="apf_area" type="text" placeholder="예: 영광군" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px"></div>';
+  fm+='</div>';
+  fm+='<label style="display:block;color:#64748b;font-size:12px;margin:12px 0 4px;font-weight:600">비고</label>';
+  fm+='<textarea id="apf_memo" placeholder="기타 사항" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px;height:60px;resize:vertical"></textarea>';
+  fm+='<button onclick="submitApplyForm()" style="width:100%;padding:14px;border:none;border-radius:10px;background:#3b82f6;color:#fff;font-size:15px;font-weight:700;cursor:pointer;margin-top:16px">신청하기</button>';
+  fm+='</div></div>';
+
+  return '<div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap">'
+    +'<div style="flex:1;min-width:600px">'+_top+h+'</div>'
+    +'<div style="width:360px;min-width:300px;flex-shrink:0">'+fm+'</div>'
+    +'</div>';
+}
+
+function submitApplyForm(){
+  var cat=document.getElementById('apf_cat').value;
+  var div=document.getElementById('apf_div').value;
+  var gtype=document.getElementById('apf_gtype').value;
+  var team=document.getElementById('apf_team').value.trim();
+  var name=document.getElementById('apf_name').value.trim();
+  var phone=document.getElementById('apf_phone').value.trim();
+  var region=document.getElementById('apf_region').value;
+  var area=document.getElementById('apf_area').value.trim();
+  var memo=document.getElementById('apf_memo').value.trim();
+  if(!cat){ alert('구분을 선택하세요'); return; }
+  if(!div){ alert('참가구분을 선택하세요'); return; }
+  if(!name){ alert('이름을 입력하세요'); return; }
+  if(!phone){ alert('연락처를 입력하세요'); return; }
+  var row={
+    "구분":cat, "참가구분":div, "신청유형(명/팀)":gtype,
+    "팀명":team, "대표자":name, "성명":name,
+    "연락처":phone, "시도별":region, "주소":area, "비고":memo
+  };
+  var btn=document.querySelector('#apf_cat').closest('.card').querySelector('button');
+  if(btn){btn.disabled=true;btn.textContent='처리 중...';}
+  api("addApply",Object.assign({id:CID},row)).then(function(r){
+    if(r&&r.ok){
+      toast('접수순번 '+r.seq+'번으로 신청되었습니다');
+      ['apf_cat','apf_div','apf_team','apf_name','apf_phone','apf_region','apf_area','apf_memo'].forEach(function(id){
+        var el=document.getElementById(id);
+        if(el) el.tagName==='SELECT'?el.selectedIndex=0:el.value='';
+      });
+      document.getElementById('apf_gtype').selectedIndex=0;
+      APPLY=null; draw();
+    } else {
+      alert('신청 실패: '+(r&&r.err||'오류'));
+    }
+    if(btn){btn.disabled=false;btn.textContent='신청하기';}
+  });
 }
 
 // 참가자 현황 엑셀 내보내기
@@ -1871,7 +1955,7 @@ function expApstat(){
   var H=APPLY.headers||[], R=APPLY.rows||[];
   var iCat=H.indexOf("구분"), iDiv=H.indexOf("참가구분"), iReg=H.indexOf("시도별"), iGT=H.indexOf("신청유형(명/팀)");
   if(iGT<0) iGT=H.indexOf("신청유형");
-  var CATS=["기악","판소리","무용","고법"];
+  var CATS=_getApplyCats();
   var DIVS=["학생부","신인부","일반부"];
   function gtype(v){ var s=String(v||"").trim(); if(/팀/.test(s)) return "팀"; return "개인"; }
   // 피벗 계산
@@ -2358,10 +2442,14 @@ function awardDel(name,giver){
 
 function loadApply_(silent){
   var evtId = (CUR_EVT && CUR_EVT.evtId) || "";
-  return api("listApply",{id:CID, evtId:evtId, _t:Date.now()}).then(function(r){
+  var p1 = api("listApply",{id:CID, evtId:evtId, _t:Date.now()});
+  var p2 = APPLY_CATS ? Promise.resolve(null) : api("getApplyConfig",{id:CID});
+  return Promise.all([p1,p2]).then(function(res){
+    var r=res[0], cfg=res[1];
     if(r && r.ok) APPLY=r;
     else APPLY={err:(r&&r.err)||"조회 실패",headers:[],rows:[]};
-    // 기본 정렬: 접수순번 오름차순 (사용자가 아직 아무 정렬 안했을 때)
+    if(cfg && cfg.cats && cfg.cats.length) APPLY_CATS=cfg.cats;
+    if(!APPLY_CATS) APPLY_CATS=APPLY_CATS_DEFAULT;
     if(APPLY_SORT.col<0 && APPLY && APPLY.headers){
       var si=APPLY.headers.indexOf("접수순번");
       if(si>=0) APPLY_SORT={col:si, asc:true};
@@ -2370,6 +2458,7 @@ function loadApply_(silent){
     if(!silent && APPLY && APPLY.rows){ toast("새로고침 완료 — "+APPLY.rows.length+"건"); }
   });
 }
+function _getApplyCats(){ return APPLY_CATS || APPLY_CATS_DEFAULT; }
 // ===== 신청 설정 팝업 (마감일/시작일/강제상태/안내/양식URL) =====
 function applyConfigOpen(){
   showLoading("설정 불러오는 중...");
@@ -2425,6 +2514,22 @@ function applyConfigOpen(){
     h+='</select>';
     h+='<div class="mut" style="font-size:11px;margin-top:3px">· auto: 시작일/마감일 기준 자동 · open: 날짜 무시하고 강제 접수 · closed: 즉시 마감 (정원 초과 시 사용)</div>';
 
+    // 구분(카테고리) 관리
+    var cats = r.cats || APPLY_CATS || APPLY_CATS_DEFAULT;
+    _cfgCats = cats.slice();
+    h+='<label style="font-weight:600;display:block;margin-top:12px">🏷️ 구분 (카테고리)</label>';
+    h+='<div id="cfgCatList" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">';
+    cats.forEach(function(c,i){
+      h+='<span style="display:inline-flex;align-items:center;gap:4px;background:#e2e8f0;padding:4px 10px;border-radius:16px;font-size:13px">';
+      h+=esc(c)+'<button onclick="cfgCatRemove('+i+')" style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:14px;padding:0 2px;line-height:1" title="삭제">&times;</button>';
+      h+='</span>';
+    });
+    h+='</div>';
+    h+='<div style="display:flex;gap:6px;margin-top:6px">';
+    h+='<input id="cfgCatNew" type="text" placeholder="새 카테고리 이름" style="flex:1;padding:6px 8px;border:1px solid #ddd;border-radius:6px;font-size:13px" onkeydown="if(event.key===\'Enter\')cfgCatAdd()">';
+    h+='<button class="btn" style="padding:6px 12px;font-size:12px" onclick="cfgCatAdd()">+ 추가</button>';
+    h+='</div>';
+
     h+='<label style="font-weight:600;display:block;margin-top:12px">📢 안내 메시지 <span class="mut" style="font-weight:400">(마감/대기 화면에 표시)</span></label>';
     h+='<textarea id="cfgNotice" rows="2" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;margin-top:4px;font-family:inherit" placeholder="예) 정원 마감되어 접수를 조기종료합니다. 문의: 010-...">'+esc(r.notice||"")+'</textarea>';
 
@@ -2442,6 +2547,30 @@ function applyConfigOpen(){
     openPopup(h, 520);
   });
 }
+// 카테고리 추가/삭제 (설정 팝업 내)
+var _cfgCats=[];
+function cfgCatAdd(){
+  var el=document.getElementById("cfgCatNew"); if(!el) return;
+  var v=el.value.trim(); if(!v){ return; }
+  if(_cfgCats.indexOf(v)>=0){ toast("이미 있는 카테고리입니다",true); return; }
+  _cfgCats.push(v);
+  _cfgCatRedraw();
+  el.value="";
+}
+function cfgCatRemove(i){
+  _cfgCats.splice(i,1);
+  _cfgCatRedraw();
+}
+function _cfgCatRedraw(){
+  var el=document.getElementById("cfgCatList"); if(!el) return;
+  var h='';
+  _cfgCats.forEach(function(c,i){
+    h+='<span style="display:inline-flex;align-items:center;gap:4px;background:#e2e8f0;padding:4px 10px;border-radius:16px;font-size:13px">';
+    h+=esc(c)+'<button onclick="cfgCatRemove('+i+')" style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:14px;padding:0 2px;line-height:1" title="삭제">&times;</button>';
+    h+='</span>';
+  });
+  el.innerHTML=h;
+}
 function applyConfigSave(){
   var start    = document.getElementById("cfgStart").value;
   var deadline = document.getElementById("cfgDeadline").value;
@@ -2449,10 +2578,10 @@ function applyConfigSave(){
   var notice   = document.getElementById("cfgNotice").value;
   var formUrl  = document.getElementById("cfgFormUrl").value;
   var formUrlPdf = (document.getElementById("cfgFormUrlPdf")||{}).value || "";
-  // 웹앱 URL 은 전 행사 공용 (메인 Config). 입력 필드가 있을 때만 payload 에 포함
   var wuEl = document.getElementById("cfgWebappUrl");
   var payload = {id:CID,start:start,deadline:deadline,status:status,notice:notice,formUrl:formUrl,formUrlPdf:formUrlPdf};
   if (wuEl) payload.webappUrl = (wuEl.value||"").trim();
+  if(_cfgCats.length) payload.cats=_cfgCats;
   if (start && deadline && start > deadline){
     alert("시작일이 마감일보다 늦을 수 없습니다."); return;
   }
@@ -2460,8 +2589,10 @@ function applyConfigSave(){
   api("setApplyConfig",payload).then(function(r){
     hideLoading();
     if(!r||!r.ok){ toast((r&&r.err)||"저장 실패", true); return; }
+    if(_cfgCats.length) APPLY_CATS=_cfgCats.slice();
     closePopup();
     toast("설정이 저장되었습니다");
+    draw();
   });
 }
 // 신청폼 URL 복사

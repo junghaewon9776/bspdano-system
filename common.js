@@ -266,7 +266,9 @@ function _dispatch(p) {
         // 참가자
         case "listApply":      _apiListApply(p).then(resolve); return;
         case "getApplyConfig": _apiGetApplyConfig(p).then(resolve); return;
-        case "saveApplyConfig":_apiSetConfig(Object.assign({}, p, {key:"APPLY_CONFIG", value:JSON.stringify({status:p.status,startDt:p.startDt,endDt:p.endDt,notice:p.notice,webappUrl:p.webappUrl})})).then(function(){resolve({ok:true})}); return;
+        case "setApplyConfig":
+        case "saveApplyConfig":{var _ac={status:p.status,startDt:p.startDt,endDt:p.endDt,notice:p.notice,webappUrl:p.webappUrl};if(p.cats)_ac.cats=p.cats;if(p.formUrl!==undefined)_ac.formUrl=p.formUrl;if(p.formUrlPdf!==undefined)_ac.formUrlPdf=p.formUrlPdf;_apiSetConfig(Object.assign({},p,{key:"APPLY_CONFIG",value:JSON.stringify(_ac)})).then(function(){resolve({ok:true})});return;}
+        case "addApply":      _apiAddApply(p).then(resolve); return;
         case "updateApplyRow": _apiUpdateApplyRow(p).then(resolve); return;
         case "updateApply":  _apiUpdateApplyBySeq(p).then(resolve); return;
         case "deleteApply":  _apiDeleteApplyBySeq(p).then(resolve); return;
@@ -984,7 +986,7 @@ function _apiGetApplyConfig(p) {
       else if (ac.endDt && today > ac.endDt) effective = "closed";
       else effective = "open";
     }
-    return {ok:true, status:status, effective:effective, today:today, count:(applyArr||[]).length, webappUrl:ac.webappUrl||"", startDt:ac.startDt||"", endDt:ac.endDt||"", notice:ac.notice||""};
+    return {ok:true, status:status, effective:effective, today:today, count:(applyArr||[]).length, webappUrl:ac.webappUrl||"", startDt:ac.startDt||"", endDt:ac.endDt||"", notice:ac.notice||"", cats:ac.cats||null};
   });
 }
 
@@ -1088,6 +1090,35 @@ function _fbSafeRow(row) {
   var out = {};
   Object.keys(row).forEach(function(k) { out[_fbSafeKey(k)] = row[k]; });
   return out;
+}
+
+function _apiAddApply(p) {
+  var evtId = _getEvtId(p);
+  if (!evtId) return Promise.resolve({ok:false, err:"행사 미선택"});
+  return new Promise(function(resolve) {
+    fbDb.ref('/evtData/' + evtId + '/Apply').once('value', function(snap) {
+      var raw = snap.val();
+      var arr = [];
+      if (Array.isArray(raw)) arr = raw.filter(function(r){return r!=null;});
+      else if (raw && typeof raw === 'object') Object.keys(raw).forEach(function(k){if(raw[k])arr.push(raw[k]);});
+      var maxSeq = 0;
+      arr.forEach(function(r) {
+        var s = parseInt(r["접수순번"] || r[_fbSafeKey("접수순번")] || 0);
+        if (s > maxSeq) maxSeq = s;
+      });
+      var row = {};
+      Object.keys(p).forEach(function(k) {
+        if (k === 'action' || k === 'evtId' || k === 'by' || k === 'id') return;
+        row[k] = p[k];
+      });
+      row["접수순번"] = maxSeq + 1;
+      row["접수일시"] = now_();
+      arr.push(_fbSafeRow(row));
+      fbDb.ref('/evtData/' + evtId + '/Apply').set(arr).then(function() {
+        resolve({ok:true, seq: maxSeq + 1});
+      });
+    });
+  });
 }
 
 function _apiBulkAddApply(p) {

@@ -27,13 +27,27 @@ function _danoInitFb() {
 }
 
 function _danoCheckSession() {
+  // 1) danoAuth 세션 확인
   var s = localStorage.getItem('danoAuth');
-  if (!s) return null;
-  try {
-    var d = JSON.parse(s);
-    if (Date.now() - d.ts < _DANO_TTL) return d;
-    localStorage.removeItem('danoAuth');
-  } catch (e) { localStorage.removeItem('danoAuth'); }
+  if (s) {
+    try {
+      var d = JSON.parse(s);
+      if (Date.now() - d.ts < _DANO_TTL) return d;
+      localStorage.removeItem('danoAuth');
+    } catch (e) { localStorage.removeItem('danoAuth'); }
+  }
+  // 2) 단오시스템 메인 세션(cleanFarm_auth_v1)이 있으면 그대로 사용
+  var m = localStorage.getItem('cleanFarm_auth_v1');
+  if (m) {
+    try {
+      var md = JSON.parse(m);
+      if (md && md.id && Date.now() - md.ts < _DANO_TTL) {
+        var session = { id: md.id, nm: md.nm || '', r: md.r || 'user', ts: md.ts };
+        localStorage.setItem('danoAuth', JSON.stringify(session));
+        return session;
+      }
+    } catch (e) {}
+  }
   return null;
 }
 
