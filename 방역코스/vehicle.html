@@ -6,58 +6,71 @@
 <title>행사차량 관리</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:'Pretendard','Noto Sans KR',sans-serif;background:#0f172a;color:#e2e8f0;min-height:100vh}
+body{font-family:'Pretendard','Noto Sans KR',sans-serif;background:#f1f5f9;color:#1e293b;min-height:100vh}
 
 /* 헤더 */
-header{background:#1e293b;padding:12px 20px;display:flex;align-items:center;gap:12px;border-bottom:1px solid #334155;flex-wrap:wrap}
-header h1{font-size:16px;flex:1;white-space:nowrap}
+header{background:#fff;padding:12px 20px;display:flex;align-items:center;gap:12px;border-bottom:1px solid #e2e8f0;flex-wrap:wrap;box-shadow:0 1px 3px rgba(0,0,0,0.06)}
+header h1{font-size:16px;flex:1;white-space:nowrap;color:#1e293b}
 header .hbtn{padding:6px 14px;border:none;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer}
 
 /* 탭 */
-.tabs{display:flex;background:#1e293b;border-bottom:1px solid #334155;padding:0 16px}
-.tab{padding:10px 20px;border:none;background:transparent;color:#64748b;font-size:13px;font-weight:700;cursor:pointer;border-bottom:2px solid transparent;transition:all .15s}
+.tabs{display:flex;background:#fff;border-bottom:1px solid #e2e8f0;padding:0 16px}
+.tab{padding:10px 20px;border:none;background:transparent;color:#94a3b8;font-size:13px;font-weight:700;cursor:pointer;border-bottom:2px solid transparent;transition:all .15s}
 .tab.active{color:#3b82f6;border-bottom-color:#3b82f6}
-.tab:hover{color:#94a3b8}
+.tab:hover{color:#64748b}
 
 /* 컨텐츠 */
-.content{max-width:1100px;margin:0 auto;padding:16px}
+.content{max-width:1200px;margin:0 auto;padding:16px}
 
 /* 신청폼 */
-.form-card{background:#1e293b;border-radius:14px;padding:24px;max-width:500px;margin:0 auto;border:1px solid #334155}
-.form-card h2{font-size:18px;margin-bottom:16px;text-align:center}
-.form-card label{display:block;color:#94a3b8;font-size:12px;margin:12px 0 4px;font-weight:600}
-.form-card input,.form-card select,.form-card textarea{width:100%;padding:10px 12px;border:1px solid #334155;border-radius:8px;background:#0f172a;color:#fff;font-size:14px}
+.form-card{background:#fff;border-radius:14px;padding:24px;max-width:500px;margin:0 auto;border:1px solid #e2e8f0;box-shadow:0 2px 8px rgba(0,0,0,0.04)}
+.form-card h2{font-size:18px;margin-bottom:16px;text-align:center;color:#1e293b}
+.form-card label{display:block;color:#64748b;font-size:12px;margin:12px 0 4px;font-weight:600}
+.form-card input,.form-card select,.form-card textarea{width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:#1e293b;font-size:14px}
+.form-card input:focus,.form-card select:focus,.form-card textarea:focus{outline:none;border-color:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,0.1)}
 .form-card textarea{height:60px;resize:vertical}
 .form-row{display:flex;gap:8px}
 .form-row>div{flex:1}
 .form-card .submit-btn{width:100%;padding:14px;border:none;border-radius:10px;background:#3b82f6;color:#fff;font-size:15px;font-weight:700;cursor:pointer;margin-top:16px;transition:all .15s}
 .form-card .submit-btn:hover{background:#2563eb}
-.form-card .submit-btn:disabled{background:#475569;cursor:not-allowed}
+.form-card .submit-btn:disabled{background:#94a3b8;cursor:not-allowed}
 
 /* 관리 테이블 */
 .mgmt-bar{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center}
-.mgmt-bar input{padding:7px 12px;border:1px solid #334155;border-radius:6px;background:#1e293b;color:#fff;font-size:12px;flex:1;min-width:150px}
-.filter-btn{padding:6px 12px;border:1px solid #334155;border-radius:6px;background:transparent;color:#94a3b8;font-size:11px;font-weight:700;cursor:pointer;transition:all .15s}
+.mgmt-bar input{padding:7px 12px;border:1px solid #cbd5e1;border-radius:6px;background:#fff;color:#1e293b;font-size:12px;flex:1;min-width:150px}
+.filter-btn{padding:6px 12px;border:1px solid #cbd5e1;border-radius:6px;background:#fff;color:#64748b;font-size:11px;font-weight:700;cursor:pointer;transition:all .15s}
 .filter-btn.active{background:#3b82f6;color:#fff;border-color:#3b82f6}
-.stat-badge{padding:4px 10px;border-radius:8px;font-size:11px;font-weight:700;background:#334155;color:#94a3b8}
+.filter-btn:hover{border-color:#3b82f6}
+.stat-badge{padding:4px 10px;border-radius:8px;font-size:11px;font-weight:700;background:#e2e8f0;color:#64748b}
 
-.tbl-wrap{overflow-x:auto;border-radius:10px;border:1px solid #334155}
+.tbl-wrap{overflow-x:auto;border-radius:10px;border:1px solid #e2e8f0;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,0.04)}
 table{width:100%;border-collapse:collapse;font-size:12px}
-thead th{background:#1e293b;color:#94a3b8;padding:10px 8px;text-align:left;font-size:11px;font-weight:700;position:sticky;top:0;white-space:nowrap}
-tbody td{padding:8px;border-top:1px solid #1e293b;vertical-align:middle}
-tbody tr{background:#0f172a;transition:background .1s}
-tbody tr:hover{background:#1e293b}
+thead th{background:#f8fafc;color:#64748b;padding:10px 8px;text-align:left;font-size:11px;font-weight:700;position:sticky;top:0;white-space:nowrap;border-bottom:1px solid #e2e8f0}
+tbody td{padding:8px;border-top:1px solid #f1f5f9;vertical-align:middle}
+tbody tr{background:#fff;transition:background .1s}
+tbody tr:hover{background:#f8fafc}
 tbody tr.rejected{opacity:0.4;text-decoration:line-through}
 
 .status{padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;white-space:nowrap}
-.status.pending{background:#f59e0b33;color:#f59e0b}
-.status.approved{background:#10b98133;color:#10b981}
-.status.rejected{background:#ef444433;color:#ef4444}
-.status.issued{background:#3b82f633;color:#3b82f6}
+.status.pending{background:#fef3c7;color:#d97706}
+.status.approved{background:#d1fae5;color:#059669}
+.status.rejected{background:#fee2e2;color:#dc2626}
+.status.issued{background:#dbeafe;color:#2563eb}
 
 .act-btn{padding:3px 8px;border:none;border-radius:4px;font-size:10px;font-weight:700;cursor:pointer;margin:1px;white-space:nowrap}
 
-/* 출력용 */
+/* 소속 관리 */
+.target-mgmt{background:#fff;border-radius:12px;padding:16px;border:1px solid #e2e8f0;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,0.04)}
+.target-mgmt h3{font-size:14px;margin-bottom:10px;color:#1e293b}
+.target-list{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.target-chip{display:inline-flex;align-items:center;gap:4px;padding:5px 10px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:20px;font-size:12px;font-weight:600;color:#475569}
+.target-chip button{background:none;border:none;color:#94a3b8;cursor:pointer;font-size:14px;line-height:1;padding:0 2px}
+.target-chip button:hover{color:#ef4444}
+.target-add{display:flex;gap:6px}
+.target-add input{flex:1;padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;background:#fff;color:#1e293b}
+.target-add button{padding:6px 12px;border:none;border-radius:6px;background:#3b82f6;color:#fff;font-size:11px;font-weight:700;cursor:pointer}
+
+/* 출력용 (A4 프린트) */
 .print-card{width:340px;border:2px solid #333;border-radius:10px;padding:20px;background:#fff;color:#000;font-family:'Noto Sans KR',sans-serif;margin:10px auto}
 .print-card h3{text-align:center;font-size:18px;margin-bottom:12px;border-bottom:2px solid #333;padding-bottom:8px}
 .print-card .field{display:flex;margin:6px 0;font-size:13px}
@@ -67,6 +80,21 @@ tbody tr.rejected{opacity:0.4;text-decoration:line-through}
 .print-card .period{text-align:center;font-size:13px;color:#555;margin:8px 0}
 .print-card .reissue{text-align:center;color:#e74c3c;font-size:11px;font-weight:700}
 .print-card .stamp{text-align:center;margin-top:16px;font-size:12px;color:#888}
+
+/* 라벨 출력 (QZ) */
+.label-preview{width:300px;height:180px;border:1px dashed #cbd5e1;border-radius:8px;background:#fff;padding:12px;margin:8px auto;font-size:11px;color:#000;overflow:hidden}
+.label-preview .lp-plate{font-size:22px;font-weight:900;text-align:center;letter-spacing:2px;margin:4px 0}
+.label-preview .lp-name{font-size:13px;font-weight:700;text-align:center}
+.label-preview .lp-info{font-size:10px;color:#555;text-align:center;margin:2px 0}
+
+/* 모달 */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:500;display:flex;align-items:center;justify-content:center}
+.modal{background:#fff;border-radius:14px;padding:20px;width:400px;max-width:92vw;color:#1e293b;box-shadow:0 8px 30px rgba(0,0,0,0.15)}
+.modal h3{font-size:15px;margin-bottom:14px}
+.modal label{display:block;color:#64748b;font-size:11px;margin:8px 0 3px;font-weight:600}
+.modal select,.modal input{width:100%;padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;background:#fff;color:#1e293b}
+.modal-btns{display:flex;gap:6px;margin-top:14px}
+.modal-btns button{flex:1;padding:9px;border:none;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer}
 
 @media print{
   body>*:not(#printArea){display:none!important}
@@ -80,7 +108,7 @@ tbody tr.rejected{opacity:0.4;text-decoration:line-through}
 <header>
   <h1>🚗 행사차량 관리</h1>
   <button class="hbtn" style="background:#10b981;color:#fff" onclick="exportExcel()">📥 엑셀</button>
-  <button class="hbtn" style="background:#64748b;color:#fff" onclick="location.href='index.html'">← 메인</button>
+  <button class="hbtn" style="background:#e2e8f0;color:#475569" onclick="location.href='index.html'">← 메인</button>
 </header>
 
 <div class="tabs">
@@ -91,6 +119,16 @@ tbody tr.rejected{opacity:0.4;text-decoration:line-through}
 
 <!-- ═══ 관리 탭 ═══ -->
 <div class="content" id="tabMgmt">
+  <!-- 소속 관리 -->
+  <div class="target-mgmt">
+    <h3>🏢 발급대상 소속 관리</h3>
+    <div class="target-list" id="targetList"></div>
+    <div class="target-add">
+      <input id="newTarget" type="text" placeholder="새 소속 입력" onkeydown="if(event.key==='Enter')addTarget()">
+      <button onclick="addTarget()">＋ 추가</button>
+    </div>
+  </div>
+
   <div class="mgmt-bar">
     <input id="searchInput" type="text" placeholder="🔍 이름, 차량번호, 연락처 검색..." oninput="renderTable()">
     <button class="filter-btn active" data-filter="all" onclick="setFilter('all',this)">전체</button>
@@ -122,7 +160,8 @@ tbody tr.rejected{opacity:0.4;text-decoration:line-through}
   <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">
     <button class="act-btn" style="background:#10b981;color:#fff;padding:6px 14px;font-size:12px" onclick="bulkApprove()">✅ 선택 승인</button>
     <button class="act-btn" style="background:#ef4444;color:#fff;padding:6px 14px;font-size:12px" onclick="bulkReject()">❌ 선택 거부</button>
-    <button class="act-btn" style="background:#3b82f6;color:#fff;padding:6px 14px;font-size:12px" onclick="bulkPrint()">🖨 선택 출력</button>
+    <button class="act-btn" style="background:#3b82f6;color:#fff;padding:6px 14px;font-size:12px" onclick="bulkPrint()">🖨 선택 출력 (A4)</button>
+    <button class="act-btn" style="background:#8b5cf6;color:#fff;padding:6px 14px;font-size:12px" onclick="bulkLabelPrint()">🏷 선택 라벨출력 (QZ)</button>
   </div>
 </div>
 
@@ -131,11 +170,11 @@ tbody tr.rejected{opacity:0.4;text-decoration:line-through}
   <div class="form-card">
     <h2>🚗 행사차량 출입증 신청</h2>
     <label>발급대상 (소속/용도)</label>
-    <input id="af_target" type="text" placeholder="예: 법성포단오제 스태프, 음향팀">
+    <select id="af_target"><option value="">-- 선택 --</option></select>
     <label>성명</label>
     <input id="af_name" type="text" placeholder="성명">
     <label>연락처</label>
-    <input id="af_phone" type="tel" placeholder="010-0000-0000">
+    <input id="af_phone" type="tel" placeholder="010-0000-0000" oninput="formatPhone(this)" maxlength="13">
     <label>차량번호</label>
     <input id="af_plate" type="text" placeholder="예: 12가 3456" style="font-size:18px;font-weight:700;text-align:center;letter-spacing:2px">
     <div class="form-row">
@@ -153,18 +192,54 @@ tbody tr.rejected{opacity:0.4;text-decoration:line-through}
 <div class="content" id="tabFormlink" style="display:none">
   <div class="form-card" style="max-width:600px">
     <h2>🔗 신청폼 공유</h2>
-    <p style="color:#94a3b8;font-size:13px;margin-bottom:16px;line-height:1.6">아래 링크를 공유하면 누구나 차량 출입증을 신청할 수 있습니다.<br>신청 내용은 관리 탭에서 확인/승인/거부할 수 있습니다.</p>
+    <p style="color:#64748b;font-size:13px;margin-bottom:16px;line-height:1.6">아래 링크를 공유하면 누구나 차량 출입증을 신청할 수 있습니다.<br>신청 내용은 관리 탭에서 확인/승인/거부할 수 있습니다.</p>
     <label>신청폼 링크</label>
     <div style="display:flex;gap:6px">
       <input id="formLinkInput" type="text" readonly style="flex:1;font-size:12px">
       <button onclick="copyFormLink()" style="padding:8px 14px;border:none;border-radius:6px;background:#3b82f6;color:#fff;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap">📋 복사</button>
     </div>
-    <div style="margin-top:16px;padding:12px;background:#0f172a;border-radius:8px;font-size:12px;color:#94a3b8;line-height:1.6">
-      💡 <b>사용법</b><br>
+    <div style="margin-top:16px;padding:12px;background:#f8fafc;border-radius:8px;font-size:12px;color:#64748b;line-height:1.6;border:1px solid #e2e8f0">
+      💡 <b style="color:#1e293b">사용법</b><br>
       1. 위 링크를 카톡/문자로 공유<br>
       2. 신청자가 폼 작성 후 제출<br>
       3. 관리 탭에서 승인/거부 처리<br>
       4. 승인 후 출력하여 차량에 부착
+    </div>
+    <div style="margin-top:12px;padding:12px;background:#f0f9ff;border-radius:8px;font-size:12px;color:#0369a1;line-height:1.6;border:1px solid #bae6fd">
+      🖨 <b>라벨 출력 안내</b><br>
+      · QZ Tray 설치 시 라벨프린터로 직접 출력 가능<br>
+      · 공유프린터도 QZ에 등록하면 출력 가능<br>
+      · <a href="https://qz.io/download/" target="_blank" style="color:#2563eb">QZ Tray 다운로드</a>
+    </div>
+  </div>
+</div>
+
+<!-- QZ 프린터 선택 모달 -->
+<div id="qzModal" class="modal-bg" style="display:none" onclick="if(event.target===this)this.style.display='none'">
+  <div class="modal">
+    <h3>🏷 라벨 프린터 선택</h3>
+    <label>프린터</label>
+    <select id="qzPrinterSel"><option value="">프린터 목록 로딩 중...</option></select>
+    <div style="margin-top:8px;font-size:11px;color:#64748b">
+      * QZ Tray가 실행 중이어야 합니다<br>
+      * 로컬/공유 프린터 모두 표시됩니다
+    </div>
+    <label>라벨 크기</label>
+    <div style="display:flex;gap:6px">
+      <div style="flex:1"><label style="font-size:10px">가로(mm)</label><input id="qzLabelW" type="number" value="100" min="30" max="200"></div>
+      <div style="flex:1"><label style="font-size:10px">세로(mm)</label><input id="qzLabelH" type="number" value="60" min="20" max="200"></div>
+    </div>
+    <div style="margin-top:10px;font-size:11px;font-weight:700;color:#64748b">미리보기</div>
+    <div class="label-preview" id="labelPreview">
+      <div class="lp-info">🚗 행사차량 출입증</div>
+      <div class="lp-plate">12가 3456</div>
+      <div class="lp-name">홍길동</div>
+      <div class="lp-info">법성포단오제 스태프</div>
+      <div class="lp-info">2026-05-15 ~ 2026-05-20</div>
+    </div>
+    <div class="modal-btns">
+      <button style="background:#8b5cf6;color:#fff" onclick="doLabelPrint()">🖨 출력</button>
+      <button style="background:#e2e8f0;color:#475569" onclick="document.getElementById('qzModal').style.display='none'">취소</button>
     </div>
   </div>
 </div>
@@ -177,19 +252,33 @@ tbody tr.rejected{opacity:0.4;text-decoration:line-through}
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <script src="firebase-config.js"></script>
 
+<!-- QZ Tray -->
+<script src="https://cdn.jsdelivr.net/npm/qz-tray@2/qz-tray.js"></script>
+
 <script>
 var passes=[];
 var currentFilter='all';
 var checkedIds={};
+var targets=[]; // 소속 목록
+var _qzReady=false;
+var _qzPrinter='';
+var _labelQueue=[];
 
 // 폼 링크 설정
 var baseUrl=location.href.split('?')[0];
 document.getElementById('formLinkInput').value=baseUrl+'?mode=form';
 
-// URL 파라미터로 폼 모드 → 로그인 불필요
 var _isFormMode = location.search.indexOf('mode=form') >= 0;
 if(_isFormMode){
   setTimeout(function(){switchTab('form',document.querySelectorAll('.tab')[1])},100);
+}
+
+// ═══ 연락처 하이폰 자동 포맷 ═══
+function formatPhone(el){
+  var v=el.value.replace(/[^0-9]/g,'');
+  if(v.length<=3) el.value=v;
+  else if(v.length<=7) el.value=v.slice(0,3)+'-'+v.slice(3);
+  else el.value=v.slice(0,3)+'-'+v.slice(3,7)+'-'+v.slice(7,11);
 }
 
 // ═══ 탭 ═══
@@ -208,9 +297,67 @@ function copyFormLink(){
   });
 }
 
+// ═══ 소속 관리 ═══
+function loadTargets(){
+  fbDb.ref('/vehicle/targets').on('value',function(snap){
+    targets=snap.val()||[];
+    renderTargets();
+    renderTargetSelect();
+  });
+}
+
+function renderTargets(){
+  var el=document.getElementById('targetList');
+  if(!targets.length){el.innerHTML='<span style="color:#94a3b8;font-size:12px">등록된 소속이 없습니다</span>';return}
+  el.innerHTML=targets.map(function(t,i){
+    return '<div class="target-chip">'+esc(t)+'<button onclick="removeTarget('+i+')" title="삭제">✕</button></div>';
+  }).join('');
+}
+
+function renderTargetSelect(){
+  var sel=document.getElementById('af_target');
+  var cur=sel.value;
+  sel.innerHTML='<option value="">-- 선택 --</option>';
+  targets.forEach(function(t){
+    sel.innerHTML+='<option value="'+esc(t)+'"'+(cur===t?' selected':'')+'>'+esc(t)+'</option>';
+  });
+  sel.innerHTML+='<option value="_custom">✏ 직접 입력...</option>';
+}
+
+function addTarget(){
+  var input=document.getElementById('newTarget');
+  var v=input.value.trim();
+  if(!v){toast('소속명을 입력하세요',true);return}
+  if(targets.indexOf(v)>=0){toast('이미 존재합니다',true);return}
+  targets.push(v);
+  fbDb.ref('/vehicle/targets').set(targets).then(function(){
+    input.value='';toast(v+' 추가됨');
+  });
+}
+
+function removeTarget(idx){
+  var name=targets[idx];
+  if(!confirm('"'+name+'" 소속을 삭제하시겠습니까?'))return;
+  targets.splice(idx,1);
+  fbDb.ref('/vehicle/targets').set(targets).then(function(){toast('삭제됨')});
+}
+
+// 직접 입력 선택 시 프롬프트
+document.getElementById('af_target').addEventListener('change',function(){
+  if(this.value==='_custom'){
+    var v=prompt('발급대상 소속을 직접 입력하세요:');
+    if(v&&v.trim()){
+      this.innerHTML+='<option value="'+esc(v.trim())+'">'+esc(v.trim())+'</option>';
+      this.value=v.trim();
+    } else {
+      this.value='';
+    }
+  }
+});
+
 // ═══ 신청폼 ═══
 function submitForm(){
-  var target=document.getElementById('af_target').value.trim();
+  var target=document.getElementById('af_target').value;
   var name=document.getElementById('af_name').value.trim();
   var phone=document.getElementById('af_phone').value.trim();
   var plate=document.getElementById('af_plate').value.trim();
@@ -241,9 +388,10 @@ function submitForm(){
   };
 
   fbDb.ref('/vehicle/passes/'+data.id).set(data).then(function(){
-    document.getElementById('formMsg').innerHTML='<span style="color:#10b981;font-size:15px">✅ 신청 완료!</span><br><span style="color:#94a3b8;font-size:12px">관리자 승인 후 출입증이 발급됩니다.</span>';
+    document.getElementById('formMsg').innerHTML='<span style="color:#059669;font-size:15px">✅ 신청 완료!</span><br><span style="color:#64748b;font-size:12px">관리자 승인 후 출입증이 발급됩니다.</span>';
     btn.textContent='신청 완료';
-    ['af_target','af_name','af_phone','af_plate','af_from','af_to','af_memo'].forEach(function(id){document.getElementById(id).value=''});
+    ['af_name','af_phone','af_plate','af_from','af_to','af_memo'].forEach(function(id){document.getElementById(id).value=''});
+    document.getElementById('af_target').value='';
     setTimeout(function(){btn.disabled=false;btn.textContent='신청하기'},3000);
   }).catch(function(e){
     toast('신청 실패: '+e.message,true);
@@ -294,7 +442,7 @@ function renderTable(){
     html+='<td><input type="checkbox" data-id="'+p.id+'" '+(checkedIds[p.id]?'checked':'')+' onchange="toggleCheck('+p.id+',this.checked)"></td>';
     html+='<td>'+(i+1)+'</td>';
     html+='<td style="font-weight:700">'+esc(p.name)+'</td>';
-    html+='<td>'+esc(p.phone)+'</td>';
+    html+='<td><a href="tel:'+p.phone+'" style="color:#2563eb;text-decoration:none">'+esc(p.phone)+'</a></td>';
     html+='<td style="font-weight:700;font-size:13px;letter-spacing:1px">'+esc(p.plate)+'</td>';
     html+='<td>'+esc(p.target||'-')+'</td>';
     html+='<td style="font-size:11px;white-space:nowrap">'+(p.fromDate||'')+' ~ '+(p.toDate||'')+'</td>';
@@ -302,6 +450,7 @@ function renderTable(){
     html+='<td style="white-space:nowrap">';
     if(p.status==='approved'||p.status==='issued'){
       html+='<button class="act-btn" style="background:#3b82f6;color:#fff" onclick="printPass('+p.id+')">🖨 '+(p.status==='issued'?'재출력'+(p.reissueCount||0):'출력')+'</button>';
+      html+='<button class="act-btn" style="background:#8b5cf6;color:#fff" onclick="labelPrintPass('+p.id+')">🏷</button>';
     }
     html+='</td>';
     html+='<td style="white-space:nowrap">';
@@ -318,10 +467,10 @@ function renderTable(){
     if(p.status==='issued'){
       html+='<button class="act-btn" style="background:#ef4444;color:#fff" onclick="reject('+p.id+')">거부</button>';
     }
-    html+='<button class="act-btn" style="background:#475569;color:#fff" onclick="deletePass('+p.id+')">삭제</button>';
+    html+='<button class="act-btn" style="background:#94a3b8;color:#fff" onclick="deletePass('+p.id+')">삭제</button>';
     html+='</td></tr>';
   });
-  document.getElementById('tBody').innerHTML=html||'<tr><td colspan="10" style="text-align:center;padding:30px;color:#64748b">데이터가 없습니다</td></tr>';
+  document.getElementById('tBody').innerHTML=html||'<tr><td colspan="10" style="text-align:center;padding:30px;color:#94a3b8">데이터가 없습니다</td></tr>';
 }
 
 function statusBadge(p){
@@ -346,18 +495,13 @@ function deletePass(id){
   toast('삭제됨');
 }
 
-// 출력
+// ═══ A4 출력 ═══
 function printPass(id){
   var p=passes.find(function(x){return x.id===id});
   if(!p)return;
-
-  // 상태를 issued로, 재출력이면 카운트 증가
   var update={status:'issued',updatedAt:new Date().toISOString()};
-  if(p.status==='issued'){
-    update.reissueCount=(p.reissueCount||0)+1;
-  }
+  if(p.status==='issued') update.reissueCount=(p.reissueCount||0)+1;
   fbDb.ref('/vehicle/passes/'+id).update(update);
-
   var reissue=p.status==='issued'?(p.reissueCount||0)+1:0;
   showPrintCard([p],reissue);
 }
@@ -384,6 +528,130 @@ function showPrintCard(list,reissueOverride){
   setTimeout(function(){window.print();setTimeout(function(){area.style.display='none'},500)},300);
 }
 
+// ═══ QZ Tray 라벨 출력 ═══
+function initQZ(){
+  if(typeof qz==='undefined'){console.log('QZ Tray SDK 미로드');return}
+  qz.security.setCertificatePromise(function(resolve){resolve()});
+  qz.security.setSignaturePromise(function(){return function(resolve){resolve()}});
+}
+
+function connectQZ(){
+  return new Promise(function(resolve,reject){
+    if(qz.websocket.isActive()){resolve();return}
+    qz.websocket.connect().then(resolve).catch(function(e){
+      toast('QZ Tray 연결 실패 — QZ Tray를 실행해주세요',true);
+      reject(e);
+    });
+  });
+}
+
+function loadQZPrinters(){
+  connectQZ().then(function(){
+    return qz.printers.find();
+  }).then(function(printers){
+    var sel=document.getElementById('qzPrinterSel');
+    sel.innerHTML='';
+    if(!printers.length){
+      sel.innerHTML='<option value="">프린터 없음</option>';
+      return;
+    }
+    printers.forEach(function(p){
+      sel.innerHTML+='<option value="'+esc(p)+'">'+esc(p)+'</option>';
+    });
+    if(_qzPrinter){sel.value=_qzPrinter}
+  }).catch(function(){});
+}
+
+function labelPrintPass(id){
+  var p=passes.find(function(x){return x.id===id});
+  if(!p)return;
+  _labelQueue=[p];
+  openQZModal();
+}
+
+function bulkLabelPrint(){
+  var list=getCheckedPasses().filter(function(p){return p.status==='approved'||p.status==='issued'});
+  if(!list.length){toast('승인/발급 상태만 출력 가능합니다',true);return}
+  _labelQueue=list;
+  openQZModal();
+}
+
+function openQZModal(){
+  initQZ();
+  var p=_labelQueue[0];
+  if(p){
+    document.querySelector('#labelPreview .lp-plate').textContent=p.plate||'';
+    document.querySelector('#labelPreview .lp-name').textContent=p.name||'';
+    var infos=document.querySelectorAll('#labelPreview .lp-info');
+    if(infos[0])infos[0].textContent='🚗 행사차량 출입증';
+    if(infos[1])infos[1].textContent=p.target||'';
+    if(infos[2])infos[2].textContent=(p.fromDate||'')+' ~ '+(p.toDate||'');
+  }
+  document.getElementById('qzModal').style.display='flex';
+  loadQZPrinters();
+}
+
+function doLabelPrint(){
+  var printer=document.getElementById('qzPrinterSel').value;
+  if(!printer){toast('프린터를 선택하세요',true);return}
+  _qzPrinter=printer;
+  var lw=parseInt(document.getElementById('qzLabelW').value)||100;
+  var lh=parseInt(document.getElementById('qzLabelH').value)||60;
+
+  connectQZ().then(function(){
+    var config=qz.configs.create(printer,{
+      size:{width:lw/25.4,height:lh/25.4},
+      units:'in',
+      margins:{top:0,right:0,bottom:0,left:0}
+    });
+
+    var pages=_labelQueue.map(function(p){
+      var reissue=(p.reissueCount||0);
+      var reissueText=reissue>0?'  [재출력'+reissue+']':'';
+      return {
+        type:'html',
+        format:'plain',
+        data:'<html><head><meta charset="utf-8"><style>'
+          +'body{margin:0;padding:8px;font-family:"Noto Sans KR","Malgun Gothic",sans-serif;font-size:10px;text-align:center}'
+          +'.title{font-size:9px;font-weight:700;margin-bottom:2px}'
+          +'.plate{font-size:20px;font-weight:900;letter-spacing:2px;margin:4px 0}'
+          +'.name{font-size:12px;font-weight:700;margin:2px 0}'
+          +'.info{font-size:9px;color:#555;margin:1px 0}'
+          +'.stamp{font-size:8px;color:#888;margin-top:4px}'
+          +'.reissue{font-size:8px;color:#e74c3c;font-weight:700}'
+          +'</style></head><body>'
+          +'<div class="title">🚗 행사차량 출입증</div>'
+          +'<div class="plate">'+esc(p.plate)+'</div>'
+          +'<div class="name">'+esc(p.name)+'</div>'
+          +'<div class="info">'+esc(p.target||'')+'</div>'
+          +'<div class="info">'+esc(p.phone||'')+'</div>'
+          +'<div class="info">'+(p.fromDate||'')+' ~ '+(p.toDate||'')+'</div>'
+          +(reissue>0?'<div class="reissue">재출력 '+reissue+'</div>':'')
+          +'<div class="stamp">법성포단오제보존회'+reissueText+'</div>'
+          +'</body></html>'
+      };
+    });
+
+    return qz.print(config,pages);
+  }).then(function(){
+    // 상태 업데이트
+    var updates={};
+    _labelQueue.forEach(function(p){
+      updates['/vehicle/passes/'+p.id+'/status']='issued';
+      updates['/vehicle/passes/'+p.id+'/updatedAt']=new Date().toISOString();
+      if(p.status==='issued'){
+        updates['/vehicle/passes/'+p.id+'/reissueCount']=(p.reissueCount||0)+1;
+      }
+    });
+    fbDb.ref().update(updates);
+    toast('🏷 라벨 '+_labelQueue.length+'건 출력 완료');
+    document.getElementById('qzModal').style.display='none';
+    checkedIds={};
+  }).catch(function(e){
+    toast('출력 실패: '+e.message,true);
+  });
+}
+
 // 체크박스
 function toggleCheck(id,checked){
   if(checked)checkedIds[id]=true;else delete checkedIds[id];
@@ -406,10 +674,8 @@ function bulkApprove(){
   if(!confirm(list.length+'건을 승인하시겠습니까?'))return;
   var updates={};
   list.forEach(function(p){
-    if(p.status!=='rejected'||true){
-      updates['/vehicle/passes/'+p.id+'/status']='approved';
-      updates['/vehicle/passes/'+p.id+'/updatedAt']=new Date().toISOString();
-    }
+    updates['/vehicle/passes/'+p.id+'/status']='approved';
+    updates['/vehicle/passes/'+p.id+'/updatedAt']=new Date().toISOString();
   });
   fbDb.ref().update(updates).then(function(){toast(list.length+'건 승인');checkedIds={}});
 }
@@ -433,9 +699,7 @@ function bulkPrint(){
   list.forEach(function(p){
     updates['/vehicle/passes/'+p.id+'/status']='issued';
     updates['/vehicle/passes/'+p.id+'/updatedAt']=new Date().toISOString();
-    if(p.status==='issued'){
-      updates['/vehicle/passes/'+p.id+'/reissueCount']=(p.reissueCount||0)+1;
-    }
+    if(p.status==='issued') updates['/vehicle/passes/'+p.id+'/reissueCount']=(p.reissueCount||0)+1;
   });
   fbDb.ref().update(updates);
   showPrintCard(list);
@@ -467,8 +731,8 @@ function toast(m,err){
 }
 
 // 시작
-// 폼 모드는 로그인 없이, 관리 모드는 로그인 필요
 loadPasses();
+loadTargets();
 </script>
 </body>
 </html>
