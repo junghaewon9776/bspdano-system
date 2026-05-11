@@ -461,6 +461,7 @@ function _apiRefresh(p) {
           assetLocs: _cache.AssetLocations || [],
           shareMems: !!isShare,
           LBL: {leader: cfg.LABEL_LEADER || "단장", member: cfg.LABEL_MEMBER || "단원"},
+          fieldMenu: cfg.FIELD_MENU || "on",
           AR: (_cache.Areas || []).map(function(a){return a.n}),
           US: _buildUserMap()
         });

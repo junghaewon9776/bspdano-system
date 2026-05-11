@@ -347,6 +347,7 @@ document.addEventListener("DOMContentLoaded", function(){
 // ===== 상태 =====
 var AR=[], BG=[], US={}, acts=[], purs=[], exps=[], mems=[], notices=[], pays=[], dpst=[], inc=[], incTypes=[], expBG=[], txn=[], expTypes=[], gwanTypes=[], incCards=[], awards=[], memGroups=[], vendors=[], fees=[], assets=[], rentals=[], assetCats=[], assetLocs=[];
 var SHARE_MEMS=false;
+var FIELD_MENU="on";
 var ACCOUNTANT_NAME = ""; // 회계담당자 고정 이름 (Config에서 로드)
 var RPT_SHOW = ""; // 현재 선택된 결산서 미리보기 ("" | inc | expAcc | expCat | expSrc)
 var EXP_LOADED = false; // 세출관리 데이터 로드 완료 플래그
@@ -794,6 +795,7 @@ async function refreshData(showToast){
   if(r.LBL){LBL.leader=r.LBL.leader||"단장";LBL.member=r.LBL.member||"단원";}
   acts=r.acts||[];purs=r.purs||[];exps=r.exps||[];mems=r.mems||[];notices=r.notices||[];pays=r.pays||[];dpst=r.dpst||[];inc=r.inc||[];incTypes=r.incTypes||[];expBG=r.expBG||[];txn=r.txn||[];expTypes=r.expTypes||[];gwanTypes=r.gwanTypes||[];incCards=r.incCards||[];awards=r.awards||[];memGroups=r.groups||[];vendors=r.vendors||vendors||[];fees=r.fees||[];assets=r.assets||[];rentals=r.rentals||[];assetCats=r.assetCats||[];assetLocs=r.assetLocs||[];fees=r.fees||fees||[];
   SHARE_MEMS=!!r.shareMems;
+  if(r.fieldMenu!=null) FIELD_MENU=r.fieldMenu||"on";
   if(r.accountantName!=null) ACCOUNTANT_NAME=r.accountantName||"";
   if(r.feeCycle!=null) FEE_CYCLE = r.feeCycle || "yearly";
   if(r.feeDefaultAmt!=null) FEE_DEFAULT_AMT = Number(r.feeDefaultAmt)||0;
@@ -1037,12 +1039,14 @@ function mkTabs(){
   cats.push({id:"sys",label:"⚙️ 시스템",items:c5});
 
   // ── 현장 ──
-  cats.push({id:"field",label:"📍 현장",items:[
-    {k:"_field_layout",l:"축제 배치도",ext:"방역코스/layout.html"},
-    {k:"_field_monitor",l:"본부 모니터링",ext:"방역코스/monitor.html"},
-    {k:"_field_vehicle",l:"행사차량 관리",ext:"방역코스/vehicle.html"},
-    {k:"_field_today",l:"오늘의 운영",ext:"방역코스/today.html"}
-  ]});
+  if(FIELD_MENU==="on"){
+    cats.push({id:"field",label:"📍 현장",items:[
+      {k:"_field_layout",l:"축제 배치도",ext:"방역코스/layout.html"},
+      {k:"_field_monitor",l:"본부 모니터링",ext:"방역코스/monitor.html"},
+      {k:"_field_vehicle",l:"행사차량 관리",ext:"방역코스/vehicle.html"},
+      {k:"_field_today",l:"오늘의 운영",ext:"방역코스/today.html"}
+    ]});
+  }
 
   // _curCat이 유효한 카테고리인지 확인, 아니면 CTAB 기반으로 자동 선택
   var validCat=cats.some(function(c){return c.id===_curCat});
@@ -14989,13 +14993,35 @@ function _evtMgrHtml(){
     + 'td[data-cell].dirty{background:#fef9c3 !important;box-shadow:inset 0 0 0 2px #eab308}'
     + 'td[data-cell].dirty select{font-weight:700;color:#b45309}'
     + '</style>';
-  return css + evTable + matrix;
+  // 현장메뉴 토글
+  var fmOn = FIELD_MENU==="on";
+  var fieldToggle = '<div class="card" style="padding:20px">'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap">'
+    +'<div><h3 style="margin:0;font-size:18px">📍 현장 메뉴</h3>'
+    +'<div class="mut" style="margin-top:4px">축제 배치도 · 본부 모니터링 · 행사차량 · 오늘의 운영</div></div>'
+    +'<button onclick="toggleFieldMenu()" style="min-width:120px;padding:16px 32px;border:none;border-radius:12px;font-size:18px;font-weight:800;cursor:pointer;'
+    +(fmOn?'background:#16a34a;color:#fff':'background:#dc2626;color:#fff')+'">'
+    +(fmOn?'✅ ON':'❌ OFF')+'</button>'
+    +'</div></div>';
+
+  return css + fieldToggle + evTable + matrix;
 }
 
 // 전역: 행사에서 활성화 가능한 모든 모듈 — 새 모듈 추가 시 여기만 수정
 var ALL_MODS = ["apply","budget","purchase","act","mem","fee","rental","files"];
 
 // 행사 추가/수정 팝업
+function toggleFieldMenu(){
+  var next = FIELD_MENU==="on" ? "off" : "on";
+  api("setConfigValue",{id:CID,key:"FIELD_MENU",value:next}).then(function(r){
+    if(!r||!r.ok){ toast("저장 실패",true); return; }
+    FIELD_MENU=next;
+    mkTabs();
+    draw();
+    toast("현장 메뉴 "+(next==="on"?"켜짐":"꺼짐"));
+  });
+}
+
 function popEvtEdit(evtId){
   var isNew = !evtId;
   var e = isNew ? {evtId:"",nm:"",yr:new Date().getFullYear(),active:true,modules:ALL_MODS.join(","),note:""} :
