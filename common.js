@@ -1,0 +1,815 @@
+// 단오시스템 — Firebase 기반 공통 라이브러리
+// 기존 GAS api() 인터페이스를 유지하면서 Firebase RTDB로 전환
+
+// ───────── Firebase 동기화 캐시 ─────────
+var _cache = null;
+var _cacheReady = false;
+var _readyCallbacks = [];
+var _syncInitialized = false;
+var _evtCaches = {}; // 행사별 캐시: { evtId: { Acts:[], Purs:[], ... } }
+
+// 메인(공용) 데이터 노드
+var MAIN_NODES = ["Users","Areas","Events","AcctEvt","Vendors","Assets","Rentals","AssetLog","AssetCategories","AssetLocations"];
+// 행사별 데이터 노드 (evtData/{evtId}/ 하위)
+var EVT_NODES = ["Acts","Purs","Exps","Inc","ExpBG","Pays","Dpst","Mems","Groups","Notices","SmsLog","Config","Contracts","ContractFields","Quotes","QuoteFields","SmsTemplates","Forms","FormFields","FormSubs","Fees"];
+
+function initFirebaseSync() {
+  if (_syncInitialized) return;
+  if (typeof fbDb === 'undefined') {
+    console.error('Firebase 초기화 안됨. firebase-config.js 확인');
+    return;
+  }
+  _syncInitialized = true;
+
+  // 메인 데이터 실시간 동기화
+  fbDb.ref('/main').on('value', function(snapshot) {
+    var data = snapshot.val();
+    if (!data) {
+      _cache = {};
+      fbDb.ref('/main').set({});
+    } else {
+      _cache = data;
+    }
+    // 배열 복원 (Firebase가 object로 변환하는 것 대응)
+    MAIN_NODES.forEach(function(n) {
+      if (_cache[n] && !Array.isArray(_cache[n])) {
+        _cache[n] = Object.values(_cache[n]);
+      }
+    });
+    if (!_cacheReady) {
+      _cacheReady = true;
+      _readyCallbacks.forEach(function(cb) { cb(); });
+      _readyCallbacks.length = 0;
+    }
+    if (window.onDataChanged) window.onDataChanged();
+  });
+}
+
+function onDataReady(cb) {
+  if (_cacheReady) cb();
+  else _readyCallbacks.push(cb);
+}
+
+// 행사별 데이터 로드
+function loadEvtData(evtId) {
+  return new Promise(function(resolve) {
+    fbDb.ref('/evtData/' + evtId).once('value', function(snapshot) {
+      var data = snapshot.val() || {};
+      EVT_NODES.forEach(function(n) {
+        if (data[n] && !Array.isArray(data[n])) {
+          data[n] = Object.values(data[n]);
+        }
+        if (!data[n]) data[n] = [];
+      });
+      // Config는 key-value 배열
+      if (data.Config && Array.isArray(data.Config)) {
+        // 그대로
+      } else if (data.Config && typeof data.Config === 'object') {
+        data.Config = Object.values(data.Config);
+      }
+      _evtCaches[evtId] = data;
+      resolve(data);
+    });
+  });
+}
+
+// 행사별 데이터 저장
+function saveEvtNode(evtId, nodeName, data) {
+  return fbDb.ref('/evtData/' + evtId + '/' + nodeName).set(data);
+}
+
+// 메인 데이터 저장
+function saveMainNode(nodeName, data) {
+  return fbDb.ref('/main/' + nodeName).set(data);
+}
+
+// ───────── Firebase Auth ─────────
+function adminSignIn(email, password) {
+  return fbAuth.signInWithEmailAndPassword(email, password);
+}
+
+function adminSignOut() {
+  return fbAuth.signOut();
+}
+
+// 보조 Firebase 앱 (현재 로그인 유지하며 새 사용자 생성용)
+var _secondaryApp = null;
+function getSecondaryAuth() {
+  if (typeof firebase === 'undefined') return null;
+  if (!_secondaryApp) {
+    _secondaryApp = firebase.initializeApp(firebaseConfig, 'secondary');
+  }
+  return _secondaryApp.auth();
+}
+
+// ───────── ID 생성 ─────────
+function uid() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+}
+
+function now_() {
+  return new Date().toISOString().replace("T"," ").slice(0,19);
+}
+
+// ───────── api() 호환 레이어 ─────────
+// 기존 GAS api(action, params) 인터페이스 유지
+// 내부에서 Firebase RTDB 직접 조작
+var _NO_EVT_INJECT={login:1,listEvents:1,addEvent:1,updateEvent:1,deleteEvent:1,listAcctEvt:1,saveAcctEvt:1,deleteAcctEvt:1,listUsers:1,addUser:1,updateUser:1,deleteUser:1};
+function api(action, params) {
+  var p = Object.assign({action: action}, params || {});
+  // evtId 자동 주입 (index.html의 CUR_EVT 참조)
+  if (typeof CUR_EVT !== 'undefined' && CUR_EVT && !_NO_EVT_INJECT[action] && p.evtId == null) {
+    p.evtId = CUR_EVT.evtId;
+  }
+  // by 자동 주입 (index.html의 CID 참조)
+  if (typeof CID !== 'undefined' && CID && p.by == null) {
+    p.by = CID;
+  }
+  return _dispatch(p);
+}
+
+function _dispatch(p) {
+  return new Promise(function(resolve) {
+    try {
+      var action = (p && p.action) || "";
+      switch (action) {
+        case "ping":    resolve({ok:true, msg:"pong"}); return;
+        case "login":   _apiLogin(p).then(resolve); return;
+        case "refresh": _apiRefresh(p).then(resolve); return;
+
+        // 인원관리
+        case "addMem":    _apiAddRow(p, "Mems").then(resolve); return;
+        case "updateMem": _apiUpdateRow(p, "Mems").then(resolve); return;
+        case "deleteMem": _apiDeleteRow(p, "Mems").then(resolve); return;
+        case "bulkReplaceMems": _apiBulkReplace(p, "Mems").then(resolve); return;
+
+        // 활동
+        case "addAct":    _apiAddRow(p, "Acts").then(resolve); return;
+        case "updateAct": _apiUpdateRow(p, "Acts").then(resolve); return;
+        case "deleteAct": _apiDeleteRow(p, "Acts").then(resolve); return;
+
+        // 구매
+        case "addPur":    _apiAddRow(p, "Purs").then(resolve); return;
+        case "updatePur": _apiUpdateRow(p, "Purs").then(resolve); return;
+        case "deletePur": _apiDeleteRow(p, "Purs").then(resolve); return;
+
+        // 공지
+        case "addNotice":    _apiAddRow(p, "Notices").then(resolve); return;
+        case "updateNotice": _apiUpdateRow(p, "Notices").then(resolve); return;
+        case "deleteNotice": _apiDeleteRow(p, "Notices").then(resolve); return;
+
+        // 지출
+        case "addExp":    _apiAddRow(p, "Exps").then(resolve); return;
+        case "updateExp": _apiUpdateRow(p, "Exps").then(resolve); return;
+        case "deleteExp": _apiDeleteRow(p, "Exps").then(resolve); return;
+
+        // 세입
+        case "addInc":    _apiAddRow(p, "Inc").then(resolve); return;
+        case "updateInc": _apiUpdateRow(p, "Inc").then(resolve); return;
+        case "deleteInc": _apiDeleteRow(p, "Inc").then(resolve); return;
+        case "listInc":   _apiListEvtNode(p, "Inc").then(resolve); return;
+
+        // 입금
+        case "addPay":    _apiAddRow(p, "Pays").then(resolve); return;
+        case "updatePay": _apiUpdateRow(p, "Pays").then(resolve); return;
+        case "deletePay": _apiDeleteRow(p, "Pays").then(resolve); return;
+
+        // 예치금
+        case "addDpst":    _apiAddRow(p, "Dpst").then(resolve); return;
+        case "updateDpst": _apiUpdateRow(p, "Dpst").then(resolve); return;
+        case "deleteDpst": _apiDeleteRow(p, "Dpst").then(resolve); return;
+
+        // 회비
+        case "listFees":   _apiListEvtNode(p, "Fees").then(resolve); return;
+        case "addFee":     _apiAddRow(p, "Fees").then(resolve); return;
+        case "updateFee":  _apiUpdateRow(p, "Fees").then(resolve); return;
+        case "deleteFee":  _apiDeleteRow(p, "Fees").then(resolve); return;
+        case "bulkAddFees": _apiBulkAdd(p, "Fees").then(resolve); return;
+
+        // 예산
+        case "bulkAddExpBG":    _apiBulkAdd(p, "ExpBG").then(resolve); return;
+        case "bulkUpsertExpBig":_apiBulkUpsert(p, "ExpBG").then(resolve); return;
+
+        // 소속/그룹
+        case "listGroups":   _apiListEvtNode(p, "Groups").then(resolve); return;
+        case "addGroup":     _apiAddRow(p, "Groups").then(resolve); return;
+        case "updateGroup":  _apiUpdateRow(p, "Groups").then(resolve); return;
+        case "deleteGroup":  _apiDeleteRow(p, "Groups").then(resolve); return;
+
+        // 거래처
+        case "listVendors":  _apiListMainNode(p, "Vendors").then(resolve); return;
+        case "addVendor":    _apiAddMainRow(p, "Vendors").then(resolve); return;
+        case "updateVendor": _apiUpdateMainRow(p, "Vendors").then(resolve); return;
+        case "deleteVendor": _apiDeleteMainRow(p, "Vendors").then(resolve); return;
+
+        // 행사 관리
+        case "listEvents":   _apiListEvents(p).then(resolve); return;
+        case "addEvent":     _apiAddEvent(p).then(resolve); return;
+        case "updateEvent":  _apiUpdateEvent(p).then(resolve); return;
+        case "deleteEvent":  _apiDeleteEvent(p).then(resolve); return;
+
+        // 계정/권한
+        case "listAcctEvt":  _apiListMainNode(p, "AcctEvt").then(resolve); return;
+        case "saveAcctEvt":  _apiSaveAcctEvt(p).then(resolve); return;
+        case "deleteAcctEvt":_apiDeleteMainRow(p, "AcctEvt").then(resolve); return;
+        case "addAcct":      _apiAddAcct(p).then(resolve); return;
+        case "updateAcct":   _apiUpdateAcct(p).then(resolve); return;
+        case "deleteAcct":   _apiDeleteAcct(p).then(resolve); return;
+        case "chgMyPw":      _apiChgMyPw(p).then(resolve); return;
+
+        // Config
+        case "setConfigValue": _apiSetConfig(p).then(resolve); return;
+        case "getLabels":      _apiGetLabels(p).then(resolve); return;
+        case "setLabels":      _apiSetLabels(p).then(resolve); return;
+        case "getDbInfo":      resolve({ok:true, ssId:"firebase", ssUrl:"https://console.firebase.google.com"}); return;
+        case "getSheetUrl":    resolve({ok:true, url:"https://console.firebase.google.com"}); return;
+
+        // SMS (GAS 프록시 필요 — 나중에 연동)
+        case "sendSms":
+        case "testSms":
+        case "sendSmsAligo":
+        case "sendFeeSms":
+        case "checkSmsConfig":
+        case "getSmsCfg":
+        case "getAligoCfg":
+        case "smsLog":
+        case "smsLogList":
+          resolve({ok:false, err:"SMS는 아직 준비 중입니다"}); return;
+
+        // 참가자 (외부 폼 연동 — 추후 구현)
+        case "listApply":      resolve({ok:true, headers:[], rows:[]}); return;
+        case "getApplyConfig": resolve({ok:true, status:"auto", effective:"closed", today:new Date().toISOString().slice(0,10), count:0, webappUrl:""}); return;
+        case "saveApplyConfig":resolve({ok:true}); return;
+        case "updateApplyRow": resolve({ok:false, err:"준비 중"}); return;
+
+        // 사진 업로드 (Drive GAS 프록시 — 추후 연동)
+        case "uploadPhoto":    resolve({ok:false, err:"사진 업로드는 Drive 설정 후 사용 가능합니다"}); return;
+        case "deletePhoto":    resolve({ok:false, err:"사진 삭제는 Drive 설정 후 사용 가능합니다"}); return;
+
+        // 대여자산
+        case "listAssets":     _apiListMainNode(p, "Assets").then(resolve); return;
+        case "addAsset":       _apiAddMainRow(p, "Assets").then(resolve); return;
+        case "updateAsset":    _apiUpdateMainRow(p, "Assets").then(resolve); return;
+        case "deleteAsset":    _apiDeleteMainRow(p, "Assets").then(resolve); return;
+        case "listRentals":    _apiListMainNode(p, "Rentals").then(resolve); return;
+        case "addRental":      _apiAddMainRow(p, "Rentals").then(resolve); return;
+        case "updateRental":   _apiUpdateMainRow(p, "Rentals").then(resolve); return;
+        case "deleteRental":   _apiDeleteMainRow(p, "Rentals").then(resolve); return;
+        case "listAssetLog":   _apiListMainNode(p, "AssetLog").then(resolve); return;
+
+        // 계약서 / 견적서 / 폼
+        case "listContracts":     _apiListEvtNode(p, "Contracts").then(resolve); return;
+        case "addContract":       _apiAddRow(p, "Contracts").then(resolve); return;
+        case "updateContract":    _apiUpdateRow(p, "Contracts").then(resolve); return;
+        case "deleteContract":    _apiDeleteRow(p, "Contracts").then(resolve); return;
+        case "listContractFields":_apiListEvtNode(p, "ContractFields").then(resolve); return;
+        case "saveContractFields":_apiBulkReplace(p, "ContractFields").then(resolve); return;
+
+        case "listQuotes":        _apiListEvtNode(p, "Quotes").then(resolve); return;
+        case "addQuote":          _apiAddRow(p, "Quotes").then(resolve); return;
+        case "updateQuote":       _apiUpdateRow(p, "Quotes").then(resolve); return;
+        case "deleteQuote":       _apiDeleteRow(p, "Quotes").then(resolve); return;
+        case "listQuoteFields":   _apiListEvtNode(p, "QuoteFields").then(resolve); return;
+        case "saveQuoteFields":   _apiBulkReplace(p, "QuoteFields").then(resolve); return;
+
+        case "listForms":         _apiListEvtNode(p, "Forms").then(resolve); return;
+        case "addForm":           _apiAddRow(p, "Forms").then(resolve); return;
+        case "updateForm":        _apiUpdateRow(p, "Forms").then(resolve); return;
+        case "deleteForm":        _apiDeleteRow(p, "Forms").then(resolve); return;
+        case "listFormFields":    _apiListEvtNode(p, "FormFields").then(resolve); return;
+        case "saveFormFields":    _apiBulkReplace(p, "FormFields").then(resolve); return;
+        case "listFormSubs":      _apiListEvtNode(p, "FormSubs").then(resolve); return;
+        case "addFormSub":        _apiAddRow(p, "FormSubs").then(resolve); return;
+        case "deleteFormSub":     _apiDeleteRow(p, "FormSubs").then(resolve); return;
+
+        // SMS 템플릿
+        case "listSmsTpl":        _apiListEvtNode(p, "SmsTemplates").then(resolve); return;
+        case "addSmsTpl":         _apiAddRow(p, "SmsTemplates").then(resolve); return;
+        case "updateSmsTpl":      _apiUpdateRow(p, "SmsTemplates").then(resolve); return;
+        case "deleteSmsTpl":      _apiDeleteRow(p, "SmsTemplates").then(resolve); return;
+
+        // 텔레그램 알림
+        case "notifyLogin": _apiNotifyLogin(p).then(resolve); return;
+
+        default:
+          console.warn("미구현 action:", action);
+          resolve({ok:false, err:"미구현: " + action});
+          return;
+      }
+    } catch (err) {
+      console.error("api error:", err);
+      resolve({ok:false, err: String(err.message || err)});
+    }
+  });
+}
+
+// ───────── 로그인 ─────────
+function _apiLogin(p) {
+  return new Promise(function(resolve) {
+    if (!_cache) {
+      resolve({ok:false, err:"데이터 로드 중"}); return;
+    }
+    var users = _cache.Users || [];
+    var user = null;
+    for (var i = 0; i < users.length; i++) {
+      if (users[i].id === p.id) { user = users[i]; break; }
+    }
+    if (!user) { resolve({ok:false, err:"아이디가 존재하지 않습니다"}); return; }
+    if (user.pw !== p.pw) { resolve({ok:false, err:"비밀번호가 일치하지 않습니다"}); return; }
+
+    var me = {id:user.id, r:user.r, ar:user.ar, nm:user.nm, tel:user.tel};
+    var evts = _getUserEvts(user.id, user.r);
+
+    resolve({
+      ok:true, me:me, evts:evts,
+      AR: (_cache.Areas||[]).map(function(a){return a.n}),
+      BG: [],
+      US: _buildUserMap(),
+      LBL: {leader:"단장", member:"단원"}
+    });
+  });
+}
+
+// 사용자별 접근 가능 행사 목록
+function _getUserEvts(acctId, globalRole) {
+  var events = _cache.Events || [];
+  var acctEvt = _cache.AcctEvt || [];
+  var myEntries = acctEvt.filter(function(ae) { return ae.acctId === acctId; });
+
+  if (myEntries.length === 0) {
+    // AcctEvt 미등록 → admin/super면 전체 접근
+    if (globalRole === "admin" || globalRole === "super") {
+      return events.map(function(ev) {
+        return {evtId:ev.evtId, nm:ev.nm, yr:ev.yr, modules:(ev.modules||"").split(","), role:globalRole, active:ev.active!==false};
+      });
+    }
+    return [];
+  }
+
+  var result = [];
+  for (var i = 0; i < myEntries.length; i++) {
+    var ae = myEntries[i];
+    var r = (ae.role || "").toLowerCase();
+    if (r === "none" || r === "없음" || r === "x" || r === "-") continue;
+    var ev = events.filter(function(e) { return e.evtId === ae.evtId; })[0];
+    if (!ev) continue;
+    result.push({
+      evtId: ev.evtId, nm: ev.nm, yr: ev.yr,
+      modules: (ev.modules||"").split(","),
+      role: ae.role || globalRole || "user",
+      active: ev.active !== false
+    });
+  }
+  return result;
+}
+
+function _buildUserMap() {
+  var us = {};
+  (_cache.Users || []).forEach(function(u) {
+    us[u.id] = {nm:u.nm, r:u.r, ar:u.ar, tel:u.tel};
+  });
+  return us;
+}
+
+// ───────── 데이터 새로고침 ─────────
+function _apiRefresh(p) {
+  return new Promise(function(resolve) {
+    if (!p.evtId && typeof CUR_EVT !== 'undefined' && CUR_EVT) {
+      p.evtId = CUR_EVT.evtId;
+    }
+    if (!p.evtId) {
+      resolve({ok:true, acts:[], purs:[], exps:[], mems:[], notices:[], pays:[], dpst:[], inc:[], incTypes:[], expBG:[], expTypes:[], gwanTypes:[], incCards:[], awards:[], memGroups:[], fees:[]});
+      return;
+    }
+    loadEvtData(p.evtId).then(function(data) {
+      // Config에서 라벨/타입 추출
+      var cfg = {};
+      (data.Config || []).forEach(function(c) { if(c && c.k) cfg[c.k] = c.v; });
+
+      resolve({
+        ok: true,
+        acts: data.Acts || [],
+        purs: data.Purs || [],
+        exps: data.Exps || [],
+        mems: data.Mems || [],
+        notices: data.Notices || [],
+        pays: data.Pays || [],
+        dpst: data.Dpst || [],
+        inc: data.Inc || [],
+        incTypes: (cfg.INC_TYPES || "이월금,보조금,지원금,자부담,자체수입").split(","),
+        expBG: data.ExpBG || [],
+        expTypes: (cfg.EXP_TYPES || "").split(",").filter(Boolean),
+        gwanTypes: (cfg.GWAN_TYPES || "행사직접비,행사운영비,행사홍보비,인건비,시설비,임차비,기타").split(","),
+        incCards: _parseIncCards(cfg.INC_CARDS || ""),
+        awards: (cfg.AWARDS || "").split(",").filter(Boolean),
+        memGroups: data.Groups || [],
+        fees: data.Fees || [],
+        vendors: _cache.Vendors || [],
+        LBL: {leader: cfg.LABEL_LEADER || "단장", member: cfg.LABEL_MEMBER || "단원"},
+        AR: (_cache.Areas || []).map(function(a){return a.n}),
+        US: _buildUserMap()
+      });
+    });
+  });
+}
+
+function _parseIncCards(s) {
+  if (!s) return [];
+  return s.split(";").map(function(chunk) {
+    var parts = chunk.split("|");
+    return {name: (parts[0]||"").trim(), methods: (parts[1]||"").trim()};
+  }).filter(function(c) { return c.name; });
+}
+
+// ───────── 범용 CRUD (행사별 데이터) ─────────
+function _getEvtId(p) {
+  return p.evtId || (typeof CUR_EVT !== 'undefined' && CUR_EVT ? CUR_EVT.evtId : null);
+}
+
+function _apiAddRow(p, nodeName) {
+  var evtId = _getEvtId(p);
+  if (!evtId) return Promise.resolve({ok:false, err:"행사 미선택"});
+  return loadEvtData(evtId).then(function(data) {
+    var arr = data[nodeName] || [];
+    var row = Object.assign({}, p);
+    delete row.action; delete row.evtId; delete row.by;
+    if (!row.id) row.id = uid();
+    if (!row.createdAt) row.createdAt = now_();
+    row.evtId = evtId;
+    arr.push(row);
+    return saveEvtNode(evtId, nodeName, arr).then(function() {
+      _evtCaches[evtId][nodeName] = arr;
+      return {ok:true, id:row.id};
+    });
+  });
+}
+
+function _apiUpdateRow(p, nodeName) {
+  var evtId = _getEvtId(p);
+  if (!evtId) return Promise.resolve({ok:false, err:"행사 미선택"});
+  return loadEvtData(evtId).then(function(data) {
+    var arr = data[nodeName] || [];
+    var idx = -1;
+    for (var i = 0; i < arr.length; i++) {
+      if (arr[i].id === p.id) { idx = i; break; }
+    }
+    if (idx < 0) return {ok:false, err:"항목을 찾을 수 없습니다"};
+    var row = arr[idx];
+    Object.keys(p).forEach(function(k) {
+      if (k !== 'action' && k !== 'by') row[k] = p[k];
+    });
+    arr[idx] = row;
+    return saveEvtNode(evtId, nodeName, arr).then(function() {
+      _evtCaches[evtId][nodeName] = arr;
+      return {ok:true};
+    });
+  });
+}
+
+function _apiDeleteRow(p, nodeName) {
+  var evtId = _getEvtId(p);
+  if (!evtId) return Promise.resolve({ok:false, err:"행사 미선택"});
+  return loadEvtData(evtId).then(function(data) {
+    var arr = data[nodeName] || [];
+    arr = arr.filter(function(r) { return r.id !== p.id; });
+    return saveEvtNode(evtId, nodeName, arr).then(function() {
+      _evtCaches[evtId][nodeName] = arr;
+      return {ok:true};
+    });
+  });
+}
+
+function _apiListEvtNode(p, nodeName) {
+  var evtId = _getEvtId(p);
+  if (!evtId) return Promise.resolve({ok:true, rows:[]});
+  return loadEvtData(evtId).then(function(data) {
+    return {ok:true, rows: data[nodeName] || []};
+  });
+}
+
+function _apiBulkAdd(p, nodeName) {
+  var evtId = _getEvtId(p);
+  if (!evtId) return Promise.resolve({ok:false, err:"행사 미선택"});
+  var newRows = p.rows || [];
+  return loadEvtData(evtId).then(function(data) {
+    var arr = data[nodeName] || [];
+    newRows.forEach(function(r) {
+      if (!r.id) r.id = uid();
+      if (!r.createdAt) r.createdAt = now_();
+      r.evtId = evtId;
+      arr.push(r);
+    });
+    return saveEvtNode(evtId, nodeName, arr).then(function() {
+      _evtCaches[evtId][nodeName] = arr;
+      return {ok:true, count:newRows.length};
+    });
+  });
+}
+
+function _apiBulkReplace(p, nodeName) {
+  var evtId = _getEvtId(p);
+  if (!evtId) return Promise.resolve({ok:false, err:"행사 미선택"});
+  var newRows = p.rows || [];
+  newRows.forEach(function(r) {
+    if (!r.id) r.id = uid();
+    r.evtId = evtId;
+  });
+  return saveEvtNode(evtId, nodeName, newRows).then(function() {
+    _evtCaches[evtId][nodeName] = newRows;
+    return {ok:true, count:newRows.length};
+  });
+}
+
+function _apiBulkUpsert(p, nodeName) {
+  var evtId = _getEvtId(p);
+  if (!evtId) return Promise.resolve({ok:false, err:"행사 미선택"});
+  return loadEvtData(evtId).then(function(data) {
+    var arr = data[nodeName] || [];
+    var rows = p.rows || [];
+    rows.forEach(function(r) {
+      if (!r.id) r.id = uid();
+      r.evtId = evtId;
+      var idx = -1;
+      for (var i = 0; i < arr.length; i++) {
+        if (arr[i].id === r.id) { idx = i; break; }
+      }
+      if (idx >= 0) arr[idx] = r;
+      else arr.push(r);
+    });
+    return saveEvtNode(evtId, nodeName, arr).then(function() {
+      _evtCaches[evtId][nodeName] = arr;
+      return {ok:true, count:rows.length};
+    });
+  });
+}
+
+// ───────── 범용 CRUD (메인 데이터) ─────────
+function _apiListMainNode(p, nodeName) {
+  return Promise.resolve({ok:true, rows: _cache[nodeName] || []});
+}
+
+function _apiAddMainRow(p, nodeName) {
+  var arr = (_cache[nodeName] || []).slice();
+  var row = Object.assign({}, p);
+  delete row.action; delete row.by;
+  if (!row.id) row.id = uid();
+  if (!row.createdAt) row.createdAt = now_();
+  arr.push(row);
+  return saveMainNode(nodeName, arr).then(function() {
+    _cache[nodeName] = arr;
+    return {ok:true, id:row.id};
+  });
+}
+
+function _apiUpdateMainRow(p, nodeName) {
+  var arr = (_cache[nodeName] || []).slice();
+  var idx = -1;
+  for (var i = 0; i < arr.length; i++) {
+    if (arr[i].id === p.id) { idx = i; break; }
+  }
+  if (idx < 0) return Promise.resolve({ok:false, err:"항목을 찾을 수 없습니다"});
+  Object.keys(p).forEach(function(k) {
+    if (k !== 'action' && k !== 'by') arr[idx][k] = p[k];
+  });
+  return saveMainNode(nodeName, arr).then(function() {
+    _cache[nodeName] = arr;
+    return {ok:true};
+  });
+}
+
+function _apiDeleteMainRow(p, nodeName) {
+  var arr = (_cache[nodeName] || []).filter(function(r) { return r.id !== p.id; });
+  return saveMainNode(nodeName, arr).then(function() {
+    _cache[nodeName] = arr;
+    return {ok:true};
+  });
+}
+
+// ───────── 행사 관리 ─────────
+function _apiListEvents(p) {
+  return Promise.resolve({ok:true, events: _cache.Events || []});
+}
+
+function _apiAddEvent(p) {
+  var events = (_cache.Events || []).slice();
+  var ev = {
+    evtId: p.evtId || uid(),
+    nm: p.nm || "",
+    yr: p.yr || new Date().getFullYear().toString(),
+    active: p.active !== false,
+    modules: p.modules || "apply,budget,purchase,act,mem",
+    note: p.note || "",
+    createdAt: now_()
+  };
+  events.push(ev);
+  // 행사별 빈 데이터 노드도 생성
+  var emptyEvtData = {};
+  EVT_NODES.forEach(function(n) { emptyEvtData[n] = []; });
+  return Promise.all([
+    saveMainNode("Events", events),
+    fbDb.ref('/evtData/' + ev.evtId).set(emptyEvtData)
+  ]).then(function() {
+    _cache.Events = events;
+    return {ok:true, evtId:ev.evtId};
+  });
+}
+
+function _apiUpdateEvent(p) {
+  var events = (_cache.Events || []).slice();
+  var idx = -1;
+  for (var i = 0; i < events.length; i++) {
+    if (events[i].evtId === p.evtId) { idx = i; break; }
+  }
+  if (idx < 0) return Promise.resolve({ok:false, err:"행사를 찾을 수 없습니다"});
+  Object.keys(p).forEach(function(k) {
+    if (k !== 'action' && k !== 'by') events[idx][k] = p[k];
+  });
+  return saveMainNode("Events", events).then(function() {
+    _cache.Events = events;
+    return {ok:true};
+  });
+}
+
+function _apiDeleteEvent(p) {
+  var events = (_cache.Events || []).filter(function(e) { return e.evtId !== p.evtId; });
+  return Promise.all([
+    saveMainNode("Events", events),
+    fbDb.ref('/evtData/' + p.evtId).remove()
+  ]).then(function() {
+    _cache.Events = events;
+    delete _evtCaches[p.evtId];
+    return {ok:true};
+  });
+}
+
+// ───────── 계정 관리 ─────────
+function _apiAddAcct(p) {
+  var users = (_cache.Users || []).slice();
+  if (users.some(function(u) { return u.id === p.id; })) {
+    return Promise.resolve({ok:false, err:"이미 존재하는 아이디입니다"});
+  }
+  var user = {id:p.id, pw:p.pw||"1234", r:p.r||"user", ar:p.ar||"", nm:p.nm||"", tel:p.tel||""};
+  users.push(user);
+  // Firebase Auth에도 계정 생성
+  var secAuth = getSecondaryAuth();
+  var email = p.id + "@dano.local";
+  return secAuth.createUserWithEmailAndPassword(email, p.pw || "123456").then(function(cred) {
+    return secAuth.signOut().then(function() {
+      return saveMainNode("Users", users);
+    });
+  }).then(function() {
+    _cache.Users = users;
+    return {ok:true};
+  }).catch(function(err) {
+    // Auth 실패해도 Users에는 저장 (호환성)
+    return saveMainNode("Users", users).then(function() {
+      _cache.Users = users;
+      return {ok:true, warn:"Firebase Auth 생성 실패: " + err.message};
+    });
+  });
+}
+
+function _apiUpdateAcct(p) {
+  return _apiUpdateMainRow(p, "Users");
+}
+
+function _apiDeleteAcct(p) {
+  var users = (_cache.Users || []).filter(function(u) { return u.id !== p.id; });
+  return saveMainNode("Users", users).then(function() {
+    _cache.Users = users;
+    return {ok:true};
+  });
+}
+
+function _apiChgMyPw(p) {
+  var users = (_cache.Users || []).slice();
+  for (var i = 0; i < users.length; i++) {
+    if (users[i].id === p.id) {
+      if (users[i].pw !== p.oldPw) return Promise.resolve({ok:false, err:"현재 비밀번호가 틀립니다"});
+      users[i].pw = p.newPw;
+      return saveMainNode("Users", users).then(function() {
+        _cache.Users = users;
+        return {ok:true};
+      });
+    }
+  }
+  return Promise.resolve({ok:false, err:"계정을 찾을 수 없습니다"});
+}
+
+function _apiSaveAcctEvt(p) {
+  var arr = (_cache.AcctEvt || []).slice();
+  if (p.id) {
+    // 수정
+    for (var i = 0; i < arr.length; i++) {
+      if (arr[i].id === p.id) {
+        Object.keys(p).forEach(function(k) { if(k!=='action'&&k!=='by') arr[i][k]=p[k]; });
+        break;
+      }
+    }
+  } else {
+    // 추가
+    arr.push({id:uid(), evtId:p.evtId, acctId:p.acctId, role:p.role||"user", note:p.note||"", createdAt:now_()});
+  }
+  return saveMainNode("AcctEvt", arr).then(function() {
+    _cache.AcctEvt = arr;
+    return {ok:true};
+  });
+}
+
+// ───────── Config ─────────
+function _apiSetConfig(p) {
+  var evtId = _getEvtId(p);
+  if (!evtId) return Promise.resolve({ok:false, err:"행사 미선택"});
+  return loadEvtData(evtId).then(function(data) {
+    var cfg = data.Config || [];
+    var found = false;
+    for (var i = 0; i < cfg.length; i++) {
+      if (cfg[i].k === p.key) {
+        cfg[i].v = p.value;
+        if (p.note !== undefined) cfg[i].note = p.note;
+        found = true;
+        break;
+      }
+    }
+    if (!found) {
+      cfg.push({k:p.key, v:p.value, note:p.note||""});
+    }
+    return saveEvtNode(evtId, "Config", cfg).then(function() {
+      _evtCaches[evtId].Config = cfg;
+      return {ok:true};
+    });
+  });
+}
+
+function _apiGetLabels(p) {
+  var evtId = _getEvtId(p);
+  if (!evtId) return Promise.resolve({ok:true, leader:"단장", member:"단원"});
+  var data = _evtCaches[evtId];
+  if (!data) return Promise.resolve({ok:true, leader:"단장", member:"단원"});
+  var cfg = {};
+  (data.Config || []).forEach(function(c) { if(c&&c.k) cfg[c.k]=c.v; });
+  return Promise.resolve({ok:true, leader:cfg.LABEL_LEADER||"단장", member:cfg.LABEL_MEMBER||"단원"});
+}
+
+function _apiSetLabels(p) {
+  var evtId = _getEvtId(p);
+  if (!evtId) return Promise.resolve({ok:false, err:"행사 미선택"});
+  return loadEvtData(evtId).then(function(data) {
+    var cfg = data.Config || [];
+    _upsertCfgArr(cfg, "LABEL_LEADER", p.leader || "단장");
+    _upsertCfgArr(cfg, "LABEL_MEMBER", p.member || "단원");
+    return saveEvtNode(evtId, "Config", cfg).then(function() {
+      _evtCaches[evtId].Config = cfg;
+      return {ok:true};
+    });
+  });
+}
+
+function _upsertCfgArr(arr, key, value) {
+  for (var i = 0; i < arr.length; i++) {
+    if (arr[i].k === key) { arr[i].v = value; return; }
+  }
+  arr.push({k:key, v:value, note:""});
+}
+
+// ───────── 텔레그램 알림 ─────────
+function _apiNotifyLogin(p) {
+  // Config에서 텔레그램 설정 읽기
+  var evtId = _getEvtId(p);
+  if (!evtId) return Promise.resolve({ok:true});
+  var data = _evtCaches[evtId];
+  if (!data) return Promise.resolve({ok:true});
+  var cfg = {};
+  (data.Config || []).forEach(function(c) { if(c&&c.k) cfg[c.k]=c.v; });
+  var botToken = cfg.TELEGRAM_BOT_TOKEN;
+  var chatIds = cfg.TELEGRAM_CHAT_IDS;
+  if (!botToken || !chatIds) return Promise.resolve({ok:true});
+
+  var text = "🔐 <b>로그인</b>\nID: " + (p.id||"") + "\n행사: " + (p.evtNm||"") + "\n시각: " + now_();
+  if (p.ip) text += "\nIP: " + p.ip;
+  var url = "https://api.telegram.org/bot" + botToken + "/sendMessage";
+  var ids = chatIds.split(/[,\s]+/).filter(Boolean);
+
+  return Promise.all(ids.map(function(chatId) {
+    return fetch(url, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({chat_id:chatId, text:text, parse_mode:'HTML'})
+    }).catch(function(e) { console.warn('텔레그램 전송 실패:', e); });
+  })).then(function() { return {ok:true}; });
+}
+
+// ───────── Drive 사진 (GAS 프록시) ─────────
+var _drivePhotoConfig = null;
+
+function getDrivePhotoConfig() {
+  if (_drivePhotoConfig) return _drivePhotoConfig;
+  // Firebase에서 설정 읽기
+  if (_cache && _cache.drivePhoto) return _cache.drivePhoto;
+  return {};
+}
+
+function setDrivePhotoConfig(cfg) {
+  _drivePhotoConfig = cfg;
+  return fbDb.ref('/main/drivePhoto').set(cfg);
+}

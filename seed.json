@@ -1,0 +1,23 @@
+{
+  "main": {
+    "Users": [
+      {
+        "id": "admin",
+        "pw": "1234",
+        "nm": "관리자",
+        "r": "super",
+        "ar": "",
+        "tel": ""
+      }
+    ],
+    "Areas": [],
+    "Events": [],
+    "AcctEvt": [],
+    "Vendors": [],
+    "Assets": [],
+    "Rentals": [],
+    "AssetLog": [],
+    "AssetCategories": [],
+    "AssetLocations": []
+  }
+}
