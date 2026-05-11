@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>축제 배치도 · 실시간 위치관제</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Pretendard','Noto Sans KR',sans-serif;background:#1a1a2e;color:#eee;overflow:hidden;display:flex}
+
+/* 왼쪽 사이드바 */
+#sidebar{width:320px;min-width:320px;height:100vh;background:#0f172a;border-right:1px solid #1e293b;display:flex;flex-direction:column;z-index:100;overflow:hidden}
+#sidebar.collapsed{width:44px;min-width:44px}
+#sidebar.collapsed .sb-body,#sidebar.collapsed .sb-header span,#sidebar.collapsed .sb-header .hbtn:not(.toggle-btn){display:none}
+.sb-header{padding:10px 12px;background:#1e293b;display:flex;align-items:center;gap:8px;flex-shrink:0}
+.sb-header h3{font-size:14px;flex:1;white-space:nowrap}
+.hbtn{background:none;border:none;color:#94a3b8;cursor:pointer;font-size:16px;padding:4px;border-radius:4px}
+.hbtn:hover{color:#fff;background:rgba(255,255,255,0.1)}
+
+/* 탭 */
+.sb-tabs{display:flex;border-bottom:1px solid #1e293b;flex-shrink:0}
+.sb-tab{flex:1;padding:8px;border:none;background:transparent;color:#64748b;font-size:12px;font-weight:700;cursor:pointer;border-bottom:2px solid transparent}
+.sb-tab.active{color:#3b82f6;border-bottom-color:#3b82f6}
+.sb-body{flex:1;overflow-y:auto;padding:8px}
+
+/* 카테고리 카드 */
+.cat-card{background:#1e293b;border-radius:10px;margin-bottom:8px;overflow:hidden;border:1px solid #334155}
+.cat-card.selected{border-color:#3b82f6}
+.cat-head{display:flex;align-items:center;gap:8px;padding:10px 12px;cursor:pointer}
+.cat-head:hover{background:rgba(255,255,255,0.03)}
+.cat-color{width:16px;height:16px;border-radius:4px;flex-shrink:0;cursor:pointer;border:2px solid rgba(255,255,255,0.2)}
+.cat-title{flex:1;font-size:13px;font-weight:700}
+.cat-count{background:#334155;color:#94a3b8;padding:1px 7px;border-radius:10px;font-size:10px;font-weight:700}
+.cat-toggle{color:#64748b;font-size:12px;transition:transform .2s}
+.cat-toggle.open{transform:rotate(90deg)}
+
+.cat-body{padding:0 12px 10px;display:none}
+.cat-body.open{display:block}
+.cat-setting{display:flex;align-items:center;gap:6px;margin:6px 0;font-size:11px;color:#94a3b8}
+.cat-setting label{width:48px;flex-shrink:0;font-weight:600}
+.cat-setting input,.cat-setting select{flex:1;padding:4px 6px;border:1px solid #334155;border-radius:4px;background:#0f172a;color:#fff;font-size:11px}
+.cat-setting input[type=color]{width:32px;height:24px;padding:0;border:none;cursor:pointer;background:transparent}
+
+/* 색상 팔레트 */
+.color-palette{display:flex;flex-wrap:wrap;gap:5px;margin:4px 0}
+.color-dot{width:24px;height:24px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:all .15s}
+.color-dot:hover{transform:scale(1.15);border-color:rgba(255,255,255,0.5)}
+.color-dot.selected{border-color:#fff;box-shadow:0 0 8px rgba(255,255,255,0.5);transform:scale(1.15)}
+.cat-setting input[type=number]{width:50px;flex:none}
+
+.cat-items{margin-top:8px;border-top:1px solid #334155;padding-top:6px}
+.cat-item{display:flex;align-items:center;gap:4px;padding:3px 4px;border-radius:4px;cursor:pointer;font-size:11px}
+.cat-item:hover{background:rgba(255,255,255,0.05)}
+.cat-item.active{background:rgba(59,130,246,0.2)}
+.cat-item-num{font-weight:700;width:36px;text-align:center;flex-shrink:0}
+.cat-item-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+.cat-btns{display:flex;gap:4px;margin-top:8px}
+.cat-btns button{flex:1;padding:5px;border:none;border-radius:5px;font-size:11px;font-weight:700;cursor:pointer}
+
+/* 시설 정보 (개별 아이템) */
+#itemPanel{padding:8px;display:none}
+#itemPanel h4{font-size:13px;margin-bottom:8px}
+#itemPanel label{display:block;color:#94a3b8;font-size:10px;margin:6px 0 2px;font-weight:600}
+#itemPanel input,#itemPanel textarea{width:100%;padding:6px 8px;border:1px solid #334155;border-radius:5px;background:#0f172a;color:#fff;font-size:12px}
+#itemPanel textarea{height:40px;resize:vertical}
+.item-btns{display:flex;gap:4px;margin-top:10px}
+.item-btns button{flex:1;padding:6px;border:none;border-radius:5px;font-size:11px;font-weight:700;cursor:pointer}
+
+/* 추적 목록 */
+.track-item{display:flex;align-items:center;gap:6px;padding:8px;border-radius:8px;background:rgba(255,255,255,0.03);margin-bottom:5px}
+.dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.dot.on{background:#10b981;box-shadow:0 0 6px #10b981}
+.dot.off{background:#6b7280}
+
+/* 지도 */
+#mapWrap{flex:1;position:relative}
+#map{width:100%;height:100vh}
+
+/* 범례 */
+#legend{position:absolute;right:10px;bottom:10px;background:rgba(15,15,30,0.92);border-radius:10px;padding:8px 12px;z-index:50;font-size:10px}
+.leg-row{display:flex;align-items:center;gap:5px;margin:2px 0}
+.leg-swatch{width:12px;height:9px;border-radius:2px}
+
+/* 카카오 라벨 */
+.f-label{padding:1px 5px;border-radius:3px;font-size:10px;font-weight:700;white-space:nowrap;pointer-events:none;text-shadow:0 1px 2px rgba(0,0,0,0.5);color:#fff}
+.gps-label{background:rgba(16,185,129,0.9);color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;white-space:nowrap;pointer-events:none}
+.gps-label.vehicle{background:rgba(59,130,246,0.9)}
+
+/* 새 카테고리 모달 */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:500;display:flex;align-items:center;justify-content:center}
+.modal{background:#1e293b;border-radius:14px;padding:20px;width:340px;max-width:90vw}
+.modal h3{color:#fff;margin-bottom:14px;font-size:15px}
+.modal label{display:block;color:#94a3b8;font-size:11px;margin:8px 0 3px;font-weight:600}
+.modal input,.modal select{width:100%;padding:8px 10px;border:1px solid #334155;border-radius:6px;background:#0f172a;color:#fff;font-size:13px}
+.modal-row{display:flex;gap:6px;align-items:center}
+.modal-row input{flex:1}
+.modal-btns{display:flex;gap:6px;margin-top:14px}
+.modal-btns button{flex:1;padding:9px;border:none;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer}
+
+/* 반응형 */
+@media(max-width:700px){
+  #sidebar{position:fixed;left:0;top:0;z-index:300;width:280px;min-width:280px;box-shadow:4px 0 20px rgba(0,0,0,0.5)}
+  #sidebar.collapsed{width:44px;min-width:44px;box-shadow:none}
+}
+</style>
+</head>
+<body>
+
+<!-- 사이드바 -->
+<div id="sidebar">
+  <div class="sb-header">
+    <h3>🏗️ 축제 배치도</h3>
+    <span>
+      <button class="hbtn" onclick="saveAll()" title="전체 저장">💾</button>
+      <button class="hbtn" onclick="location.href='index.html'" title="메인으로">🏠</button>
+    </span>
+    <button class="hbtn toggle-btn" onclick="toggleSidebar()" title="접기/펼치기">☰</button>
+  </div>
+  <div class="sb-tabs">
+    <button class="sb-tab active" onclick="switchTab('layout',this)">🗺️ 배치도</button>
+    <button class="sb-tab" onclick="switchTab('track',this)">📡 위치추적</button>
+  </div>
+
+  <!-- 배치도 탭 바디 -->
+  <div class="sb-body" id="layoutBody">
+    <div id="catList"></div>
+    <button onclick="showNewCatModal()" style="width:100%;padding:8px;border:1px dashed #475569;border-radius:8px;background:transparent;color:#94a3b8;font-size:12px;font-weight:700;cursor:pointer;margin-top:4px">＋ 새 카테고리 추가</button>
+    <!-- 개별 아이템 편집 -->
+    <div id="itemPanel">
+      <h4 id="itemTitle">아이템 편집</h4>
+      <label>번호</label>
+      <input id="iNum" type="text" placeholder="B-01">
+      <label>이름 / 행사명</label>
+      <input id="iName" type="text" placeholder="영광굴비 홍보부스">
+      <label>담당자</label>
+      <input id="iDuty" type="text" placeholder="담당자">
+      <label>연락처</label>
+      <input id="iPhone" type="text" placeholder="010-0000-0000">
+      <label>메모</label>
+      <textarea id="iMemo" placeholder="비고"></textarea>
+      <div class="item-btns">
+        <button style="background:#3b82f6;color:#fff" onclick="applyItem()">적용</button>
+        <button style="background:#dc2626;color:#fff" onclick="deleteItem()">삭제</button>
+        <button style="background:#475569;color:#fff" onclick="closeItem()">닫기</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 추적 탭 바디 -->
+  <div class="sb-body" id="trackBody" style="display:none">
+    <div style="display:flex;gap:4px;margin-bottom:8px">
+      <button onclick="showRegModal('person')" style="flex:1;padding:7px;border:none;border-radius:6px;background:#10b981;color:#fff;font-size:11px;font-weight:700;cursor:pointer">＋ 인원</button>
+      <button onclick="showRegModal('vehicle')" style="flex:1;padding:7px;border:none;border-radius:6px;background:#3b82f6;color:#fff;font-size:11px;font-weight:700;cursor:pointer">＋ 차량</button>
+      <button onclick="showGPSModal()" style="flex:1;padding:7px;border:none;border-radius:6px;background:#f59e0b;color:#000;font-size:11px;font-weight:700;cursor:pointer">📍 GPS공유</button>
+    </div>
+    <div id="trackList"></div>
+  </div>
+</div>
+
+<!-- 지도 영역 -->
+<div id="mapWrap">
+  <div id="map"></div>
+  <div id="legend"></div>
+</div>
+
+<!-- 새 카테고리 모달 -->
+<div id="newCatModal" class="modal-bg" style="display:none" onclick="if(event.target===this)this.style.display='none'">
+  <div class="modal">
+    <h3>📁 새 카테고리</h3>
+    <label>카테고리 이름</label>
+    <input id="ncName" type="text" placeholder="예: 행사부스">
+    <label>도형</label>
+    <select id="ncShape">
+      <option value="rect">사각형</option>
+      <option value="circle">원형</option>
+    </select>
+    <div id="ncRectSize">
+      <label>기본 크기 (가로m × 세로m)</label>
+      <div class="modal-row">
+        <input id="ncW" type="number" value="3" min="0.5" max="200" step="0.5">
+        <span style="color:#94a3b8">×</span>
+        <input id="ncH" type="number" value="6" min="0.5" max="200" step="0.5">
+      </div>
+    </div>
+    <div id="ncCircleSize" style="display:none">
+      <label>기본 지름 (m)</label>
+      <input id="ncDiam" type="number" value="5" min="0.5" max="200" step="0.5">
+    </div>
+    <label>색상</label>
+    <div class="color-palette" id="ncPalette"></div>
+    <input id="ncColor" type="hidden" value="#FF6B6B">
+    <label>번호 접두어</label>
+    <input id="ncPrefix" type="text" placeholder="예: B" maxlength="5">
+    <div class="modal-btns">
+      <button style="background:#10b981;color:#fff" onclick="createCategory()">생성</button>
+      <button style="background:#475569;color:#fff" onclick="document.getElementById('newCatModal').style.display='none'">취소</button>
+    </div>
+  </div>
+</div>
+
+<!-- 카테고리 편집 모달 -->
+<div id="editCatModal" class="modal-bg" style="display:none" onclick="if(event.target===this)this.style.display='none'">
+  <div class="modal">
+    <h3 id="ecTitle">카테고리 설정</h3>
+    <label>카테고리 이름</label>
+    <input id="ecName" type="text">
+    <label>도형</label>
+    <select id="ecShape">
+      <option value="rect">사각형</option>
+      <option value="circle">원형</option>
+    </select>
+    <div id="ecRectSize">
+      <label>기본 크기 (가로m × 세로m)</label>
+      <div class="modal-row">
+        <input id="ecW" type="number" min="0.5" max="200" step="0.5">
+        <span style="color:#94a3b8">×</span>
+        <input id="ecH" type="number" min="0.5" max="200" step="0.5">
+      </div>
+    </div>
+    <div id="ecCircleSize" style="display:none">
+      <label>기본 지름 (m)</label>
+      <input id="ecDiam" type="number" min="0.5" max="200" step="0.5">
+    </div>
+    <label>색상 (변경 시 전체 아이템 적용)</label>
+    <div class="color-palette" id="ecPalette"></div>
+    <input id="ecColor" type="hidden">
+    <label>번호 접두어</label>
+    <input id="ecPrefix" type="text" maxlength="5">
+    <div class="modal-btns">
+      <button style="background:#3b82f6;color:#fff" onclick="updateCategory()">적용</button>
+      <button style="background:#dc2626;color:#fff" onclick="deleteCategory()">카테고리 삭제</button>
+      <button style="background:#475569;color:#fff" onclick="document.getElementById('editCatModal').style.display='none'">취소</button>
+    </div>
+  </div>
+</div>
+
+<!-- 등록 모달 (추적) -->
+<div id="regModal" class="modal-bg" style="display:none" onclick="if(event.target===this)this.style.display='none'">
+  <div class="modal">
+    <h3 id="rmTitle">등록</h3>
+    <label>이름 / 차량번호</label>
+    <input id="rmName" type="text">
+    <label>유형</label>
+    <select id="rmType"><option value="person">인원</option><option value="vehicle">차량</option></select>
+    <label>연락처</label>
+    <input id="rmPhone" type="text" placeholder="010-0000-0000">
+    <label>메모</label>
+    <input id="rmMemo" type="text" placeholder="역할, 소속">
+    <div class="modal-btns">
+      <button style="background:#10b981;color:#fff" onclick="registerTracker()">등록</button>
+      <button style="background:#475569;color:#fff" onclick="document.getElementById('regModal').style.display='none'">취소</button>
+    </div>
+  </div>
+</div>
+
+<!-- GPS 공유 모달 -->
+<div id="gpsModal" class="modal-bg" style="display:none" onclick="if(event.target===this)this.style.display='none'">
+  <div class="modal">
+    <h3>📍 내 위치 공유</h3>
+    <p style="color:#94a3b8;font-size:12px;margin-bottom:10px">본부에서 내 위치를 실시간으로 확인합니다</p>
+    <label>대상 선택</label>
+    <select id="gpsSel" style="margin-bottom:8px"></select>
+    <div id="gpsStat" style="text-align:center;padding:12px;color:#94a3b8;font-size:13px">GPS 대기 중...</div>
+    <div class="modal-btns">
+      <button id="gpsStartBtn" style="background:#10b981;color:#fff" onclick="startGPS()">📍 공유 시작</button>
+      <button id="gpsStopBtn" style="background:#dc2626;color:#fff;display:none" onclick="stopGPS()">⏹ 중지</button>
+      <button style="background:#475569;color:#fff" onclick="document.getElementById('gpsModal').style.display='none'">닫기</button>
+    </div>
+  </div>
+</div>
+
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="firebase-config.js"></script>
+
+<script>
+
+var PRESET_COLORS=['#FF6B6B','#4ECDC4','#95E1D3','#FFA45B','#A66CFF','#3498db','#e67e22','#27ae60','#e74c3c','#f1c40f','#9b59b6','#1abc9c','#e91e63','#00bcd4','#8bc34a','#ff5722'];
+
+function renderPalette(containerId,hiddenId,selectedColor){
+  var el=document.getElementById(containerId);
+  el.innerHTML='';
+  PRESET_COLORS.forEach(function(c){
+    var dot=document.createElement('div');
+    dot.className='color-dot'+(c===selectedColor?' selected':'');
+    dot.style.background=c;
+    dot.onclick=function(){
+      document.getElementById(hiddenId).value=c;
+      el.querySelectorAll('.color-dot').forEach(function(d){d.classList.remove('selected')});
+      dot.classList.add('selected');
+    };
+    el.appendChild(dot);
+  });
+}
+
+var KAKAO_KEY_L='f3f8fa6decb5e2185b09d6bf70ef525b';
+var DEFAULT_CENTER={lat:35.3585,lng:126.5090};
+var map;
+
+// ══ 데이터 ══
+var categories=[];   // [{id,name,shape,w,h,diameter,color,prefix}]
+var items=[];        // [{id,catId,num,name,duty,phone,memo,lat,lng,w,h,diameter,shape}]
+var selectedItemIdx=-1;
+var editingCatId=null;
+var nextCatId=1, nextItemId=1;
+
+// ══ 추적 ══
+var trackers=[], livePos={}, gpsMarkers={}, gpsLabels={}, gpsWatchId=null;
+
+// ══ 미터↔위경도 ══
+var M_LAT=111320;
+function mLng(lat){return 111320*Math.cos(lat*Math.PI/180)}
+
+function loadKakao(){
+  var s=document.createElement('script');
+  s.src='//dapi.kakao.com/v2/maps/sdk.js?appkey='+KAKAO_KEY_L+'&autoload=false';
+  s.onload=function(){kakao.maps.load(initMap)};
+  document.head.appendChild(s);
+}
+
+function initMap(){
+  map=new kakao.maps.Map(document.getElementById('map'),{
+    center:new kakao.maps.LatLng(DEFAULT_CENTER.lat,DEFAULT_CENTER.lng),
+    level:2,mapTypeId:kakao.maps.MapTypeId.HYBRID
+  });
+  kakao.maps.event.addListener(map,'click',function(){deselectItem()});
+  loadData();
+  loadTrackers();
+  listenGPS();
+  if(location.search.indexOf('gps=1')>=0)setTimeout(showGPSModal,500);
+}
+
+// ══════════════════════════════════════
+//  사이드바 / 탭
+// ══════════════════════════════════════
+function toggleSidebar(){document.getElementById('sidebar').classList.toggle('collapsed')}
+
+function switchTab(tab,btn){
+  document.querySelectorAll('.sb-tab').forEach(function(t){t.classList.remove('active')});
+  btn.classList.add('active');
+  document.getElementById('layoutBody').style.display=tab==='layout'?'block':'none';
+  document.getElementById('trackBody').style.display=tab==='track'?'block':'none';
+}
+
+// ══════════════════════════════════════
+//  카테고리 관리
+// ══════════════════════════════════════
+function renderCategories(){
+  var el=document.getElementById('catList');
+  var html='';
+  categories.forEach(function(cat){
+    var catItems=items.filter(function(it){return it.catId===cat.id});
+    html+='<div class="cat-card" id="cat_'+cat.id+'">';
+    html+='<div class="cat-head" onclick="toggleCat('+cat.id+')">';
+    html+='<div class="cat-color" style="background:'+cat.color+'" onclick="event.stopPropagation();showEditCat('+cat.id+')"></div>';
+    html+='<div class="cat-title">'+cat.name+'</div>';
+    html+='<div class="cat-count">'+catItems.length+'</div>';
+    html+='<button class="hbtn" onclick="event.stopPropagation();showEditCat('+cat.id+')" title="설정">⚙</button>';
+    html+='<div class="cat-toggle" id="catArrow_'+cat.id+'">▶</div>';
+    html+='</div>';
+    html+='<div class="cat-body" id="catBody_'+cat.id+'">';
+    html+='<div class="cat-setting"><label>도형</label><span style="color:#cbd5e1;font-size:11px">'+(cat.shape==='circle'?'원형 ⌀'+cat.diameter+'m':'사각형 '+cat.w+'×'+cat.h+'m')+'</span></div>';
+
+    if(catItems.length){
+      html+='<div class="cat-items">';
+      catItems.forEach(function(it){
+        var idx=items.indexOf(it);
+        html+='<div class="cat-item'+(selectedItemIdx===idx?' active':'')+'" onclick="selectItem('+idx+')">';
+        html+='<div class="cat-item-num">'+it.num+'</div>';
+        html+='<div class="cat-item-name">'+(it.name||cat.name)+'</div>';
+        html+='</div>';
+      });
+      html+='</div>';
+    }
+
+    html+='<div class="cat-btns">';
+    html+='<button style="background:'+cat.color+';color:#fff" onclick="addItem('+cat.id+')">＋ '+cat.name+' 추가</button>';
+    html+='</div>';
+    html+='</div></div>';
+  });
+  el.innerHTML=html;
+  renderLegend();
+}
+
+function toggleCat(catId){
+  var body=document.getElementById('catBody_'+catId);
+  var arrow=document.getElementById('catArrow_'+catId);
+  if(body.classList.contains('open')){
+    body.classList.remove('open');arrow.classList.remove('open');
+  } else {
+    body.classList.add('open');arrow.classList.add('open');
+  }
+}
+
+// 새 카테고리
+document.getElementById('ncShape').addEventListener('change',function(){
+  document.getElementById('ncRectSize').style.display=this.value==='rect'?'block':'none';
+  document.getElementById('ncCircleSize').style.display=this.value==='circle'?'block':'none';
+});
+document.getElementById('ecShape').addEventListener('change',function(){
+  document.getElementById('ecRectSize').style.display=this.value==='rect'?'block':'none';
+  document.getElementById('ecCircleSize').style.display=this.value==='circle'?'block':'none';
+});
+
+function showNewCatModal(){
+  document.getElementById('ncName').value='';
+  document.getElementById('ncShape').value='rect';
+  document.getElementById('ncW').value=3;document.getElementById('ncH').value=6;
+  document.getElementById('ncDiam').value=5;
+  document.getElementById('ncColor').value='#3b82f6';
+  document.getElementById('ncPrefix').value='';
+  document.getElementById('ncRectSize').style.display='block';
+  document.getElementById('ncCircleSize').style.display='none';
+  renderPalette('ncPalette','ncColor','#FF6B6B');
+  document.getElementById('newCatModal').style.display='flex';
+}
+
+function createCategory(){
+  var name=document.getElementById('ncName').value.trim();
+  if(!name){toast('이름을 입력하세요',true);return}
+  var cat={
+    id:nextCatId++,
+    name:name,
+    shape:document.getElementById('ncShape').value,
+    w:parseFloat(document.getElementById('ncW').value)||3,
+    h:parseFloat(document.getElementById('ncH').value)||6,
+    diameter:parseFloat(document.getElementById('ncDiam').value)||5,
+    color:document.getElementById('ncColor').value,
+    prefix:document.getElementById('ncPrefix').value.trim()||name.charAt(0)
+  };
+  categories.push(cat);
+  renderCategories();
+  document.getElementById('newCatModal').style.display='none';
+  toast(name+' 카테고리 생성');
+}
+
+// 카테고리 편집
+function showEditCat(catId){
+  var cat=categories.find(function(c){return c.id===catId});
+  if(!cat)return;
+  editingCatId=catId;
+  document.getElementById('ecTitle').textContent='⚙ '+cat.name+' 설정';
+  document.getElementById('ecName').value=cat.name;
+  document.getElementById('ecShape').value=cat.shape;
+  document.getElementById('ecW').value=cat.w;
+  document.getElementById('ecH').value=cat.h;
+  document.getElementById('ecDiam').value=cat.diameter||5;
+  document.getElementById('ecColor').value=cat.color;
+  document.getElementById('ecPrefix').value=cat.prefix;
+  document.getElementById('ecRectSize').style.display=cat.shape==='rect'?'block':'none';
+  document.getElementById('ecCircleSize').style.display=cat.shape==='circle'?'block':'none';
+  renderPalette('ecPalette','ecColor',cat.color);
+  document.getElementById('editCatModal').style.display='flex';
+}
+
+function updateCategory(){
+  var cat=categories.find(function(c){return c.id===editingCatId});
+  if(!cat)return;
+  var oldColor=cat.color;
+  cat.name=document.getElementById('ecName').value.trim()||cat.name;
+  cat.shape=document.getElementById('ecShape').value;
+  cat.w=parseFloat(document.getElementById('ecW').value)||3;
+  cat.h=parseFloat(document.getElementById('ecH').value)||6;
+  cat.diameter=parseFloat(document.getElementById('ecDiam').value)||5;
+  cat.color=document.getElementById('ecColor').value;
+  cat.prefix=document.getElementById('ecPrefix').value.trim()||cat.name.charAt(0);
+
+  // 색상 변경 → 해당 카테고리 전체 아이템 다시 그리기
+  items.forEach(function(it,i){
+    if(it.catId===cat.id) drawItem(i);
+  });
+
+  renderCategories();
+  document.getElementById('editCatModal').style.display='none';
+  toast(cat.name+' 설정 적용');
+}
+
+function deleteCategory(){
+  var cat=categories.find(function(c){return c.id===editingCatId});
+  if(!cat)return;
+  var cnt=items.filter(function(it){return it.catId===cat.id}).length;
+  if(!confirm(cat.name+' 카테고리를 삭제합니다'+(cnt?'\n포함된 '+cnt+'개 아이템도 함께 삭제됩니다.':'')))return;
+
+  // 아이템 제거
+  for(var i=items.length-1;i>=0;i--){
+    if(items[i].catId===cat.id){
+      if(items[i]._poly)items[i]._poly.setMap(null);
+      if(items[i]._label)items[i]._label.setMap(null);
+      items.splice(i,1);
+    }
+  }
+  categories=categories.filter(function(c){return c.id!==editingCatId});
+  selectedItemIdx=-1;
+  document.getElementById('itemPanel').style.display='none';
+  renderCategories();
+  document.getElementById('editCatModal').style.display='none';
+  toast('삭제됨');
+}
+
+// ══════════════════════════════════════
+//  아이템 관리
+// ══════════════════════════════════════
+function addItem(catId){
+  var cat=categories.find(function(c){return c.id===catId});
+  if(!cat)return;
+  var cnt=items.filter(function(it){return it.catId===catId}).length;
+  var c=map.getCenter();
+  var it={
+    id:nextItemId++,
+    catId:catId,
+    num:cat.prefix+'-'+String(cnt+1).padStart(2,'0'),
+    name:'', duty:'', phone:'', memo:'',
+    lat:c.getLat(), lng:c.getLng(),
+    w:cat.w, h:cat.h, diameter:cat.diameter, shape:cat.shape
+  };
+  items.push(it);
+  drawItem(items.length-1);
+  selectItem(items.length-1);
+  renderCategories();
+
+  // 카테고리 펼치기
+  var body=document.getElementById('catBody_'+catId);
+  if(body&&!body.classList.contains('open'))toggleCat(catId);
+}
+
+function getRectPts(lat,lng,wM,hM){
+  var dLat=hM/M_LAT,dLng=wM/mLng(lat);
+  var hw=dLng/2,hh=dLat/2;
+  return[
+    new kakao.maps.LatLng(lat+hh,lng-hw),new kakao.maps.LatLng(lat+hh,lng+hw),
+    new kakao.maps.LatLng(lat-hh,lng+hw),new kakao.maps.LatLng(lat-hh,lng-hw)
+  ];
+}
+function getCirclePts(lat,lng,r,n){
+  n=n||36;var pts=[];
+  for(var i=0;i<n;i++){
+    var a=2*Math.PI*i/n;
+    pts.push(new kakao.maps.LatLng(lat+r*Math.cos(a)/M_LAT, lng+r*Math.sin(a)/mLng(lat)));
+  }
+  return pts;
+}
+
+function drawItem(idx){
+  var it=items[idx];
+  var cat=categories.find(function(c){return c.id===it.catId});
+  if(!cat)return;
+  var color=cat.color;
+
+  if(it._poly)it._poly.setMap(null);
+  if(it._label)it._label.setMap(null);
+
+  var pts;
+  if(it.shape==='circle') pts=getCirclePts(it.lat,it.lng,(it.diameter||5)/2);
+  else pts=getRectPts(it.lat,it.lng,it.w,it.h);
+
+  it._poly=new kakao.maps.Polygon({
+    path:pts,strokeWeight:2,strokeColor:color,strokeOpacity:0.9,
+    fillColor:color,fillOpacity:0.4
+  });
+  it._poly.setMap(map);
+
+  var txt=it.num+(it.name?' '+it.name:'');
+  it._label=new kakao.maps.CustomOverlay({
+    position:new kakao.maps.LatLng(it.lat,it.lng),
+    content:'<div class="f-label" style="background:'+color+'cc">'+txt+'</div>',
+    yAnchor:0.5
+  });
+  it._label.setMap(map);
+
+  // 클릭
+  kakao.maps.event.addListener(it._poly,'click',function(){selectItem(idx)});
+
+  // 드래그
+  var drag=false,sx,sy,slat,slng;
+  kakao.maps.event.addListener(it._poly,'mousedown',function(e){
+    drag=true;sx=e.point.x;sy=e.point.y;slat=it.lat;slng=it.lng;
+    map.setDraggable(false);
+  });
+  kakao.maps.event.addListener(map,'mousemove',function(e){
+    if(!drag)return;
+    var proj=map.getProjection();
+    var sp=proj.containerPointFromCoords(new kakao.maps.LatLng(slat,slng));
+    var np=new kakao.maps.Point(sp.x+(e.point.x-sx),sp.y+(e.point.y-sy));
+    var nc=proj.coordsFromContainerPoint(np);
+    it.lat=nc.getLat();it.lng=nc.getLng();
+    var pts2;
+    if(it.shape==='circle')pts2=getCirclePts(it.lat,it.lng,(it.diameter||5)/2);
+    else pts2=getRectPts(it.lat,it.lng,it.w,it.h);
+    it._poly.setPath(pts2);
+    it._label.setPosition(new kakao.maps.LatLng(it.lat,it.lng));
+  });
+  kakao.maps.event.addListener(map,'mouseup',function(){
+    if(drag){drag=false;map.setDraggable(true)}
+  });
+}
+
+function selectItem(idx){
+  deselectItem();
+  selectedItemIdx=idx;
+  var it=items[idx];
+  var cat=categories.find(function(c){return c.id===it.catId});
+  it._poly.setOptions({strokeWeight:4,strokeColor:'#fff',fillOpacity:0.6});
+
+  var p=document.getElementById('itemPanel');
+  document.getElementById('itemTitle').textContent=it.num+' 편집'+(cat?' ('+cat.name+')':'');
+  document.getElementById('iNum').value=it.num;
+  document.getElementById('iName').value=it.name;
+  document.getElementById('iDuty').value=it.duty||'';
+  document.getElementById('iPhone').value=it.phone;
+  document.getElementById('iMemo').value=it.memo||'';
+  p.style.display='block';
+  renderCategories();
+}
+
+function deselectItem(){
+  if(selectedItemIdx>=0&&items[selectedItemIdx]){
+    var it=items[selectedItemIdx];
+    var cat=categories.find(function(c){return c.id===it.catId});
+    if(cat)it._poly.setOptions({strokeWeight:2,strokeColor:cat.color,fillOpacity:0.4});
+  }
+  selectedItemIdx=-1;
+  document.getElementById('itemPanel').style.display='none';
+}
+
+function applyItem(){
+  if(selectedItemIdx<0)return;
+  var it=items[selectedItemIdx];
+  it.num=document.getElementById('iNum').value;
+  it.name=document.getElementById('iName').value;
+  it.duty=document.getElementById('iDuty').value;
+  it.phone=document.getElementById('iPhone').value;
+  it.memo=document.getElementById('iMemo').value;
+  drawItem(selectedItemIdx);
+  selectItem(selectedItemIdx);
+  renderCategories();
+  toast('적용됨');
+}
+
+function deleteItem(){
+  if(selectedItemIdx<0)return;
+  if(!confirm('삭제하시겠습니까?'))return;
+  var it=items[selectedItemIdx];
+  if(it._poly)it._poly.setMap(null);
+  if(it._label)it._label.setMap(null);
+  items.splice(selectedItemIdx,1);
+  selectedItemIdx=-1;
+  document.getElementById('itemPanel').style.display='none';
+  renderCategories();toast('삭제됨');
+}
+
+function closeItem(){deselectItem();renderCategories()}
+
+// 범례
+function renderLegend(){
+  var el=document.getElementById('legend');
+  var html='';
+  categories.forEach(function(cat){
+    var cnt=items.filter(function(it){return it.catId===cat.id}).length;
+    html+='<div class="leg-row"><div class="leg-swatch" style="background:'+cat.color+'"></div> '+cat.name+' ('+cnt+')</div>';
+  });
+  html+='<div style="border-top:1px solid #334155;margin:4px 0"></div>';
+  html+='<div class="leg-row"><div class="leg-swatch" style="background:#10b981;border-radius:50%"></div> 인원 GPS</div>';
+  html+='<div class="leg-row"><div class="leg-swatch" style="background:#3b82f6;border-radius:50%"></div> 차량 GPS</div>';
+  el.innerHTML=html;
+}
+
+// ══════════════════════════════════════
+//  Firebase 저장/로드
+// ══════════════════════════════════════
+function saveAll(){
+  var catData=categories.map(function(c){return{id:c.id,name:c.name,shape:c.shape,w:c.w,h:c.h,diameter:c.diameter||5,color:c.color,prefix:c.prefix}});
+  var itemData=items.map(function(it){return{id:it.id,catId:it.catId,num:it.num,name:it.name,duty:it.duty||'',phone:it.phone,memo:it.memo||'',lat:it.lat,lng:it.lng,w:it.w,h:it.h,diameter:it.diameter||5,shape:it.shape}});
+  fbDb.ref('/layout').update({categories:catData,items:itemData}).then(function(){
+    toast('💾 저장 완료 (카테고리 '+catData.length+', 아이템 '+itemData.length+')');
+  }).catch(function(e){toast('저장 실패: '+e.message,true)});
+}
+
+function loadData(){
+  fbDb.ref('/layout').once('value').then(function(snap){
+    var d=snap.val();
+    if(!d)return;
+    if(d.categories&&Array.isArray(d.categories)){
+      categories=d.categories;
+      var maxC=0;categories.forEach(function(c){if(c.id>maxC)maxC=c.id});
+      nextCatId=maxC+1;
+    }
+    if(d.items&&Array.isArray(d.items)){
+      items=d.items;
+      var maxI=0;items.forEach(function(it){if(it.id>maxI)maxI=it.id;it._poly=null;it._label=null});
+      nextItemId=maxI+1;
+      items.forEach(function(it,i){drawItem(i)});
+    }
+    renderCategories();
+    if(items.length)toast(items.length+'개 시설 로드됨');
+  });
+}
+
+// ══════════════════════════════════════
+//  추적
+// ══════════════════════════════════════
+function showRegModal(type){
+  document.getElementById('rmType').value=type;
+  document.getElementById('rmTitle').textContent=type==='vehicle'?'🚗 차량 등록':'👤 인원 등록';
+  document.getElementById('rmName').value='';document.getElementById('rmPhone').value='';document.getElementById('rmMemo').value='';
+  document.getElementById('regModal').style.display='flex';
+}
+
+function registerTracker(){
+  var name=document.getElementById('rmName').value.trim();
+  if(!name){toast('이름을 입력하세요',true);return}
+  var t={id:Date.now(),type:document.getElementById('rmType').value,name:name,phone:document.getElementById('rmPhone').value.trim(),memo:document.getElementById('rmMemo').value.trim(),created:new Date().toISOString()};
+  fbDb.ref('/layout/trackers/'+t.id).set(t).then(function(){
+    toast(name+' 등록 완료');document.getElementById('regModal').style.display='none';
+  }).catch(function(e){toast('등록 실패',true)});
+}
+
+function loadTrackers(){
+  fbDb.ref('/layout/trackers').on('value',function(snap){
+    trackers=[];var d=snap.val()||{};
+    Object.keys(d).forEach(function(k){trackers.push(d[k])});
+    renderTrackList();updateGPSSel();
+  });
+}
+
+function renderTrackList(){
+  var el=document.getElementById('trackList');
+  document.getElementById('trackBody').querySelector('div:last-child');
+  if(!trackers.length){el.innerHTML='<div style="color:#94a3b8;padding:12px;font-size:12px;text-align:center">등록된 대상이 없습니다</div>';return}
+  var html='';
+  trackers.forEach(function(t){
+    var pos=livePos[t.id];
+    var on=pos&&(Date.now()-pos.ts<120000);
+    html+='<div class="track-item">';
+    html+='<div class="dot '+(on?'on':'off')+'"></div>';
+    html+='<div style="flex:1;font-size:12px"><div style="font-weight:700">'+(t.type==='vehicle'?'🚗':'👤')+' '+t.name+'</div>';
+    html+='<div style="color:#94a3b8;font-size:10px">'+(t.phone||'')+(t.memo?' · '+t.memo:'')+'</div>';
+    if(on){var d=new Date(pos.ts);html+='<div style="color:#10b981;font-size:10px">📍 '+d.getHours()+':'+String(d.getMinutes()).padStart(2,'0')+'</div>'}
+    html+='</div>';
+    if(on)html+='<button onclick="focusT('+t.id+')" style="background:#0ea5e9;color:#fff;border:none;padding:3px 6px;border-radius:4px;font-size:10px;font-weight:700;cursor:pointer">위치</button>';
+    html+='<button onclick="delTracker('+t.id+')" style="background:#dc2626;color:#fff;border:none;padding:3px 5px;border-radius:4px;font-size:10px;cursor:pointer;margin-left:2px">✕</button>';
+    html+='</div>';
+  });
+  el.innerHTML=html;
+}
+
+function focusT(id){var p=livePos[id];if(p){map.setCenter(new kakao.maps.LatLng(p.lat,p.lng));map.setLevel(2)}}
+function delTracker(id){if(!confirm('삭제?'))return;fbDb.ref('/layout/trackers/'+id).remove();fbDb.ref('/layout/gps/'+id).remove();toast('삭제됨')}
+
+function listenGPS(){
+  fbDb.ref('/layout/gps').on('value',function(snap){
+    livePos=snap.val()||{};renderGPSMarkers();renderTrackList();
+  });
+}
+
+function renderGPSMarkers(){
+  Object.keys(gpsMarkers).forEach(function(k){gpsMarkers[k].setMap(null);if(gpsLabels[k])gpsLabels[k].setMap(null)});
+  gpsMarkers={};gpsLabels={};
+  Object.keys(livePos).forEach(function(id){
+    var p=livePos[id];if(!p||!p.lat||Date.now()-p.ts>120000)return;
+    var tk=trackers.find(function(t){return String(t.id)===String(id)});
+    var isV=tk&&tk.type==='vehicle';
+    var nm=tk?tk.name:id;
+    var img=new kakao.maps.MarkerImage('https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/markerStar.png',new kakao.maps.Size(24,35));
+    var m=new kakao.maps.Marker({position:new kakao.maps.LatLng(p.lat,p.lng),image:img,map:map});
+    gpsMarkers[id]=m;
+    var lb=new kakao.maps.CustomOverlay({position:new kakao.maps.LatLng(p.lat,p.lng),content:'<div class="gps-label'+(isV?' vehicle':'')+'">'+(isV?'🚗':'👤')+' '+nm+'</div>',yAnchor:2.2});
+    lb.setMap(map);gpsLabels[id]=lb;
+  });
+}
+
+function showGPSModal(){updateGPSSel();document.getElementById('gpsModal').style.display='flex'}
+function updateGPSSel(){
+  var s=document.getElementById('gpsSel');s.innerHTML='';
+  trackers.forEach(function(t){var o=document.createElement('option');o.value=t.id;o.textContent=(t.type==='vehicle'?'🚗':'👤')+' '+t.name;s.appendChild(o)});
+}
+
+function startGPS(){
+  if(!navigator.geolocation){toast('GPS 불가',true);return}
+  var id=document.getElementById('gpsSel').value;if(!id){toast('대상 선택 필요',true);return}
+  document.getElementById('gpsStartBtn').style.display='none';
+  document.getElementById('gpsStopBtn').style.display='block';
+  document.getElementById('gpsStat').innerHTML='<div style="color:#10b981">📍 위치 공유 중...</div>';
+  gpsWatchId=navigator.geolocation.watchPosition(function(p){
+    var d={lat:p.coords.latitude,lng:p.coords.longitude,ts:Date.now(),acc:p.coords.accuracy||0};
+    fbDb.ref('/layout/gps/'+id).set(d);
+    document.getElementById('gpsStat').innerHTML='<div style="color:#10b981;font-size:13px">📍 공유 중<br><span style="font-size:11px;color:#94a3b8">'+d.lat.toFixed(5)+', '+d.lng.toFixed(5)+'</span></div>';
+  },function(e){document.getElementById('gpsStat').innerHTML='<div style="color:#ef4444">오류: '+e.message+'</div>';
+  },{enableHighAccuracy:true,maximumAge:5000,timeout:15000});
+}
+
+function stopGPS(){
+  if(gpsWatchId!==null){navigator.geolocation.clearWatch(gpsWatchId);gpsWatchId=null}
+  var id=document.getElementById('gpsSel').value;if(id)fbDb.ref('/layout/gps/'+id).remove();
+  document.getElementById('gpsStartBtn').style.display='block';document.getElementById('gpsStopBtn').style.display='none';
+  document.getElementById('gpsStat').innerHTML='GPS 대기 중...';toast('공유 중지');
+}
+
+function toast(m,err){
+  var t=document.createElement('div');t.textContent=m;
+  t.style.cssText='position:fixed;bottom:40px;left:50%;transform:translateX(-50%);padding:10px 20px;border-radius:8px;font-size:13px;font-weight:600;z-index:9999;color:#fff;background:'+(err?'#dc2626':'#10b981');
+  document.body.appendChild(t);setTimeout(function(){t.remove()},2500);
+}
+
+loadKakao();
+</script>
+</body>
+</html>

@@ -1,0 +1,377 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>통계 - 방역 횟수</title>
+  <link rel="stylesheet" href="style.css?v=20260512v">
+  <style>
+    table { width:100%; border-collapse: collapse; font-size: 13px; }
+    th, td { padding: 6px 8px; border: 1px solid #ddd; text-align: center; }
+    th { background: #34495e; color: #fff; position: sticky; top: 0; }
+    td:first-child { text-align: left; font-weight: 600; background: #f8f9fa; white-space: nowrap; }
+    th:first-child { white-space: nowrap; }
+    tr:hover td { background: #fffde7; }
+    .num-zero { color: #ccc; }
+    .num-high { background: #c8e6c9; font-weight: 700; }
+    .scroll-x { overflow-x: auto; max-height: 600px; }
+  </style>
+</head>
+<body>
+<header>
+  <h1>📈 통계 - 방역 횟수</h1>
+  <nav>
+    <a href="index.html">홈</a>
+    <a href="admin.html">관리</a>
+    <a href="members.html">인원</a>
+    <a href="today.html">오늘운영</a>
+    <a href="monitor.html">모니터링</a>
+    <a href="stats.html" class="active">통계</a>
+    <a href="accounts.html">계정</a>
+    <a href="#" onclick="adminLogout();return false;">로그아웃</a>
+  </nav>
+</header>
+
+<div class="container">
+  <div class="card">
+    <div class="flex-between" style="flex-wrap:wrap;gap:8px;">
+      <h2>필터</h2>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+        <label style="display:inline;font-size:12px;">행사:</label>
+        <select id="eventFilter" onchange="render()" style="width:auto;display:inline-block;">
+          <option value="">전체 행사</option>
+        </select>
+        <label style="display:inline;font-size:12px;">기간:</label>
+        <select id="period" onchange="onPeriodChange()" style="width:auto;display:inline-block;">
+          <option value="all">전체</option>
+          <option value="month">최근 30일</option>
+          <option value="week">최근 7일</option>
+          <option value="today">오늘</option>
+          <option value="day">일별 선택</option>
+          <option value="monthly">월별 선택</option>
+          <option value="range">기간 선택</option>
+        </select>
+        <span id="dayPicker" style="display:none;">
+          <input type="date" id="dayInput" onchange="render()" style="width:auto;display:inline-block;">
+        </span>
+        <span id="monthPicker" style="display:none;">
+          <input type="month" id="monthInput" onchange="render()" style="width:auto;display:inline-block;">
+        </span>
+        <span id="rangePicker" style="display:none;">
+          <input type="date" id="rangeStart" onchange="render()" style="width:auto;display:inline-block;">
+          ~
+          <input type="date" id="rangeEnd" onchange="render()" style="width:auto;display:inline-block;">
+        </span>
+        <button class="small" onclick="exportStatsCSV()">⬇️ 엑셀</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="col" style="flex:1;min-width:320px;">
+      <div class="card">
+        <div class="flex-between">
+          <h2 id="memberChartTitle">회원별 방역 횟수 (코스별 누적)</h2>
+          <select id="memberGroupBy" onchange="render()" style="width:auto;display:inline-block;">
+            <option value="member" selected>회원 전체</option>
+            <option value="driver">운전자만</option>
+            <option value="assist">보조자만</option>
+            <option value="team">조별</option>
+          </select>
+        </div>
+        <canvas id="memberChart" style="max-height:400px;"></canvas>
+      </div>
+    </div>
+    <div class="col" style="flex:1;min-width:320px;">
+      <div class="card">
+        <h2>코스별 방역 총 횟수</h2>
+        <canvas id="courseChart" style="max-height:400px;"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>회원 × 코스 표</h2>
+    <p class="muted" style="font-size:12px;">행: 회원, 열: 코스, 칸: 방역 참여 횟수</p>
+    <div class="scroll-x">
+      <table id="statsTable"></table>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
+<script src="firebase-config.js?v=20260512v"></script>
+<script src="common.js?v=20260512v"></script>
+<script>
+let memberChart, courseChart;
+
+window.onAuthSuccess = () => onDataReady(render);
+window.onDataChanged = () => render();
+checkAdminAuth().then(ok => { if (ok) onDataReady(render); });
+
+// 관리자만 들어올 수 있으니 항상 admin 권한
+function isEventVisibleForViewer() { return true; }
+
+function onPeriodChange() {
+  const period = document.getElementById('period').value;
+  document.getElementById('dayPicker').style.display = period === 'day' ? 'inline-block' : 'none';
+  document.getElementById('monthPicker').style.display = period === 'monthly' ? 'inline-block' : 'none';
+  document.getElementById('rangePicker').style.display = period === 'range' ? 'inline-block' : 'none';
+  if (period === 'day' && !document.getElementById('dayInput').value) {
+    document.getElementById('dayInput').value = todayStr();
+  } else if (period === 'monthly' && !document.getElementById('monthInput').value) {
+    document.getElementById('monthInput').value = todayStr().slice(0, 7);
+  } else if (period === 'range') {
+    if (!document.getElementById('rangeStart').value) document.getElementById('rangeStart').value = todayStr();
+    if (!document.getElementById('rangeEnd').value) document.getElementById('rangeEnd').value = todayStr();
+  }
+  render();
+}
+
+function getFilteredLogs() {
+  const data = loadData();
+  const period = document.getElementById('period').value;
+  const now = Date.now();
+  let from = 0, to = Infinity;
+  if (period === 'today') {
+    const d = new Date(); d.setHours(0,0,0,0);
+    from = d.getTime();
+  } else if (period === 'week') from = now - 7*24*60*60*1000;
+  else if (period === 'month') from = now - 30*24*60*60*1000;
+  else if (period === 'day') {
+    const v = document.getElementById('dayInput').value;
+    if (v) {
+      const d = new Date(v + 'T00:00:00');
+      from = d.getTime();
+      to = from + 24*60*60*1000;
+    }
+  } else if (period === 'monthly') {
+    const v = document.getElementById('monthInput').value;
+    if (v) {
+      const [y, m] = v.split('-').map(Number);
+      from = new Date(y, m-1, 1).getTime();
+      to = new Date(y, m, 1).getTime();
+    }
+  } else if (period === 'range') {
+    const s = document.getElementById('rangeStart').value;
+    const e = document.getElementById('rangeEnd').value;
+    if (s) from = new Date(s + 'T00:00:00').getTime();
+    if (e) to = new Date(e + 'T23:59:59').getTime();
+  }
+  const eventFilter = document.getElementById('eventFilter')?.value || '';
+  return (data.logs || []).filter(l => {
+    const t = l.startedAt || 0;
+    if (t < from || t > to) return false;
+    if (!l.finishedAt) return false;
+    if (eventFilter && l.eventId !== eventFilter) return false;
+    if (!isEventVisibleForViewer(l.eventId, data)) return false;
+    return true;
+  });
+}
+
+function renderEventFilterOptions() {
+  const sel = document.getElementById('eventFilter');
+  if (!sel) return;
+  const data = loadData();
+  const cur = sel.value;
+  const visible = (data.events || []).filter(e => isEventVisibleForViewer(e.id, data));
+  sel.innerHTML = '<option value="">전체 행사</option>' +
+    visible.map(e => `<option value="${e.id}"${cur===e.id?' selected':''}>${e.name}</option>`).join('');
+}
+
+// 한 로그에서 그룹 키 뽑아내기 (groupBy에 따라)
+function logGroupKeys(log, groupBy, data) {
+  const keys = [];
+  if (groupBy === 'member') {
+    if (log.crew?.driver) keys.push(log.crew.driver.trim());
+    if (log.crew?.assist) {
+      log.crew.assist.split(',').map(s => s.trim()).filter(Boolean).forEach(n => keys.push(n));
+    }
+  } else if (groupBy === 'driver') {
+    if (log.crew?.driver) keys.push(log.crew.driver.trim());
+  } else if (groupBy === 'assist') {
+    if (log.crew?.assist) {
+      log.crew.assist.split(',').map(s => s.trim()).filter(Boolean).forEach(n => keys.push(n));
+    }
+  } else if (groupBy === 'team') {
+    const team = getTeam(data, log.teamId);
+    if (team) keys.push(team.name);
+  }
+  return keys;
+}
+
+const GROUP_LABELS = {
+  member: { row: '회원', title: '회원별 방역 횟수 (코스별 누적)' },
+  driver: { row: '운전자', title: '운전자별 방역 횟수 (코스별 누적)' },
+  assist: { row: '보조자', title: '보조자별 방역 횟수 (코스별 누적)' },
+  team:   { row: '조',   title: '조별 방역 횟수 (코스별 누적)' }
+};
+
+function render() {
+  renderEventFilterOptions();
+  const data = loadData();
+  const logs = getFilteredLogs();
+  const members = data.members || [];
+  const groupBy = document.getElementById('memberGroupBy')?.value || 'member';
+  const labels = GROUP_LABELS[groupBy] || GROUP_LABELS.member;
+  const titleEl = document.getElementById('memberChartTitle');
+  if (titleEl) titleEl.textContent = labels.title;
+
+  // 행사 필터에 맞는 코스만 (필터 없으면 전체) + 비관리자는 숨김 행사 제외
+  const eventFilter = document.getElementById('eventFilter')?.value || '';
+  const courses = [];
+  const visibleEventIds = new Set();
+  for (const e of data.events) {
+    if (!isEventVisibleForViewer(e.id, data)) continue;
+    visibleEventIds.add(e.id);
+    if (eventFilter && e.id !== eventFilter) continue;
+    for (const c of e.courses) courses.push({ id: c.id, label: `${e.name}-${c.name}`, color: c.color });
+  }
+
+  // matrix[key][courseId] = count
+  const matrix = {};
+  const memberTotals = {};
+  const courseTotals = {};
+
+  for (const log of logs) {
+    const courseId = log.courseId;
+    const keys = logGroupKeys(log, groupBy, data);
+    for (const name of keys) {
+      if (!matrix[name]) matrix[name] = {};
+      matrix[name][courseId] = (matrix[name][courseId] || 0) + 1;
+      memberTotals[name] = (memberTotals[name] || 0) + 1;
+    }
+    courseTotals[courseId] = (courseTotals[courseId] || 0) + 1;
+  }
+
+  // 표 그리기 (0회 제외, 많은 순)
+  const sortedAll = Object.entries(memberTotals).sort((a,b) => b[1]-a[1]);
+  let thead = `<tr><th>${labels.row}</th><th>총합</th>` + courses.map(c => `<th>${c.label}</th>`).join('') + '</tr>';
+  let tbody = '';
+  for (const [name, total] of sortedAll) {
+    if (total === 0) continue;
+    const isUnregistered = groupBy === 'member' && !members.find(m=>m.name===name);
+    let row = `<tr><td>${name}${isUnregistered ? ' <span class="sub">(미등록)</span>' : ''}</td>`;
+    row += `<td><b>${total}</b></td>`;
+    for (const c of courses) {
+      const v = matrix[name]?.[c.id] || 0;
+      row += `<td class="${v===0?'num-zero':v>=3?'num-high':''}">${v||''}</td>`;
+    }
+    row += '</tr>';
+    tbody += row;
+  }
+  document.getElementById('statsTable').innerHTML = thead + tbody;
+
+  // 회원별: 코스별 누적 막대 (각 코스 색깔, 총합 위에 표시)
+  // 0회는 memberTotals에 없으니 자동으로 제외됨, 횟수 많은 순
+  const sortedNames = Object.entries(memberTotals).sort((a,b) => b[1]-a[1]).map(x => x[0]);
+  if (memberChart) memberChart.destroy();
+  memberChart = new Chart(document.getElementById('memberChart'), {
+    type: 'bar',
+    data: {
+      labels: sortedNames,
+      datasets: courses.map(c => ({
+        label: c.label,
+        data: sortedNames.map(name => matrix[name]?.[c.id] || 0),
+        backgroundColor: c.color
+      }))
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: true, position: 'bottom', labels: { font: { size: 10 } } },
+        tooltip: { mode: 'index', intersect: false }
+      },
+      scales: {
+        x: { stacked: true, ticks: { font: { size: 10 } } },
+        y: { stacked: true, beginAtZero: true, ticks: { precision: 0 } }
+      },
+      layout: { padding: { top: 24 } }  // 총합 라벨 공간
+    },
+    plugins: [stackTotalsPlugin]
+  });
+
+  // 코스별 (단일 막대)
+  if (courseChart) courseChart.destroy();
+  courseChart = new Chart(document.getElementById('courseChart'), {
+    type: 'bar',
+    data: {
+      labels: courses.map(c => c.label),
+      datasets: [{ label: '방역 횟수', data: courses.map(c => courseTotals[c.id] || 0), backgroundColor: courses.map(c => c.color) }]
+    },
+    options: {
+      indexAxis: 'x',
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: { x: { beginAtZero: true, ticks: { precision: 0 } }, y: { beginAtZero: true, ticks: { precision: 0 } } }
+    }
+  });
+}
+
+// 누적 막대: 각 세그먼트 안에 코스별 개수 + 막대 위에 총합
+const stackTotalsPlugin = {
+  id: 'stackTotals',
+  afterDatasetsDraw(chart) {
+    const { ctx, data } = chart;
+    if (!data.datasets.length) return;
+
+    // 1) 각 세그먼트 안에 개수 표시 (흰색)
+    data.datasets.forEach((ds, dsIdx) => {
+      const meta = chart.getDatasetMeta(dsIdx);
+      meta.data.forEach((bar, i) => {
+        const v = ds.data[i] || 0;
+        if (v === 0) return;
+        const top = bar.y;
+        const bottom = bar.base;
+        const h = Math.abs(bottom - top);
+        if (h < 14) return; // 너무 좁으면 생략
+        ctx.save();
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 11px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(v, bar.x, (top + bottom) / 2);
+        ctx.restore();
+      });
+    });
+
+    // 2) 막대 꼭대기 위에 총합 표시
+    const lastMeta = chart.getDatasetMeta(data.datasets.length - 1);
+    lastMeta.data.forEach((bar, i) => {
+      let total = 0;
+      data.datasets.forEach(ds => { total += (ds.data[i] || 0); });
+      if (total === 0) return;
+      ctx.save();
+      ctx.fillStyle = '#222';
+      ctx.font = 'bold 12px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'bottom';
+      ctx.fillText(total, bar.x, bar.y - 4);
+      ctx.restore();
+    });
+  }
+};
+
+function exportStatsCSV() {
+  const table = document.getElementById('statsTable');
+  let csv = '﻿';
+  for (const row of table.rows) {
+    csv += [...row.cells].map(c => `"${c.textContent.replace(/"/g, '""')}"`).join(',') + '\n';
+  }
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `방역통계-${todayStr()}.csv`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+}
+</script>
+</body>
+</html>

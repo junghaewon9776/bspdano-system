@@ -39,10 +39,16 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Malgun Gothic','Apple SD Goth
 .evtBar .evtMods{color:#64748b;font-size:11px;margin-left:auto}
 .evtBar .evtMgrBtn{background:#4f46e5;color:#fff;border:none;padding:5px 10px;border-radius:6px;font-size:11px;cursor:pointer;font-family:inherit;font-weight:600}
 .evtBar .evtMgrBtn:hover{background:#4338ca}
-.tabs{background:#fff;border-bottom:1px solid #ddd;display:flex;padding:0 16px;overflow-x:auto;position:sticky;top:94px;z-index:40;scrollbar-width:thin}
+.tabs{background:#fff;border-bottom:1px solid #ddd;padding:0 16px;position:sticky;top:94px;z-index:40;scrollbar-width:thin}
 .tabs::-webkit-scrollbar{height:3px}
-.tabs button{background:none;border:none;padding:12px 18px;font-size:13px;color:#777;cursor:pointer;border-bottom:3px solid transparent;white-space:nowrap;font-family:inherit}
-.tabs button.on{color:#2563eb;font-weight:700;border-bottom-color:#2563eb}
+.cat-row{display:flex;overflow-x:auto;gap:2px;padding:4px 0;border-bottom:1px solid #eee}
+.cat-btn{background:#f1f5f9;border:none;padding:8px 16px;font-size:12px;color:#64748b;cursor:pointer;border-radius:8px;white-space:nowrap;font-family:inherit;font-weight:700;transition:all .15s}
+.cat-btn:hover{background:#e2e8f0}
+.cat-btn.on{background:#2563eb;color:#fff}
+.sub-row{display:flex;overflow-x:auto;gap:2px;padding:4px 0}
+.sub-row:empty{display:none}
+.tabs button{background:none;border:none;padding:8px 14px;font-size:12px;color:#777;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;font-family:inherit;border-radius:6px 6px 0 0}
+.tabs button.on{color:#2563eb;font-weight:700;border-bottom-color:#2563eb;background:#eef2ff}
 #mc{padding:16px 20px;max-width:1200px;margin:0 auto}
 
 .card{background:#fff;border-radius:10px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,.08);margin-bottom:12px}
@@ -150,7 +156,8 @@ label{display:block;font-size:10px;color:#999;margin-bottom:3px}
   .g4,.g2,.g3,.fr3,.fr2,.fr4{grid-template-columns:1fr}
   .card{padding:13px}
   .popup-box{padding:18px;border-radius:10px}
-  .tabs button{padding:10px 14px;font-size:12px}
+  .tabs button{padding:8px 12px;font-size:11px}
+  .cat-btn{padding:6px 12px;font-size:11px}
   table{font-size:11px}
   th,td{padding:6px 4px}
   .btn{padding:8px 12px}
@@ -229,6 +236,7 @@ label{display:block;font-size:10px;color:#999;margin-bottom:3px}
       <label for="lKeep" style="margin:0;cursor:pointer;font-weight:500">로그인 상태 유지 (새로고침 시 자동 로그인)</label>
     </div>
     <button id="loginBtn" onclick="login()">로그인</button>
+    <a href="방역코스/index.html" style="display:block;margin-top:10px;padding:12px;background:#10b981;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;text-align:center;text-decoration:none;cursor:pointer">📍 실시간 위치관제</a>
     <div class="acctInfo">
       <b>담당자 기본 비번:</b> 1234<br>
       <small>최초 로그인 후 반드시 비번을 변경하세요</small>
@@ -978,35 +986,98 @@ function extendSession(){
   toast("로그인이 연장되었습니다");
 }
 
+var _curCat="";
+
 function mkTabs(){
-  var ts=[];
-  // ===== 행사별 모듈(참가자/세입세출/구매/활동) =====
-  var HM = _hasModule;  // 헬퍼 별칭
-  if(isA() && HM("apply"))  ts.push({k:"apply",l:"참가자 관리"});
-  if(isA() && HM("apply"))  ts.push({k:"apstat",l:"참가자 현황"});
-  ts.push({k:"dash",l:"대시보드"});                         // 공용 (행사 무관)
-  if(HM("act"))             ts.push({k:"act",l:"활동일지"});
-  if(HM("purchase"))        ts.push({k:"pur",l:"물품/구매"});
-  if(isA() && HM("budget")) ts.push({k:"inc",l:"세입관리"});
-  if(isA() && HM("budget")) ts.push({k:"exp",l:"예산관리 (세출)"});
-  if(isA() && HM("budget")) ts.push({k:"rpt",l:"📊 결산서"});
-  if(HM("purchase") || HM("act")) ts.push({k:"gal",l:"갤러리"});
-  // ===== 보존회 공용 탭 (행사 무관하게 항상 표시) =====
-  ts.push({k:"notice",l:"공지"+(notices.length?"("+notices.length+")":"")});
-  // 인원관리는 메인 행사용 기능 — 행사 모듈 'mem' 으로 on/off (미설정/레거시 행사는 기본 ON)
-  if(HM("mem")) ts.push({k:"mem",l:"인원관리"});
-  if(isA() && HM("fee")) ts.push({k:"fee",l:"💵 회비"});
-  if(HM("rental")) ts.push({k:"rental",l:"📦 대여자산"});
-  if(HM("files")) ts.push({k:"files",l:"📁 자료실"});
-  if(isA() && HM("contract")) ts.push({k:"contract",l:"📄 계약서"});
-  if(isA() && HM("quote"))    ts.push({k:"quote",l:"💰 견적서"});
-  if(isA())ts.push({k:"acct",l:"계정관리"});
-  if(!isA()) ts.push({k:"myinfo",l:"🔑 내 정보"});
-  if(_isEvtAdmin()) ts.push({k:"evtMgr",l:"🎪 행사관리"});
-  // 📋 폼 관리 — admin 이상(super/admin)만 접근 가능
-  if(ME && (ME.r==="super" || ME.r==="admin")) ts.push({k:"forms",l:"📋 폼 관리"});
-  var h="";for(var i=0;i<ts.length;i++)h+='<button class="'+(ts[i].k==CTAB?"on":"")+'" onclick="switchTab(\''+ts[i].k+'\')">'+ts[i].l+"</button>";
-  document.getElementById("tabBar").innerHTML=h;
+  var HM = _hasModule;
+  var cats=[];
+
+  // ── 참가자 ──
+  var c1=[];
+  if(isA() && HM("apply"))  c1.push({k:"apply",l:"참가자 관리"});
+  if(isA() && HM("apply"))  c1.push({k:"apstat",l:"참가자 현황"});
+  if(c1.length) cats.push({id:"apply",label:"👥 참가자",items:c1});
+
+  // ── 재정 ──
+  var c2=[];
+  if(isA() && HM("budget")) c2.push({k:"inc",l:"세입관리"});
+  if(isA() && HM("budget")) c2.push({k:"exp",l:"예산관리 (세출)"});
+  if(isA() && HM("budget")) c2.push({k:"rpt",l:"결산서"});
+  if(isA() && HM("fee"))    c2.push({k:"fee",l:"회비"});
+  if(c2.length) cats.push({id:"finance",label:"💰 재정",items:c2});
+
+  // ── 운영 ──
+  var c3=[];
+  ts_push_dash(c3);
+  if(HM("act"))             c3.push({k:"act",l:"활동일지"});
+  if(HM("purchase"))        c3.push({k:"pur",l:"물품/구매"});
+  if(HM("purchase") || HM("act")) c3.push({k:"gal",l:"갤러리"});
+  if(c3.length) cats.push({id:"ops",label:"📋 운영",items:c3});
+
+  // ── 관리 ──
+  var c4=[];
+  if(HM("mem")) c4.push({k:"mem",l:"인원관리"});
+  if(HM("rental")) c4.push({k:"rental",l:"대여자산"});
+  if(HM("files")) c4.push({k:"files",l:"자료실"});
+  if(isA() && HM("contract")) c4.push({k:"contract",l:"계약서"});
+  if(isA() && HM("quote"))    c4.push({k:"quote",l:"견적서"});
+  if(c4.length) cats.push({id:"mgmt",label:"📁 관리",items:c4});
+
+  // ── 시스템 ──
+  var c5=[];
+  c5.push({k:"notice",l:"공지"+(notices.length?"("+notices.length+")":"")});
+  if(isA()) c5.push({k:"acct",l:"계정관리"});
+  if(!isA()) c5.push({k:"myinfo",l:"내 정보"});
+  if(_isEvtAdmin()) c5.push({k:"evtMgr",l:"행사관리"});
+  if(ME && (ME.r==="super" || ME.r==="admin")) c5.push({k:"forms",l:"폼 관리"});
+  cats.push({id:"sys",label:"⚙️ 시스템",items:c5});
+
+  // ── 현장 ──
+  cats.push({id:"field",label:"📍 현장",items:[
+    {k:"_field_layout",l:"축제 배치도",ext:"방역코스/layout.html"},
+    {k:"_field_monitor",l:"본부 모니터링",ext:"방역코스/monitor.html"},
+    {k:"_field_vehicle",l:"행사차량 관리",ext:"방역코스/vehicle.html"},
+    {k:"_field_today",l:"오늘의 운영",ext:"방역코스/today.html"}
+  ]});
+
+  // 현재 CTAB이 어느 카테고리에 속하는지 찾기
+  var foundCat="";
+  cats.forEach(function(cat){
+    cat.items.forEach(function(t){if(t.k===CTAB)foundCat=cat.id});
+  });
+  if(!foundCat && !_curCat) foundCat=cats[0]?cats[0].id:"";
+  if(foundCat) _curCat=foundCat;
+  if(!_curCat && cats.length) _curCat=cats[0].id;
+
+  // 카테고리 버튼 행
+  var h1='<div class="cat-row">';
+  cats.forEach(function(cat){
+    h1+='<button class="cat-btn'+(cat.id===_curCat?' on':'')+'" onclick="_switchCat(\''+cat.id+'\')">'+cat.label+'</button>';
+  });
+  h1+='</div>';
+
+  // 서브 탭 행
+  var h2='<div class="sub-row">';
+  var activeCat=cats.find(function(c){return c.id===_curCat});
+  if(activeCat){
+    activeCat.items.forEach(function(t){
+      if(t.ext){
+        h2+='<button onclick="window.open(\''+t.ext+'\',\'_blank\')">'+t.l+'</button>';
+      } else {
+        h2+='<button class="'+(t.k===CTAB?'on':'')+'" onclick="switchTab(\''+t.k+'\')">'+t.l+'</button>';
+      }
+    });
+  }
+  h2+='</div>';
+
+  document.getElementById("tabBar").innerHTML=h1+h2;
+}
+
+function ts_push_dash(arr){arr.push({k:"dash",l:"대시보드"})}
+
+function _switchCat(catId){
+  _curCat=catId;
+  mkTabs();
 }
 
 // 현재 선택된 행사의 modules 배열에 해당 모듈이 포함돼 있는지 확인

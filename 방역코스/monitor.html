@@ -1,0 +1,1539 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>본부 모니터링</title>
+  <link rel="stylesheet" href="style.css?v=20260513s">
+</head>
+<body>
+<header>
+  <h1>📊 본부 모니터링</h1>
+  <nav>
+    <a href="index.html">홈</a>
+    <a href="admin.html">관리</a>
+    <a href="members.html">인원</a>
+    <a href="today.html">오늘운영</a>
+    <a href="monitor.html" class="active">모니터링</a>
+    <a href="stats.html">통계</a>
+    <a href="accounts.html">계정</a>
+    <a href="#" onclick="adminLogout();return false;">로그아웃</a>
+  </nav>
+</header>
+
+<div class="container">
+  <div class="card">
+    <div class="flex-between" style="flex-wrap:wrap;gap:8px;">
+      <h2>운행 기록</h2>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+        <label style="display:inline;font-size:12px;">행사:</label>
+        <select id="eventFilter" style="width:auto;display:inline-block;" onchange="render()">
+          <option value="">전체 행사</option>
+        </select>
+        <label style="display:inline;font-size:12px;">기간:</label>
+        <select id="periodSel" style="width:auto;display:inline-block;" onchange="onPeriodChange()">
+          <option value="today">오늘</option>
+          <option value="week">최근 7일</option>
+          <option value="month" selected>최근 30일</option>
+          <option value="day">일별 선택</option>
+          <option value="monthly">월별 선택</option>
+          <option value="range">기간 선택</option>
+          <option value="all">전체</option>
+        </select>
+        <span id="dayPicker" style="display:none;">
+          <input type="date" id="dayInput" onchange="render()" style="width:auto;display:inline-block;">
+        </span>
+        <span id="monthPicker" style="display:none;">
+          <input type="month" id="monthInput" onchange="render()" style="width:auto;display:inline-block;">
+        </span>
+        <span id="rangePicker" style="display:none;">
+          <input type="date" id="rangeStart" onchange="render()" style="width:auto;display:inline-block;">
+          ~
+          <input type="date" id="rangeEnd" onchange="render()" style="width:auto;display:inline-block;">
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 라이브 차량 위치 (지금 운영 중) -->
+  <div class="card" id="liveCard" style="border-left:4px solid #27ae60;">
+    <div class="flex-between" style="cursor:pointer;user-select:none;" onclick="toggleLiveCard()">
+      <h2>🟢 지금 운영 중 <span id="liveCount" class="muted" style="font-size:13px;font-weight:400;"></span></h2>
+      <button id="liveCardToggle" class="small" onclick="event.stopPropagation();toggleLiveCard()" style="background:#27ae60;color:#fff;">▼ 접기</button>
+    </div>
+    <div id="liveCardBody">
+      <p class="muted" style="font-size:11px;margin-bottom:6px;">
+        운영 중인 차량의 실시간 위치 (10초마다 갱신, 5분 무업데이트면 자동 숨김)
+      </p>
+      <div id="liveList" style="max-height:320px;overflow-y:auto;"></div>
+    </div>
+  </div>
+
+  <!-- 공개 모니터링 링크 (관리/공유용) -->
+  <div class="card" style="border-left:4px solid #9b59b6;">
+    <h2>🌐 공개 모니터링 링크</h2>
+    <p class="muted" style="font-size:11px;margin-bottom:6px;">
+      외부 사람이 로그인 없이 차량 위치만 보게 하는 링크. <b>운영 끝나면 반드시 끄세요.</b>
+    </p>
+    <label style="display:flex;align-items:center;cursor:pointer;">
+      <input id="pubMonEnabled" type="checkbox" style="width:18px;height:18px;margin-right:6px;" onchange="togglePubMon()">
+      <span><b>공개 모니터링 켜기</b></span>
+    </label>
+    <div id="pubMonBox" style="display:none;margin-top:10px;">
+      <label>공유 URL</label>
+      <div style="display:flex;gap:4px;">
+        <input id="pubMonUrl" type="text" readonly style="flex:1;font-size:11px;background:#f8f9fa;">
+        <button class="small" onclick="copyPubMonUrl()">📋 URL</button>
+      </div>
+      <label style="margin-top:8px;">접속 PIN (4자리 숫자, 빈칸이면 PIN 없음)</label>
+      <div style="display:flex;gap:4px;">
+        <input id="pubMonPin" type="text" inputmode="numeric" maxlength="4" placeholder="예: 1234" style="flex:1;font-size:14px;letter-spacing:4px;">
+        <button class="small success" onclick="savePubMonPin()">저장</button>
+      </div>
+      <div style="display:flex;gap:6px;margin-top:8px;">
+        <button class="small" onclick="copyPubMonShareText()" style="background:#27ae60;color:#fff;flex:1;">📋 URL+PIN 안내문 복사</button>
+        <button class="small gray" onclick="regeneratePubMonToken()">🔄 토큰 재발급</button>
+      </div>
+      <p class="muted" style="font-size:11px;margin-top:6px;">
+        받는 사람에게 URL과 PIN 둘 다 보내세요. PIN 빈칸이면 URL만으로 접속 가능합니다.
+      </p>
+    </div>
+  </div>
+
+  <!-- 코스 전체 보기 -->
+  <div class="card" style="border-left:4px solid #3498db;">
+    <div class="flex-between" style="flex-wrap:wrap;gap:8px;">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <h2 style="margin:0;">🗺 코스 전체 보기</h2>
+        <button id="btnAllCourses" onclick="toggleShowAllCourses()" style="border:none;padding:8px 14px;border-radius:6px;font-weight:800;cursor:pointer;font-size:12px;box-shadow:0 1px 3px rgba(0,0,0,0.2);transition:all 0.15s;">
+          🌐 전체 코스
+        </button>
+      </div>
+      <label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:12px;color:#555;">
+        <input type="checkbox" id="cnsAlwaysOn" onchange="toggleComplaintNoSpray()" checked>
+        <span>📞 민원 ⛔ 방역금지</span>
+      </label>
+    </div>
+    <p class="muted" style="font-size:11px;margin:6px 0 6px;">전체 코스 버튼으로 핀 켜고 끄세요. 특정 코스 누르면 그 코스만 보입니다.</p>
+    <div id="courseQuickList" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
+  </div>
+
+  <div class="row">
+    <div class="col" style="flex:2;min-width:400px;">
+      <div class="card">
+        <h2>지도 (선택한 운행 궤적 / 운영 중 차량)</h2>
+        <div id="map" class="map"></div>
+        <div id="logInfo" class="muted" style="margin-top:8px;"></div>
+      </div>
+    </div>
+    <div class="col" style="flex:1;min-width:300px;">
+      <div class="card">
+        <h2>요약</h2>
+        <div id="summary"></div>
+      </div>
+      <div class="card">
+        <div class="flex-between">
+          <h2>운행 목록</h2>
+          <button class="small danger" onclick="clearLogs()">🗑 전체삭제</button>
+        </div>
+        <div id="logList"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
+<script src="firebase-config.js?v=20260513s"></script>
+<script src="common.js?v=20260513s"></script>
+<script src="dano-auth.js"></script>
+
+<script>
+let map, logMarkers = [], logTrack, selectedLogIdx = null;
+
+window.onAuthSuccess = () => onDataReady(loadKakaoMap);
+window.onDataChanged = () => { if (map) { render(); renderCourseQuickList(); renderPubMonConfig(); renderAllAnchorsAlwaysOn(); renderComplaintsAndNoSpray(); } };
+
+// 단오시스템 로그인 게이트 → 통과 후 기존 인증 시도
+danoAuthGate(function() {
+  checkAdminAuth().then(function(ok) {
+    if (ok) onDataReady(loadKakaoMap);
+    else {
+      initFirebaseSync();
+      onDataReady(loadKakaoMap);
+    }
+  });
+});
+
+let __kakaoLoadAttempt = 0;
+function loadKakaoMap() {
+  if (window.kakao && window.kakao.maps) {
+    if (!map) initMonitorMap(); else render();
+    return;
+  }
+  if (document.querySelector('script[data-kakao-sdk]')) return;
+  __kakaoLoadAttempt++;
+  const script = document.createElement('script');
+  script.dataset.kakaoSdk = '1';
+  script.src = `//dapi.kakao.com/v2/maps/sdk.js?appkey=${KAKAO_KEY}&autoload=false`;
+  script.onload = () => kakao.maps.load(initMonitorMap);
+  script.onerror = () => {
+    console.warn('카카오 SDK 로드 실패. 재시도', __kakaoLoadAttempt);
+    script.remove();
+    if (__kakaoLoadAttempt < 5) setTimeout(loadKakaoMap, 1500);
+    else alert('지도를 불러오지 못했습니다. 새로고침 해주세요.');
+  };
+  document.head.appendChild(script);
+}
+
+function initMonitorMap() {
+  const data = loadData();
+  map = new kakao.maps.Map(document.getElementById('map'), {
+    center: new kakao.maps.LatLng(data.mapDefault.lat, data.mapDefault.lng),
+    level: data.mapDefault.level || 5
+  });
+  map.relayout();
+  // 위성/지도 전환 + 줌 컨트롤 (카카오 기본 컨트롤)
+  try {
+    const mtCtl = new kakao.maps.MapTypeControl();
+    map.addControl(mtCtl, kakao.maps.ControlPosition.TOPRIGHT);
+    const zmCtl = new kakao.maps.ZoomControl();
+    map.addControl(zmCtl, kakao.maps.ControlPosition.RIGHT);
+  } catch (e) { console.warn('지도 컨트롤 추가 실패', e); }
+  render();
+  subscribeLive();
+  renderCourseQuickList();
+  renderPubMonConfig();
+  renderAllAnchorsAlwaysOn();  // 전체 코스 핑 영구 표시
+  renderComplaintsAndNoSpray();  // 민원 + 방역금지 (관제 전용)
+  // 버튼/체크박스 상태 sync
+  updateAllCoursesBtn();
+  const cb2 = document.getElementById('cnsAlwaysOn');
+  if (cb2) cb2.checked = localStorage.getItem('hideComplaintNoSpray') !== '1';
+  // 사용자가 지도 직접 만지면 따라가기 자동 해제
+  kakao.maps.event.addListener(map, 'dragstart', () => stopFollow('manual-drag'));
+  kakao.maps.event.addListener(map, 'zoom_start', () => stopFollow('manual-zoom'));
+
+  // ── 배치도 시설물 로드 ──
+  loadLayoutFacilities();
+  kakao.maps.event.addListener(map, 'zoom_changed', updateFacilityLabelsVisibility);
+}
+
+// ══ 배치도 시설물 on 모니터링 ══
+var _facPolys = [], _facLabels = [], _facInfoWin = null;
+var _facCategories = [], _facItems = [];
+var M_LAT = 111320;
+function _mLng(lat) { return 111320 * Math.cos(lat * Math.PI / 180); }
+
+function loadLayoutFacilities() {
+  fbDb.ref('/layout').once('value').then(function(snap) {
+    var d = snap.val();
+    if (!d) return;
+    _facCategories = d.categories || [];
+    _facItems = d.items || [];
+    renderFacilities();
+  });
+  // 실시간 변경 감지
+  fbDb.ref('/layout/items').on('value', function(snap) {
+    _facItems = snap.val() || [];
+    renderFacilities();
+  });
+  fbDb.ref('/layout/categories').on('value', function(snap) {
+    _facCategories = snap.val() || [];
+    renderFacilities();
+  });
+}
+
+function renderFacilities() {
+  // 기존 제거
+  _facPolys.forEach(function(p) { p.setMap(null); });
+  _facLabels.forEach(function(l) { l.setMap(null); });
+  _facPolys = []; _facLabels = [];
+
+  _facItems.forEach(function(it) {
+    var cat = _facCategories.find(function(c) { return c.id === it.catId; });
+    if (!cat) return;
+    var color = cat.color || '#6b7280';
+    var pts;
+    if (it.shape === 'circle') {
+      pts = _circPts(it.lat, it.lng, (it.diameter || 5) / 2);
+    } else {
+      pts = _rectPts(it.lat, it.lng, it.w, it.h);
+    }
+
+    var poly = new kakao.maps.Polygon({
+      path: pts, strokeWeight: 2, strokeColor: color, strokeOpacity: 0.9,
+      fillColor: color, fillOpacity: 0.35
+    });
+    poly.setMap(map);
+    _facPolys.push(poly);
+
+    // 라벨
+    var txt = it.num + (it.name ? ' ' + it.name : '');
+    var label = new kakao.maps.CustomOverlay({
+      position: new kakao.maps.LatLng(it.lat, it.lng),
+      content: '<div style="padding:1px 5px;border-radius:3px;font-size:10px;font-weight:700;white-space:nowrap;pointer-events:none;color:#fff;background:' + color + 'cc;text-shadow:0 1px 2px rgba(0,0,0,0.5)">' + _esc(txt) + '</div>',
+      yAnchor: 0.5
+    });
+    label.setMap(map);
+    _facLabels.push(label);
+
+    // 클릭 → 정보 팝업
+    kakao.maps.event.addListener(poly, 'click', function(e) {
+      showFacilityInfo(it, cat, e.latLng);
+    });
+  });
+
+  updateFacilityLabelsVisibility();
+}
+
+function showFacilityInfo(it, cat, latLng) {
+  if (_facInfoWin) _facInfoWin.setMap(null);
+  var size = it.shape === 'circle' ? '⌀' + (it.diameter || 5) + 'm' : (it.w || 3) + '×' + (it.h || 6) + 'm';
+  var html = '<div style="background:#1e293b;color:#e2e8f0;padding:14px;border-radius:10px;min-width:200px;box-shadow:0 4px 20px rgba(0,0,0,0.5);font-size:12px;line-height:1.6;position:relative">';
+  html += '<div style="position:absolute;top:6px;right:8px;cursor:pointer;color:#94a3b8;font-size:14px" onclick="this.parentElement.parentElement.remove()">✕</div>';
+  html += '<div style="font-size:14px;font-weight:700;margin-bottom:6px;color:' + (cat.color || '#fff') + '">' + _esc(it.num || '') + ' ' + _esc(it.name || cat.name) + '</div>';
+  html += '<div style="color:#94a3b8;font-size:10px;margin-bottom:8px">' + _esc(cat.name) + ' · ' + size + '</div>';
+  if (it.duty) html += '<div>👤 <b>' + _esc(it.duty) + '</b></div>';
+  if (it.phone) html += '<div>📞 <a href="tel:' + it.phone + '" style="color:#60a5fa;text-decoration:none">' + _esc(it.phone) + '</a></div>';
+  if (it.memo) html += '<div style="margin-top:4px;color:#94a3b8;font-size:11px">📝 ' + _esc(it.memo) + '</div>';
+  html += '</div>';
+
+  _facInfoWin = new kakao.maps.CustomOverlay({
+    position: latLng || new kakao.maps.LatLng(it.lat, it.lng),
+    content: html,
+    yAnchor: 1.2
+  });
+  _facInfoWin.setMap(map);
+}
+
+function updateFacilityLabelsVisibility() {
+  if (!map) return;
+  var level = map.getLevel();
+  var show = level <= 4;
+  _facLabels.forEach(function(l) { l.setMap(show ? map : null); });
+}
+
+function _rectPts(lat, lng, w, h) {
+  var dLat = (h || 6) / M_LAT, dLng = (w || 3) / _mLng(lat);
+  var hw = dLng / 2, hh = dLat / 2;
+  return [
+    new kakao.maps.LatLng(lat + hh, lng - hw), new kakao.maps.LatLng(lat + hh, lng + hw),
+    new kakao.maps.LatLng(lat - hh, lng + hw), new kakao.maps.LatLng(lat - hh, lng - hw)
+  ];
+}
+function _circPts(lat, lng, r, n) {
+  n = n || 36; var pts = [];
+  for (var i = 0; i < n; i++) {
+    var a = 2 * Math.PI * i / n;
+    pts.push(new kakao.maps.LatLng(lat + r * Math.cos(a) / M_LAT, lng + r * Math.sin(a) / _mLng(lat)));
+  }
+  return pts;
+}
+function _esc(s) { return String(s || '').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+
+// 라이브 세션에서 courseId로 운영중인 호차 찾기
+function getVehiclesOnCourse(courseId) {
+  const live = window.__liveCache || {};
+  const STALE_MS = 5 * 60 * 1000;
+  const now = Date.now();
+  const result = [];
+  for (const [key, sess] of Object.entries(live)) {
+    if (!sess || sess.courseId !== courseId) continue;
+    if (!sess.lastUpdate || now - sess.lastUpdate > STALE_MS) continue;
+    const hocha = deriveHochaName(sess) || sess.crew?.driver || '?';
+    const driver = sess.crew?.driver || '';
+    const driverPhone = sess.crew?.driverPhone || '';
+    const progress = (sess.totalCount > 0)
+      ? `${sess.completedCount || 0}/${sess.totalCount}`
+      : '';
+    result.push({ hocha, driver, driverPhone, progress });
+  }
+  return result;
+}
+// 거점에 정적으로 배정된 차량 (등록 시 코스 단위) — 라이브에 없을 때 폴백
+function getVehiclesAssignedToCourse(courseId) {
+  // 현재 차량 데이터에는 courseId 매핑 없음. 향후 확장 가능.
+  return [];
+}
+function buildVehicleBadgesForCourse(courseId, courseColor) {
+  const vehs = getVehiclesOnCourse(courseId);
+  if (!vehs.length) {
+    return `<div style="margin-top:5px;font-size:11px;color:#aaa;">🚐 이 코스 운행 중인 차량 없음</div>`;
+  }
+  return vehs.map(v => {
+    const tel = v.driverPhone ? v.driverPhone.replace(/[^0-9+]/g,'') : '';
+    const phoneBtn = tel
+      ? `<a href="tel:${tel}" style="background:#27ae60;color:#fff;padding:2px 7px;border-radius:3px;font-size:10px;text-decoration:none;font-weight:600;margin-left:4px;">📞</a>`
+      : '';
+    return `<div style="margin-top:5px;display:flex;align-items:center;gap:5px;flex-wrap:wrap;">
+      <span style="background:${courseColor};color:#fff;padding:3px 8px;border-radius:4px;font-weight:800;font-size:11px;">🚐 ${escapeHtml(v.hocha)}</span>
+      <span style="font-size:11px;color:#555;">${escapeHtml(v.driver)}${v.progress ? ` · 진행 ${v.progress}` : ''}</span>
+      ${phoneBtn}
+    </div>`;
+  }).join('');
+}
+
+// ─── 거점 InfoWindow 헬퍼 (토글 + 일관된 패딩) ───
+function attachAnchorInfoWindow(marker, content) {
+  const iw = new kakao.maps.InfoWindow({ removable: true, content });
+  kakao.maps.event.addListener(marker, 'click', () => {
+    // 같은 마커 다시 누르면 닫기
+    if (window.__crsIw === iw && iw.getMap && iw.getMap()) {
+      try { iw.close(); } catch (e) {}
+      window.__crsIw = null;
+      return;
+    }
+    if (window.__crsIw && window.__crsIw !== iw) {
+      try { window.__crsIw.close(); } catch (e) {}
+    }
+    iw.open(map, marker);
+    window.__crsIw = iw;
+  });
+  return iw;
+}
+function buildAnchorIwHtml({ headerColor, headerText, name, memo, naviUrl, vehicleBadges }) {
+  const memoHtml = memo ? `<div style="margin-top:4px;color:#444;white-space:pre-wrap;font-size:11px;line-height:1.4;">${escapeHtml(memo)}</div>` : '';
+  return `<div style="padding:9px 11px 11px;font-size:11px;min-width:180px;max-width:260px;box-sizing:border-box;font-family:-apple-system,'Malgun Gothic',sans-serif;line-height:1.45;">
+    <div style="font-weight:700;color:${headerColor};margin-bottom:3px;font-size:10px;">${headerText}</div>
+    <div style="font-weight:700;color:#2c3e50;font-size:13px;word-break:keep-all;">${escapeHtml(name||'')}</div>
+    ${memoHtml}
+    ${vehicleBadges || ''}
+    <a href="${naviUrl}" target="_blank" style="display:inline-block;margin-top:7px;background:#3498db;color:#fff;padding:4px 10px;border-radius:4px;font-size:11px;text-decoration:none;font-weight:600;">🧭 길찾기</a>
+  </div>`;
+}
+
+// ─── 모든 코스 거점 영구 표시 (항상 켜짐, 클릭 미리보기와 별개) ───
+const __alwaysOnAnchors = [];
+const __alwaysOnLines = [];
+function clearAlwaysOnAnchors() {
+  __alwaysOnAnchors.forEach(m => m.setMap(null));
+  __alwaysOnAnchors.length = 0;
+  __alwaysOnLines.forEach(l => l.setMap(null));
+  __alwaysOnLines.length = 0;
+}
+function renderAllAnchorsAlwaysOn() {
+  if (!map) return;
+  clearAlwaysOnAnchors();
+  if (localStorage.getItem('hideAllAnchors') === '1') return;  // 토글 OFF
+  if (window.__focusedMode) return;  // 특정 코스 집중 보기 중 → 전체핑 잠시 숨김
+  const data = loadData();
+  const evVis = (data.visibility || {}).events || {};
+  const csVis = (data.visibility || {}).courses || {};
+  for (const ev of (data.events || [])) {
+    if (evVis[ev.id] === false) continue;
+    for (const c of (ev.courses || [])) {
+      if (csVis[c.id] === false) continue;
+      const anchors = (data.anchors || [])
+        .filter(a => a.courseId === c.id)
+        .sort((a, b) => (a.order || 0) - (b.order || 0));
+      if (!anchors.length) continue;
+      // 작고 반투명한 핑 — 라이브 차량과 안 부딪히게
+      const dotSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="18" viewBox="0 0 14 18">
+        <path d="M7 0 C3 0 0 3 0 7 C0 11 7 18 7 18 C7 18 14 11 14 7 C14 3 11 0 7 0 Z" fill="${c.color}" stroke="white" stroke-width="1" opacity="0.85"/>
+      </svg>`;
+      const dotImg = new kakao.maps.MarkerImage(
+        'data:image/svg+xml;utf8,' + encodeURIComponent(dotSvg),
+        new kakao.maps.Size(14, 18),
+        { offset: new kakao.maps.Point(7, 18) }
+      );
+      const path = [];
+      anchors.forEach((a, i) => {
+        const pos = new kakao.maps.LatLng(a.lat, a.lng);
+        path.push(pos);
+        const marker = new kakao.maps.Marker({
+          position: pos, map,
+          image: dotImg,
+          title: `[${c.name}] ${i + 1}. ${a.name}`,
+          zIndex: 10  // 라이브 차량(50)보다 아래
+        });
+        const naviUrl = `https://map.kakao.com/link/to/${encodeURIComponent(a.name||'거점')},${a.lat},${a.lng}`;
+        attachAnchorInfoWindow(marker, buildAnchorIwHtml({
+          headerColor: c.color,
+          headerText: `${escapeHtml(ev.name)} · ${escapeHtml(c.name)} · ${i+1}번`,
+          name: a.name,
+          memo: a.memo,
+          naviUrl,
+          vehicleBadges: ''
+        }));
+        __alwaysOnAnchors.push(marker);
+      });
+      // 가벼운 점선 라인
+      const line = new kakao.maps.Polyline({
+        path, strokeWeight: 1.5, strokeColor: c.color,
+        strokeOpacity: 0.4, strokeStyle: 'shortdash'
+      });
+      line.setMap(map);
+      __alwaysOnLines.push(line);
+    }
+  }
+}
+function toggleAllAnchors() {
+  const cur = localStorage.getItem('hideAllAnchors') === '1';
+  const willHide = !cur;
+  localStorage.setItem('hideAllAnchors', willHide ? '1' : '0');
+  renderAllAnchorsAlwaysOn();
+  if (willHide) clearCoursePreview();
+  renderCourseQuickList();
+}
+
+// 전체 코스 ON/OFF 토글 (단일 버튼) — 집중 모드 중이면 풀고 ON으로 복귀
+function toggleShowAllCourses() {
+  if (window.__focusedMode) {
+    // 단일/전체 코스 미리보기 중 → 끄고 영구 핀 ON으로
+    clearCoursePreview();
+    localStorage.setItem('hideAllAnchors', '0');
+    renderAllAnchorsAlwaysOn();
+  } else {
+    // 일반 토글 (영구 핀 ON ↔ OFF)
+    const cur = localStorage.getItem('hideAllAnchors') === '1';
+    localStorage.setItem('hideAllAnchors', cur ? '0' : '1');
+    renderAllAnchorsAlwaysOn();
+  }
+  updateAllCoursesBtn();
+}
+
+function updateAllCoursesBtn() {
+  const btn = document.getElementById('btnAllCourses');
+  if (!btn) return;
+  const isOn = localStorage.getItem('hideAllAnchors') !== '1' && !window.__focusedMode;
+  if (isOn) {
+    btn.style.background = 'linear-gradient(135deg,#27ae60,#16a085)';
+    btn.style.color = '#fff';
+    btn.textContent = '🌐 전체 코스 (켜짐)';
+  } else if (window.__focusedMode) {
+    btn.style.background = 'linear-gradient(135deg,#e67e22,#d35400)';
+    btn.style.color = '#fff';
+    btn.textContent = '🌐 전체 코스로 돌아가기';
+  } else {
+    btn.style.background = '#ecf0f1';
+    btn.style.color = '#7f8c8d';
+    btn.textContent = '🌐 전체 코스 (꺼짐)';
+  }
+}
+
+// ─── 민원 + 방역금지 핀 (관제 전용 — 공개페이지엔 안 보임) ───
+const __complaintMarkers = [];
+const __noSprayMarkers = [];
+const __noSprayCircles = [];
+function clearComplaintAndNoSprayMarkers() {
+  __complaintMarkers.forEach(m => m.setMap(null));
+  __complaintMarkers.length = 0;
+  __noSprayMarkers.forEach(m => m.setMap(null));
+  __noSprayMarkers.length = 0;
+  __noSprayCircles.forEach(c => c.setMap(null));
+  __noSprayCircles.length = 0;
+}
+// 행사가 "방역행사"류인지 (효도위안잔치 등은 제외) — 이름에 "방역" 포함 여부로 판별
+function isDisinfectionEvent(ev) {
+  if (!ev) return false;
+  return /방역/.test(ev.name || '');
+}
+function renderComplaintsAndNoSpray() {
+  if (!map) return;
+  clearComplaintAndNoSprayMarkers();
+  if (localStorage.getItem('hideComplaintNoSpray') === '1') return;
+  const data = loadData();
+  const evVis = (data.visibility || {}).events || {};
+  // 보이는 방역행사 ID 집합
+  const disinfectEvIds = new Set(
+    (data.events || [])
+      .filter(ev => evVis[ev.id] !== false && isDisinfectionEvent(ev))
+      .map(ev => ev.id)
+  );
+  // 방역행사가 하나도 안 보이면 → 핀 전부 숨김 (효도위안잔치만 운영중일 때)
+  if (disinfectEvIds.size === 0) return;
+
+  // 민원 (미처리 + 방역행사 소속만)
+  const complaints = (data.complaints || []).filter(c => {
+    if (c.status === 'resolved') return false;
+    // eventId가 있으면 방역행사 소속인지 확인. 없으면 (구 데이터) 표시
+    return !c.eventId || disinfectEvIds.has(c.eventId);
+  });
+  complaints.forEach(c => {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 28 28">
+      <circle cx="14" cy="14" r="12" fill="#f1c40f" stroke="white" stroke-width="2"/>
+      <path d="M11 9c-.5 0-1 .4-1 1 0 4 3 7 7 7 .6 0 1-.4 1-1v-2c0-.5-.4-1-1-1l-2 .3c-.4-.6-.8-1-1.3-1.3l.3-2c0-.6-.4-1-1-1H11z" fill="white"/>
+    </svg>`;
+    const m = new kakao.maps.Marker({
+      position: new kakao.maps.LatLng(c.lat, c.lng), map,
+      image: new kakao.maps.MarkerImage(
+        'data:image/svg+xml;utf8,' + encodeURIComponent(svg),
+        new kakao.maps.Size(24, 24),
+        { offset: new kakao.maps.Point(12, 12) }
+      ),
+      title: '[민원] ' + (c.phone || ''),
+      zIndex: 30
+    });
+    const phoneTel = (c.phone || '').replace(/[^0-9+]/g, '');
+    const phoneLink = c.phone
+      ? `<div style="margin-top:6px;font-size:11px;"><a href="tel:${phoneTel}" style="color:#27ae60;text-decoration:none;font-weight:600;">📞 ${escapeHtml(c.phone)}</a></div>`
+      : '';
+    const iwHtml = `<div style="padding:9px 11px 11px;font-size:12px;max-width:240px;box-sizing:border-box;font-family:-apple-system,'Malgun Gothic',sans-serif;line-height:1.45;">
+      <div style="font-weight:700;color:#b7950b;margin-bottom:4px;">📞 민원 (미처리)</div>
+      <div style="color:#444;white-space:pre-wrap;font-size:12px;word-break:keep-all;">${escapeHtml(c.content || '내용 없음')}</div>
+      ${phoneLink}
+      <div style="margin-top:6px;font-size:10px;color:#888;">${new Date(c.createdAt || 0).toLocaleString('ko-KR')}</div>
+    </div>`;
+    attachAnchorInfoWindow(m, iwHtml);
+    __complaintMarkers.push(m);
+  });
+
+  // 방역금지 구역 (반경 원 + 핀)
+  (data.noSprayZones || []).forEach(z => {
+    const radius = z.radius || 50;
+    const pos = new kakao.maps.LatLng(z.lat, z.lng);
+    const circle = new kakao.maps.Circle({
+      center: pos, radius,
+      strokeWeight: 2, strokeColor: '#e74c3c', strokeOpacity: 0.7, strokeStyle: 'solid',
+      fillColor: '#e74c3c', fillOpacity: 0.15, map, zIndex: 5
+    });
+    __noSprayCircles.push(circle);
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 28 28">
+      <circle cx="14" cy="14" r="12" fill="#e74c3c" stroke="white" stroke-width="2"/>
+      <path d="M5 14a9 9 0 0118 0 9 9 0 01-18 0zm3.5-6.5l13 13" stroke="white" stroke-width="2.5" fill="none"/>
+    </svg>`;
+    const m = new kakao.maps.Marker({
+      position: pos, map,
+      image: new kakao.maps.MarkerImage(
+        'data:image/svg+xml;utf8,' + encodeURIComponent(svg),
+        new kakao.maps.Size(24, 24),
+        { offset: new kakao.maps.Point(12, 12) }
+      ),
+      title: '[방역금지] ' + (z.name || ''),
+      zIndex: 30
+    });
+    const iwHtml = `<div style="padding:9px 11px 11px;font-size:12px;max-width:230px;box-sizing:border-box;font-family:-apple-system,'Malgun Gothic',sans-serif;line-height:1.45;">
+      <div style="font-weight:700;color:#e74c3c;margin-bottom:4px;">⛔ 방역금지</div>
+      <div style="font-weight:700;color:#2c3e50;font-size:13px;word-break:keep-all;">${escapeHtml(z.name || '')}</div>
+      ${z.reason ? `<div style="margin-top:4px;color:#444;white-space:pre-wrap;font-size:11px;">${escapeHtml(z.reason)}</div>` : ''}
+      <div style="margin-top:5px;color:#888;font-size:11px;">반경 ${radius}m</div>
+    </div>`;
+    attachAnchorInfoWindow(m, iwHtml);
+    __noSprayMarkers.push(m);
+  });
+}
+function toggleComplaintNoSpray() {
+  const cur = localStorage.getItem('hideComplaintNoSpray') === '1';
+  localStorage.setItem('hideComplaintNoSpray', cur ? '0' : '1');
+  renderComplaintsAndNoSpray();
+}
+
+// ─── 공개 모니터링 관리 (admin과 동일 기능) ───
+function generatePublicTokenLocal() {
+  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  let s = '';
+  for (let i = 0; i < 16; i++) s += chars[Math.floor(Math.random() * chars.length)];
+  return s;
+}
+function renderPubMonConfig() {
+  const data = loadData();
+  const pm = data.publicMonitor || {};
+  const cb = document.getElementById('pubMonEnabled');
+  const box = document.getElementById('pubMonBox');
+  const urlInput = document.getElementById('pubMonUrl');
+  const pinInput = document.getElementById('pubMonPin');
+  if (!cb || !box || !urlInput) return;
+  cb.checked = !!pm.enabled;
+  box.style.display = pm.enabled ? 'block' : 'none';
+  if (pm.enabled && pm.token) {
+    const base = location.href.replace(/[^/]*$/, '');
+    urlInput.value = `${base}monitor-public.html?t=${pm.token}`;
+  }
+  if (pinInput) pinInput.value = pm.pin || '';
+}
+function togglePubMon() {
+  const enabled = document.getElementById('pubMonEnabled').checked;
+  const data = loadData();
+  if (!data.publicMonitor) data.publicMonitor = { enabled: false, token: '', pin: '', updatedAt: 0 };
+  data.publicMonitor.enabled = enabled;
+  if (enabled && !data.publicMonitor.token) {
+    data.publicMonitor.token = (typeof generatePublicToken === 'function')
+      ? generatePublicToken() : generatePublicTokenLocal();
+  }
+  data.publicMonitor.updatedAt = Date.now();
+  saveData(data);
+  renderPubMonConfig();
+}
+function savePubMonPin() {
+  const pin = (document.getElementById('pubMonPin').value || '').trim();
+  if (pin && !/^\d{4}$/.test(pin)) { alert('PIN은 4자리 숫자여야 합니다 (예: 1234) 또는 빈칸'); return; }
+  const data = loadData();
+  if (!data.publicMonitor) data.publicMonitor = { enabled: false, token: '', pin: '', updatedAt: 0 };
+  data.publicMonitor.pin = pin;
+  data.publicMonitor.updatedAt = Date.now();
+  saveData(data);
+  alert(pin ? `✅ PIN ${pin} 저장됨` : '✅ PIN 제거됨 (URL만으로 접속 가능)');
+}
+function regeneratePubMonToken() {
+  if (!confirm('새 토큰을 만들면 이전 URL은 즉시 무효화됩니다. 계속할까요?')) return;
+  const data = loadData();
+  if (!data.publicMonitor) data.publicMonitor = { enabled: true, token: '', pin: '', updatedAt: 0 };
+  data.publicMonitor.token = (typeof generatePublicToken === 'function')
+    ? generatePublicToken() : generatePublicTokenLocal();
+  data.publicMonitor.updatedAt = Date.now();
+  saveData(data);
+  renderPubMonConfig();
+  alert('✅ 새 URL이 생성됐어요. 다시 공유해주세요.');
+}
+function copyPubMonUrl() {
+  const inp = document.getElementById('pubMonUrl');
+  if (!inp || !inp.value) return;
+  inp.select();
+  navigator.clipboard?.writeText(inp.value).then(
+    () => alert('📋 URL 복사됨'),
+    () => { document.execCommand('copy'); alert('📋 URL 복사됨'); }
+  );
+}
+function copyPubMonShareText() {
+  const url = document.getElementById('pubMonUrl').value;
+  const pin = ((loadData().publicMonitor || {}).pin) || '';
+  const text = pin
+    ? `🚐 코스 차량 실시간 위치\n\n링크: ${url}\nPIN: ${pin}`
+    : `🚐 코스 차량 실시간 위치\n\n링크: ${url}`;
+  navigator.clipboard?.writeText(text).then(
+    () => alert('📋 안내문 복사됨\n\n' + text),
+    () => alert('복사 실패. 수동 복사:\n\n' + text)
+  );
+}
+
+// ─── 코스 전체 보기 (항상 표시) ───
+let __courseQuickMarkers = [];
+let __courseQuickLine = null;
+function renderCourseQuickList() {
+  const data = loadData();
+  const el = document.getElementById('courseQuickList');
+  if (!el) return;
+  // admin에서 👁→🚫 처리한 행사/코스는 숨김 (visibility[id] === false)
+  const evVis = (data.visibility || {}).events || {};
+  const csVis = (data.visibility || {}).courses || {};
+  const buttons = [];
+  const visibleCourseIds = [];
+  for (const ev of (data.events || [])) {
+    if (evVis[ev.id] === false) continue;  // 행사 숨김
+    for (const c of (ev.courses || [])) {
+      if (csVis[c.id] === false) continue;  // 코스 숨김
+      const courseAnchors = (data.anchors || [])
+        .filter(a => a.courseId === c.id)
+        .sort((a, b) => (a.order || 0) - (b.order || 0));
+      const count = courseAnchors.length;
+      if (!count) continue;
+      visibleCourseIds.push(c.id);
+      buttons.push(`
+        <button onclick="showCourseOnMap('${c.id}')" style="background:${c.color};color:#fff;border:none;padding:8px 12px;border-radius:6px;font-weight:700;cursor:pointer;font-size:12px;">
+          ${escapeHtml(ev.name)} · ${escapeHtml(c.name)}
+          <span style="opacity:0.85;font-weight:400;">(${count}거점)</span>
+        </button>
+      `);
+    }
+  }
+  // 헤더의 "🌐 전체 코스" 버튼 표시 여부 (코스 1개면 의미 없음)
+  const btnAll = document.getElementById('btnAllCourses');
+  if (btnAll) btnAll.style.display = visibleCourseIds.length > 1 ? '' : 'none';
+  el.innerHTML = buttons.length
+    ? buttons.join('')
+    : '<span class="muted" style="font-size:12px;">표시할 코스가 없습니다 (admin에서 숨김 처리되었거나 거점이 없음)</span>';
+}
+
+// 모든 보이는 코스의 거점을 한 번에 지도에 표시
+function showAllCoursesOnMap() {
+  const data = loadData();
+  const evVis = (data.visibility || {}).events || {};
+  const csVis = (data.visibility || {}).courses || {};
+  // 이전 미리보기 정리
+  __courseQuickMarkers.forEach(m => m.setMap(null));
+  __courseQuickMarkers = [];
+  if (__courseQuickLine) { __courseQuickLine.setMap(null); __courseQuickLine = null; }
+  if (window.__allCourseLines) {
+    window.__allCourseLines.forEach(l => l.setMap(null));
+    window.__allCourseLines = [];
+  }
+  if (typeof logTrack !== 'undefined' && logTrack) { logTrack.setMap(null); logTrack = null; }
+  selectedLogIdx = null;
+  // 집중 모드 ON → 영구 핀 잠시 숨김
+  window.__focusedMode = true;
+  renderAllAnchorsAlwaysOn();
+
+  window.__allCourseLines = [];
+  const bounds = new kakao.maps.LatLngBounds();
+  let totalAnchors = 0;
+  let totalCourses = 0;
+
+  for (const ev of (data.events || [])) {
+    if (evVis[ev.id] === false) continue;
+    for (const c of (ev.courses || [])) {
+      if (csVis[c.id] === false) continue;
+      const anchors = (data.anchors || [])
+        .filter(a => a.courseId === c.id)
+        .sort((a, b) => (a.order || 0) - (b.order || 0));
+      if (!anchors.length) continue;
+      totalCourses++;
+      // 코스마다 색깔 다른 핀
+      const dotSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="20" viewBox="0 0 16 20">
+        <path d="M8 0 C3.5 0 0 3.5 0 8 C0 13 8 20 8 20 C8 20 16 13 16 8 C16 3.5 12.5 0 8 0 Z" fill="${c.color}" stroke="white" stroke-width="1.2"/>
+      </svg>`;
+      const dotImg = new kakao.maps.MarkerImage(
+        'data:image/svg+xml;utf8,' + encodeURIComponent(dotSvg),
+        new kakao.maps.Size(16, 20),
+        { offset: new kakao.maps.Point(8, 20) }
+      );
+      const path = [];
+      anchors.forEach((a, i) => {
+        const pos = new kakao.maps.LatLng(a.lat, a.lng);
+        bounds.extend(pos);
+        path.push(pos);
+        totalAnchors++;
+        const marker = new kakao.maps.Marker({
+          position: pos, map,
+          image: dotImg,
+          title: `[${c.name}] ${i + 1}. ${a.name}`,
+          zIndex: 20
+        });
+        const naviUrl = `https://map.kakao.com/link/to/${encodeURIComponent(a.name||'거점')},${a.lat},${a.lng}`;
+        attachAnchorInfoWindow(marker, buildAnchorIwHtml({
+          headerColor: c.color,
+          headerText: `${escapeHtml(c.name)} · ${i+1}번`,
+          name: a.name,
+          memo: a.memo,
+          naviUrl,
+          vehicleBadges: ''
+        }));
+        __courseQuickMarkers.push(marker);
+      });
+      // 코스 라인
+      const line = new kakao.maps.Polyline({
+        path, strokeWeight: 2, strokeColor: c.color,
+        strokeOpacity: 0.6, strokeStyle: 'shortdash'
+      });
+      line.setMap(map);
+      window.__allCourseLines.push(line);
+    }
+  }
+
+  if (totalAnchors === 0) {
+    alert('표시할 거점이 없습니다');
+    return;
+  }
+  map.setBounds(bounds);
+  const info = document.getElementById('logInfo');
+  if (info) info.innerHTML = `<b>🌐 전체 코스 미리보기</b> · ${totalCourses}개 코스 · ${totalAnchors}개 거점`;
+  updateAllCoursesBtn();
+}
+
+function clearCoursePreview() {
+  __courseQuickMarkers.forEach(m => m.setMap(null));
+  __courseQuickMarkers = [];
+  if (__courseQuickLine) { __courseQuickLine.setMap(null); __courseQuickLine = null; }
+  if (window.__allCourseLines) {
+    window.__allCourseLines.forEach(l => l.setMap(null));
+    window.__allCourseLines = [];
+  }
+  if (window.__crsIw) { try { window.__crsIw.close(); } catch (e) {} }
+  const info = document.getElementById('logInfo');
+  if (info) info.textContent = '';
+  // 집중 모드 OFF → 영구 핀 다시 살림 (체크박스가 ON일 때)
+  window.__focusedMode = false;
+  renderAllAnchorsAlwaysOn();
+  updateAllCoursesBtn();
+}
+function showCourseOnMap(courseId) {
+  const data = loadData();
+  const course = getCourse(data, courseId);
+  if (!course) return;
+  const anchors = (data.anchors || [])
+    .filter(a => a.courseId === courseId)
+    .sort((a, b) => (a.order || 0) - (b.order || 0));
+  if (!anchors.length) { alert('이 코스에 거점이 없습니다'); return; }
+  // 이전 코스 미리보기 정리
+  __courseQuickMarkers.forEach(m => m.setMap(null));
+  __courseQuickMarkers = [];
+  if (__courseQuickLine) { __courseQuickLine.setMap(null); __courseQuickLine = null; }
+  if (window.__allCourseLines) {
+    window.__allCourseLines.forEach(l => l.setMap(null));
+    window.__allCourseLines = [];
+  }
+  // logTrack 같은 기존 운행 궤적도 끔
+  if (typeof logTrack !== 'undefined' && logTrack) { logTrack.setMap(null); logTrack = null; }
+  selectedLogIdx = null;
+  // 집중 모드 ON → 영구 핀 잠시 숨김
+  window.__focusedMode = true;
+  renderAllAnchorsAlwaysOn();
+
+  const bounds = new kakao.maps.LatLngBounds();
+  const path = [];
+  // 번호 없이 코스 색 핀만
+  const dotSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="22" viewBox="0 0 18 22">
+    <path d="M9 0 C4 0 0 4 0 9 C0 15 9 22 9 22 C9 22 18 15 18 9 C18 4 14 0 9 0 Z" fill="${course.color}" stroke="white" stroke-width="1.5"/>
+  </svg>`;
+  const dotImg = new kakao.maps.MarkerImage(
+    'data:image/svg+xml;utf8,' + encodeURIComponent(dotSvg),
+    new kakao.maps.Size(18, 22),
+    { offset: new kakao.maps.Point(9, 22) }
+  );
+  anchors.forEach((a, i) => {
+    const pos = new kakao.maps.LatLng(a.lat, a.lng);
+    bounds.extend(pos);
+    path.push(pos);
+    const marker = new kakao.maps.Marker({
+      position: pos, map,
+      image: dotImg,
+      title: `${i + 1}. ${a.name}`,
+      zIndex: 20
+    });
+    // 클릭 시 InfoWindow (거점 이름 + 메모) — 헬퍼로 토글 처리
+    const naviUrl = `https://map.kakao.com/link/to/${encodeURIComponent(a.name||'거점')},${a.lat},${a.lng}`;
+    attachAnchorInfoWindow(marker, buildAnchorIwHtml({
+      headerColor: course.color,
+      headerText: `${i+1}번 거점`,
+      name: a.name,
+      memo: a.memo,
+      naviUrl,
+      vehicleBadges: buildVehicleBadgesForCourse(course.id, course.color)
+    }));
+    __courseQuickMarkers.push(marker);
+  });
+  __courseQuickLine = new kakao.maps.Polyline({
+    path, strokeWeight: 3, strokeColor: course.color,
+    strokeOpacity: 0.7, strokeStyle: 'dashed', map
+  });
+  map.setBounds(bounds);
+  // 따라가기 모드 끔
+  stopFollow('show-course');
+  const totalDist = totalAnchorDistance(anchors);
+  const distKm = (totalDist * ETA_ROAD_FACTOR / 1000).toFixed(1);
+  document.getElementById('logInfo').innerHTML = `
+    <div style="background:#eaf3fb;border-left:4px solid ${course.color};padding:8px 10px;border-radius:4px;">
+      <b>🗺 ${escapeHtml(course.name)}</b> (${anchors.length}개 거점 · 약 ${distKm}km)<br>
+      <span class="muted" style="font-size:12px;">거점 순서: ${anchors.map((a, i) => `${i+1}.${escapeHtml(a.name)}`).join(' → ')}</span>
+    </div>
+  `;
+  updateAllCoursesBtn();
+}
+
+// ─── 따라가기 모드 (특정 차량을 자동 추적) ───
+let __followKey = null;
+function stopFollow(reason) {
+  if (!__followKey) return;
+  __followKey = null;
+  const data = loadData();
+  // 버튼 라벨 갱신
+  if (window.__liveCache) renderLive(window.__liveCache);
+}
+
+// ─── 라이브 구독 (admin도 실시간 차량 위치 보기) ───
+const liveMarkers = {};
+function subscribeLive() {
+  if (typeof fbDb === 'undefined') return;
+  fbDb.ref('/live').on('value', snap => {
+    const live = snap.val() || {};
+    renderLive(live);
+  });
+}
+function extractHochaNum(name) {
+  if (!name) return null;
+  const m = String(name).match(/(\d+)\s*호\s*차/);
+  return m ? m[1] : null;
+}
+// 라이브 세션 → 등록된 차량 테이블 조회로 호차명 도출 (vehicleName이 옛 데이터면 폴백)
+function deriveHochaName(sess) {
+  const raw = sess?.crew?.vehicleName || '';
+  // 이미 "N호차" 형태면 그대로
+  if (extractHochaNum(raw) !== null) return raw;
+  // 차번호(plate) 매칭으로 등록 차량 찾기
+  const data = loadData();
+  const plate = (sess?.crew?.vehicle || '').trim();
+  if (plate && data.vehicles?.length) {
+    const match = data.vehicles.find(v => (v.plate || '').trim() === plate);
+    if (match) return `${match.order || 1}호차`;
+  }
+  return raw;  // 매칭 실패 시 원본 (카니발 흰색 등) 반환
+}
+function vehicleMarkerSvg(color, label, heading) {
+  // label은 "1호차"/"10호차" 형식 우선 — 숫자만 추출, 없으면 첫 2글자
+  const num = extractHochaNum(label);
+  const safe = num || (String(label || '?').replace(/\s/g,'').slice(0, 2));
+  const fontSize = safe.length >= 2 ? 6 : 8;
+  const angle = (typeof heading === 'number' && !isNaN(heading)) ? heading : 0;
+  const hasDir = (typeof heading === 'number' && !isNaN(heading));
+  // 위에서 본 차량 (Top-down car) — heading 방향으로 회전, 진행방향 표시 화살표
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 30 30">
+    <g transform="rotate(${angle} 15 15)">
+      ${hasDir ? `<path d="M15 1 L19 7 L11 7 Z" fill="${color}" stroke="white" stroke-width="1"/>` : ''}
+      <ellipse cx="15" cy="26" rx="6" ry="1.2" fill="rgba(0,0,0,0.25)"/>
+      <rect x="5" y="11" width="1.5" height="3.5" rx="0.5" fill="#222"/>
+      <rect x="23.5" y="11" width="1.5" height="3.5" rx="0.5" fill="#222"/>
+      <rect x="5" y="18" width="1.5" height="3.5" rx="0.5" fill="#222"/>
+      <rect x="23.5" y="18" width="1.5" height="3.5" rx="0.5" fill="#222"/>
+      <rect x="6.5" y="7" width="17" height="18" rx="3.5" fill="${color}" stroke="white" stroke-width="1.2"/>
+      <rect x="8" y="8.5" width="13" height="4" rx="1" fill="rgba(255,255,255,0.85)"/>
+      <rect x="8" y="19.5" width="13" height="4" rx="1" fill="rgba(255,255,255,0.85)"/>
+      <text x="15" y="${safe.length >= 2 ? 18 : 18.5}" text-anchor="middle" font-family="Arial,sans-serif" font-size="${fontSize}" font-weight="bold" fill="white" transform="rotate(${-angle} 15 15)">${safe}</text>
+    </g>
+  </svg>`;
+  return new kakao.maps.MarkerImage(
+    'data:image/svg+xml;utf8,' + encodeURIComponent(svg),
+    new kakao.maps.Size(30, 30),
+    { offset: new kakao.maps.Point(15, 15) }
+  );
+}
+// 이전 위치 캐시 — heading 없을 때 폴백 계산용
+const prevPos = {};
+function calcBearing(lat1, lng1, lat2, lng2) {
+  const toRad = d => d * Math.PI / 180;
+  const toDeg = r => r * 180 / Math.PI;
+  const dLng = toRad(lng2 - lng1);
+  const y = Math.sin(dLng) * Math.cos(toRad(lat2));
+  const x = Math.cos(toRad(lat1)) * Math.sin(toRad(lat2)) - Math.sin(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.cos(dLng);
+  return (toDeg(Math.atan2(y, x)) + 360) % 360;
+}
+// 이름 라벨 (마커 위쪽에 떠 있는 텍스트) — 지도 POI 스타일, 차번호만
+const liveNameOverlays = {};
+function buildNameLabelHTML(plate, hocha) {
+  const esc = s => String(s||'').replace(/</g,'&lt;');
+  return esc(plate || hocha || '');
+}
+function buildNameOverlay(pos, plate, hocha, color) {
+  const div = document.createElement('div');
+  // 지도 POI 같은 텍스트 — 박스 X, 흰 후광 X4 방향 그림자로 가독성
+  div.style.cssText = `
+    color:#1a1a1a; font-weight:700; font-size:11px;
+    white-space:nowrap; font-family:-apple-system,'Malgun Gothic',sans-serif;
+    text-align:center; line-height:1; letter-spacing:0.3px;
+    text-shadow: -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 1px 1px 0 #fff,
+                 0 -1px 0 #fff, 0 1px 0 #fff, -1px 0 0 #fff, 1px 0 0 #fff;
+    pointer-events:none;
+  `;
+  div.textContent = buildNameLabelHTML(plate, hocha);
+  div.dataset.plate = plate || '';
+  div.dataset.hocha = hocha || '';
+  return new kakao.maps.CustomOverlay({ position: pos, content: div, xAnchor: 0.5, yAnchor: 2.6, zIndex: 51 });
+}
+function buildVehicleInfoHtml(sess) {
+  const driver = sess.crew?.driver || '운전자';
+  const assist = sess.crew?.assist || '';
+  const driverPhone = sess.crew?.driverPhone || '';
+  const assistPhone = sess.crew?.assistPhone || '';
+  const data = loadData();
+  const courseAnchors = (data.anchors || [])
+    .filter(a => a.courseId === sess.courseId)
+    .sort((a, b) => (a.order || 0) - (b.order || 0));
+  const total = courseAnchors.length;
+  const done = sess.completedCount || 0;
+  // 거점 가로 나열 (완료 = 회색, 다음 = 강조, 미방문 = 검정)
+  const anchorChips = courseAnchors.map((a, i) => {
+    let style = '';
+    if (i < done) style = 'background:#ecf0f1;color:#95a5a6;text-decoration:line-through;'; // 완료
+    else if (i === done) style = 'background:#f39c12;color:#fff;font-weight:700;';            // 다음
+    else style = 'background:#ecf0f1;color:#34495e;';                                          // 미방문
+    return `<span style="display:inline-block;${style}padding:3px 7px;border-radius:10px;font-size:10px;margin:2px 2px 0 0;white-space:nowrap;">${i+1}.${(a.name||'').replace(/</g,'&lt;')}</span>`;
+  }).join('');
+  const phoneBtn = (label, ph) => ph
+    ? `<a href="tel:${ph.replace(/[^0-9+]/g,'')}" style="display:block;background:#27ae60;color:#fff;padding:8px 10px;border-radius:5px;text-decoration:none;font-weight:700;font-size:13px;text-align:center;">📞 ${label}</a>`
+    : '';
+  const veh = sess.crew?.vehicle || '';
+  const vColor = sess.crew?.vehicleColor || '';
+  const vName = deriveHochaName(sess);
+  const compactPhoneRow = (label, ph) => ph
+    ? `<div style="display:flex;align-items:center;gap:6px;padding:3px 0;">
+        <span style="flex:1;color:#34495e;">${label.replace(/</g,'&lt;')}</span>
+        <a href="tel:${ph.replace(/[^0-9+]/g,'')}" style="background:#27ae60;color:#fff;padding:3px 8px;border-radius:4px;text-decoration:none;font-weight:700;font-size:11px;white-space:nowrap;">📞 전화걸기</a>
+      </div>`
+    : `<div style="padding:3px 0;color:#888;font-size:11px;">${label.replace(/</g,'&lt;')} (번호 없음)</div>`;
+  return `
+    <div style="padding:7px 9px;font-size:11px;width:200px;font-family:-apple-system,'Malgun Gothic',sans-serif;">
+      ${vName ? `<div style="font-weight:700;color:#fff;background:#e67e22;padding:3px 8px;border-radius:4px;margin-bottom:5px;text-align:center;font-size:12px;">🚐 ${vName.replace(/</g,'&lt;')}</div>` : ''}
+      ${(veh || vColor) ? `<div style="font-size:10px;color:#666;text-align:center;margin-bottom:5px;">${[vColor, veh].filter(Boolean).join(' · ').replace(/</g,'&lt;')}</div>` : ''}
+      ${compactPhoneRow(driver || '운전자', driverPhone)}
+      ${assist ? compactPhoneRow(assist, assistPhone) : ''}
+      <div style="font-size:10px;color:#888;margin-top:5px;margin-bottom:3px;">거점 (${done}/${total})</div>
+      <div style="line-height:1.4;font-size:10px;">${anchorChips || '<span style="color:#888;">거점 없음</span>'}</div>
+    </div>
+  `;
+}
+function renderLive(live) {
+  window.__liveCache = live;  // focusLiveMarker에서 참조
+  const data = loadData();
+  const STALE_MS = 5 * 60 * 1000;
+  const now = Date.now();
+  const items = [];
+  const activeKeys = new Set();
+  for (const [key, sess] of Object.entries(live)) {
+    if (!sess || typeof sess.lat !== 'number') continue;
+    if (!sess.lastUpdate || now - sess.lastUpdate > STALE_MS) continue;
+    activeKeys.add(key);
+    const course = getCourse(data, sess.courseId);
+    const event = getEvent(data, sess.eventId);
+    const color = course?.color || '#9b59b6';
+    const driver = sess.crew?.driver || '운전자';
+    const pos = new kakao.maps.LatLng(sess.lat, sess.lng);
+    // 마커 가운데 글자 — 차량명("1호차" "10호차")에서 숫자 추출, 없으면 첫글자
+    const markerLabel = deriveHochaName(sess) || sess.crew?.vehicle || driver || '?';
+    // 진행 방향 — sess.heading 우선, 없으면 prev→curr 위치차이로 계산
+    let heading = (typeof sess.heading === 'number' && !isNaN(sess.heading)) ? sess.heading : null;
+    const prev = prevPos[key];
+    if (heading === null && prev && (Math.abs(prev.lat - sess.lat) > 1e-6 || Math.abs(prev.lng - sess.lng) > 1e-6)) {
+      heading = calcBearing(prev.lat, prev.lng, sess.lat, sess.lng);
+    }
+    if (heading === null && prev && prev.heading != null) heading = prev.heading;  // 정지시 마지막 방향 유지
+    prevPos[key] = { lat: sess.lat, lng: sess.lng, heading: heading };
+    const img = vehicleMarkerSvg(color, markerLabel, heading);
+    let m = liveMarkers[key];
+    if (!m) {
+      m = new kakao.maps.Marker({ position: pos, map, image: img, title: driver, zIndex: 50 });
+      // 클릭 = InfoWindow 토글 + 그 마커 맨 위로 (zIndex 999)
+      const iw = new kakao.maps.InfoWindow({ content: buildVehicleInfoHtml(sess), removable: true });
+      kakao.maps.event.addListener(m, 'click', () => {
+        // 같은 마커 다시 누르면 닫기
+        if (window.__monIw === iw && iw.getMap && iw.getMap()) {
+          iw.close();
+          window.__monIw = null;
+          return;
+        }
+        // 다른 IW 열려있으면 먼저 닫기
+        if (window.__monIw && window.__monIw !== iw) {
+          try { window.__monIw.close(); } catch (e) {}
+        }
+        // 모든 마커 zIndex 원복, 클릭한 것만 맨 위
+        Object.values(liveMarkers).forEach(om => { try { om.setZIndex(50); } catch(e){} });
+        m.setZIndex(999);
+        iw.setContent(buildVehicleInfoHtml(sess));
+        iw.open(map, m);
+        window.__monIw = iw;
+        // 마커가 화면 가장자리면 InfoWindow 짤림 → 마커를 살짝 화면 아래쪽 1/3 지점으로 팬
+        setTimeout(() => {
+          map.panTo(m.getPosition());
+          // 마커를 화면 중앙 약간 아래로 → 위쪽에 IW 띄울 공간 확보
+          setTimeout(() => map.panBy(0, -120), 250);
+        }, 50);
+      });
+      m.__iw = iw;
+      liveMarkers[key] = m;
+    } else {
+      m.setPosition(pos);
+      m.setImage(img);
+      if (m.__iw && m.__iw.getMap && m.__iw.getMap()) m.__iw.setContent(buildVehicleInfoHtml(sess));
+    }
+    // 라벨 (CustomOverlay) — 위:차번호, 아래:호차 (호차 없으면 운전자)
+    const platePart = sess.crew?.vehicle || '';
+    const hochaPart = deriveHochaName(sess) || driver || '?';
+    let nameOv = liveNameOverlays[key];
+    if (!nameOv) {
+      nameOv = buildNameOverlay(pos, platePart, hochaPart, color);
+      nameOv.setMap(map);
+      liveNameOverlays[key] = nameOv;
+    } else {
+      nameOv.setPosition(pos);
+      const cont = nameOv.getContent();
+      if (cont && (cont.dataset.plate !== platePart || cont.dataset.hocha !== hochaPart)) {
+        cont.textContent = buildNameLabelHTML(platePart, hochaPart);
+        cont.dataset.plate = platePart;
+        cont.dataset.hocha = hochaPart;
+      }
+    }
+    items.push({ key, sess, event, course, driver, color });
+  }
+  for (const key of Object.keys(liveMarkers)) {
+    if (!activeKeys.has(key)) {
+      try { liveMarkers[key].setMap(null); } catch (e) {}
+      delete liveMarkers[key];
+    }
+  }
+  for (const key of Object.keys(liveNameOverlays)) {
+    if (!activeKeys.has(key)) {
+      try { liveNameOverlays[key].setMap(null); } catch (e) {}
+      delete liveNameOverlays[key];
+    }
+  }
+  const countEl = document.getElementById('liveCount');
+  const listEl = document.getElementById('liveList');
+  if (!items.length) {
+    if (countEl) countEl.textContent = '(없음)';
+    if (listEl) listEl.innerHTML = '<div class="empty">현재 운영 중인 차량이 없습니다</div>';
+    return;
+  }
+  if (countEl) countEl.textContent = `(${items.length}대)`;
+  if (listEl) {
+    listEl.innerHTML = items.map(it => {
+      const elapsed = Math.round((now - (it.sess.startedAt || now)) / 60000);
+      const progress = (it.sess.totalCount > 0)
+        ? `${it.sess.completedCount}/${it.sess.totalCount}`
+        : '-';
+      // 다음 거점 + 도착예상
+      const courseAnchors = (data.anchors || [])
+        .filter(a => a.courseId === it.sess.courseId)
+        .sort((a, b) => (a.order || 0) - (b.order || 0));
+      const remainAnchors = courseAnchors.slice(it.sess.completedCount || 0);
+      let nextLabel = '';    // GPS 없어도 다음 거점 이름은 표시
+      let nextEta = '';      // GPS 있으면 도착 예상시간
+      let remainEta = '';
+      if (remainAnchors.length) {
+        nextLabel = ` · 다음 <b>${escapeHtml(remainAnchors[0].name||'')}</b>`;
+        if (typeof it.sess.lat === 'number' && typeof remainAnchors[0].lat === 'number') {
+          const dToNext = distance(it.sess.lat, it.sess.lng, remainAnchors[0].lat, remainAnchors[0].lng);
+          nextEta = ` (약 ${formatEtaMin(estimateMinutes(dToNext, 0))})`;
+          const dTotal = dToNext + totalAnchorDistance(remainAnchors);
+          remainEta = ' · 끝까지 약 ' + formatEtaMin(estimateMinutes(dTotal, remainAnchors.length));
+        }
+      } else if (courseAnchors.length) {
+        nextLabel = ' · 🎉 전 거점 완료';
+      }
+      const veh = [it.sess.crew?.vehicle, it.sess.crew?.vehicleColor].filter(Boolean).join(' / ');
+      const safeKey = it.key.replace(/'/g,"\\'");
+      const isFollowing = __followKey === it.key;
+      const followLabel = isFollowing ? '🎯 따라가는 중' : '📍 따라가기';
+      const followBg = isFollowing ? '#27ae60' : it.color;
+      const hochaName = deriveHochaName(it.sess) || '';
+      // 좌측 호차 배지 — 호차 있으면 큼직, 없으면 운전자 이니셜 동그라미 (폴백)
+      const leftBadge = hochaName
+        ? `<div style="background:${it.color};color:#fff;padding:8px 12px;border-radius:8px;font-weight:800;font-size:16px;flex:none;min-width:62px;text-align:center;line-height:1.1;box-shadow:0 1px 3px rgba(0,0,0,0.15);">${escapeHtml(hochaName)}</div>`
+        : `<div style="background:${it.color};color:#fff;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;flex:none;">${(it.driver||'?').slice(0,1)}</div>`;
+      return `
+        <div style="display:flex;align-items:center;gap:10px;padding:10px 8px;border-bottom:1px solid #eee;${isFollowing ? 'background:#e8f8f5;' : ''}">
+          ${leftBadge}
+          <div style="flex:1;min-width:0;">
+            <div class="name" style="font-weight:600;color:#2c3e50;">${escapeHtml(it.event?.name || '?')} · ${escapeHtml(it.course?.name || '?')} · ${escapeHtml(it.driver)}</div>
+            <div class="sub" style="font-size:12px;color:#7f8c8d;">진행 ${progress} · ${elapsed}분${nextLabel}${nextEta}${remainEta}${veh ? ' · 🚐 ' + escapeHtml(veh) : ''}${it.sess.crew?.assist ? ' · 보조: ' + escapeHtml(it.sess.crew.assist) : ''}</div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:4px;flex:none;">
+            <button onclick="toggleFollowDriver('${safeKey}')" style="background:${followBg};color:#fff;border:none;padding:6px 10px;border-radius:5px;font-weight:700;font-size:12px;cursor:pointer;white-space:nowrap;">${followLabel}</button>
+            <button onclick="fitDriverCourse('${safeKey}')" style="background:#7f8c8d;color:#fff;border:none;padding:6px 10px;border-radius:5px;font-weight:700;font-size:12px;cursor:pointer;white-space:nowrap;">🗺 코스 전체</button>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+  // 따라가기 중이면 그 차량으로 지도 자동 이동
+  if (__followKey && liveMarkers[__followKey]) {
+    map.setCenter(liveMarkers[__followKey].getPosition());
+  }
+}
+function toggleFollowDriver(key) {
+  if (__followKey === key) {
+    stopFollow('user-toggle');
+    return;
+  }
+  __followKey = key;
+  const m = liveMarkers[key];
+  if (m && map) {
+    map.setCenter(m.getPosition());
+    map.setLevel(Math.min(map.getLevel(), 4));
+    // 깜빡 효과
+    let count = 0;
+    const blink = setInterval(() => {
+      count++;
+      m.setMap(count % 2 === 0 ? map : null);
+      if (count >= 4) { clearInterval(blink); m.setMap(map); }
+    }, 200);
+  }
+  if (window.__liveCache) renderLive(window.__liveCache);
+}
+function fitDriverCourse(key) {
+  const sess = (window.__liveCache || {})[key];
+  if (!sess) { alert('세션 정보 없음'); return; }
+  const data = loadData();
+  const anchors = (data.anchors || []).filter(a => a.courseId === sess.courseId);
+  if (!anchors.length) { alert('이 코스에 거점이 없습니다'); return; }
+  // 그 차량의 코스만 강조 표시 — 다른 코스 핑은 잠시 숨김
+  showCourseOnMap(sess.courseId);
+  // 차량 위치도 bounds에 포함
+  const bounds = new kakao.maps.LatLngBounds();
+  anchors.forEach(a => bounds.extend(new kakao.maps.LatLng(a.lat, a.lng)));
+  bounds.extend(new kakao.maps.LatLng(sess.lat, sess.lng));
+  map.setBounds(bounds);
+  stopFollow('fit-course');
+}
+// 라이브 카드 접기/펼치기 (차량 많을 때 지도 위로 끌어올리기)
+function toggleLiveCard() {
+  const body = document.getElementById('liveCardBody');
+  const btn = document.getElementById('liveCardToggle');
+  if (!body) return;
+  const collapsed = body.style.display === 'none';
+  body.style.display = collapsed ? 'block' : 'none';
+  if (btn) btn.textContent = collapsed ? '▼ 접기' : '▲ 펼치기';
+}
+
+function escapeHtml(s) {
+  return String(s == null ? '' : s).replace(/[<>&"']/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function focusLiveMarker(key) {
+  const m = liveMarkers[key];
+  if (!m || !map) return;
+  map.setCenter(m.getPosition());
+  map.setLevel(Math.min(map.getLevel(), 4));
+  // 마커 강조: 잠깐 진동 (위로 살짝 올렸다 내림)
+  const orig = m.getPosition();
+  let count = 0;
+  const blink = setInterval(() => {
+    count++;
+    m.setMap(count % 2 === 0 ? map : null);
+    if (count >= 6) { clearInterval(blink); m.setMap(map); }
+  }, 200);
+  // 로그 패널 정보 표시
+  const data = loadData();
+  const live = (window.__liveCache || {});
+  const sess = live[key];
+  if (sess) {
+    const event = getEvent(data, sess.eventId);
+    const course = getCourse(data, sess.courseId);
+    const driver = sess.crew?.driver || '운전자';
+    const veh = [sess.crew?.vehicle, sess.crew?.vehicleColor].filter(Boolean).join(' / ');
+    const elapsed = Math.round((Date.now() - (sess.startedAt || Date.now())) / 60000);
+    const progress = (sess.totalCount > 0) ? `${sess.completedCount}/${sess.totalCount}` : '-';
+    document.getElementById('logInfo').innerHTML = `
+      <div style="background:#e8f8f5;border-left:4px solid #27ae60;padding:8px 10px;border-radius:4px;">
+        <b>🟢 ${event?.name || ''} · ${course?.name || ''}</b> (운영 중)<br>
+        운전: <b>${driver}</b>${sess.crew?.assist ? ' · 보조: <b>' + sess.crew.assist + '</b>' : ''}${veh ? '<br>🚐 ' + veh : ''}<br>
+        진행: ${progress} · ${elapsed}분 경과
+      </div>
+    `;
+  }
+}
+
+function onPeriodChange() {
+  const period = document.getElementById('periodSel').value;
+  document.getElementById('dayPicker').style.display = period === 'day' ? 'inline-block' : 'none';
+  document.getElementById('monthPicker').style.display = period === 'monthly' ? 'inline-block' : 'none';
+  document.getElementById('rangePicker').style.display = period === 'range' ? 'inline-block' : 'none';
+  // 기본값 자동 채움
+  if (period === 'day' && !document.getElementById('dayInput').value) {
+    document.getElementById('dayInput').value = todayStr();
+  } else if (period === 'monthly' && !document.getElementById('monthInput').value) {
+    document.getElementById('monthInput').value = todayStr().slice(0, 7);
+  } else if (period === 'range') {
+    if (!document.getElementById('rangeStart').value) document.getElementById('rangeStart').value = todayStr();
+    if (!document.getElementById('rangeEnd').value) document.getElementById('rangeEnd').value = todayStr();
+  }
+  render();
+}
+
+function getFilteredLogs() {
+  const data = loadData();
+  const period = document.getElementById('periodSel').value;
+  const now = new Date();
+  let from = 0, to = Infinity;
+  if (period === 'today') {
+    const d = new Date(); d.setHours(0,0,0,0);
+    from = d.getTime();
+  } else if (period === 'week') from = now.getTime() - 7*24*60*60*1000;
+  else if (period === 'month') from = now.getTime() - 30*24*60*60*1000;
+  else if (period === 'day') {
+    const v = document.getElementById('dayInput').value;
+    if (v) {
+      const d = new Date(v + 'T00:00:00');
+      from = d.getTime();
+      to = from + 24*60*60*1000;
+    }
+  } else if (period === 'monthly') {
+    const v = document.getElementById('monthInput').value;
+    if (v) {
+      const [y, m] = v.split('-').map(Number);
+      from = new Date(y, m-1, 1).getTime();
+      to = new Date(y, m, 1).getTime();
+    }
+  } else if (period === 'range') {
+    const s = document.getElementById('rangeStart').value;
+    const e = document.getElementById('rangeEnd').value;
+    if (s) from = new Date(s + 'T00:00:00').getTime();
+    if (e) to = new Date(e + 'T23:59:59').getTime();
+  }
+
+  const eventFilter = document.getElementById('eventFilter')?.value || '';
+
+  return (data.logs || [])
+    .filter(l => {
+      const t = l.startedAt || 0;
+      if (t < from || t > to) return false;
+      if (eventFilter && l.eventId !== eventFilter) return false;
+      return true;
+    })
+    .sort((a, b) => (b.startedAt || 0) - (a.startedAt || 0));
+}
+
+function renderEventFilterOptions() {
+  const sel = document.getElementById('eventFilter');
+  if (!sel) return;
+  const data = loadData();
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">전체 행사</option>' +
+    (data.events || []).map(e => `<option value="${e.id}"${cur===e.id?' selected':''}>${e.name}</option>`).join('');
+}
+
+function render() {
+  renderEventFilterOptions();
+  const data = loadData();
+  const logs = getFilteredLogs();
+
+  // 요약
+  const totalCourses = logs.length;
+  const totalAnchors = logs.reduce((s, l) => s + (l.completions?.length || 0), 0);
+  const totalDist = logs.reduce((s, l) => s + trackDistance(l.track || []), 0);
+  const totalTime = logs.reduce((s, l) => {
+    if (l.startedAt && l.finishedAt) return s + (l.finishedAt - l.startedAt);
+    return s;
+  }, 0);
+  document.getElementById('summary').innerHTML = `
+    <div class="list-item"><b>총 운행</b><span>${totalCourses}회</span></div>
+    <div class="list-item"><b>방역 거점</b><span>${totalAnchors}개</span></div>
+    <div class="list-item"><b>총 거리</b><span>${(totalDist/1000).toFixed(1)} km</span></div>
+    <div class="list-item"><b>총 시간</b><span>${formatDuration(totalTime)}</span></div>
+  `;
+
+  // 목록
+  const el = document.getElementById('logList');
+  if (!logs.length) {
+    el.innerHTML = '<div class="empty">운행 기록 없음</div>';
+    return;
+  }
+  el.innerHTML = logs.map((l, i) => {
+    const event = getEvent(data, l.eventId);
+    const course = getCourse(data, l.courseId);
+    const team = getTeam(data, l.teamId);
+    const totalA = data.anchors.filter(a => a.courseId === l.courseId).length;
+    const dur = l.finishedAt ? formatDuration(l.finishedAt - l.startedAt) : '진행중';
+    const dist = (trackDistance(l.track || []) / 1000).toFixed(1);
+    const driver = l.crew?.driver || '';
+    const assist = l.crew?.assist || '';
+    return `
+      <div class="anchor-row" style="cursor:pointer;${selectedLogIdx===i?'background:#fff9e6;':''}" onclick="selectLog(${i})">
+        <div class="num" style="background:${course?.color || '#999'}">${(driver||team?.name||'?').slice(0,1)}</div>
+        <div style="flex:1;min-width:0;">
+          <div class="name">${event?.name || '?'} · ${course?.name || '?'}</div>
+          <div class="sub">${l.date} · ${l.completions?.length || 0}/${totalA} · ${dist}km · ${dur}</div>
+          ${driver || assist ? `<div class="sub">운전: ${driver || '-'}${assist ? ' · 보조: ' + assist : ''}</div>` : ''}
+        </div>
+        <button class="small danger" onclick="event.stopPropagation();deleteLog('${(l.key || '').replace(/'/g, "\\'")}')">🗑</button>
+      </div>
+    `;
+  }).join('');
+
+  if (selectedLogIdx !== null && logs[selectedLogIdx]) drawLog(logs[selectedLogIdx]);
+}
+
+function selectLog(idx) {
+  selectedLogIdx = idx;
+  render();
+  const log = getFilteredLogs()[idx];
+  if (log) drawLog(log);
+}
+
+function drawLog(log) {
+  if (!map) return;
+  logMarkers.forEach(m => m.setMap(null)); logMarkers = [];
+  if (logTrack) logTrack.setMap(null);
+
+  const data = loadData();
+  const anchors = getCourseAnchors(data, log.courseId);
+  const done = new Set(log.completions || []);
+  const bounds = new kakao.maps.LatLngBounds();
+
+  anchors.forEach((a, i) => {
+    const pos = new kakao.maps.LatLng(a.lat, a.lng);
+    bounds.extend(pos);
+    const marker = new kakao.maps.Marker({
+      position: pos, map, title: `${i+1}. ${a.name}`
+    });
+    if (!done.has(a.id)) marker.setOpacity(0.4);
+    logMarkers.push(marker);
+  });
+
+  if (log.track && log.track.length >= 2) {
+    const path = log.track.map(t => {
+      const p = new kakao.maps.LatLng(t[0], t[1]);
+      bounds.extend(p);
+      return p;
+    });
+    logTrack = new kakao.maps.Polyline({
+      path, strokeWeight: 3, strokeColor: '#3498db',
+      strokeOpacity: 0.8, map
+    });
+  }
+  if (anchors.length || (log.track || []).length) map.setBounds(bounds);
+
+  const event = getEvent(data, log.eventId);
+  const course = getCourse(data, log.courseId);
+  const team = getTeam(data, log.teamId);
+  const driver = log.crew?.driver || '';
+  const assist = log.crew?.assist || '';
+  const photoIds = log.photos || [];
+  const photoHtml = photoIds.length
+    ? `<div style="margin-top:8px;"><b>📷 현장사진 (${photoIds.length}장)</b><div id="logPhotos" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;"></div></div>`
+    : '';
+  document.getElementById('logInfo').innerHTML = `
+    <b>${event?.name} · ${course?.name}</b>${team ? ' · ' + team.name : ''}<br>
+    ${driver || assist ? `운전: <b>${driver || '-'}</b>${assist ? ' · 보조: <b>' + assist + '</b>' : ''}<br>` : ''}
+    완료 ${(log.completions||[]).length}/${anchors.length} ·
+    이동 ${(trackDistance(log.track || []) / 1000).toFixed(2)}km ·
+    소요 ${log.finishedAt ? formatDuration(log.finishedAt - log.startedAt) : '진행중'}
+    ${photoHtml}
+  `;
+  if (photoIds.length) {
+    const stripEl = document.getElementById('logPhotos');
+    stripEl.innerHTML = photoIds.map(id => `
+      <div style="position:relative;width:80px;height:80px;border-radius:6px;overflow:hidden;border:1px solid #ddd;background:#f3f4f6;cursor:pointer;" onclick="viewLogPhoto('${id}')">
+        <img id="lph-${id}" alt="" style="width:100%;height:100%;object-fit:cover;display:none;">
+        <span style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#888;font-size:10px;">로딩...</span>
+      </div>
+    `).join('');
+    photoIds.forEach(function(id) {
+      getPhotoDataUrl(id).then(function(dataUrl) {
+        if (!dataUrl) return;
+        var img = document.getElementById('lph-' + id);
+        if (img) { img.src = dataUrl; img.style.display = 'block'; img.parentElement.querySelectorAll('span').forEach(function(s) { s.style.display='none'; }); }
+      }).catch(function() {});
+    });
+  }
+}
+async function viewLogPhoto(id) {
+  var p = await loadPhoto(id);
+  if (!p) { alert('사진을 불러올 수 없습니다'); return; }
+  var dataUrl = await getPhotoDataUrl(id);
+  if (!dataUrl) { alert('사진 데이터를 가져올 수 없습니다'); return; }
+  var overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.92);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;cursor:pointer;';
+  var ts = new Date(p.takenAt).toLocaleString('ko-KR');
+  overlay.innerHTML = '<div style="position:relative;max-width:100%;max-height:100%;text-align:center;">'
+    + '<img src="' + dataUrl + '" style="max-width:100%;max-height:85vh;border-radius:8px;">'
+    + '<div style="color:#fff;margin-top:8px;font-size:13px;">' + ts + (p.lat ? ' · 📍 ' + p.lat.toFixed(5) + ', ' + p.lng.toFixed(5) : '') + '</div>'
+    + '</div>';
+  overlay.onclick = function() { overlay.remove(); };
+  document.body.appendChild(overlay);
+}
+
+function trackDistance(track) {
+  let d = 0;
+  for (let i = 1; i < track.length; i++) {
+    d += distance(track[i-1][0], track[i-1][1], track[i][0], track[i][1]);
+  }
+  return d;
+}
+function formatDuration(ms) {
+  if (!ms) return '-';
+  const m = Math.floor(ms / 60000);
+  const h = Math.floor(m / 60);
+  return h ? `${h}시간 ${m%60}분` : `${m}분`;
+}
+function clearLogs() {
+  if (!confirm('필터 무시하고 모든 운행 기록을 영구 삭제할까요?')) return;
+  const data = loadData();
+  data.logs = [];
+  saveData(data);
+  selectedLogIdx = null;
+  render();
+}
+
+function deleteLog(key) {
+  if (!key) { alert('이 기록은 삭제 식별자가 없습니다 (이전 버전 데이터)'); return; }
+  if (!confirm('이 운행 기록 한 건만 삭제할까요?')) return;
+  const data = loadData();
+  data.logs = (data.logs || []).filter(l => l.key !== key);
+  saveData(data);
+  selectedLogIdx = null;
+  render();
+}
+</script>
+</body>
+</html>
