@@ -874,6 +874,13 @@ function _apiListApply(p) {
           if (!colSet[k]) { colSet[k] = true; colOrder.push(k); }
         });
       });
+      // 기본 헤더 순서 적용 (양식 기준)
+      var PREFERRED = ["접수순번","접수일시","구분","참가구분","신청유형(명/팀)","팀명","대표자","성명","주민번호","연락처","주소","시도별","은행명","계좌번호","예금주","신청인","스승","소속","예선곡","본선곡","지정고수사용","USB여부","참가신청서","통장사본","주민등록등본","개인정보동의","예선합격","최종합격","수상","수여자","불참","다회참가자"];
+      var sorted = [];
+      var inCol = {};
+      PREFERRED.forEach(function(h) { if (colSet[h]) { sorted.push(h); inCol[h] = true; } });
+      colOrder.forEach(function(h) { if (!inCol[h]) sorted.push(h); });
+      colOrder = sorted;
       // 2차원 배열로 변환
       var rows = arr.map(function(r) {
         if (!r || typeof r !== 'object') return colOrder.map(function() { return ""; });
