@@ -209,6 +209,7 @@
 <!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script>
 <script>
 // ===== 설정 =====
 var FIREBASE_CONFIG = {
@@ -221,11 +222,9 @@ var FIREBASE_CONFIG = {
   appId: "1:614152392942:web:de6ddc09a3d9225d83a3ff"
 };
 
-// ★ GAS 파일업로드 프록시 URL — FileUpload_GAS.gs 배포 후 여기에 입력
-var GAS_UPLOAD_URL = "";
-
 firebase.initializeApp(FIREBASE_CONFIG);
 var db = firebase.database();
+var storage = firebase.storage();
 
 // URL 파라미터에서 evtId 추출
 var params = new URLSearchParams(window.location.search);
@@ -327,25 +326,23 @@ function validate() {
   return true;
 }
 
-// ===== GAS 프록시로 파일 업로드 =====
+// ===== Firebase Storage 파일 업로드 =====
 async function uploadFile(fileObj, label, subFolder) {
   if (!fileObj || !fileObj.dataUrl) return "";
-  if (!GAS_UPLOAD_URL) return "(GAS 미연결)";
   try {
-    var res = await fetch(GAS_UPLOAD_URL, {
-      method: "POST",
-      headers: {"Content-Type":"application/json"},
-      body: JSON.stringify({
-        dataUrl: fileObj.dataUrl,
-        fileName: label + "_" + fileObj.name,
-        subFolder: subFolder
-      })
-    });
-    // GAS 웹앱은 리다이렉트 응답을 줄 수 있음
-    var text = await res.text();
-    try { var r = JSON.parse(text); return (r && r.ok) ? r.url : ""; }
-    catch(e) { return ""; }
-  } catch(e) { return ""; }
+    var m = fileObj.dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+    if (!m) return "";
+    var mime = m[1] || "application/octet-stream";
+    var raw = atob(m[2]);
+    var arr = new Uint8Array(raw.length);
+    for (var i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
+    var fileName = label + "_" + fileObj.name.replace(/[\/\\:*?"<>|]/g, "_");
+    var path = "apply/" + EVT_ID + "/" + subFolder + "/" + fileName;
+    var ref = storage.ref(path);
+    await ref.put(arr, {contentType: mime});
+    var url = await ref.getDownloadURL();
+    return url;
+  } catch(e) { console.error("upload err:", e); return ""; }
 }
 
 // ===== 접수순번 생성 (Firebase에서 기존 최대값 조회) =====
@@ -386,17 +383,14 @@ async function submitForm() {
       String(now.getMinutes()).padStart(2,"0") + ":" +
       String(now.getSeconds()).padStart(2,"0");
 
-    // 2) 파일 업로드 (GAS 프록시)
+    // 2) 파일 업로드 (Firebase Storage)
     var subFolder = seq + "_" + v("fName");
-    var urlForm = "", urlBank = "", urlReg = "";
-    if (GAS_UPLOAD_URL) {
-      showLoading("파일 업로드 중... (1/3)");
-      urlForm = await uploadFile(FILES.file_form, "참가신청서", subFolder);
-      showLoading("파일 업로드 중... (2/3)");
-      urlBank = await uploadFile(FILES.file_bank, "통장사본", subFolder);
-      showLoading("파일 업로드 중... (3/3)");
-      urlReg = await uploadFile(FILES.file_reg, "주민등록등본", subFolder);
-    }
+    showLoading("파일 업로드 중... (1/3)");
+    var urlForm = await uploadFile(FILES.file_form, "참가신청서", subFolder);
+    showLoading("파일 업로드 중... (2/3)");
+    var urlBank = await uploadFile(FILES.file_bank, "통장사본", subFolder);
+    showLoading("파일 업로드 중... (3/3)");
+    var urlReg = await uploadFile(FILES.file_reg, "주민등록등본", subFolder);
 
     // 3) Firebase RTDB 에 저장
     showLoading("데이터 저장 중...");
