@@ -14104,6 +14104,8 @@ function openSheet(sheetName) {
 function _sheetSwitchToMain() { openSheet("Users"); }
 function _sheetSwitchToEvt() { openSheet("Mems"); }
 
+var _APPLY_COL_ORDER = ["접수순번","접수일시","구분","참가구분","신청유형(명/팀)","팀명","대표자","성명","주민번호","연락처","주소","시도별","은행명","계좌번호","예금주","신청인","스승","소속","예선곡","본선곡","지정고수사용","USB여부","참가신청서","통장사본","주민등록등본","개인정보동의","예선합격","최종합격","수상","수여자","불참","다회참가자"];
+
 function _sheetBuildCols(rows) {
   var colSet = {};
   var colOrder = [];
@@ -14113,6 +14115,15 @@ function _sheetBuildCols(rows) {
       if (!colSet[k]) { colSet[k] = true; colOrder.push(k); }
     });
   });
+  // Apply 시트면 양식 순서 적용
+  if (_sheetState.node === "Apply") {
+    var sorted = [];
+    var inCol = {};
+    _APPLY_COL_ORDER.forEach(function(h) { if (colSet[h]) { sorted.push(h); inCol[h] = true; } });
+    colOrder.forEach(function(h) { if (!inCol[h]) sorted.push(h); });
+    _sheetState.cols = sorted;
+    return;
+  }
   // id를 맨 앞으로
   var idx = colOrder.indexOf("id");
   if (idx > 0) { colOrder.splice(idx, 1); colOrder.unshift("id"); }
