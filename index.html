@@ -14305,9 +14305,9 @@ async function doImp(inp){
       if((impMode=="all"||impMode=="pur") && wb.SheetNames.indexOf("물품구매")>=0)
         checkList.push({sheet:"물품구매", cols:["구매일","물품명",["합계(원)","합계(천원)","합계"]]});
       if((impMode=="all"||impMode=="bud") && wb.SheetNames.indexOf("지출내역")>=0)
-        checkList.push({sheet:"지출내역", cols:["날짜",["금액(원)","금액(천원)","금액"]]});
+        checkList.push({sheet:"지출내역", cols:[["날짜","일자","지출일"],["금액(원)","금액(천원)","금액","지출액","지출액(원)"]]});
       if((impMode=="all"||impMode=="expbg") && wb.SheetNames.indexOf("세출예산")>=0)
-        checkList.push({sheet:"세출예산", cols:["대분류","중분류",["사업계획비(원)","사업계획비"]]});
+        checkList.push({sheet:"세출예산", cols:["대분류","중분류"]});
       if((impMode=="all"||impMode=="inc") && wb.SheetNames.indexOf("세입관리")>=0)
         checkList.push({sheet:"세입관리", cols:["대분류",["금액(원)","금액"]]});
       if((impMode=="all"||impMode=="mem") && wb.SheetNames.indexOf("인원관리")>=0)
@@ -14382,8 +14382,8 @@ async function doImp(inp){
       if(checkList.some(function(x){return x.sheet==="지출내역";})){
         var r3=XLSX.utils.sheet_to_json(wb.Sheets["지출내역"]);
         var eRows=r3.map(function(x){
-          var bi=null;for(var j=0;j<BG.length;j++)if(BG[j].n==String(x["비목"]||x["예산비목"]||""))bi=BG[j].id;
-          return {dt:String(x["날짜"]||""),bi:bi||(BG[0]?BG[0].id:"B1"),ar:String(x["부서"]||""),am:String(x["금액(원)"]||x["금액(천원)"]||x["금액"]||""),ds:String(x["적요"]||""),by:CID};
+          var bi=null;var biNm=String(_rowGet(x,["비목","예산비목"])||"");for(var j=0;j<BG.length;j++)if(BG[j].n==biNm)bi=BG[j].id;
+          return {dt:String(_rowGet(x,["날짜","일자","지출일"])||""),bi:bi||(BG[0]?BG[0].id:"B1"),ar:String(_rowGet(x,["부서","소속"])||""),am:String(_rowGet(x,["금액(원)","금액(천원)","금액","지출액","지출액(원)"])||""),ds:String(_rowGet(x,["적요","내용","비고"])||""),by:CID};
         });
         if(eRows.length){
           showLoading("지출내역 "+eRows.length+"건 일괄 저장중...");
@@ -14398,12 +14398,12 @@ async function doImp(inp){
           var tp=String(_rowGet(x,"대분류")||"").trim();
           var mid=String(_rowGet(x,"중분류")||"").trim();
           if(!tp||!mid) return null;
-          return {tp:tp, mid:mid, sub:String(_rowGet(x,"소분류")||"").trim(), planAm:Number(String(_rowGet(x,["사업계획비(원)","사업계획비"])||"0").replace(/[^0-9.-]/g,""))||0, note:String(_rowGet(x,"비고")||"").trim()};
+          return {tp:tp, mid:mid, sub:String(_rowGet(x,"소분류")||"").trim(), planAm:Number(String(_rowGet(x,["사업계획비(원)","사업계획비","예산액","예산액(원)","금액","금액(원)","계획금액","계획금액(원)","배정액","배정액(원)"])||"0").replace(/[^0-9.-]/g,""))||0, note:String(_rowGet(x,"비고")||"").trim()};
         }).filter(function(x){return x;});
         if(bgRows.length){
           showLoading("세출예산 "+bgRows.length+"건 일괄 저장중...");
-          var rsBG=await api("bulkAddExpBG",{rows:bgRows});
-          if(rsBG&&rsBG.ok){c+=rsBG.added||0;}else{fail+=bgRows.length;}
+          var rsBG=await api("bulkUpsertExpBig",{rows:bgRows});
+          if(rsBG&&rsBG.ok){c+=(rsBG.added||0)+(rsBG.updated||0);}else{fail+=bgRows.length;}
         }
       }
       // 세입 — 벌크

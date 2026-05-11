@@ -573,7 +573,13 @@ function _apiBulkUpsert(p, nodeName) {
     rows.forEach(function(r) {
       r.evtId = evtId;
       var idx = -1;
-      if (r.name) {
+      // tp+mid 조합으로 매칭 (ExpBG 등)
+      if (r.tp && idx < 0) {
+        for (var i = 0; i < arr.length; i++) {
+          if (arr[i].tp === r.tp && (arr[i].mid||"") === (r.mid||"")) { idx = i; break; }
+        }
+      }
+      if (r.name && idx < 0) {
         for (var i = 0; i < arr.length; i++) {
           if (arr[i].name === r.name || arr[i].tp === r.name) { idx = i; break; }
         }
