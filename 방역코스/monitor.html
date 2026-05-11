@@ -258,19 +258,39 @@ function renderFacilities() {
     var cat = _facCategories.find(function(c) { return c.id === it.catId; });
     if (!cat) return;
     var color = cat.color || '#6b7280';
-    var pts;
-    if (it.shape === 'circle') {
-      pts = _circPts(it.lat, it.lng, (it.diameter || 5) / 2);
-    } else {
-      pts = _rectPts(it.lat, it.lng, it.w, it.h);
-    }
+    var poly;
 
-    var poly = new kakao.maps.Polygon({
-      path: pts, strokeWeight: 2, strokeColor: color, strokeOpacity: 0.9,
-      fillColor: color, fillOpacity: 0.35
-    });
-    poly.setMap(map);
-    _facPolys.push(poly);
+    if (it.shape === 'line') {
+      if (!it.path || it.path.length < 2) return;
+      var lpts = it.path.map(function(p) { return new kakao.maps.LatLng(p.lat, p.lng); });
+      poly = new kakao.maps.Polyline({
+        path: lpts, strokeWeight: cat.strokeWeight || 4, strokeColor: color, strokeOpacity: 0.9, strokeStyle: 'solid'
+      });
+      poly.setMap(map);
+      _facPolys.push(poly);
+      // 방향 화살표
+      if (cat.direction === 'oneway' && lpts.length >= 2) _addFacArrow(lpts[lpts.length-2], lpts[lpts.length-1], color);
+      else if (cat.direction === 'twoway' && lpts.length >= 2) { _addFacArrow(lpts[lpts.length-2], lpts[lpts.length-1], color); _addFacArrow(lpts[1], lpts[0], color); }
+    } else if (it.shape === 'polygon') {
+      if (!it.path || it.path.length < 3) return;
+      var pgpts = it.path.map(function(p) { return new kakao.maps.LatLng(p.lat, p.lng); });
+      poly = new kakao.maps.Polygon({
+        path: pgpts, strokeWeight: 2, strokeColor: color, strokeOpacity: 0.9,
+        fillColor: color, fillOpacity: 0.35
+      });
+      poly.setMap(map);
+      _facPolys.push(poly);
+    } else {
+      var pts;
+      if (it.shape === 'circle') pts = _circPts(it.lat, it.lng, (it.diameter || 5) / 2);
+      else pts = _rectPts(it.lat, it.lng, it.w, it.h);
+      poly = new kakao.maps.Polygon({
+        path: pts, strokeWeight: 2, strokeColor: color, strokeOpacity: 0.9,
+        fillColor: color, fillOpacity: 0.35
+      });
+      poly.setMap(map);
+      _facPolys.push(poly);
+    }
 
     // 라벨
     var txt = it.num + (it.name ? ' ' + it.name : '');
@@ -293,7 +313,7 @@ function renderFacilities() {
 
 function showFacilityInfo(it, cat, latLng) {
   if (_facInfoWin) _facInfoWin.setMap(null);
-  var size = it.shape === 'circle' ? '⌀' + (it.diameter || 5) + 'm' : (it.w || 3) + '×' + (it.h || 6) + 'm';
+  var size = it.shape === 'circle' ? '⌀' + (it.diameter || 5) + 'm' : it.shape === 'line' ? '선' + (cat.direction === 'oneway' ? ' 일방→' : cat.direction === 'twoway' ? ' 양방↔' : '') : it.shape === 'polygon' ? '다각형' : (it.w || 3) + '×' + (it.h || 6) + 'm';
   var html = '<div style="background:#1e293b;color:#e2e8f0;padding:14px;border-radius:10px;min-width:200px;box-shadow:0 4px 20px rgba(0,0,0,0.5);font-size:12px;line-height:1.6;position:relative">';
   html += '<div style="position:absolute;top:6px;right:8px;cursor:pointer;color:#94a3b8;font-size:14px" onclick="this.parentElement.parentElement.remove()">✕</div>';
   html += '<div style="font-size:14px;font-weight:700;margin-bottom:6px;color:' + (cat.color || '#fff') + '">' + _esc(it.num || '') + ' ' + _esc(it.name || cat.name) + '</div>';
@@ -335,6 +355,20 @@ function _circPts(lat, lng, r, n) {
   return pts;
 }
 function _esc(s) { return String(s || '').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+
+function _addFacArrow(from, to, color) {
+  var dLat = to.getLat() - from.getLat(), dLng = to.getLng() - from.getLng();
+  var deg = Math.atan2(dLng, dLat) * 180 / Math.PI - 90;
+  var midLat = from.getLat() * 0.2 + to.getLat() * 0.8;
+  var midLng = from.getLng() * 0.2 + to.getLng() * 0.8;
+  var arrow = new kakao.maps.CustomOverlay({
+    position: new kakao.maps.LatLng(midLat, midLng),
+    content: '<div style="font-size:18px;font-weight:900;color:' + color + ';transform:rotate(' + deg + 'deg);text-shadow:0 1px 4px rgba(0,0,0,0.6);pointer-events:none">▶</div>',
+    yAnchor: 0.5, xAnchor: 0.5
+  });
+  arrow.setMap(map);
+  _facLabels.push(arrow);
+}
 
 // 라이브 세션에서 courseId로 운영중인 호차 찾기
 function getVehiclesOnCourse(courseId) {
