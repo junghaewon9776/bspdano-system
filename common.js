@@ -268,6 +268,8 @@ function _dispatch(p) {
         case "getApplyConfig": _apiGetApplyConfig(p).then(resolve); return;
         case "saveApplyConfig":_apiSetConfig(Object.assign({}, p, {key:"APPLY_CONFIG", value:JSON.stringify({status:p.status,startDt:p.startDt,endDt:p.endDt,notice:p.notice,webappUrl:p.webappUrl})})).then(function(){resolve({ok:true})}); return;
         case "updateApplyRow": _apiUpdateApplyRow(p).then(resolve); return;
+        case "updateApply":  _apiUpdateApplyBySeq(p).then(resolve); return;
+        case "deleteApply":  _apiDeleteApplyBySeq(p).then(resolve); return;
 
         // 사진 업로드 (Drive GAS 프록시 — 추후 연동)
         case "uploadPhoto":    resolve({ok:false, err:"사진 업로드는 Drive 설정 후 사용 가능합니다"}); return;
@@ -1004,6 +1006,54 @@ function _apiUpdateApplyRow(p) {
       ref.set(arr).then(function() {
         resolve({ok:true});
       });
+    });
+  });
+}
+
+function _apiUpdateApplyBySeq(p) {
+  var evtId = _getEvtId(p);
+  if (!evtId) return Promise.resolve({ok:false, err:"행사 미선택"});
+  var seq = p.seq;
+  var fields = p.fields || {};
+  if (!seq) return Promise.resolve({ok:false, err:"seq 필요"});
+  return new Promise(function(resolve) {
+    var ref = fbDb.ref('/evtData/' + evtId + '/Apply');
+    ref.once('value', function(snap) {
+      var raw = snap.val();
+      if (!raw) return resolve({ok:false, err:"데이터 없음"});
+      var arr = Array.isArray(raw) ? raw.filter(function(r){return r!=null;}) : Object.values(raw);
+      var found = false;
+      var seqKey = _fbSafeKey("접수순번");
+      for (var i = 0; i < arr.length; i++) {
+        if (String(arr[i][seqKey] || arr[i]["접수순번"] || "") === String(seq)) {
+          Object.keys(fields).forEach(function(f) { arr[i][_fbSafeKey(f)] = fields[f]; });
+          found = true;
+          break;
+        }
+      }
+      if (!found) return resolve({ok:false, err:"접수순번 "+seq+" 없음"});
+      ref.set(arr).then(function() { resolve({ok:true}); });
+    });
+  });
+}
+
+function _apiDeleteApplyBySeq(p) {
+  var evtId = _getEvtId(p);
+  if (!evtId) return Promise.resolve({ok:false, err:"행사 미선택"});
+  var seq = p.seq;
+  if (!seq) return Promise.resolve({ok:false, err:"seq 필요"});
+  return new Promise(function(resolve) {
+    var ref = fbDb.ref('/evtData/' + evtId + '/Apply');
+    ref.once('value', function(snap) {
+      var raw = snap.val();
+      if (!raw) return resolve({ok:false, err:"데이터 없음"});
+      var arr = Array.isArray(raw) ? raw.filter(function(r){return r!=null;}) : Object.values(raw);
+      var seqKey = _fbSafeKey("접수순번");
+      var newArr = arr.filter(function(r) {
+        return String(r[seqKey] || r["접수순번"] || "") !== String(seq);
+      });
+      if (newArr.length === arr.length) return resolve({ok:false, err:"접수순번 "+seq+" 없음"});
+      ref.set(newArr).then(function() { resolve({ok:true}); });
     });
   });
 }
