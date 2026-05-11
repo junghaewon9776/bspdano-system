@@ -524,7 +524,7 @@ function _apiBulkAdd(p, nodeName) {
     });
     return saveEvtNode(evtId, nodeName, arr).then(function() {
       _evtCaches[evtId][nodeName] = arr;
-      return {ok:true, count:newRows.length};
+      return {ok:true, added:newRows.length, count:newRows.length};
     });
   });
 }
@@ -549,19 +549,26 @@ function _apiBulkUpsert(p, nodeName) {
   return loadEvtData(evtId).then(function(data) {
     var arr = data[nodeName] || [];
     var rows = p.rows || [];
+    var added = 0, updated = 0;
     rows.forEach(function(r) {
-      if (!r.id) r.id = uid();
       r.evtId = evtId;
       var idx = -1;
-      for (var i = 0; i < arr.length; i++) {
-        if (arr[i].id === r.id) { idx = i; break; }
+      if (r.name) {
+        for (var i = 0; i < arr.length; i++) {
+          if (arr[i].name === r.name || arr[i].tp === r.name) { idx = i; break; }
+        }
       }
-      if (idx >= 0) arr[idx] = r;
-      else arr.push(r);
+      if (r.id && idx < 0) {
+        for (var i = 0; i < arr.length; i++) {
+          if (arr[i].id === r.id) { idx = i; break; }
+        }
+      }
+      if (idx >= 0) { Object.assign(arr[idx], r); updated++; }
+      else { if (!r.id) r.id = uid(); arr.push(r); added++; }
     });
     return saveEvtNode(evtId, nodeName, arr).then(function() {
       _evtCaches[evtId][nodeName] = arr;
-      return {ok:true, count:rows.length};
+      return {ok:true, added:added, updated:updated, count:rows.length};
     });
   });
 }
@@ -874,8 +881,10 @@ function _apiListApply(p) {
           if (!colSet[k]) { colSet[k] = true; colOrder.push(k); }
         });
       });
-      // 기본 헤더 순서 적용 (양식 기준)
+      // 기본 헤더 순서 적용 (양식 기준) + 필수 컬럼 보장
       var PREFERRED = ["접수순번","접수일시","구분","참가구분","신청유형(명/팀)","팀명","대표자","성명","주민번호","연락처","주소","시도별","은행명","계좌번호","예금주","신청인","스승","소속","예선곡","본선곡","지정고수사용","USB여부","참가신청서","통장사본","주민등록등본","개인정보동의","예선합격","최종합격","수상","수여자","불참","다회참가자"];
+      var REQUIRED = ["예선합격","최종합격","수상","수여자","불참","다회참가자"];
+      REQUIRED.forEach(function(h) { if (!colSet[h]) { colSet[h] = true; colOrder.push(h); } });
       var sorted = [];
       var inCol = {};
       PREFERRED.forEach(function(h) { if (colSet[h]) { sorted.push(h); inCol[h] = true; } });
@@ -946,7 +955,7 @@ function _apiBulkAddMain(p, nodeName) {
   });
   return saveMainNode(nodeName, arr).then(function() {
     _cache[nodeName] = arr;
-    return {ok:true, count:newRows.length};
+    return {ok:true, added:newRows.length, count:newRows.length};
   });
 }
 
@@ -1005,10 +1014,10 @@ function _apiBulkReplaceMems(p) {
         groups = groups.concat(newGroups);
         return saveEvtNode(evtId, "Groups", groups).then(function() {
           _evtCaches[evtId].Groups = groups;
-          return {ok:true, count:arr.length, newGroups:newGroups.length};
+          return {ok:true, cnt:arr.length, count:arr.length, newGroups:newGroups.length};
         });
       }
-      return {ok:true, count:arr.length};
+      return {ok:true, cnt:arr.length, count:arr.length};
     });
   });
 }
@@ -1039,7 +1048,7 @@ function _apiBulkReplaceAccounts(p) {
   ]).then(function() {
     _cache.Users = existUsers;
     _cache.Areas = existAreas;
-    return {ok:true, userCount:existUsers.length, areaCount:existAreas.length};
+    return {ok:true, userCnt:users.length, areaCnt:areas.length, userCount:existUsers.length, areaCount:existAreas.length};
   });
 }
 
