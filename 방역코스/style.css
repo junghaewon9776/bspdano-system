@@ -220,6 +220,7 @@ label { display: block; font-size: 12px; color: #666; margin: 6px 0 2px; }
   max-width: 600px; margin: 40px auto;
 }
 .menu-card {
+  display: block;
   background: #fff;
   padding: 30px 20px;
   border-radius: 12px;
@@ -228,6 +229,7 @@ label { display: block; font-size: 12px; color: #666; margin: 6px 0 2px; }
   text-align: center;
   box-shadow: 0 2px 6px rgba(0,0,0,0.08);
   transition: transform 0.15s;
+  cursor: pointer;
 }
 .menu-card:hover { transform: translateY(-2px); }
 .menu-card .icon { font-size: 36px; margin-bottom: 8px; }
