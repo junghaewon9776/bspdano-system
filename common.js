@@ -221,7 +221,7 @@ function _dispatch(p) {
         // 계정/권한
         case "listAcctEvt":  _apiListMainNode(p, "AcctEvt").then(resolve); return;
         case "saveAcctEvt":  _apiSaveAcctEvt(p).then(resolve); return;
-        case "deleteAcctEvt":_apiDeleteMainRow(p, "AcctEvt").then(resolve); return;
+        case "deleteAcctEvt":_apiDeleteAcctEvt(p).then(resolve); return;
         case "addAcct":      _apiAddAcct(p).then(resolve); return;
         case "updateAcct":   _apiUpdateAcct(p).then(resolve); return;
         case "deleteAcct":   _apiDeleteAcct(p).then(resolve); return;
@@ -752,6 +752,17 @@ function _apiSaveAcctEvt(p) {
       arr.push({id:uid(), evtId:p.evtId, acctId:p.acctId, role:p.role||"user", note:p.note||"", createdAt:now_()});
     }
   }
+  return saveMainNode("AcctEvt", arr).then(function() {
+    _cache.AcctEvt = arr;
+    return {ok:true};
+  });
+}
+
+function _apiDeleteAcctEvt(p) {
+  var arr = (_cache.AcctEvt || []).filter(function(r) {
+    if (p.id) return r.id !== p.id;
+    return !(r.acctId === p.acctId && r.evtId === p.evtId);
+  });
   return saveMainNode("AcctEvt", arr).then(function() {
     _cache.AcctEvt = arr;
     return {ok:true};
