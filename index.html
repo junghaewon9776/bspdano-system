@@ -1041,14 +1041,15 @@ function mkTabs(){
     {k:"_field_today",l:"오늘의 운영",ext:"방역코스/today.html"}
   ]});
 
-  // 현재 CTAB이 어느 카테고리에 속하는지 찾기
-  var foundCat="";
-  cats.forEach(function(cat){
-    cat.items.forEach(function(t){if(t.k===CTAB)foundCat=cat.id});
-  });
-  if(!foundCat && !_curCat) foundCat=cats[0]?cats[0].id:"";
-  if(foundCat) _curCat=foundCat;
-  if(!_curCat && cats.length) _curCat=cats[0].id;
+  // _curCat이 유효한 카테고리인지 확인, 아니면 CTAB 기반으로 자동 선택
+  var validCat=cats.some(function(c){return c.id===_curCat});
+  if(!validCat){
+    var foundCat="";
+    cats.forEach(function(cat){
+      cat.items.forEach(function(t){if(t.k===CTAB)foundCat=cat.id});
+    });
+    _curCat=foundCat||(cats[0]?cats[0].id:"");
+  }
 
   // 카테고리 버튼 행
   var h1='<div class="cat-row">';
