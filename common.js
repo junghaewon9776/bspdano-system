@@ -75,7 +75,11 @@ function loadEvtData(evtId) {
 
 // 행사별 데이터 저장
 function saveEvtNode(evtId, nodeName, data) {
-  return fbDb.ref('/evtData/' + evtId + '/' + nodeName).set(data);
+  var d = data;
+  if (nodeName === "Apply" && Array.isArray(d)) {
+    d = d.map(function(r) { return _fbSafeRow(r); });
+  }
+  return fbDb.ref('/evtData/' + evtId + '/' + nodeName).set(d);
 }
 
 // 메인 데이터 저장
@@ -910,6 +914,13 @@ function _apiListApply(p) {
         Object.keys(raw).forEach(function(k) { if (raw[k] != null) arr.push(raw[k]); });
       }
       if (!arr.length) return resolve({ok:true, headers:[], rows:[], note:"참가자 데이터가 없습니다."});
+      // Firebase 전각 키 → 원래 키로 복원
+      arr = arr.map(function(r) {
+        if (!r || typeof r !== 'object') return r;
+        var out = {};
+        Object.keys(r).forEach(function(k) { out[_fbRestoreKey(k)] = r[k]; });
+        return out;
+      });
       // 헤더 추출 (모든 row의 키 합집합)
       var colSet = {};
       var colOrder = [];
@@ -974,7 +985,7 @@ function _apiUpdateApplyRow(p) {
       var val = p.value;
       if (ri == null || col == null) return resolve({ok:false, err:"rowIndex/col 필요"});
       if (!arr[ri]) return resolve({ok:false, err:"행 없음"});
-      arr[ri][col] = val;
+      arr[ri][_fbSafeKey(col)] = val;
       ref.set(arr).then(function() {
         resolve({ok:true});
       });
@@ -997,6 +1008,23 @@ function _apiBulkAddMain(p, nodeName) {
   });
 }
 
+function _fbSafeKey(s) {
+  return String(s).replace(/[.#$/\[\]]/g, function(c) {
+    return {'.':'．','#':'＃','$':'＄','/':'／','[':'［',']':'］'}[c] || c;
+  });
+}
+function _fbRestoreKey(s) {
+  return String(s).replace(/[．＃＄／［］]/g, function(c) {
+    return {'．':'.','＃':'#','＄':'$','／':'/','［':'[','］':']'}[c] || c;
+  });
+}
+function _fbSafeRow(row) {
+  if (!row || typeof row !== 'object') return row;
+  var out = {};
+  Object.keys(row).forEach(function(k) { out[_fbSafeKey(k)] = row[k]; });
+  return out;
+}
+
 function _apiBulkAddApply(p) {
   var evtId = _getEvtId(p);
   if (!evtId) return Promise.resolve({ok:false, err:"행사 미선택"});
@@ -1007,7 +1035,7 @@ function _apiBulkAddApply(p) {
       if (Array.isArray(raw)) arr = raw.filter(function(r){return r!=null;});
       else if (raw && typeof raw === 'object') Object.keys(raw).forEach(function(k){if(raw[k])arr.push(raw[k]);});
       var newRows = p.rows || [];
-      newRows.forEach(function(r) { arr.push(r); });
+      newRows.forEach(function(r) { arr.push(_fbSafeRow(r)); });
       fbDb.ref('/evtData/' + evtId + '/Apply').set(arr).then(function() {
         resolve({ok:true, count:newRows.length});
       });
