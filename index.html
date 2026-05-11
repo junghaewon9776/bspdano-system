@@ -994,6 +994,7 @@ function mkTabs(){
   if(HM("mem")) ts.push({k:"mem",l:"인원관리"});
   if(isA() && HM("fee")) ts.push({k:"fee",l:"💵 회비"});
   if(HM("rental")) ts.push({k:"rental",l:"📦 대여자산"});
+  if(HM("files")) ts.push({k:"files",l:"📁 자료실"});
   if(isA() && HM("contract")) ts.push({k:"contract",l:"📄 계약서"});
   if(isA() && HM("quote"))    ts.push({k:"quote",l:"💰 견적서"});
   if(isA())ts.push({k:"acct",l:"계정관리"});
@@ -1038,6 +1039,7 @@ function _tabAllowedByEvt(tab){
     case "mem":                    return _hasModule("mem");
     case "fee":                    return _hasModule("fee");
     case "rental":                 return _hasModule("rental");
+    case "files":                  return _hasModule("files");
     default:                       return true;
   }
 }
@@ -1061,7 +1063,7 @@ function drawEventBar(){
   var role = (CUR_EVT && CUR_EVT.role) || "viewer";
   var roleLbl = role==="admin"?"관리자":(role==="user"?"사용자":"보기");
   // 모듈 요약
-  var mlabel = {apply:"참가자", budget:"세입세출", purchase:"구매", act:"활동", mem:"인원관리", fee:"💵 회비", rental:"📦 대여자산"};
+  var mlabel = {apply:"참가자", budget:"세입세출", purchase:"구매", act:"활동", mem:"인원관리", fee:"💵 회비", rental:"📦 대여자산", files:"📁 자료실"};
   var mods = CUR_EVT ? (typeof CUR_EVT.modules==="string" ? CUR_EVT.modules.split(",") : (CUR_EVT.modules||[])) : [];
   mods = mods.map(function(s){return String(s||"").trim();}).filter(Boolean);
   var modsTxt = mods.length ? mods.map(function(m){return mlabel[m]||m;}).join(" · ") : "(모듈 미설정)";
@@ -3588,6 +3590,7 @@ function draw(){
   else if(CTAB=="rpt")el.innerHTML=dReport();
   else if(CTAB=="fee")el.innerHTML=dFee();
   else if(CTAB=="rental")el.innerHTML=dRental();
+  else if(CTAB=="files"){ el.innerHTML=dFiles(); loadFileFolders(); }
   else if(CTAB=="contract"){ el.innerHTML=dContract(); loadContracts(); }
   else if(CTAB=="quote"){    el.innerHTML=dQuote();    loadQuotes(); }
   else if(CTAB=="forms"){    el.innerHTML=dForms();    loadForms(); }
@@ -14622,7 +14625,7 @@ function _evtMgrHtml(){
 }
 
 // 전역: 행사에서 활성화 가능한 모든 모듈 — 새 모듈 추가 시 여기만 수정
-var ALL_MODS = ["apply","budget","purchase","act","mem","fee","rental"];
+var ALL_MODS = ["apply","budget","purchase","act","mem","fee","rental","files"];
 
 // 행사 추가/수정 팝업
 function popEvtEdit(evtId){
@@ -14644,7 +14647,7 @@ function popEvtEdit(evtId){
   };
   var modSection = grpBox("📋 행사 운영",        cb("apply","참가자")    +cb("budget","세입세출")+cb("purchase","구매")+cb("act","활동"))
                  + grpBox("👥 회원 관리",        cb("mem","인원관리")    +cb("fee","💵 회비"))
-                 + grpBox("📦 조직 공용",        cb("rental","📦 대여자산"));
+                 + grpBox("📦 조직 공용",        cb("rental","📦 대여자산")+cb("files","📁 자료실"));
   var ssHint = isNew ? '' : '<div class="fr"><label>데이터</label><button type="button" class="btn btn-s" style="background:#10b981;color:#fff" onclick="closePopup();openSheet(\'Mems\')">📊 시트 보기</button></div>';
   var h='<div class="pop-head"><h3>'+(isNew?"➕ 새 행사 추가":"✏️ 행사 수정 — "+esc(e.evtId))+'</h3></div>'
     +'<div style="padding:14px">'
@@ -17657,6 +17660,209 @@ function formDelSub(sid){
   api("deleteFormSub", {sid:sid, evtId:(CUR_EVT&&CUR_EVT.evtId)||""}).then(function(r){
     hideLoading();
     if(r&&r.ok){ toast("삭제됨"); formViewSubs(FORM_CUR); }
+    else toast((r&&r.err)||"실패", true);
+  });
+}
+
+// 📁 자료실
+var FILES_DATA = { folders:[], files:[] };
+var FILES_CUR_FOLDER = null;
+
+function dFiles(){
+  var h = "";
+  h += '<div class="card" style="margin-bottom:10px">';
+  h += '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">';
+  h += '<div><strong style="font-size:18px">📁 자료실</strong>';
+  h += '<span class="mut" style="margin-left:8px;font-size:12px">사업계획서·회의록·결산서 등 보관</span></div>';
+  if(isA()) h += '<button class="btn btn-b btn-s" onclick="filesAddFolder()">+ 폴더 추가</button>';
+  h += '</div></div>';
+  h += '<div id="filesWrap" style="display:grid;grid-template-columns:240px 1fr;gap:12px">';
+  h += '<div id="filesFolderPane"><div class="card mut">불러오는 중...</div></div>';
+  h += '<div id="filesContentPane"><div class="card mut" style="text-align:center;padding:40px">왼쪽에서 폴더를 선택하세요</div></div>';
+  h += '</div>';
+  return h;
+}
+
+function loadFileFolders(){
+  api("listFileFolders", {evtId:(CUR_EVT&&CUR_EVT.evtId)||""}).then(function(r){
+    var w=document.getElementById("filesFolderPane");
+    if(!r||!r.ok){ if(w) w.innerHTML='<div class="card" style="color:#dc2626">'+esc((r&&r.err)||"실패")+'</div>'; return; }
+    FILES_DATA.folders = r.folders||[];
+    _drawFileFolders();
+    if(FILES_CUR_FOLDER){
+      var still = FILES_DATA.folders.filter(function(f){return f.id===FILES_CUR_FOLDER;})[0];
+      if(still) loadFiles(FILES_CUR_FOLDER);
+      else FILES_CUR_FOLDER = null;
+    }
+  });
+}
+
+function _drawFileFolders(){
+  var folders = FILES_DATA.folders||[];
+  var h = '<div class="card" style="padding:8px">';
+  h += '<div style="font-weight:700;padding:6px 8px;color:#0c4a6e;border-bottom:1px solid #e5e7eb;margin-bottom:4px">📂 폴더 ('+folders.length+')</div>';
+  if(!folders.length){
+    h += '<div class="mut" style="padding:20px;text-align:center;font-size:12px">폴더 없음</div>';
+  } else {
+    folders.forEach(function(f){
+      var on = FILES_CUR_FOLDER === f.id;
+      var bg = on ? "background:#dbeafe;color:#1e40af;font-weight:700" : "";
+      h += '<div onclick="filesOpenFolder(\''+esc(f.id)+'\')" style="padding:8px 10px;border-radius:6px;cursor:pointer;display:flex;align-items:center;gap:6px;'+bg+'">';
+      h += '<span>📁</span><span style="flex:1">'+esc(f.name)+'</span><span class="mut" style="font-size:11px">'+(f.fileCnt||0)+'</span></div>';
+    });
+  }
+  h += '</div>';
+  var w = document.getElementById("filesFolderPane");
+  if(w) w.innerHTML = h;
+}
+
+function filesOpenFolder(fid){
+  FILES_CUR_FOLDER = fid;
+  _drawFileFolders();
+  loadFiles(fid);
+}
+
+function loadFiles(fid){
+  var w = document.getElementById("filesContentPane");
+  if(w) w.innerHTML = '<div class="card mut">📡 파일 가져오는 중...</div>';
+  api("listFiles", {folderId:fid, evtId:(CUR_EVT&&CUR_EVT.evtId)||""}).then(function(r){
+    if(!r||!r.ok){ if(w) w.innerHTML='<div class="card" style="color:#dc2626">'+esc((r&&r.err)||"실패")+'</div>'; return; }
+    FILES_DATA.files = r.files||[];
+    _drawFiles(fid);
+  });
+}
+
+function _drawFiles(fid){
+  var folder = (FILES_DATA.folders||[]).filter(function(f){return f.id===fid;})[0];
+  var files = FILES_DATA.files||[];
+  var h = '<div class="card">';
+  h += '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px">';
+  h += '<div><strong style="font-size:16px">📁 '+esc(folder?folder.name:"")+'</strong>';
+  h += '<span class="mut" style="font-size:12px;margin-left:6px">('+files.length+'개)</span></div>';
+  if(isA()){
+    h += '<div style="display:flex;gap:6px">';
+    h += '<button class="btn btn-b btn-s" onclick="filesUpload(\''+esc(fid)+'\')">📤 업로드</button>';
+    h += '<button class="btn btn-r btn-s" onclick="filesDeleteFolder(\''+esc(fid)+'\')">🗑 삭제</button>';
+    h += '</div>';
+  }
+  h += '</div>';
+  if(!files.length){
+    h += '<div class="empty mut" style="text-align:center;padding:40px">파일 없음';
+    if(isA()) h += '<br><button class="btn btn-b" onclick="filesUpload(\''+esc(fid)+'\')" style="margin-top:14px">📤 업로드</button>';
+    h += '</div>';
+  } else {
+    h += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px">';
+    files.forEach(function(f){
+      var ico = _fileIcon(f.mime, f.filename);
+      var sz = _fileSize(f.size);
+      h += '<div style="border:1px solid #e5e7eb;border-radius:8px;padding:10px;background:#fafafa">';
+      h += '<div style="font-size:32px;text-align:center">'+ico+'</div>';
+      h += '<div style="font-size:13px;font-weight:600;text-align:center;word-break:break-all;line-height:1.3;margin-top:6px">'+esc(f.filename)+'</div>';
+      h += '<div class="mut" style="font-size:10px;text-align:center;margin-top:4px">'+esc(sz)+' · '+esc(String(f.uploadedAt||"").slice(0,10))+'</div>';
+      h += '<div style="display:flex;gap:4px;margin-top:8px">';
+      h += '<a href="'+esc(f.url)+'" target="_blank" class="btn btn-b btn-s" style="flex:1;text-align:center;text-decoration:none;font-size:11px">📥 열기</a>';
+      if(isA()) h += '<button class="btn btn-r btn-s" onclick="filesDelete(\''+esc(f.id)+'\')" style="font-size:11px">x</button>';
+      h += '</div></div>';
+    });
+    h += '</div>';
+  }
+  h += '</div>';
+  var w = document.getElementById("filesContentPane");
+  if(w) w.innerHTML = h;
+}
+
+function _fileIcon(mime, name){
+  mime = String(mime||"").toLowerCase();
+  name = String(name||"").toLowerCase();
+  if(mime.indexOf("pdf")>=0 || name.indexOf(".pdf")>=0) return "📄";
+  if(mime.indexOf("image")>=0) return "🖼️";
+  if(name.indexOf(".hwp")>=0) return "📝";
+  if(name.indexOf(".doc")>=0 || mime.indexOf("word")>=0) return "📝";
+  if(name.indexOf(".xls")>=0 || mime.indexOf("excel")>=0 || mime.indexOf("spreadsheet")>=0) return "📊";
+  if(name.indexOf(".ppt")>=0 || mime.indexOf("presentation")>=0) return "📽️";
+  if(name.indexOf(".zip")>=0) return "🗜️";
+  return "📎";
+}
+function _fileSize(b){ b=Number(b)||0; if(b<1024)return b+"B"; if(b<1024*1024)return Math.round(b/1024)+"KB"; return (b/1024/1024).toFixed(1)+"MB"; }
+
+function filesAddFolder(){
+  var name = prompt("폴더 이름 (예: 회의록, 결산서, 사업계획서)");
+  if(!name) return;
+  name = String(name).trim();
+  if(!name) return;
+  showLoading("폴더 생성 중...");
+  api("addFileFolder", {name:name, evtId:(CUR_EVT&&CUR_EVT.evtId)||""}).then(function(r){
+    hideLoading();
+    if(r&&r.ok){ toast("폴더 생성됨"); loadFileFolders(); }
+    else toast((r&&r.err)||"실패", true);
+  });
+}
+
+function filesDeleteFolder(fid){
+  var folder = (FILES_DATA.folders||[]).filter(function(f){return f.id===fid;})[0];
+  if(!folder) return;
+  var fcnt = folder.fileCnt||0;
+  var msg = "폴더 \"" + folder.name + "\" 삭제?";
+  if(fcnt>0) msg += "\n안에 " + fcnt + "개 파일도 함께 삭제됩니다.";
+  if(!confirm(msg)) return;
+  showLoading("삭제 중...");
+  api("deleteFileFolder", {fid:fid, force:true, evtId:(CUR_EVT&&CUR_EVT.evtId)||""}).then(function(r){
+    hideLoading();
+    if(r&&r.ok){
+      toast("삭제됨");
+      FILES_CUR_FOLDER = null;
+      loadFileFolders();
+      var w=document.getElementById("filesContentPane");
+      if(w) w.innerHTML = '<div class="card mut" style="text-align:center;padding:40px">왼쪽에서 폴더를 선택하세요</div>';
+    } else toast((r&&r.err)||"실패", true);
+  });
+}
+
+function filesUpload(fid){
+  var inp = document.createElement("input");
+  inp.type = "file";
+  inp.multiple = true;
+  inp.onchange = function(){
+    var files = inp.files;
+    if(!files || !files.length) return;
+    _filesUploadMulti(fid, Array.prototype.slice.call(files), 0, 0);
+  };
+  inp.click();
+}
+
+function _filesUploadMulti(fid, files, idx, ok){
+  if(idx>=files.length){
+    hideLoading();
+    toast("✓ " + ok + "/" + files.length + " 업로드 완료");
+    loadFiles(fid);
+    loadFileFolders();
+    return;
+  }
+  var f = files[idx];
+  if(f.size > 30*1024*1024){
+    toast("⚠ " + f.name + " 30MB 초과 - 스킵", true);
+    _filesUploadMulti(fid, files, idx+1, ok);
+    return;
+  }
+  showLoading("업로드 중... (" + (idx+1) + "/" + files.length + ")");
+  var reader = new FileReader();
+  reader.onload = function(){
+    var b64 = String(reader.result||"").replace(/^data:[^;]+;base64,/,"");
+    api("uploadFile", { folderId:fid, filename:f.name, mime:f.type||"application/octet-stream", base64:b64, size:f.size, evtId:(CUR_EVT&&CUR_EVT.evtId)||"" }).then(function(r){
+      _filesUploadMulti(fid, files, idx+1, ok+(r&&r.ok?1:0));
+    }).catch(function(){
+      _filesUploadMulti(fid, files, idx+1, ok);
+    });
+  };
+  reader.readAsDataURL(f);
+}
+
+function filesDelete(fid){
+  if(!confirm("파일 삭제?")) return;
+  showLoading("삭제 중...");
+  api("deleteFile", {fid:fid, evtId:(CUR_EVT&&CUR_EVT.evtId)||""}).then(function(r){
+    hideLoading();
+    if(r&&r.ok){ toast("삭제됨"); loadFiles(FILES_CUR_FOLDER); loadFileFolders(); }
     else toast((r&&r.err)||"실패", true);
   });
 }

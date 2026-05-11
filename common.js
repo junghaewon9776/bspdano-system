@@ -190,6 +190,16 @@ function _dispatch(p) {
         case "bulkAddExpBG":    _apiBulkAdd(p, "ExpBG").then(resolve); return;
         case "bulkUpsertExpBig":_apiBulkUpsert(p, "ExpBG").then(resolve); return;
 
+        // 일괄 가져오기 (엑셀)
+        case "bulkAddAct":      _apiBulkAdd(p, "Acts").then(resolve); return;
+        case "bulkAddPur":      _apiBulkAdd(p, "Purs").then(resolve); return;
+        case "bulkAddExps":     _apiBulkAdd(p, "Exps").then(resolve); return;
+        case "bulkAddInc":      _apiBulkAdd(p, "Inc").then(resolve); return;
+        case "bulkAddApply":    _apiBulkAddApply(p).then(resolve); return;
+        case "bulkAddVendors":  _apiBulkAddMain(p, "Vendors").then(resolve); return;
+        case "bulkReplaceMems": _apiBulkReplaceMems(p).then(resolve); return;
+        case "bulkReplaceAccounts": _apiBulkReplaceAccounts(p).then(resolve); return;
+
         // 소속/그룹
         case "listGroups":   _apiListEvtNode(p, "Groups").then(resolve); return;
         case "addGroup":     _apiAddRow(p, "Groups").then(resolve); return;
@@ -251,6 +261,7 @@ function _dispatch(p) {
         case "addAsset":       _apiAddMainRow(p, "Assets").then(resolve); return;
         case "updateAsset":    _apiUpdateMainRow(p, "Assets").then(resolve); return;
         case "deleteAsset":    _apiDeleteMainRow(p, "Assets").then(resolve); return;
+        case "bulkAddAssets":  _apiBulkAddMain(p, "Assets").then(resolve); return;
         case "listRentals":    _apiListMainNode(p, "Rentals").then(resolve); return;
         case "addRental":      _apiAddMainRow(p, "Rentals").then(resolve); return;
         case "updateRental":   _apiUpdateMainRow(p, "Rentals").then(resolve); return;
@@ -287,6 +298,14 @@ function _dispatch(p) {
         case "addSmsTpl":         _apiAddRow(p, "SmsTemplates").then(resolve); return;
         case "updateSmsTpl":      _apiUpdateRow(p, "SmsTemplates").then(resolve); return;
         case "deleteSmsTpl":      _apiDeleteRow(p, "SmsTemplates").then(resolve); return;
+
+        // 자료실
+        case "listFileFolders": _apiListFileFolders(p).then(resolve); return;
+        case "addFileFolder":   _apiAddFileFolder(p).then(resolve); return;
+        case "deleteFileFolder":_apiDeleteFileFolder(p).then(resolve); return;
+        case "listFiles":       _apiListFiles(p).then(resolve); return;
+        case "uploadFile":      _apiUploadFile(p).then(resolve); return;
+        case "deleteFile":      _apiDeleteFile(p).then(resolve); return;
 
         // 텔레그램 알림
         case "notifyLogin": _apiNotifyLogin(p).then(resolve); return;
@@ -707,8 +726,20 @@ function _apiSaveAcctEvt(p) {
       }
     }
   } else {
-    // 추가
-    arr.push({id:uid(), evtId:p.evtId, acctId:p.acctId, role:p.role||"user", note:p.note||"", createdAt:now_()});
+    // 추가 — 같은 acctId+evtId 중복 방지
+    var dup = arr.filter(function(a) { return a.acctId === p.acctId && a.evtId === p.evtId; });
+    if (dup.length > 0) {
+      // 이미 있으면 업데이트
+      for (var i = 0; i < arr.length; i++) {
+        if (arr[i].acctId === p.acctId && arr[i].evtId === p.evtId) {
+          arr[i].role = p.role || arr[i].role;
+          arr[i].note = p.note != null ? p.note : arr[i].note;
+          break;
+        }
+      }
+    } else {
+      arr.push({id:uid(), evtId:p.evtId, acctId:p.acctId, role:p.role||"user", note:p.note||"", createdAt:now_()});
+    }
   }
   return saveMainNode("AcctEvt", arr).then(function() {
     _cache.AcctEvt = arr;
@@ -887,6 +918,264 @@ function _apiUpdateApplyRow(p) {
       if (!arr[ri]) return resolve({ok:false, err:"행 없음"});
       arr[ri][col] = val;
       ref.set(arr).then(function() {
+        resolve({ok:true});
+      });
+    });
+  });
+}
+
+// ───────── Bulk 가져오기 (엑셀) ─────────
+function _apiBulkAddMain(p, nodeName) {
+  var arr = (_cache[nodeName] || []).slice();
+  var newRows = p.rows || [];
+  newRows.forEach(function(r) {
+    if (!r.id) r.id = uid();
+    if (!r.createdAt) r.createdAt = now_();
+    arr.push(r);
+  });
+  return saveMainNode(nodeName, arr).then(function() {
+    _cache[nodeName] = arr;
+    return {ok:true, count:newRows.length};
+  });
+}
+
+function _apiBulkAddApply(p) {
+  var evtId = _getEvtId(p);
+  if (!evtId) return Promise.resolve({ok:false, err:"행사 미선택"});
+  return new Promise(function(resolve) {
+    fbDb.ref('/evtData/' + evtId + '/Apply').once('value', function(snap) {
+      var raw = snap.val();
+      var arr = [];
+      if (Array.isArray(raw)) arr = raw.filter(function(r){return r!=null;});
+      else if (raw && typeof raw === 'object') Object.keys(raw).forEach(function(k){if(raw[k])arr.push(raw[k]);});
+      var newRows = p.rows || [];
+      newRows.forEach(function(r) { arr.push(r); });
+      fbDb.ref('/evtData/' + evtId + '/Apply').set(arr).then(function() {
+        resolve({ok:true, count:newRows.length});
+      });
+    });
+  });
+}
+
+function _apiBulkReplaceMems(p) {
+  var evtId = _getEvtId(p);
+  if (!evtId) return Promise.resolve({ok:false, err:"행사 미선택"});
+  return loadEvtData(evtId).then(function(data) {
+    var arr = data.Mems || [];
+    var newRows = p.rows || [];
+    if (p.mode === "append") {
+      newRows.forEach(function(r) {
+        if (!r.id) r.id = uid();
+        if (!r.createdAt) r.createdAt = now_();
+        r.evtId = evtId;
+        arr.push(r);
+      });
+    } else {
+      arr = newRows.map(function(r) {
+        if (!r.id) r.id = uid();
+        r.evtId = evtId;
+        return r;
+      });
+    }
+    return saveEvtNode(evtId, "Mems", arr).then(function() {
+      _evtCaches[evtId].Mems = arr;
+      // 소속(Groups) 자동 등록
+      var groups = data.Groups || [];
+      var existNames = {};
+      groups.forEach(function(g) { existNames[g.n] = true; });
+      var newGroups = [];
+      arr.forEach(function(m) {
+        if (m.ar && !existNames[m.ar]) {
+          existNames[m.ar] = true;
+          newGroups.push({id:uid(), n:m.ar, sort:groups.length + newGroups.length, note:""});
+        }
+      });
+      if (newGroups.length) {
+        groups = groups.concat(newGroups);
+        return saveEvtNode(evtId, "Groups", groups).then(function() {
+          _evtCaches[evtId].Groups = groups;
+          return {ok:true, count:arr.length, newGroups:newGroups.length};
+        });
+      }
+      return {ok:true, count:arr.length};
+    });
+  });
+}
+
+function _apiBulkReplaceAccounts(p) {
+  var users = p.users || [];
+  var areas = p.areas || [];
+  var existUsers = (_cache.Users || []).slice();
+  var existAreas = (_cache.Areas || []).slice();
+  var existIds = {};
+  existUsers.forEach(function(u) { existIds[u.id] = true; });
+  users.forEach(function(u) {
+    if (!existIds[u.id]) {
+      existUsers.push({id:u.id, pw:u.pw||"1234", r:u.r||"user", ar:u.ar||"", nm:u.nm||"", tel:u.tel||""});
+    }
+  });
+  var existAreaNames = {};
+  existAreas.forEach(function(a) { existAreaNames[a.n] = true; });
+  areas.forEach(function(a) {
+    if (a.n && !existAreaNames[a.n]) {
+      existAreas.push({id:uid(), n:a.n, sort:existAreas.length});
+      existAreaNames[a.n] = true;
+    }
+  });
+  return Promise.all([
+    saveMainNode("Users", existUsers),
+    saveMainNode("Areas", existAreas)
+  ]).then(function() {
+    _cache.Users = existUsers;
+    _cache.Areas = existAreas;
+    return {ok:true, userCount:existUsers.length, areaCount:existAreas.length};
+  });
+}
+
+// ───────── 자료실 (Firebase RTDB 저장) ─────────
+function _filesRef(evtId) {
+  return fbDb.ref('/evtData/' + evtId + '/Files');
+}
+
+function _apiListFileFolders(p) {
+  var evtId = _getEvtId(p);
+  if (!evtId) return Promise.resolve({ok:true, folders:[]});
+  return new Promise(function(resolve) {
+    _filesRef(evtId).child('folders').once('value', function(snap) {
+      var raw = snap.val();
+      var arr = [];
+      if (raw) {
+        if (Array.isArray(raw)) arr = raw.filter(function(r){return r!=null;});
+        else Object.keys(raw).forEach(function(k){if(raw[k])arr.push(raw[k]);});
+      }
+      // 각 폴더에 파일 개수 추가
+      _filesRef(evtId).child('items').once('value', function(snap2) {
+        var items = snap2.val();
+        var allFiles = [];
+        if (items) {
+          if (Array.isArray(items)) allFiles = items.filter(function(r){return r!=null;});
+          else Object.keys(items).forEach(function(k){if(items[k])allFiles.push(items[k]);});
+        }
+        arr.forEach(function(f) {
+          f.fileCnt = allFiles.filter(function(it){return it.folderId===f.id;}).length;
+        });
+        resolve({ok:true, folders:arr});
+      });
+    });
+  });
+}
+
+function _apiAddFileFolder(p) {
+  var evtId = _getEvtId(p);
+  if (!evtId) return Promise.resolve({ok:false, err:"행사 미선택"});
+  return new Promise(function(resolve) {
+    _filesRef(evtId).child('folders').once('value', function(snap) {
+      var raw = snap.val();
+      var arr = [];
+      if (raw) {
+        if (Array.isArray(raw)) arr = raw.filter(function(r){return r!=null;});
+        else Object.keys(raw).forEach(function(k){if(raw[k])arr.push(raw[k]);});
+      }
+      arr.push({id:uid(), name:p.name, createdAt:now_()});
+      _filesRef(evtId).child('folders').set(arr).then(function() {
+        resolve({ok:true});
+      });
+    });
+  });
+}
+
+function _apiDeleteFileFolder(p) {
+  var evtId = _getEvtId(p);
+  if (!evtId) return Promise.resolve({ok:false, err:"행사 미선택"});
+  return new Promise(function(resolve) {
+    var ref = _filesRef(evtId);
+    Promise.all([
+      ref.child('folders').once('value'),
+      ref.child('items').once('value')
+    ]).then(function(snaps) {
+      var rawF = snaps[0].val();
+      var rawI = snaps[1].val();
+      var folders = [];
+      if (rawF) {
+        if (Array.isArray(rawF)) folders = rawF.filter(function(r){return r!=null;});
+        else Object.keys(rawF).forEach(function(k){if(rawF[k])folders.push(rawF[k]);});
+      }
+      var items = [];
+      if (rawI) {
+        if (Array.isArray(rawI)) items = rawI.filter(function(r){return r!=null;});
+        else Object.keys(rawI).forEach(function(k){if(rawI[k])items.push(rawI[k]);});
+      }
+      folders = folders.filter(function(f){return f.id!==p.fid;});
+      items = items.filter(function(f){return f.folderId!==p.fid;});
+      Promise.all([
+        ref.child('folders').set(folders),
+        ref.child('items').set(items)
+      ]).then(function() { resolve({ok:true}); });
+    });
+  });
+}
+
+function _apiListFiles(p) {
+  var evtId = _getEvtId(p);
+  if (!evtId) return Promise.resolve({ok:true, files:[]});
+  return new Promise(function(resolve) {
+    _filesRef(evtId).child('items').once('value', function(snap) {
+      var raw = snap.val();
+      var arr = [];
+      if (raw) {
+        if (Array.isArray(raw)) arr = raw.filter(function(r){return r!=null;});
+        else Object.keys(raw).forEach(function(k){if(raw[k])arr.push(raw[k]);});
+      }
+      var filtered = arr.filter(function(f){return f.folderId===p.folderId;});
+      // base64 데이터는 목록에서 제외 (용량 절약)
+      var files = filtered.map(function(f) {
+        return {id:f.id, folderId:f.folderId, filename:f.filename, mime:f.mime, size:f.size, uploadedAt:f.uploadedAt, url:f.url||""};
+      });
+      resolve({ok:true, files:files});
+    });
+  });
+}
+
+function _apiUploadFile(p) {
+  var evtId = _getEvtId(p);
+  if (!evtId) return Promise.resolve({ok:false, err:"행사 미선택"});
+  return new Promise(function(resolve) {
+    _filesRef(evtId).child('items').once('value', function(snap) {
+      var raw = snap.val();
+      var arr = [];
+      if (raw) {
+        if (Array.isArray(raw)) arr = raw.filter(function(r){return r!=null;});
+        else Object.keys(raw).forEach(function(k){if(raw[k])arr.push(raw[k]);});
+      }
+      var fileId = uid();
+      var dataUrl = "data:" + (p.mime||"application/octet-stream") + ";base64," + p.base64;
+      arr.push({
+        id:fileId, folderId:p.folderId, filename:p.filename,
+        mime:p.mime||"application/octet-stream", size:p.size||0,
+        uploadedAt:now_(), url:dataUrl
+      });
+      _filesRef(evtId).child('items').set(arr).then(function() {
+        resolve({ok:true, id:fileId});
+      }).catch(function(err) {
+        resolve({ok:false, err:"업로드 실패: " + err.message});
+      });
+    });
+  });
+}
+
+function _apiDeleteFile(p) {
+  var evtId = _getEvtId(p);
+  if (!evtId) return Promise.resolve({ok:false, err:"행사 미선택"});
+  return new Promise(function(resolve) {
+    _filesRef(evtId).child('items').once('value', function(snap) {
+      var raw = snap.val();
+      var arr = [];
+      if (raw) {
+        if (Array.isArray(raw)) arr = raw.filter(function(r){return r!=null;});
+        else Object.keys(raw).forEach(function(k){if(raw[k])arr.push(raw[k]);});
+      }
+      arr = arr.filter(function(f){return f.id!==p.fid;});
+      _filesRef(evtId).child('items').set(arr).then(function() {
         resolve({ok:true});
       });
     });
