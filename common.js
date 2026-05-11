@@ -400,38 +400,58 @@ function _apiRefresh(p) {
       resolve({ok:true, acts:[], purs:[], exps:[], mems:[], notices:[], pays:[], dpst:[], inc:[], incTypes:[], expBG:[], expTypes:[], gwanTypes:[], incCards:[], awards:[], memGroups:[], fees:[]});
       return;
     }
+    // shareMems 체크: 현재 행사가 shareMems면 메인(첫 번째) 행사의 Mems/Groups 사용
+    var evts = _cache.Events || [];
+    var curEvt = null;
+    for (var i = 0; i < evts.length; i++) { if (evts[i].evtId === p.evtId) { curEvt = evts[i]; break; } }
+    var isShare = curEvt && curEvt.shareMems;
+    var mainEvtId = evts.length ? evts[0].evtId : null;
+    // 메인 행사 자체는 공유 대상이 아님
+    if (isShare && mainEvtId === p.evtId) isShare = false;
+
     loadEvtData(p.evtId).then(function(data) {
       // Config에서 라벨/타입 추출
       var cfg = {};
       (data.Config || []).forEach(function(c) { if(c && c.k) cfg[c.k] = c.v; });
 
-      resolve({
-        ok: true,
-        acts: data.Acts || [],
-        purs: data.Purs || [],
-        exps: data.Exps || [],
-        mems: data.Mems || [],
-        notices: data.Notices || [],
-        pays: data.Pays || [],
-        dpst: data.Dpst || [],
-        inc: data.Inc || [],
-        incTypes: (cfg.INC_TYPES || "이월금,보조금,지원금,자부담,자체수입").split(","),
-        expBG: data.ExpBG || [],
-        expTypes: (cfg.EXP_TYPES || "").split(",").filter(Boolean),
-        gwanTypes: (cfg.GWAN_TYPES || "행사직접비,행사운영비,행사홍보비,인건비,시설비,임차비,기타").split(","),
-        incCards: _parseIncCards(cfg.INC_CARDS || ""),
-        awards: (cfg.AWARDS || "").split(",").filter(Boolean),
-        memGroups: data.Groups || [],
-        fees: data.Fees || [],
-        vendors: _cache.Vendors || [],
-        assets: _cache.Assets || [],
-        rentals: _cache.Rentals || [],
-        assetCats: _cache.AssetCategories || [],
-        assetLocs: _cache.AssetLocations || [],
-        LBL: {leader: cfg.LABEL_LEADER || "단장", member: cfg.LABEL_MEMBER || "단원"},
-        AR: (_cache.Areas || []).map(function(a){return a.n}),
-        US: _buildUserMap()
-      });
+      function buildResult(memData, groupData) {
+        resolve({
+          ok: true,
+          acts: data.Acts || [],
+          purs: data.Purs || [],
+          exps: data.Exps || [],
+          mems: memData,
+          notices: data.Notices || [],
+          pays: data.Pays || [],
+          dpst: data.Dpst || [],
+          inc: data.Inc || [],
+          incTypes: (cfg.INC_TYPES || "이월금,보조금,지원금,자부담,자체수입").split(","),
+          expBG: data.ExpBG || [],
+          expTypes: (cfg.EXP_TYPES || "").split(",").filter(Boolean),
+          gwanTypes: (cfg.GWAN_TYPES || "행사직접비,행사운영비,행사홍보비,인건비,시설비,임차비,기타").split(","),
+          incCards: _parseIncCards(cfg.INC_CARDS || ""),
+          awards: (cfg.AWARDS || "").split(",").filter(Boolean),
+          memGroups: groupData,
+          fees: data.Fees || [],
+          vendors: _cache.Vendors || [],
+          assets: _cache.Assets || [],
+          rentals: _cache.Rentals || [],
+          assetCats: _cache.AssetCategories || [],
+          assetLocs: _cache.AssetLocations || [],
+          shareMems: !!isShare,
+          LBL: {leader: cfg.LABEL_LEADER || "단장", member: cfg.LABEL_MEMBER || "단원"},
+          AR: (_cache.Areas || []).map(function(a){return a.n}),
+          US: _buildUserMap()
+        });
+      }
+
+      if (isShare && mainEvtId) {
+        loadEvtData(mainEvtId).then(function(mainData) {
+          buildResult(mainData.Mems || [], mainData.Groups || []);
+        });
+      } else {
+        buildResult(data.Mems || [], data.Groups || []);
+      }
     });
   });
 }
@@ -629,6 +649,7 @@ function _apiAddEvent(p) {
     active: p.active !== false,
     modules: p.modules || "apply,budget,purchase,act,mem",
     note: p.note || "",
+    shareMems: !!p.shareMems,
     createdAt: now_()
   };
   events.push(ev);

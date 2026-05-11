@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "dano",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["http-server", ".", "-c-1"],
+      "port": 8090,
+      "autoPort": true
+    }
+  ]
+}

@@ -333,6 +333,7 @@ document.addEventListener("DOMContentLoaded", function(){
 
 // ===== 상태 =====
 var AR=[], BG=[], US={}, acts=[], purs=[], exps=[], mems=[], notices=[], pays=[], dpst=[], inc=[], incTypes=[], expBG=[], txn=[], expTypes=[], gwanTypes=[], incCards=[], awards=[], memGroups=[], vendors=[], fees=[], assets=[], rentals=[], assetCats=[], assetLocs=[];
+var SHARE_MEMS=false;
 var ACCOUNTANT_NAME = ""; // 회계담당자 고정 이름 (Config에서 로드)
 var RPT_SHOW = ""; // 현재 선택된 결산서 미리보기 ("" | inc | expAcc | expCat | expSrc)
 var EXP_LOADED = false; // 세출관리 데이터 로드 완료 플래그
@@ -781,6 +782,7 @@ async function refreshData(showToast){
   if(r.curEvt) CUR_EVT=r.curEvt;
   if(r.LBL){LBL.leader=r.LBL.leader||"단장";LBL.member=r.LBL.member||"단원";}
   acts=r.acts||[];purs=r.purs||[];exps=r.exps||[];mems=r.mems||[];notices=r.notices||[];pays=r.pays||[];dpst=r.dpst||[];inc=r.inc||[];incTypes=r.incTypes||[];expBG=r.expBG||[];txn=r.txn||[];expTypes=r.expTypes||[];gwanTypes=r.gwanTypes||[];incCards=r.incCards||[];awards=r.awards||[];memGroups=r.groups||[];vendors=r.vendors||vendors||[];fees=r.fees||[];assets=r.assets||[];rentals=r.rentals||[];assetCats=r.assetCats||[];assetLocs=r.assetLocs||[];fees=r.fees||fees||[];
+  SHARE_MEMS=!!r.shareMems;
   if(r.accountantName!=null) ACCOUNTANT_NAME=r.accountantName||"";
   if(r.feeCycle!=null) FEE_CYCLE = r.feeCycle || "yearly";
   if(r.feeDefaultAmt!=null) FEE_DEFAULT_AMT = Number(r.feeDefaultAmt)||0;
@@ -808,6 +810,7 @@ async function switchEvent(evtId){
   AR=r.AR||AR;BG=r.BG||BG;US=r.US||US;
   if(r.LBL){LBL.leader=r.LBL.leader||"단장";LBL.member=r.LBL.member||"단원";}
   acts=r.acts||[];purs=r.purs||[];exps=r.exps||[];mems=r.mems||[];notices=r.notices||[];pays=r.pays||[];dpst=r.dpst||[];inc=r.inc||[];incTypes=r.incTypes||[];expBG=r.expBG||[];txn=r.txn||[];expTypes=r.expTypes||[];gwanTypes=r.gwanTypes||[];incCards=r.incCards||[];awards=r.awards||[];memGroups=r.groups||[];vendors=r.vendors||vendors||[];fees=r.fees||[];assets=r.assets||[];rentals=r.rentals||[];assetCats=r.assetCats||[];assetLocs=r.assetLocs||[];
+  SHARE_MEMS=!!r.shareMems;
   fixDates();
   if(!_tabAllowedByEvt(CTAB)) CTAB="dash";
   // 참가자까지 다 로드
@@ -7868,7 +7871,12 @@ function dMem(){
     }
   });
   var gr={};for(var i=0;i<fm2.length;i++){var m=fm2[i];if(!gr[m.ar])gr[m.ar]=[];gr[m.ar].push(m)}
-  var h='<div class="exbar"><button class="btn btn-b" onclick="popAddMem()">+ 인원 추가</button> <button class="btn-out btn-tp" onclick="tmplMem()">📋 양식</button> <button class="btn-out btn-ex" onclick="expMem()">엑셀 내보내기</button>'+(isA()?' <button class="btn-out btn-im" onclick="impClick(\'mem\')">엑셀 가져오기</button> <button class="btn btn-s" style="background:#0ea5e9;color:#fff;font-weight:700" onclick="_memNormalizePhones()" title="010 누락/하이픈 없는 번호를 한번에 수정">📞 연락처 정규화</button> <button class="btn" style="background:#f59e0b;color:#fff;font-weight:700" onclick="popMemSms()">💬 문자 발송</button>'+(isSuper()?' <button class="btn" style="background:#10b981;color:#fff" onclick="openSheet(\'Mems\')">📊 스프레드시트 열기</button>':'')+' <button class="btn" style="background:#a855f7;color:#fff" onclick="popGroups()">🏷 소속 관리</button>':'')+'</div>';
+  var h='';
+  if(SHARE_MEMS){
+    var mainEvtNm = (EVENTS&&EVENTS[0])?EVENTS[0].nm:"메인 행사";
+    h+='<div class="card" style="background:#eff6ff;border:1.5px solid #2563eb;padding:12px"><span style="font-size:13px;color:#2563eb;font-weight:700">🔗 인원공유 모드</span> <span style="font-size:12px;color:#475569">— <b>'+esc(mainEvtNm)+'</b>의 인원 명단을 공유 중입니다. 인원 수정은 메인 행사에서 해주세요.</span></div>';
+  }
+  h+='<div class="exbar">'+(SHARE_MEMS?'':'<button class="btn btn-b" onclick="popAddMem()">+ 인원 추가</button> ')+'<button class="btn-out btn-tp" onclick="tmplMem()">📋 양식</button> <button class="btn-out btn-ex" onclick="expMem()">엑셀 내보내기</button>'+(isA()&&!SHARE_MEMS?' <button class="btn-out btn-im" onclick="impClick(\'mem\')">엑셀 가져오기</button> <button class="btn btn-s" style="background:#0ea5e9;color:#fff;font-weight:700" onclick="_memNormalizePhones()" title="010 누락/하이픈 없는 번호를 한번에 수정">📞 연락처 정규화</button>':'')+(isA()?' <button class="btn" style="background:#f59e0b;color:#fff;font-weight:700" onclick="popMemSms()">💬 문자 발송</button>':'')+(isSuper()&&!SHARE_MEMS?' <button class="btn" style="background:#10b981;color:#fff" onclick="openSheet(\'Mems\')">📊 스프레드시트 열기</button>':'')+(isA()&&!SHARE_MEMS?' <button class="btn" style="background:#a855f7;color:#fff" onclick="popGroups()">🏷 소속 관리</button>':'')+'</div>';
   h+='<div class="card" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px"><div><h3 style="margin:0">인원 관리</h3><span style="font-size:11px;color:#999">'+(isA()?"총 "+mems.length+"명":myar()+" "+fm2.length+"명")+"</span></div>"+(isA()?memFiltSel():"")+"</div>";
   // 상태 필터 바
   function fBtn(k,lbl,cnt,col){
@@ -7923,7 +7931,7 @@ function dMem(){
     });
     h+='<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:8px">'+
        '<h3 style="margin:0"><span class="tag tag-b">'+esc(area)+"</span> "+ms.length+'명</h3>'+
-       '<button class="btn btn-s" style="background:#0ea5e9;color:#fff" onclick="popAddMem(\''+esc(area).replace(/\'/g,"\\'")+'\')">+ 이 소속에 추가</button>'+
+       (SHARE_MEMS?'':'<button class="btn btn-s" style="background:#0ea5e9;color:#fff" onclick="popAddMem(\''+esc(area).replace(/\'/g,"\\'")+'\')">+ 이 소속에 추가</button>')+
        '</div><div class="scrollx"><table><tr><th>No</th><th>이름</th><th>소속</th><th>연락처</th><th class="mobile-hide">생년월일</th><th class="mobile-hide">주소</th><th class="mobile-hide">전승구분</th><th>관리자</th><th></th></tr>';
     for(var i=0;i<ms.length;i++){
       var m=ms[i];
@@ -7936,7 +7944,7 @@ function dMem(){
          '<td class="mobile-hide" style="color:'+(m.addr?"#333":"#ccc")+';font-size:11px">'+esc(m.addr||"-")+(m.zip?' ('+esc(m.zip)+')':'')+'</td>'+
          '<td class="mobile-hide" style="color:'+(m.trad?"#333":"#ccc")+';font-size:11px">'+esc(m.trad||"-")+'</td>'+
          '<td>'+(m.adm?'<span class="tag" style="background:#2563eb;color:#fff">관리자</span>':'-')+'</td>'+
-         '<td><button class="btn btn-b btn-s" onclick="edM(\''+m.id+"')\">수정</button> <button class=\"btn btn-r btn-s\" onclick=\"delM('"+m.id+"')\">삭제</button></td></tr>";
+         '<td>'+(SHARE_MEMS?'<span style="color:#94a3b8;font-size:11px">공유</span>':'<button class="btn btn-b btn-s" onclick="edM(\''+m.id+"')\">수정</button> <button class=\"btn btn-r btn-s\" onclick=\"delM('"+m.id+"')\">삭제</button>")+'</td></tr>';
     }
     h+="</table></div></div>";
   }
@@ -14656,6 +14664,7 @@ function popEvtEdit(evtId){
     +'  <div class="fr"><label>연도</label><input id="evYr" value="'+esc(e.yr)+'" placeholder="2026"></div>'
     +'  <div class="fr" style="align-items:flex-start"><label style="padding-top:4px">사용 모듈</label><div style="flex:1"><div id="evmBox" style="padding:12px;background:#f8fafc;border-radius:8px;border:1px solid #e5e7eb">'+modSection+'</div><div style="margin-top:6px;display:flex;align-items:center;gap:6px"><button type="button" onclick="_evtModAll(true)" style="padding:5px 12px;border:1px solid #16a34a;color:#16a34a;background:#fff;border-radius:6px;font-size:12px;cursor:pointer;font-weight:600">✓ 전체선택</button><button type="button" onclick="_evtModAll(false)" style="padding:5px 12px;border:1px solid #64748b;color:#64748b;background:#fff;border-radius:6px;font-size:12px;cursor:pointer;font-weight:600">해제</button> <span id="evmStat" style="font-size:12px;color:#64748b;margin-left:4px;font-weight:600"></span></div></div></div>'
     +'  <div class="fr"><label>활성</label><label><input type="checkbox" id="evAct" '+(e.active!==false?"checked":"")+'> 이 행사 사용 중</label></div>'
+    +'  <div class="fr"><label>인원공유</label><label><input type="checkbox" id="evShareMems" '+(e.shareMems?"checked":"")+'> 메인 인원관리 공유 <span style="color:#888;font-size:11px">(체크 시 메인 행사의 회원 명단을 그대로 사용)</span></label></div>'
     +'  '+ssHint
     +'  <div class="fr"><label>비고</label><input id="evNote" value="'+esc(e.note||"")+'"></div>'
     +'  <div style="text-align:right;margin-top:12px"><button class="btn" onclick="closePopup()">취소</button> <button class="btn btn-b" onclick="doEvtSave('+(isNew?"true":"false")+',\''+esc(e.evtId)+'\')">저장</button></div>'
@@ -14691,6 +14700,7 @@ async function doEvtSave(isNew, origId){
   var nm = (document.getElementById("evNm").value||"").trim();
   var yr = (document.getElementById("evYr").value||"").trim();
   var active = document.getElementById("evAct").checked;
+  var shareMems = !!(document.getElementById("evShareMems")||{}).checked;
   var note = (document.getElementById("evNote").value||"").trim();
   var mods = [];
   ALL_MODS.forEach(function(k){ var el=document.getElementById("evm_"+k); if(el && el.checked) mods.push(k); });
@@ -14700,8 +14710,8 @@ async function doEvtSave(isNew, origId){
   }
   showLoading("저장 중...");
   var r = isNew
-    ? await api("addEvent", {evtId:evtId, nm:nm, yr:yr, active:active, modules:mods.join(","), note:note})
-    : await api("updateEvent", {evtId:origId, nm:nm, yr:yr, active:active, modules:mods.join(","), note:note});
+    ? await api("addEvent", {evtId:evtId, nm:nm, yr:yr, active:active, modules:mods.join(","), note:note, shareMems:shareMems})
+    : await api("updateEvent", {evtId:origId, nm:nm, yr:yr, active:active, modules:mods.join(","), note:note, shareMems:shareMems});
   hideLoading();
   if(!r||!r.ok) return toast((r&&r.err)||"저장 실패",true);
   closePopup();
