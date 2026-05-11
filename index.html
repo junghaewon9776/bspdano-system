@@ -1151,11 +1151,14 @@ function dApply(){
     h0+='<strong style="font-size:16px">참가자 관리</strong>';
     h0+='<span class="mut">(0건)</span>';
     h0+='<span style="flex:1"></span>';
+    h0+='<button class="btn" style="background:#10b981;color:#fff;font-weight:700" onclick="openSheet(\'Apply\')" title="참가자 데이터를 시트 형태로 보기/편집">📊 시트 열기</button>';
     h0+='<button class="btn" style="background:#f59e0b;color:#fff" onclick="applyConfigOpen()" title="신청기간/마감/양식 설정">⚙️ 신청 설정</button>';
     h0+='<button class="btn" style="background:#ea580c;color:#fff;font-weight:700" onclick="awardsManage()" title="수상 종류 추가/수정/삭제">🏆 상 관리</button>';
+    h0+='<button class="btn" style="background:#8b5cf6;color:#fff;font-weight:700" onclick="applyImpTmpl()" title="엑셀 양식 다운로드">📋 양식</button>';
+    h0+='<button class="btn" style="background:#ea580c;color:#fff;font-weight:700" onclick="applyImpExcel()" title="엑셀로 참가자 일괄 추가">⬆ 엑셀 가져오기</button>';
     h0+='</div>';
     h0+='<div class="mut" style="padding:20px;text-align:center;background:#f8fafc;border-radius:6px">'+esc(note)+'</div>';
-    h0+='<div class="mut" style="font-size:12px;margin-top:10px">💡 먼저 <b>⚙️ 신청 설정</b> 을 눌러 신청폼 URL을 등록하고 마감일을 지정하세요.</div>';
+    h0+='<div class="mut" style="font-size:12px;margin-top:10px">💡 <b>⬆ 엑셀 가져오기</b>로 참가자를 추가하거나, <b>⚙️ 신청 설정</b>에서 신청폼 URL을 등록하세요.</div>';
     h0+='</div>';
     return h0;
   }
