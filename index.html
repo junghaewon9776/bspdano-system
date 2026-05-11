@@ -14309,7 +14309,7 @@ async function doImp(inp){
       if((impMode=="all"||impMode=="expbg") && wb.SheetNames.indexOf("세출예산")>=0)
         checkList.push({sheet:"세출예산", cols:["대분류","중분류"]});
       if((impMode=="all"||impMode=="inc") && wb.SheetNames.indexOf("세입관리")>=0)
-        checkList.push({sheet:"세입관리", cols:["대분류",["금액(원)","금액"]]});
+        checkList.push({sheet:"세입관리", cols:[["대분류","분류"],["금액(원)","금액","세입액","세입액(원)","수입액","수입액(원)"]]});
       if((impMode=="all"||impMode=="mem") && wb.SheetNames.indexOf("인원관리")>=0)
         checkList.push({sheet:"인원관리", cols:[["이름","성명"]]});
       if((impMode=="all"||impMode=="acct") && wb.SheetNames.indexOf("담당자")>=0)
@@ -14410,7 +14410,7 @@ async function doImp(inp){
       if(checkList.some(function(x){return x.sheet==="세입관리";})){
         var r5=XLSX.utils.sheet_to_json(wb.Sheets["세입관리"]);
         var iRows=r5.map(function(x){
-          return {tp:String(x["대분류"]||"").trim(),sub:String(x["중분류"]||"").trim(),am:String(x["금액(원)"]||x["금액"]||"0"),card:String(x["카드/계좌"]||"").trim(),payM:String(x["결제방법"]||"").trim(),note:String(x["비고"]||"").trim()};
+          return {tp:String(_rowGet(x,["대분류","분류"])||"").trim(),sub:String(_rowGet(x,["중분류","소분류","세부항목"])||"").trim(),am:String(_rowGet(x,["금액(원)","금액","세입액","세입액(원)","수입액","수입액(원)"])||"0"),card:String(_rowGet(x,["카드/계좌","계좌","카드"])||"").trim(),payM:String(_rowGet(x,["결제방법","결제수단"])||"").trim(),note:String(_rowGet(x,["비고","메모"])||"").trim()};
         }).filter(function(x){return x.tp||x.sub;});
         if(iRows.length){
           showLoading("세입관리 "+iRows.length+"건 일괄 저장중...");

@@ -643,7 +643,7 @@ function _apiDeleteMainRow(p, nodeName) {
 
 // ───────── 행사 관리 ─────────
 function _apiListEvents(p) {
-  return Promise.resolve({ok:true, events: _cache.Events || []});
+  return Promise.resolve({ok:true, events: _cache.Events || [], acctEvt: _cache.AcctEvt || []});
 }
 
 function _apiAddEvent(p) {
