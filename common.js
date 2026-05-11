@@ -424,6 +424,10 @@ function _apiRefresh(p) {
         memGroups: data.Groups || [],
         fees: data.Fees || [],
         vendors: _cache.Vendors || [],
+        assets: _cache.Assets || [],
+        rentals: _cache.Rentals || [],
+        assetCats: _cache.AssetCategories || [],
+        assetLocs: _cache.AssetLocations || [],
         LBL: {leader: cfg.LABEL_LEADER || "단장", member: cfg.LABEL_MEMBER || "단원"},
         AR: (_cache.Areas || []).map(function(a){return a.n}),
         US: _buildUserMap()
