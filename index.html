@@ -281,6 +281,7 @@ label{display:block;font-size:10px;color:#999;margin-bottom:3px}
       <div class="sheetBtns">
         <button onclick="_sheetAddRow()" style="background:#10b981;color:#fff;border-color:#10b981">+ 행 추가</button>
         <button onclick="_sheetDelRow()" style="background:#ef4444;color:#fff;border-color:#ef4444">🗑 행 삭제</button>
+        <button onclick="_sheetDelAll()" style="background:#7f1d1d;color:#fff;border-color:#7f1d1d">🗑 전체 삭제</button>
         <button onclick="_sheetSave()" style="background:#2563eb;color:#fff;border-color:#2563eb">💾 저장</button>
         <button onclick="_sheetClose()" style="background:#fff;color:#333">✕ 닫기</button>
       </div>
@@ -627,11 +628,10 @@ async function uploadAll(files, ar, type){
 
 // ===== 로그인 =====
 var AUTH_KEY="cleanFarm_auth_v1";
-var IDLE_MS=10*60*1000;     // 10분 무활동 → 연장 팝업
+var IDLE_MS=6*60*60*1000;     // 6시간 무활동 → 연장 팝업
 var WARN_COUNT_MS=60*1000;  // 팝업 뜬 뒤 60초 내 응답 없으면 자동 로그아웃
 // 자동로그인 TTL — 마지막 활동 이후 이 시간이 지나면 자동로그인 X, 수동 로그인 필요
-// (버그 수정: 과거엔 TTL 체크 없어 며칠 지나도 자동로그인 되며 텔레그램 알림 발송됨)
-var AUTO_LOGIN_TTL_MS=10*60*1000; // 10분
+var AUTO_LOGIN_TTL_MS=6*60*60*1000; // 6시간
 var idleTimer=null, warnTimer=null, warnCountdown=null;
 
 function saveAuth(id,pw){
@@ -1260,7 +1260,7 @@ function dApply(){
   h+='<button class="btn" style="border-radius:0;border:none;background:'+(APPLY_VIEW==="full"?"#2563eb":"#e2e8f0")+';color:'+(APPLY_VIEW==="full"?"#fff":"#334155")+'" onclick="applyView(\'full\')">상세</button>';
   h+='<button class="btn" style="border-radius:0;border:none;background:'+(APPLY_VIEW==="judge"?"#16a34a":"#e2e8f0")+';color:'+(APPLY_VIEW==="judge"?"#fff":"#334155")+';font-weight:700" onclick="applyView(\'judge\')">📱 심사</button>';
   h+='</div>';
-  if(APPLY.sheetUrl && isSuper()) h+='<a class="btn btn-g" href="'+esc(APPLY.sheetUrl)+'" target="_blank" rel="noopener" title="구글 스프레드시트 새 탭에서 열기">📊 스프레드시트</a>';
+  h+='<button class="btn" style="background:#10b981;color:#fff;font-weight:700" onclick="openSheet(\'Apply\')" title="참가자 데이터를 시트 형태로 보기/편집">📊 시트 열기</button>';
   h+='<button class="btn" style="background:#f59e0b;color:#fff" onclick="applyConfigOpen()" title="신청기간/마감/양식 설정">⚙️ 신청 설정</button>';
   h+='<button class="btn" style="background:#ea580c;color:#fff;font-weight:700" onclick="awardsManage()" title="수상 종류 추가/수정/삭제">🏆 상 관리</button>';
   h+='<button class="btn btn-b" onclick="applyXLSX()">⬇ 엑셀 내보내기</button>';
@@ -1341,7 +1341,7 @@ function dApply(){
 
   // 📱 심사 모드 — 핸드폰 최적화 (이름 + 큰 체크박스 3개)
   if(APPLY_VIEW==="judge"){
-    h+='<div style="margin-top:12px;max-height:calc(100vh - 280px);overflow:auto;border:1px solid #e5e7eb;border-radius:6px;background:#f9fafb">';
+    h+='<div style="margin-top:12px;max-height:calc(100vh - 200px);overflow:auto;border:1px solid #e5e7eb;border-radius:6px;background:#f9fafb">';
     // 상단 헤더 (sticky)
     h+='<div style="position:sticky;top:0;z-index:2;background:#f1f5f9;padding:10px 12px;border-bottom:2px solid #cbd5e1;display:flex;gap:8px;font-size:11px;font-weight:700;color:#475569">';
     h+='<div style="flex:1">이름/팀 (접수번호)</div>';
@@ -1394,7 +1394,7 @@ function dApply(){
     return h;
   }
 
-  h+='<div class="scrollx" style="overflow:auto;margin-top:12px;max-height:calc(100vh - 280px);border:1px solid #e5e7eb;border-radius:6px">';
+  h+='<div class="scrollx" style="overflow:auto;margin-top:12px;max-height:calc(100vh - 200px);border:1px solid #e5e7eb;border-radius:6px">';
   h+='<table style="min-width:100%;border-collapse:separate;border-spacing:0;font-size:13px">';
   h+='<thead><tr style="background:#f1f5f9;position:sticky;top:0;z-index:2">';
   h+='<th style="padding:10px 6px;border-bottom:2px solid #cbd5e1;white-space:nowrap;background:#e0e7ff;text-align:center;width:40px" title="현재 필터/정렬 기준 순번">#</th>';
@@ -14043,12 +14043,12 @@ function impClick(m){
 var _sheetState = {node:null, isMain:false, rows:[], cols:[], selRow:-1, dirty:false};
 
 var _MAIN_SHEET_NODES = ["Users","Areas","Events","AcctEvt","Vendors","Assets","Rentals","AssetLog","AssetCategories","AssetLocations"];
-var _EVT_SHEET_NODES = ["Mems","Acts","Purs","Exps","Inc","ExpBG","Pays","Dpst","Groups","Notices","Config","Contracts","Quotes","Forms","FormSubs","Fees","SmsTemplates"];
+var _EVT_SHEET_NODES = ["Mems","Apply","Acts","Purs","Exps","Inc","ExpBG","Pays","Dpst","Groups","Notices","Config","Contracts","Quotes","Forms","FormSubs","Fees","SmsTemplates"];
 
 var _SHEET_LABELS = {
   Users:"👥 계정",Areas:"📍 부서",Events:"🎪 행사",AcctEvt:"🔑 행사권한",Vendors:"🏢 거래처",
   Assets:"📦 자산",Rentals:"📋 대여",AssetLog:"📝 자산이력",AssetCategories:"📂 자산분류",AssetLocations:"📍 자산위치",
-  Mems:"👤 인원",Acts:"📋 활동",Purs:"🛒 구매",Exps:"💰 지출",Inc:"💵 세입",ExpBG:"📊 예산",
+  Mems:"👤 인원",Apply:"📝 참가자",Acts:"📋 활동",Purs:"🛒 구매",Exps:"💰 지출",Inc:"💵 세입",ExpBG:"📊 예산",
   Pays:"💳 입금",Dpst:"🏦 예치금",Groups:"👥 소속",Notices:"📢 공지",Config:"⚙️ 설정",
   Contracts:"📄 계약",Quotes:"📃 견적",Forms:"📝 폼",FormSubs:"📨 폼제출",Fees:"💰 회비",SmsTemplates:"💬 SMS템플릿"
 };
@@ -14199,6 +14199,17 @@ function _sheetDelRow() {
   _sheetState.selRow = -1;
   _sheetState.dirty = true;
   _sheetRender(_sheetState.cols, _sheetState.rows);
+}
+
+function _sheetDelAll() {
+  var cnt = _sheetState.rows.length;
+  if (!cnt) { toast("삭제할 데이터가 없습니다", true); return; }
+  if (!confirm("⚠️ 전체 " + cnt + "행을 모두 삭제하시겠습니까?\n\n💾 저장 버튼을 눌러야 실제로 반영됩니다.")) return;
+  _sheetState.rows = [];
+  _sheetState.selRow = -1;
+  _sheetState.dirty = true;
+  _sheetRender(_sheetState.cols, _sheetState.rows);
+  toast("전체 " + cnt + "행 삭제됨 — 저장을 눌러야 반영됩니다");
 }
 
 function _sheetSave() {
