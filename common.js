@@ -11,7 +11,7 @@ var _evtCaches = {}; // 행사별 캐시: { evtId: { Acts:[], Purs:[], ... } }
 // 메인(공용) 데이터 노드
 var MAIN_NODES = ["Users","Areas","Events","AcctEvt","Vendors","Assets","Rentals","AssetLog","AssetCategories","AssetLocations"];
 // 행사별 데이터 노드 (evtData/{evtId}/ 하위)
-var EVT_NODES = ["Acts","Purs","Exps","Inc","ExpBG","Pays","Dpst","Mems","Groups","Notices","SmsLog","Config","Contracts","ContractFields","Quotes","QuoteFields","SmsTemplates","Forms","FormFields","FormSubs","Fees"];
+var EVT_NODES = ["Acts","Purs","Exps","Inc","ExpBG","Pays","Dpst","Mems","Groups","Notices","SmsLog","Config","Contracts","ContractFields","Quotes","QuoteFields","SmsTemplates","Forms","FormFields","FormSubs","Fees","Apply"];
 
 function initFirebaseSync() {
   if (_syncInitialized) return;
@@ -236,11 +236,11 @@ function _dispatch(p) {
         case "smsLogList":
           resolve({ok:false, err:"SMS는 아직 준비 중입니다"}); return;
 
-        // 참가자 (외부 폼 연동 — 추후 구현)
-        case "listApply":      resolve({ok:true, headers:[], rows:[]}); return;
-        case "getApplyConfig": resolve({ok:true, status:"auto", effective:"closed", today:new Date().toISOString().slice(0,10), count:0, webappUrl:""}); return;
-        case "saveApplyConfig":resolve({ok:true}); return;
-        case "updateApplyRow": resolve({ok:false, err:"준비 중"}); return;
+        // 참가자
+        case "listApply":      _apiListApply(p).then(resolve); return;
+        case "getApplyConfig": _apiGetApplyConfig(p).then(resolve); return;
+        case "saveApplyConfig":_apiSetConfig(Object.assign({}, p, {key:"APPLY_CONFIG", value:JSON.stringify({status:p.status,startDt:p.startDt,endDt:p.endDt,notice:p.notice,webappUrl:p.webappUrl})})).then(function(){resolve({ok:true})}); return;
+        case "updateApplyRow": _apiUpdateApplyRow(p).then(resolve); return;
 
         // 사진 업로드 (Drive GAS 프록시 — 추후 연동)
         case "uploadPhoto":    resolve({ok:false, err:"사진 업로드는 Drive 설정 후 사용 가능합니다"}); return;
@@ -812,4 +812,83 @@ function getDrivePhotoConfig() {
 function setDrivePhotoConfig(cfg) {
   _drivePhotoConfig = cfg;
   return fbDb.ref('/main/drivePhoto').set(cfg);
+}
+
+// ───────── 참가자 (Apply) ─────────
+function _apiListApply(p) {
+  var evtId = _getEvtId(p);
+  if (!evtId) return Promise.resolve({ok:true, headers:[], rows:[]});
+  return new Promise(function(resolve) {
+    fbDb.ref('/evtData/' + evtId + '/Apply').once('value', function(snap) {
+      var raw = snap.val();
+      if (!raw) return resolve({ok:true, headers:[], rows:[], note:"참가자 데이터가 없습니다."});
+      // Firebase sparse array/object → 실제 배열로 변환 (null 제거)
+      var arr = [];
+      if (Array.isArray(raw)) {
+        arr = raw.filter(function(r) { return r != null; });
+      } else if (typeof raw === 'object') {
+        Object.keys(raw).forEach(function(k) { if (raw[k] != null) arr.push(raw[k]); });
+      }
+      if (!arr.length) return resolve({ok:true, headers:[], rows:[], note:"참가자 데이터가 없습니다."});
+      // 헤더 추출 (모든 row의 키 합집합)
+      var colSet = {};
+      var colOrder = [];
+      arr.forEach(function(r) {
+        if (!r || typeof r !== 'object') return;
+        Object.keys(r).forEach(function(k) {
+          if (!colSet[k]) { colSet[k] = true; colOrder.push(k); }
+        });
+      });
+      // 2차원 배열로 변환
+      var rows = arr.map(function(r) {
+        if (!r || typeof r !== 'object') return colOrder.map(function() { return ""; });
+        return colOrder.map(function(k) { return r[k] != null ? r[k] : ""; });
+      });
+      resolve({ok:true, headers:colOrder, rows:rows, count:rows.length});
+    });
+  });
+}
+
+function _apiGetApplyConfig(p) {
+  var evtId = _getEvtId(p);
+  if (!evtId) return Promise.resolve({ok:true, status:"auto", effective:"closed", today:new Date().toISOString().slice(0,10), count:0, webappUrl:""});
+  return loadEvtData(evtId).then(function(data) {
+    var cfg = {};
+    (data.Config || []).forEach(function(c) { if(c && c.k) cfg[c.k] = c.v; });
+    var ac = {};
+    try { ac = JSON.parse(cfg.APPLY_CONFIG || "{}"); } catch(e){}
+    var applyArr = data.Apply || [];
+    if (!Array.isArray(applyArr) && applyArr) applyArr = Object.values(applyArr);
+    var today = new Date().toISOString().slice(0,10);
+    var status = ac.status || "auto";
+    var effective = status;
+    if (status === "auto") {
+      if (ac.startDt && today < ac.startDt) effective = "notyet";
+      else if (ac.endDt && today > ac.endDt) effective = "closed";
+      else effective = "open";
+    }
+    return {ok:true, status:status, effective:effective, today:today, count:(applyArr||[]).length, webappUrl:ac.webappUrl||"", startDt:ac.startDt||"", endDt:ac.endDt||"", notice:ac.notice||""};
+  });
+}
+
+function _apiUpdateApplyRow(p) {
+  var evtId = _getEvtId(p);
+  if (!evtId) return Promise.resolve({ok:false, err:"행사 미선택"});
+  return new Promise(function(resolve) {
+    var ref = fbDb.ref('/evtData/' + evtId + '/Apply');
+    ref.once('value', function(snap) {
+      var arr = snap.val();
+      if (!arr) return resolve({ok:false, err:"데이터 없음"});
+      if (!Array.isArray(arr)) arr = Object.values(arr);
+      var ri = p.rowIndex;
+      var col = p.col;
+      var val = p.value;
+      if (ri == null || col == null) return resolve({ok:false, err:"rowIndex/col 필요"});
+      if (!arr[ri]) return resolve({ok:false, err:"행 없음"});
+      arr[ri][col] = val;
+      ref.set(arr).then(function() {
+        resolve({ok:true});
+      });
+    });
+  });
 }
