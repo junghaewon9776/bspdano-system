@@ -6,13 +6,16 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <title>법성포청년회 - 코스 관리 시스템</title>
+  <title>실시간 위치관제 · 축제관리</title>
   <link rel="stylesheet" href="style.css?v=20260512v">
 </head>
 <body>
 <header>
-  <h1>📍 코스 관리 시스템</h1>
-  <span id="syncStatus" style="font-size:11px;opacity:0.7;">Firebase 연결 중...</span>
+  <h1>📍 실시간 위치관제</h1>
+  <div style="display:flex;align-items:center;gap:10px">
+    <span id="syncStatus" style="font-size:11px;opacity:0.7;">연결 중...</span>
+    <a href="../index.html" style="color:#fff;font-size:12px;background:rgba(255,255,255,0.15);padding:4px 10px;border-radius:5px;text-decoration:none;font-weight:700">🏠 단오시스템</a>
+  </div>
 </header>
 
 <div class="container">
@@ -45,31 +48,17 @@
   </div>
 
   <div class="card" style="max-width:600px;margin:0 auto;">
-    <h2>🔥 Firebase 연동됨</h2>
+    <h2>📌 안내</h2>
     <p style="font-size:13px;line-height:1.6;">
-      이제 모든 기기에서 <b>실시간 동기화</b>됩니다.<br>
-      JSON 복사·붙여넣기 필요 없음. PC에서 추가하면 폰에 즉시 반영.
-    </p>
-    <p class="muted" style="margin-top:8px;">
-      관리자/모니터링/인원관리/통계 = 로그인 필요<br>
-      오늘의 운영 = 누구나 접근 가능
+      <b>본부 모니터링</b> — 로그인 필요 (단오시스템 계정)<br>
+      <b>오늘의 운영</b> — 누구나 접근 가능 (GPS 공유용)<br>
+      <b>배치도 · 차량관리</b> — 단오시스템에서 접근
     </p>
   </div>
 </div>
 
-<!-- Firebase SDK -->
-<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-database-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
-<script src="firebase-config.js?v=20260512v"></script>
-<script src="common.js?v=20260512v"></script>
 <script>
-  ensureAnonAuth().then(() => {
-    initFirebaseSync();
-    onDataReady(() => {
-      document.getElementById('syncStatus').textContent = '✅ 연결됨';
-    });
-  });
+  document.getElementById('syncStatus').textContent = '✅ 메뉴';
 </script>
 </body>
 </html>
