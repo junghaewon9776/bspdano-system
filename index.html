@@ -2178,7 +2178,7 @@ function awardsImport(){
       try {
         var wb = XLSX.read(new Uint8Array(ev.target.result), {type:"array"});
         var ws = wb.Sheets[wb.SheetNames[0]];
-        var rows = XLSX.utils.sheet_to_json(ws, {defval:""});
+        var rows = XLSX.utils.sheet_to_json(ws, {defval:"", raw:false, dateNF:'yyyy-mm-dd HH:MM:SS'});
         if(!rows.length){ toast("가져올 데이터가 없습니다", true); return; }
         var existing = _awardsNorm();
         var existingMap = {};
@@ -3185,11 +3185,11 @@ function applyImpExcel(){
     rd.onload=function(){
       try {
         var data=new Uint8Array(rd.result);
-        var wb=XLSX.read(data,{type:"array"});
+        var wb=XLSX.read(data,{type:"array", cellDates:true});
         // "참가자" 시트 우선, 없으면 첫 시트
         var sheetName = wb.SheetNames.indexOf("참가자")>=0 ? "참가자" : wb.SheetNames[0];
         var ws=wb.Sheets[sheetName];
-        var rows=XLSX.utils.sheet_to_json(ws,{defval:""});
+        var rows=XLSX.utils.sheet_to_json(ws,{defval:"", raw:false, dateNF:'yyyy-mm-dd HH:MM:SS'});
         if(!rows.length){ alert("❌ 데이터가 없습니다"); return; }
         // 헤더 검증 — 필수 컬럼: 성명(또는 이름) 또는 팀명
         var first=rows[0];
@@ -4647,9 +4647,9 @@ function vendorImportExcel(){
     rd.onload=function(){
       try {
         var data=new Uint8Array(rd.result);
-        var wb=XLSX.read(data,{type:"array"});
+        var wb=XLSX.read(data,{type:"array", cellDates:true});
         var ws=wb.Sheets[wb.SheetNames[0]];
-        var rows=XLSX.utils.sheet_to_json(ws,{defval:""});
+        var rows=XLSX.utils.sheet_to_json(ws,{defval:"", raw:false, dateNF:'yyyy-mm-dd HH:MM:SS'});
         if(!rows.length){ alert("❌ 데이터가 없습니다. 빈 파일입니다."); return; }
         // 헤더 검증 — 필수 컬럼 "거래처명"(또는 별칭) 있어야 함
         var first=rows[0];
@@ -6754,9 +6754,9 @@ function expTypeImport(){
     rd.onload=async function(){
       try {
         var data=new Uint8Array(rd.result);
-        var wb=XLSX.read(data,{type:"array"});
+        var wb=XLSX.read(data,{type:"array", cellDates:true});
         var sName=wb.SheetNames.indexOf("세출대분류")>=0?"세출대분류":wb.SheetNames[0];
-        var rows=XLSX.utils.sheet_to_json(wb.Sheets[sName],{defval:""});
+        var rows=XLSX.utils.sheet_to_json(wb.Sheets[sName],{defval:"", raw:false, dateNF:'yyyy-mm-dd HH:MM:SS'});
         if(!rows.length){ alert("❌ 데이터가 없습니다"); return; }
         // 검증 — 대분류 컬럼 필수 (공백 무시 매칭)
         var first=rows[0];
@@ -9610,9 +9610,9 @@ function feeImport(){
     rd.onload=async function(){
       try {
         var data=new Uint8Array(rd.result);
-        var wb=XLSX.read(data,{type:"array"});
+        var wb=XLSX.read(data,{type:"array", cellDates:true});
         var sName=wb.SheetNames.indexOf("입회비")>=0?"입회비":wb.SheetNames[0];
-        var rows=XLSX.utils.sheet_to_json(wb.Sheets[sName],{defval:""});
+        var rows=XLSX.utils.sheet_to_json(wb.Sheets[sName],{defval:"", raw:false, dateNF:'yyyy-mm-dd HH:MM:SS'});
         if(!rows.length){ alert("❌ 데이터 없음"); return; }
         var first=rows[0];
         // 새 양식 (날짜/예금주/입금액/회비) 또는 구 양식 (연도/이름/...) 자동 감지
@@ -14298,7 +14298,7 @@ function _rowGet(row, aliases){
 }
 function _validateImportSheet(wb, sheetName, requiredCols){
   if(wb.SheetNames.indexOf(sheetName)<0) return null; // 시트 없으면 스킵
-  var rows=XLSX.utils.sheet_to_json(wb.Sheets[sheetName]);
+  var rows=XLSX.utils.sheet_to_json(wb.Sheets[sheetName],{raw:false, dateNF:'yyyy-mm-dd HH:MM:SS'});
   if(!rows.length) return { ok:false, err:'"'+sheetName+'" 시트가 비어있습니다' };
   var first=rows[0];
   var headers=Object.keys(first);
@@ -14359,7 +14359,7 @@ async function doImp(inp){
       // 건수 요약 확인 (import 전 최종 체크)
       var summary=[];
       checkList.forEach(function(c){
-        var rows=XLSX.utils.sheet_to_json(wb.Sheets[c.sheet]);
+        var rows=XLSX.utils.sheet_to_json(wb.Sheets[c.sheet],{raw:false, dateNF:'yyyy-mm-dd HH:MM:SS'});
         var valid=rows.filter(function(r){
           return c.cols.every(function(colSet){
             var aliases=Array.isArray(colSet)?colSet:[colSet];
@@ -14377,7 +14377,7 @@ async function doImp(inp){
       showLoading("가져오는 중...");
       // 활동일지 — 벌크
       if(checkList.some(function(x){return x.sheet==="활동일지";})){
-        var rA=XLSX.utils.sheet_to_json(wb.Sheets["활동일지"]);
+        var rA=XLSX.utils.sheet_to_json(wb.Sheets["활동일지"],{raw:false, dateNF:'yyyy-mm-dd HH:MM:SS'});
         var aRows=rA.map(function(x){return {dt:String(x["날짜"]||""),ar:String(x["부서"]||""),tp:String(x["유형"]||x["활동유형"]||"수거"),ppl:String(x["인원"]||x["참여인원"]||""),bag:String(x["수거량"]||""),loc:String(x["장소"]||x["수거장소"]||""),nt:String(x["비고"]||""),ph:[],by:String(x["등록자"]||CID)};});
         if(aRows.length){
           showLoading("활동일지 "+aRows.length+"건 일괄 저장중...");
@@ -14387,7 +14387,7 @@ async function doImp(inp){
       }
       // 구매 — 벌크 (명세서ID 그룹핑은 서버에서 처리하지 않으므로 클라에서 inv 매핑)
       if(checkList.some(function(x){return x.sheet==="물품구매";})){
-        var r2=XLSX.utils.sheet_to_json(wb.Sheets["물품구매"]);
+        var r2=XLSX.utils.sheet_to_json(wb.Sheets["물품구매"],{raw:false, dateNF:'yyyy-mm-dd HH:MM:SS'});
         var invMap={};
         var pRows=r2.map(function(x){
           var bi=null;for(var j=0;j<BG.length;j++)if(BG[j].n==String(x["비목"]||x["예산비목"]||""))bi=BG[j].id;
@@ -14403,7 +14403,7 @@ async function doImp(inp){
       }
       // 지출 — 벌크
       if(checkList.some(function(x){return x.sheet==="지출내역";})){
-        var r3=XLSX.utils.sheet_to_json(wb.Sheets["지출내역"]);
+        var r3=XLSX.utils.sheet_to_json(wb.Sheets["지출내역"],{raw:false, dateNF:'yyyy-mm-dd HH:MM:SS'});
         var eRows=r3.map(function(x){
           var bi=null;var biNm=String(_rowGet(x,["비목","예산비목"])||"");for(var j=0;j<BG.length;j++)if(BG[j].n==biNm)bi=BG[j].id;
           return {dt:String(_rowGet(x,["날짜","일자","지출일"])||""),bi:bi||(BG[0]?BG[0].id:"B1"),ar:String(_rowGet(x,["부서","소속"])||""),am:String(_rowGet(x,["금액(원)","금액(천원)","금액","지출액","지출액(원)"])||""),ds:String(_rowGet(x,["적요","내용","비고"])||""),by:CID};
@@ -14416,7 +14416,7 @@ async function doImp(inp){
       }
       // 세출예산(중분류) — 벌크
       if(checkList.some(function(x){return x.sheet==="세출예산";})){
-        var rE=XLSX.utils.sheet_to_json(wb.Sheets["세출예산"]);
+        var rE=XLSX.utils.sheet_to_json(wb.Sheets["세출예산"],{raw:false, dateNF:'yyyy-mm-dd HH:MM:SS'});
         var bgRows=rE.map(function(x){
           var tp=String(_rowGet(x,"대분류")||"").trim();
           var mid=String(_rowGet(x,"중분류")||"").trim();
@@ -14431,7 +14431,7 @@ async function doImp(inp){
       }
       // 세입 — 벌크
       if(checkList.some(function(x){return x.sheet==="세입관리";})){
-        var r5=XLSX.utils.sheet_to_json(wb.Sheets["세입관리"]);
+        var r5=XLSX.utils.sheet_to_json(wb.Sheets["세입관리"],{raw:false, dateNF:'yyyy-mm-dd HH:MM:SS'});
         var iRows=r5.map(function(x){
           return {tp:String(_rowGet(x,["대분류","분류"])||"").trim(),sub:String(_rowGet(x,["중분류","소분류","세부항목"])||"").trim(),am:String(_rowGet(x,["금액(원)","금액","세입액","세입액(원)","수입액","수입액(원)"])||"0"),card:String(_rowGet(x,["카드/계좌","계좌","카드"])||"").trim(),payM:String(_rowGet(x,["결제방법","결제수단"])||"").trim(),note:String(_rowGet(x,["비고","메모"])||"").trim()};
         }).filter(function(x){return x.tp||x.sub;});
@@ -14443,7 +14443,7 @@ async function doImp(inp){
       }
       // 인원 - 전체 교체 (단일 RPC로 벌크 처리: 빠름)
       if((impMode=="all"||impMode=="mem")&&wb.SheetNames.indexOf("인원관리")>=0){
-        var r4=XLSX.utils.sheet_to_json(wb.Sheets["인원관리"]);
+        var r4=XLSX.utils.sheet_to_json(wb.Sheets["인원관리"],{raw:false, dateNF:'yyyy-mm-dd HH:MM:SS'});
         var rowsOut=[];
         for(var i=0;i<r4.length;i++){
           var x=r4[i];
@@ -14481,7 +14481,7 @@ async function doImp(inp){
       if((impMode=="all"||impMode=="acct")&&(wb.SheetNames.indexOf("담당자")>=0||wb.SheetNames.indexOf("부서")>=0)){
         var uRows=[], aRows=[];
         if(wb.SheetNames.indexOf("담당자")>=0){
-          var rU=XLSX.utils.sheet_to_json(wb.Sheets["담당자"]);
+          var rU=XLSX.utils.sheet_to_json(wb.Sheets["담당자"],{raw:false, dateNF:'yyyy-mm-dd HH:MM:SS'});
           for(var i=0;i<rU.length;i++){
             var x=rU[i];
             var id=String(x["아이디"]||"").trim();
@@ -14497,7 +14497,7 @@ async function doImp(inp){
           }
         }
         if(wb.SheetNames.indexOf("부서")>=0){
-          var rA=XLSX.utils.sheet_to_json(wb.Sheets["부서"]);
+          var rA=XLSX.utils.sheet_to_json(wb.Sheets["부서"],{raw:false, dateNF:'yyyy-mm-dd HH:MM:SS'});
           for(var i=0;i<rA.length;i++){
             var n=String(rA[i]["부서명"]||"").trim();
             if(n)aRows.push({n:n});
