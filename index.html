@@ -3212,9 +3212,8 @@ function applyImpExcel(){
         api("bulkAddApply",{id:CID, rows:valid}).then(async function(r){
           hideLoading();
           if(!r||!r.ok){ toast((r&&r.err)||"실패",true); return; }
-          toast(r.added+"건 추가 완료");
+          toast((r.added||r.count||valid.length)+"건 추가 완료");
           APPLY=null;
-          try { await refreshData(false); } catch(e){}
           draw();
         });
       } catch(e){ alert("❌ 엑셀 읽기 실패:\n"+e.message); }
