@@ -1889,17 +1889,9 @@ function dApstat(){
   fm+='<label style="display:block;color:#64748b;font-size:12px;margin:12px 0 4px;font-weight:600">신청유형</label>';
   fm+='<select id="apf_gtype" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px">';
   fm+='<option value="개인(명)">개인(명)</option><option value="단체(팀)">단체(팀)</option>';
-  fm+='</select>';
-  fm+='<div style="display:flex;gap:8px;margin-top:12px">';
-  fm+='<div style="flex:1"><label style="display:block;color:#64748b;font-size:12px;margin:0 0 4px;font-weight:600">팀명</label>';
-  fm+='<input id="apf_team" type="text" placeholder="팀명 입력" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px"></div>';
-  fm+='<div style="flex:1"><label style="display:block;color:#64748b;font-size:12px;margin:0 0 4px;font-weight:600">대표자 <span style="color:#ef4444">*</span></label>';
-  fm+='<input id="apf_name" type="text" placeholder="대표자 이름" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px"></div>';
-  fm+='</div></div>';
-  fm+='<div id="apf_soloWrap" style="display:none">';
+  fm+='</select></div>';
   fm+='<label style="display:block;color:#64748b;font-size:12px;margin:12px 0 4px;font-weight:600">이름 <span style="color:#ef4444">*</span></label>';
-  fm+='<input id="apf_name2" type="text" placeholder="이름" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px">';
-  fm+='</div>';
+  fm+='<input id="apf_name" type="text" placeholder="이름" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px">';
   fm+='<label style="display:block;color:#64748b;font-size:12px;margin:12px 0 4px;font-weight:600">연락처 <span style="color:#ef4444">*</span></label>';
   fm+='<input id="apf_phone" type="tel" placeholder="010-0000-0000" maxlength="13" oninput="(function(el){var v=el.value.replace(/[^0-9]/g,\'\');if(v.length<=3)el.value=v;else if(v.length<=7)el.value=v.slice(0,3)+\'-\'+v.slice(3);else el.value=v.slice(0,3)+\'-\'+v.slice(3,7)+\'-\'+v.slice(7,11)})(this)" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px">';
   fm+='<div style="display:flex;gap:8px;margin-top:12px">';
@@ -1962,17 +1954,9 @@ function dApform(){
   h+='<label style="display:block;color:#64748b;font-size:12px;margin:12px 0 4px;font-weight:600">신청유형</label>';
   h+='<select id="apf_gtype" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px">';
   h+='<option value="개인(명)">개인(명)</option><option value="단체(팀)">단체(팀)</option>';
-  h+='</select>';
-  h+='<div style="display:flex;gap:8px;margin-top:12px">';
-  h+='<div style="flex:1"><label style="display:block;color:#64748b;font-size:12px;margin:0 0 4px;font-weight:600">팀명</label>';
-  h+='<input id="apf_team" type="text" placeholder="팀명 입력" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px"></div>';
-  h+='<div style="flex:1"><label style="display:block;color:#64748b;font-size:12px;margin:0 0 4px;font-weight:600">대표자 <span style="color:#ef4444">*</span></label>';
-  h+='<input id="apf_name" type="text" placeholder="대표자 이름" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px"></div>';
-  h+='</div></div>';
-  h+='<div id="apf_soloWrap" style="display:none">';
+  h+='</select></div>';
   h+='<label style="display:block;color:#64748b;font-size:12px;margin:12px 0 4px;font-weight:600">이름 <span style="color:#ef4444">*</span></label>';
-  h+='<input id="apf_name2" type="text" placeholder="이름" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px">';
-  h+='</div>';
+  h+='<input id="apf_name" type="text" placeholder="이름" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px">';
 
   h+='<label style="display:block;color:#64748b;font-size:12px;margin:12px 0 4px;font-weight:600">연락처 <span style="color:#ef4444">*</span></label>';
   h+='<input id="apf_phone" type="tel" placeholder="010-0000-0000" maxlength="13" oninput="(function(el){var v=el.value.replace(/[^0-9]/g,\'\');if(v.length<=3)el.value=v;else if(v.length<=7)el.value=v.slice(0,3)+\'-\'+v.slice(3);else el.value=v.slice(0,3)+\'-\'+v.slice(3,7)+\'-\'+v.slice(7,11)})(this)" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px">';
@@ -2016,16 +2000,10 @@ function cpApformLink(){
 function apfDivChg(){
   var v=(document.getElementById('apf_div')||{}).value||"";
   var tw=document.getElementById('apf_teamWrap');
-  var sw=document.getElementById('apf_soloWrap');
   if(v==="신인부"){
     if(tw)tw.style.display="";
-    if(sw)sw.style.display="none";
-  } else if(v){
-    if(tw)tw.style.display="none";
-    if(sw)sw.style.display="";
   } else {
     if(tw)tw.style.display="none";
-    if(sw)sw.style.display="none";
   }
 }
 
@@ -2034,16 +2012,12 @@ function submitApplyForm(){
   var div=document.getElementById('apf_div').value;
   if(!cat){ alert('구분을 선택하세요'); return; }
   if(!div){ alert('참가구분을 선택하세요'); return; }
-  var gtype="개인(명)", team="", name="";
+  var gtype="개인(명)";
   if(div==="신인부"){
     gtype=(document.getElementById('apf_gtype')||{}).value||"개인(명)";
-    team=(document.getElementById('apf_team')||{}).value.trim();
-    name=(document.getElementById('apf_name')||{}).value.trim();
-    if(!name){ alert('대표자 이름을 입력하세요'); return; }
-  } else {
-    name=(document.getElementById('apf_name2')||{}).value.trim();
-    if(!name){ alert('이름을 입력하세요'); return; }
   }
+  var name=(document.getElementById('apf_name')||{}).value.trim();
+  if(!name){ alert('이름을 입력하세요'); return; }
   var phone=document.getElementById('apf_phone').value.trim();
   var region=document.getElementById('apf_region').value;
   var area=document.getElementById('apf_area').value.trim();
@@ -2051,8 +2025,7 @@ function submitApplyForm(){
   if(!phone){ alert('연락처를 입력하세요'); return; }
   var row={
     "구분":cat, "참가구분":div, "신청유형(명/팀)":gtype,
-    "팀명":team, "대표자":name, "성명":name,
-    "연락처":phone, "시도별":region, "주소":area, "비고":memo
+    "성명":name, "연락처":phone, "시도별":region, "주소":area, "비고":memo
   };
   var btn=document.querySelector('#apf_cat').closest('.card').querySelector('button[onclick*="submitApplyForm"]');
   if(!btn) btn=document.querySelector('#apf_cat').closest('.card').querySelector('button');
@@ -2060,7 +2033,7 @@ function submitApplyForm(){
   api("addApply",Object.assign({id:CID},row)).then(function(r){
     if(r&&r.ok){
       toast('접수순번 '+r.seq+'번으로 신청되었습니다');
-      ['apf_cat','apf_div','apf_team','apf_name','apf_name2','apf_phone','apf_region','apf_area','apf_memo'].forEach(function(id){
+      ['apf_cat','apf_div','apf_name','apf_phone','apf_region','apf_area','apf_memo'].forEach(function(id){
         var el=document.getElementById(id);
         if(el) el.tagName==='SELECT'?el.selectedIndex=0:el.value='';
       });
