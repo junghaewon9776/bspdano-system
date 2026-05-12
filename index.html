@@ -935,7 +935,7 @@ async function doLogin(id,pw,keep,silent){
     if(!silent){
       var uaNow = navigator.userAgent || "";
       _fetchIp_().then(function(ip){
-        api("notifyLogin",{id:CID, evtId:(CUR_EVT && CUR_EVT.evtId)||"", evtNm:(CUR_EVT && CUR_EVT.nm)||"", ip:ip||"", ua:uaNow}).catch(function(){});
+        api("notifyLogin",{id:CID, nm:ME.nm||"", role:ME.r||"", evtId:(CUR_EVT && CUR_EVT.evtId)||"", evtNm:(CUR_EVT && CUR_EVT.nm)||"", ip:ip||"", ua:uaNow}).catch(function(){});
       });
     }
   } catch(e){ console.warn("notifyLogin err:", e); }

@@ -894,15 +894,31 @@ function _upsertCfgArr(arr, key, value) {
 }
 
 // ───────── 텔레그램 알림 ─────────
+var TG_BOT_TOKEN = "8761665630:AAGv9FjG4fcxee4hpyjoIjd5wkXm0c-_qV0";
+var TG_CHAT_IDS  = "8613833560";
+
 function _apiNotifyLogin(p) {
-  // 시스템 설정에서 텔레그램 읽기
-  var sys = (_cache && _cache.SysConfig) || {};
-  var botToken = sys.TELEGRAM_BOT_TOKEN;
-  var chatIds = sys.TELEGRAM_CHAT_IDS;
+  var botToken = TG_BOT_TOKEN;
+  var chatIds = TG_CHAT_IDS;
   if (!botToken || !chatIds) return Promise.resolve({ok:true});
 
-  var text = "🔐 <b>로그인</b>\nID: " + (p.id||"") + "\n행사: " + (p.evtNm||"") + "\n시각: " + now_();
-  if (p.ip) text += "\nIP: " + p.ip;
+  // 역할 라벨
+  var roleMap = {super:"🔴 SUPER", admin:"🟠 관리자", subAdm:"🟡 부관리자"};
+  var roleLabel = roleMap[p.role] || "🟢 일반";
+  // UA → 기기 파싱
+  var dev = "";
+  var ua = p.ua || "";
+  if (ua) {
+    var br = /Edg\//.test(ua)?"Edge":/OPR\//.test(ua)?"Opera":/Chrome\//.test(ua)?"Chrome":/Safari\//.test(ua)?"Safari":/Firefox\//.test(ua)?"Firefox":"브라우저";
+    var os = /Windows/.test(ua)?"Windows":/Mac OS/.test(ua)?"Mac":/Android/.test(ua)?"Android":/iPhone|iPad/.test(ua)?"iOS":/Linux/.test(ua)?"Linux":"";
+    dev = br + (os ? " on " + os : "");
+  }
+  var text = "✅ <b>로그인 성공</b>"
+    + "\n• 계정: " + (p.id||"") + (p.nm ? " (" + p.nm + ")" : "")
+    + "\n• 역할: " + roleLabel
+    + "\n• IP: " + (p.ip||"-")
+    + (dev ? "\n• 기기: " + dev : "")
+    + "\n• 시각: " + now_();
   var url = "https://api.telegram.org/bot" + botToken + "/sendMessage";
   var ids = chatIds.split(/[,\s]+/).filter(Boolean);
 
@@ -1143,10 +1159,8 @@ function _apiAddApply(p) {
 
 // 참가 접수 텔레그램 알림
 function _notifyApply(evtId, row, seq) {
-  // 시스템 설정에서 텔레그램 읽기
-  var sys = (_cache && _cache.SysConfig) || {};
-  var botToken = sys.TELEGRAM_BOT_TOKEN;
-  var chatIds = sys.TELEGRAM_CHAT_IDS;
+  var botToken = TG_BOT_TOKEN;
+  var chatIds = TG_CHAT_IDS;
   if (!botToken || !chatIds) return;
   var cat = row["구분"] || "";
   var div = row["참가구분"] || row[_fbSafeKey("참가구분")] || "";
