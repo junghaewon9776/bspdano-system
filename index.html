@@ -548,7 +548,7 @@ var incFilter={tp:"",card:""};
 var expFilter={tp:"",gwan:""};
 var txnFilter={fromDt:"",toDt:"",incTp:"",expTp:"",card:"",status:""};
 var LBL={leader:"단장",member:"단원"};
-var ME=null, CID=null, CTAB="dash", FILT="전체", ATT=null;
+var ME=null, CID=null, CTAB="dash", FILT="전체", ATT=null, LAST_IP="";
 // ===== 다중 행사(Event) 컨텍스트 =====
 // EVENTS: 현재 로그인 사용자가 접근 가능한 행사 목록 [{evtId, nm, yr, modules:[], role, active}]
 // CUR_EVT: 현재 선택된 행사 객체 (EVENTS 중 하나 레퍼런스)
@@ -935,7 +935,8 @@ async function doLogin(id,pw,keep,silent){
     if(!silent){
       var uaNow = navigator.userAgent || "";
       _fetchIp_().then(function(ip){
-        api("notifyLogin",{id:CID, nm:ME.nm||"", role:ME.r||"", evtId:(CUR_EVT && CUR_EVT.evtId)||"", evtNm:(CUR_EVT && CUR_EVT.nm)||"", ip:ip||"", ua:uaNow}).catch(function(){});
+        LAST_IP = ip||"";
+        api("notifyLogin",{id:CID, nm:ME.nm||"", role:ME.r||"", evtId:(CUR_EVT && CUR_EVT.evtId)||"", evtNm:(CUR_EVT && CUR_EVT.nm)||"", ip:LAST_IP, ua:uaNow}).catch(function(){});
       });
     }
   } catch(e){ console.warn("notifyLogin err:", e); }
@@ -1088,8 +1089,8 @@ function logout(msg){
       var ua = navigator.userAgent||"";
       var logoutNm = (ME&&ME.nm)||"";
       var logoutRole = (ME&&ME.r)||"";
-      // IP 조회 없이 바로 발송 (로그아웃 시 페이지 리로드 전에 확실히 보내기)
-      api("notifyLogin",{id:logoutId, nm:logoutNm, role:logoutRole, logout:true, reason:reason, ip:"", ua:ua}).catch(function(){});
+      // 로그인 때 캐시한 IP 사용 (외부 조회 없이 바로 발송)
+      api("notifyLogin",{id:logoutId, nm:logoutNm, role:logoutRole, logout:true, reason:reason, ip:LAST_IP||"", ua:ua}).catch(function(){});
       setTimeout(function(){ _doLogoutReload_(msg); }, 800);
       return;
     }
