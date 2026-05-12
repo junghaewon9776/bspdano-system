@@ -2856,7 +2856,7 @@ function awardDel(name,giver){
 function loadApply_(silent){
   var evtId = (CUR_EVT && CUR_EVT.evtId) || "";
   var p1 = api("listApply",{id:CID, evtId:evtId, _t:Date.now()});
-  var p2 = APPLY_CATS ? Promise.resolve(null) : api("getApplyConfig",{id:CID});
+  var p2 = (APPLY_CATS && DRIVE_UPLOAD_URL) ? Promise.resolve(null) : api("getApplyConfig",{id:CID});
   return Promise.all([p1,p2]).then(function(res){
     var r=res[0], cfg=res[1];
     if(r && r.ok) APPLY=r;
