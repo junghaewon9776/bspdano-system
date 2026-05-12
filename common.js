@@ -1206,7 +1206,7 @@ function _notifyApply(evtId, row, seq) {
     + "\n접수번호: " + seq
     + "\n구분: " + cat + " / " + div
     + "\n성명: " + nm
-    + "\n연락처: " + phone
+    + "\n연락처: <code>" + phone + "</code>"
     + "\n시도: " + region
     + "\n시각: " + now_()
     + "\n\n<a href=\"" + applyUrl + "\">🔗 신청폼 열기</a>";
