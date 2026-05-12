@@ -204,10 +204,14 @@ body{font-family:'Pretendard','Noto Sans KR',sans-serif;background:#1a1a2e;color
   <div id="drawIndicator">🖊 그리기 모드 — 클릭으로 점 추가, 더블클릭으로 완료 (ESC 취소)</div>
   <!-- 측정 모드 표시 -->
   <div id="measureIndicator"></div>
+  <!-- 면적 합계 패널 -->
+  <div id="measureTotal" style="position:absolute;bottom:50px;left:50%;transform:translateX(-50%);z-index:50;background:rgba(139,92,246,0.92);color:#fff;padding:8px 16px;border-radius:8px;font-size:13px;font-weight:700;display:none;backdrop-filter:blur(8px);white-space:nowrap"></div>
   <!-- 지도 버튼들 -->
   <div id="mapBtns">
     <button onclick="startMeasure('distance')">📏 거리 측정</button>
     <button onclick="startMeasure('area')">📐 면적 측정</button>
+    <button onclick="clearLastMeasure()" title="마지막 측정 하나 삭제">🧹 되돌리기</button>
+    <button onclick="clearAllMeasure()" title="측정 전부 삭제">🗑️ 측정 지우기</button>
     <button onclick="saveMapPos()">📍 현재위치 기본설정</button>
     <button onclick="clearSearchPin()">🔍 핀 제거</button>
   </div>
@@ -218,7 +222,8 @@ body{font-family:'Pretendard','Noto Sans KR',sans-serif;background:#1a1a2e;color
     <div class="ctx-item" onclick="ctxAction('distance')">📏 거리 측정</div>
     <div class="ctx-item" onclick="ctxAction('area')">📐 면적 측정</div>
     <div class="ctx-sep"></div>
-    <div class="ctx-item" onclick="ctxAction('clearMeasure')">🗑️ 측정 지우기</div>
+    <div class="ctx-item" onclick="ctxAction('undo')">🧹 마지막 측정 삭제</div>
+    <div class="ctx-item" onclick="ctxAction('clearMeasure')">🗑️ 측정 전부 지우기</div>
     <div class="ctx-item" onclick="ctxAction('clearPin')">🔍 핀 제거</div>
     <div class="ctx-sep"></div>
     <div class="ctx-item" onclick="ctxAction('savePos')">📍 현재위치 기본설정</div>
@@ -506,7 +511,8 @@ function getDisplayNum(it){
 var _searchPin=null, _searchPinLabel=null;
 
 // ══ 측정 모드 ══
-var _measure=null; // {type:'distance'|'area', points:[], lines:[], labels:[], polygon:null, dots:[]}
+var _measure=null; // 현재 진행 중인 측정
+var _measureResults=[]; // 완료된 측정 결과 [{type,area,dist,gfx:[]}]
 
 function startMeasure(type){
   if(_drawMode){toast('그리기 모드를 먼저 종료하세요',true);return;}
@@ -515,55 +521,76 @@ function startMeasure(type){
   map.setCursor('crosshair');
   var ind=document.getElementById('measureIndicator');
   ind.style.display='block';
-  ind.textContent=type==='distance'?'📏 거리 측정 — 클릭으로 점 추가, 더블클릭으로 완료 (ESC 취소)':'📐 면적 측정 — 클릭으로 꼭짓점 추가, 더블클릭으로 닫기 (ESC 취소)';
+  if(type==='distance') ind.textContent='📏 거리 측정 — 클릭으로 점 추가, 더블클릭으로 완료 (ESC 취소)';
+  else ind.textContent='📐 면적 측정 — 클릭으로 꼭짓점 추가, 더블클릭으로 닫기 (ESC 취소)';
+  _updateMeasureTotal();
 }
 
 function cancelMeasureMode(){
   if(!_measure)return;
-  // 그래픽은 남기고 모드만 해제
   _measure=null;
   map.setCursor('');
   document.getElementById('measureIndicator').style.display='none';
 }
 
 function clearAllMeasure(){
-  // 모든 측정 그래픽 제거
-  (_measureGfx||[]).forEach(function(g){
-    try{g.setMap(null);}catch(e){}
+  _measureResults.forEach(function(r){
+    r.gfx.forEach(function(g){try{g.setMap(null);}catch(e){}});
   });
-  _measureGfx=[];
+  _measureResults=[];
   cancelMeasureMode();
+  _updateMeasureTotal();
+  toast('측정 결과 전부 삭제');
 }
-var _measureGfx=[];
+
+// 마지막 측정 하나 지우기
+function clearLastMeasure(){
+  if(!_measureResults.length){toast('지울 측정이 없습니다',true);return;}
+  var last=_measureResults.pop();
+  last.gfx.forEach(function(g){try{g.setMap(null);}catch(e){}});
+  _updateMeasureTotal();
+  toast('마지막 측정 삭제');
+}
+
+// 면적 합산 표시
+function _updateMeasureTotal(){
+  var areas=_measureResults.filter(function(r){return r.type==='area'});
+  var panel=document.getElementById('measureTotal');
+  if(!panel)return;
+  if(!areas.length){panel.style.display='none';return;}
+  var total=0;
+  areas.forEach(function(r){total+=r.area});
+  panel.style.display='block';
+  panel.innerHTML='📐 면적 합계: <b>'+_fmtArea(total)+'</b> ('+areas.length+'개)'
+    +'<button onclick="clearLastMeasure()" style="margin-left:8px;padding:2px 8px;border:none;border-radius:4px;background:#ef4444;color:#fff;font-size:11px;font-weight:700;cursor:pointer" title="마지막 측정 삭제">🧹 되돌리기</button>'
+    +'<button onclick="clearAllMeasure()" style="margin-left:4px;padding:2px 8px;border:none;border-radius:4px;background:#475569;color:#fff;font-size:11px;font-weight:700;cursor:pointer" title="전체 삭제">🗑️ 전체 지우기</button>';
+}
 
 function _measureClick(latLng){
   if(!_measure)return;
   var pt={lat:latLng.getLat(),lng:latLng.getLng()};
   _measure.points.push(pt);
+  var color=_measure.type==='distance'?'#10b981':'#8b5cf6';
   // 점 마커
   var dot=new kakao.maps.CustomOverlay({
     position:latLng,
-    content:'<div style="width:10px;height:10px;background:#10b981;border:2px solid #fff;border-radius:50%;box-shadow:0 1px 4px rgba(0,0,0,0.4)"></div>',
+    content:'<div style="width:10px;height:10px;background:'+color+';border:2px solid #fff;border-radius:50%;box-shadow:0 1px 4px rgba(0,0,0,0.4)"></div>',
     yAnchor:0.5,xAnchor:0.5
   });
   dot.setMap(map);
   _measure.dots.push(dot);
-  _measureGfx.push(dot);
 
   var pts=_measure.points;
   if(pts.length>=2){
     var p1=pts[pts.length-2],p2=pts[pts.length-1];
-    // 구간 선
     var line=new kakao.maps.Polyline({
       path:[new kakao.maps.LatLng(p1.lat,p1.lng),new kakao.maps.LatLng(p2.lat,p2.lng)],
-      strokeWeight:3,strokeColor:_measure.type==='distance'?'#10b981':'#8b5cf6',strokeOpacity:0.9,strokeStyle:'solid'
+      strokeWeight:3,strokeColor:color,strokeOpacity:0.9,strokeStyle:'solid'
     });
     line.setMap(map);
     _measure.lines.push(line);
-    _measureGfx.push(line);
 
     if(_measure.type==='distance'){
-      // 구간 거리 라벨
       var segDist=_calcDist(p1,p2);
       var totalDist=0;
       for(var i=1;i<pts.length;i++) totalDist+=_calcDist(pts[i-1],pts[i]);
@@ -575,7 +602,6 @@ function _measureClick(latLng){
       });
       lbl.setMap(map);
       _measure.labels.push(lbl);
-      _measureGfx.push(lbl);
     }
   }
   // 면적 미리보기
@@ -583,64 +609,97 @@ function _measureClick(latLng){
     if(_measure.polygon){_measure.polygon.setMap(null);}
     _measure.polygon=new kakao.maps.Polygon({
       path:pts.map(function(p){return new kakao.maps.LatLng(p.lat,p.lng)}),
-      strokeWeight:2,strokeColor:'#8b5cf6',strokeOpacity:0.8,
-      fillColor:'#8b5cf6',fillOpacity:0.2
+      strokeWeight:2,strokeColor:color,strokeOpacity:0.8,
+      fillColor:color,fillOpacity:0.2
     });
     _measure.polygon.setMap(map);
-    _measureGfx.push(_measure.polygon);
   }
 }
 
 function _measureFinish(){
   if(!_measure)return;
   var pts=_measure.points;
+  // 이 측정의 모든 그래픽을 수집
+  var gfx=[].concat(_measure.dots).concat(_measure.lines).concat(_measure.labels);
+
   if(_measure.type==='distance'){
     if(pts.length<2){cancelMeasureMode();return;}
     var total=0;
     for(var i=1;i<pts.length;i++) total+=_calcDist(pts[i-1],pts[i]);
-    // 마지막 점에 총 거리 라벨
     var last=pts[pts.length-1];
     var lbl=new kakao.maps.CustomOverlay({
       position:new kakao.maps.LatLng(last.lat,last.lng),
-      content:'<div class="measure-label" style="background:#10b981;font-size:13px">📏 총 거리: '+_fmtDist(total)+'</div>',
+      content:'<div class="measure-label" style="background:#10b981;font-size:13px">📏 총 '+_fmtDist(total)+'</div>',
       yAnchor:2.2
     });
     lbl.setMap(map);
-    _measureGfx.push(lbl);
+    gfx.push(lbl);
+    _measureResults.push({type:'distance',dist:total,area:0,gfx:gfx});
     toast('📏 총 거리: '+_fmtDist(total));
   } else {
     if(pts.length<3){cancelMeasureMode();return;}
-    // 닫힌 다각형
-    if(_measure.polygon){_measure.polygon.setMap(null);var idx=_measureGfx.indexOf(_measure.polygon);if(idx>=0)_measureGfx.splice(idx,1);}
-    // 마지막 선 연결
+    // 미리보기 폴리곤 제거
+    if(_measure.polygon){_measure.polygon.setMap(null);}
+    // 닫는 선
     var closeLine=new kakao.maps.Polyline({
       path:[new kakao.maps.LatLng(pts[pts.length-1].lat,pts[pts.length-1].lng),new kakao.maps.LatLng(pts[0].lat,pts[0].lng)],
       strokeWeight:3,strokeColor:'#8b5cf6',strokeOpacity:0.9,strokeStyle:'solid'
     });
     closeLine.setMap(map);
-    _measureGfx.push(closeLine);
+    gfx.push(closeLine);
+    // 최종 폴리곤
     var poly=new kakao.maps.Polygon({
       path:pts.map(function(p){return new kakao.maps.LatLng(p.lat,p.lng)}),
       strokeWeight:2,strokeColor:'#8b5cf6',strokeOpacity:0.9,
       fillColor:'#8b5cf6',fillOpacity:0.25
     });
     poly.setMap(map);
-    _measureGfx.push(poly);
+    gfx.push(poly);
     var area=_calcArea(pts);
+    var peri=0;
+    for(var i=0;i<pts.length;i++) peri+=_calcDist(pts[i],pts[(i+1)%pts.length]);
     var center=pathCenter(pts);
+    // 개별 면적 라벨 (X 버튼으로 삭제 가능)
+    var mIdx=_measureResults.length;
+    var lblEl=document.createElement('div');
+    lblEl.className='measure-label';
+    lblEl.style.background='#8b5cf6';
+    lblEl.style.fontSize='13px';
+    lblEl.style.cursor='default';
+    lblEl.innerHTML='📐 '+_fmtArea(area)+' <span onclick="_delMeasure('+mIdx+')" style="cursor:pointer;margin-left:4px;color:#fca5a5" title="이 측정 삭제">✕</span>';
     var lbl=new kakao.maps.CustomOverlay({
       position:new kakao.maps.LatLng(center.lat,center.lng),
-      content:'<div class="measure-label" style="background:#8b5cf6;font-size:13px">📐 면적: '+_fmtArea(area)+'</div>',
+      content:lblEl,
       yAnchor:0.5
     });
     lbl.setMap(map);
-    _measureGfx.push(lbl);
-    // 둘레도 표시
-    var peri=0;
-    for(var i=0;i<pts.length;i++) peri+=_calcDist(pts[i],pts[(i+1)%pts.length]);
+    gfx.push(lbl);
+    _measureResults.push({type:'area',area:area,dist:peri,gfx:gfx});
     toast('📐 면적: '+_fmtArea(area)+' / 둘레: '+_fmtDist(peri));
   }
   cancelMeasureMode();
+  _updateMeasureTotal();
+}
+
+// 개별 측정 삭제
+function _delMeasure(idx){
+  if(!_measureResults[idx])return;
+  _measureResults[idx].gfx.forEach(function(g){try{g.setMap(null);}catch(e){}});
+  _measureResults.splice(idx,1);
+  // 라벨의 삭제 버튼 인덱스 갱신 — 남은 결과에 새 인덱스 부여
+  _measureResults.forEach(function(r,i){
+    r.gfx.forEach(function(g){
+      try{
+        var el=g.getContent();
+        if(typeof el==='object'&&el.querySelector){
+          var btn=el.querySelector('span[onclick]');
+          if(btn) btn.setAttribute('onclick','_delMeasure('+i+')');
+        }
+      }catch(e){}
+    });
+  });
+  _updateMeasureTotal();
+  toast('측정 삭제됨');
 }
 
 // 두 점 거리 (m) — Haversine
@@ -691,6 +750,7 @@ function ctxAction(act){
   if(act==='save') saveAll();
   else if(act==='distance') startMeasure('distance');
   else if(act==='area') startMeasure('area');
+  else if(act==='undo') clearLastMeasure();
   else if(act==='clearMeasure') clearAllMeasure();
   else if(act==='clearPin') clearSearchPin();
   else if(act==='savePos') saveMapPos();
