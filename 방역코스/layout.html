@@ -122,6 +122,16 @@ body{font-family:'Pretendard','Noto Sans KR',sans-serif;background:#1a1a2e;color
 .pin-close{background:none;border:none;color:#94a3b8;cursor:pointer;font-size:12px;margin-left:4px}
 .pin-close:hover{color:#fff}
 
+/* 측정 모드 표시 */
+#measureIndicator{position:absolute;top:52px;left:50%;transform:translateX(-50%);z-index:50;background:rgba(16,185,129,0.92);color:#fff;padding:8px 16px;border-radius:8px;font-size:12px;font-weight:700;display:none;backdrop-filter:blur(8px);white-space:nowrap}
+.measure-label{background:rgba(0,0,0,0.75);color:#fff;padding:4px 8px;border-radius:4px;font-size:12px;font-weight:700;white-space:nowrap;pointer-events:none}
+
+/* 우클릭 메뉴 */
+#ctxMenu{position:fixed;z-index:600;background:#1e293b;border:1px solid #334155;border-radius:10px;padding:4px 0;min-width:180px;box-shadow:0 8px 30px rgba(0,0,0,0.5);display:none}
+#ctxMenu .ctx-item{display:flex;align-items:center;gap:8px;padding:9px 16px;color:#e2e8f0;font-size:13px;cursor:pointer;white-space:nowrap}
+#ctxMenu .ctx-item:hover{background:rgba(59,130,246,0.2)}
+#ctxMenu .ctx-sep{height:1px;background:#334155;margin:4px 0}
+
 /* 반응형 */
 @media(max-width:700px){
   #sidebar{position:fixed;left:0;top:0;z-index:300;width:280px;min-width:280px;box-shadow:4px 0 20px rgba(0,0,0,0.5)}
@@ -192,10 +202,26 @@ body{font-family:'Pretendard','Noto Sans KR',sans-serif;background:#1a1a2e;color
   </div>
   <!-- 그리기 모드 표시 -->
   <div id="drawIndicator">🖊 그리기 모드 — 클릭으로 점 추가, 더블클릭으로 완료 (ESC 취소)</div>
+  <!-- 측정 모드 표시 -->
+  <div id="measureIndicator"></div>
   <!-- 지도 버튼들 -->
   <div id="mapBtns">
+    <button onclick="startMeasure('distance')">📏 거리 측정</button>
+    <button onclick="startMeasure('area')">📐 면적 측정</button>
     <button onclick="saveMapPos()">📍 현재위치 기본설정</button>
     <button onclick="clearSearchPin()">🔍 핀 제거</button>
+  </div>
+  <!-- 우클릭 메뉴 -->
+  <div id="ctxMenu">
+    <div class="ctx-item" onclick="ctxAction('save')">💾 저장</div>
+    <div class="ctx-sep"></div>
+    <div class="ctx-item" onclick="ctxAction('distance')">📏 거리 측정</div>
+    <div class="ctx-item" onclick="ctxAction('area')">📐 면적 측정</div>
+    <div class="ctx-sep"></div>
+    <div class="ctx-item" onclick="ctxAction('clearMeasure')">🗑️ 측정 지우기</div>
+    <div class="ctx-item" onclick="ctxAction('clearPin')">🔍 핀 제거</div>
+    <div class="ctx-sep"></div>
+    <div class="ctx-item" onclick="ctxAction('savePos')">📍 현재위치 기본설정</div>
   </div>
   <div id="legend"></div>
 </div>
@@ -479,6 +505,197 @@ function getDisplayNum(it){
 // ══ 검색 핀 ══
 var _searchPin=null, _searchPinLabel=null;
 
+// ══ 측정 모드 ══
+var _measure=null; // {type:'distance'|'area', points:[], lines:[], labels:[], polygon:null, dots:[]}
+
+function startMeasure(type){
+  if(_drawMode){toast('그리기 모드를 먼저 종료하세요',true);return;}
+  cancelMeasureMode();
+  _measure={type:type, points:[], lines:[], labels:[], polygon:null, dots:[]};
+  map.setCursor('crosshair');
+  var ind=document.getElementById('measureIndicator');
+  ind.style.display='block';
+  ind.textContent=type==='distance'?'📏 거리 측정 — 클릭으로 점 추가, 더블클릭으로 완료 (ESC 취소)':'📐 면적 측정 — 클릭으로 꼭짓점 추가, 더블클릭으로 닫기 (ESC 취소)';
+}
+
+function cancelMeasureMode(){
+  if(!_measure)return;
+  // 그래픽은 남기고 모드만 해제
+  _measure=null;
+  map.setCursor('');
+  document.getElementById('measureIndicator').style.display='none';
+}
+
+function clearAllMeasure(){
+  // 모든 측정 그래픽 제거
+  (_measureGfx||[]).forEach(function(g){
+    try{g.setMap(null);}catch(e){}
+  });
+  _measureGfx=[];
+  cancelMeasureMode();
+}
+var _measureGfx=[];
+
+function _measureClick(latLng){
+  if(!_measure)return;
+  var pt={lat:latLng.getLat(),lng:latLng.getLng()};
+  _measure.points.push(pt);
+  // 점 마커
+  var dot=new kakao.maps.CustomOverlay({
+    position:latLng,
+    content:'<div style="width:10px;height:10px;background:#10b981;border:2px solid #fff;border-radius:50%;box-shadow:0 1px 4px rgba(0,0,0,0.4)"></div>',
+    yAnchor:0.5,xAnchor:0.5
+  });
+  dot.setMap(map);
+  _measure.dots.push(dot);
+  _measureGfx.push(dot);
+
+  var pts=_measure.points;
+  if(pts.length>=2){
+    var p1=pts[pts.length-2],p2=pts[pts.length-1];
+    // 구간 선
+    var line=new kakao.maps.Polyline({
+      path:[new kakao.maps.LatLng(p1.lat,p1.lng),new kakao.maps.LatLng(p2.lat,p2.lng)],
+      strokeWeight:3,strokeColor:_measure.type==='distance'?'#10b981':'#8b5cf6',strokeOpacity:0.9,strokeStyle:'solid'
+    });
+    line.setMap(map);
+    _measure.lines.push(line);
+    _measureGfx.push(line);
+
+    if(_measure.type==='distance'){
+      // 구간 거리 라벨
+      var segDist=_calcDist(p1,p2);
+      var totalDist=0;
+      for(var i=1;i<pts.length;i++) totalDist+=_calcDist(pts[i-1],pts[i]);
+      var midLat=(p1.lat+p2.lat)/2,midLng=(p1.lng+p2.lng)/2;
+      var lbl=new kakao.maps.CustomOverlay({
+        position:new kakao.maps.LatLng(midLat,midLng),
+        content:'<div class="measure-label">'+_fmtDist(segDist)+(pts.length>2?' (총 '+_fmtDist(totalDist)+')':'')+'</div>',
+        yAnchor:1.5
+      });
+      lbl.setMap(map);
+      _measure.labels.push(lbl);
+      _measureGfx.push(lbl);
+    }
+  }
+  // 면적 미리보기
+  if(_measure.type==='area'&&pts.length>=3){
+    if(_measure.polygon){_measure.polygon.setMap(null);}
+    _measure.polygon=new kakao.maps.Polygon({
+      path:pts.map(function(p){return new kakao.maps.LatLng(p.lat,p.lng)}),
+      strokeWeight:2,strokeColor:'#8b5cf6',strokeOpacity:0.8,
+      fillColor:'#8b5cf6',fillOpacity:0.2
+    });
+    _measure.polygon.setMap(map);
+    _measureGfx.push(_measure.polygon);
+  }
+}
+
+function _measureFinish(){
+  if(!_measure)return;
+  var pts=_measure.points;
+  if(_measure.type==='distance'){
+    if(pts.length<2){cancelMeasureMode();return;}
+    var total=0;
+    for(var i=1;i<pts.length;i++) total+=_calcDist(pts[i-1],pts[i]);
+    // 마지막 점에 총 거리 라벨
+    var last=pts[pts.length-1];
+    var lbl=new kakao.maps.CustomOverlay({
+      position:new kakao.maps.LatLng(last.lat,last.lng),
+      content:'<div class="measure-label" style="background:#10b981;font-size:13px">📏 총 거리: '+_fmtDist(total)+'</div>',
+      yAnchor:2.2
+    });
+    lbl.setMap(map);
+    _measureGfx.push(lbl);
+    toast('📏 총 거리: '+_fmtDist(total));
+  } else {
+    if(pts.length<3){cancelMeasureMode();return;}
+    // 닫힌 다각형
+    if(_measure.polygon){_measure.polygon.setMap(null);var idx=_measureGfx.indexOf(_measure.polygon);if(idx>=0)_measureGfx.splice(idx,1);}
+    // 마지막 선 연결
+    var closeLine=new kakao.maps.Polyline({
+      path:[new kakao.maps.LatLng(pts[pts.length-1].lat,pts[pts.length-1].lng),new kakao.maps.LatLng(pts[0].lat,pts[0].lng)],
+      strokeWeight:3,strokeColor:'#8b5cf6',strokeOpacity:0.9,strokeStyle:'solid'
+    });
+    closeLine.setMap(map);
+    _measureGfx.push(closeLine);
+    var poly=new kakao.maps.Polygon({
+      path:pts.map(function(p){return new kakao.maps.LatLng(p.lat,p.lng)}),
+      strokeWeight:2,strokeColor:'#8b5cf6',strokeOpacity:0.9,
+      fillColor:'#8b5cf6',fillOpacity:0.25
+    });
+    poly.setMap(map);
+    _measureGfx.push(poly);
+    var area=_calcArea(pts);
+    var center=pathCenter(pts);
+    var lbl=new kakao.maps.CustomOverlay({
+      position:new kakao.maps.LatLng(center.lat,center.lng),
+      content:'<div class="measure-label" style="background:#8b5cf6;font-size:13px">📐 면적: '+_fmtArea(area)+'</div>',
+      yAnchor:0.5
+    });
+    lbl.setMap(map);
+    _measureGfx.push(lbl);
+    // 둘레도 표시
+    var peri=0;
+    for(var i=0;i<pts.length;i++) peri+=_calcDist(pts[i],pts[(i+1)%pts.length]);
+    toast('📐 면적: '+_fmtArea(area)+' / 둘레: '+_fmtDist(peri));
+  }
+  cancelMeasureMode();
+}
+
+// 두 점 거리 (m) — Haversine
+function _calcDist(a,b){
+  var R=6371000;
+  var dLat=(b.lat-a.lat)*Math.PI/180;
+  var dLng=(b.lng-a.lng)*Math.PI/180;
+  var s=Math.sin(dLat/2)*Math.sin(dLat/2)+Math.cos(a.lat*Math.PI/180)*Math.cos(b.lat*Math.PI/180)*Math.sin(dLng/2)*Math.sin(dLng/2);
+  return R*2*Math.atan2(Math.sqrt(s),Math.sqrt(1-s));
+}
+// 다각형 면적 (m²) — Shoelace + 위경도→미터 변환
+function _calcArea(pts){
+  var n=pts.length;if(n<3)return 0;
+  var cLat=0;pts.forEach(function(p){cLat+=p.lat});cLat/=n;
+  var mLat2=111320;
+  var mLng2=111320*Math.cos(cLat*Math.PI/180);
+  var sum=0;
+  for(var i=0;i<n;i++){
+    var j=(i+1)%n;
+    var x1=pts[i].lng*mLng2, y1=pts[i].lat*mLat2;
+    var x2=pts[j].lng*mLng2, y2=pts[j].lat*mLat2;
+    sum+=(x1*y2-x2*y1);
+  }
+  return Math.abs(sum)/2;
+}
+function _fmtDist(m){
+  if(m>=1000) return (m/1000).toFixed(2)+'km';
+  return m.toFixed(1)+'m';
+}
+function _fmtArea(a){
+  if(a>=10000) return (a/10000).toFixed(2)+'만㎡ (≈'+(a/3.3058).toFixed(0)+'평)';
+  if(a>=1000) return a.toFixed(0)+'㎡ (≈'+(a/3.3058).toFixed(0)+'평)';
+  return a.toFixed(1)+'㎡ (≈'+(a/3.3058).toFixed(1)+'평)';
+}
+
+// ══ 우클릭 메뉴 ══
+function _showCtxMenu(x,y){
+  var m=document.getElementById('ctxMenu');
+  m.style.left=x+'px';m.style.top=y+'px';m.style.display='block';
+  // 화면 밖 보정
+  var r=m.getBoundingClientRect();
+  if(r.right>window.innerWidth) m.style.left=(x-r.width)+'px';
+  if(r.bottom>window.innerHeight) m.style.top=(y-r.height)+'px';
+}
+function _hideCtxMenu(){document.getElementById('ctxMenu').style.display='none';}
+function ctxAction(act){
+  _hideCtxMenu();
+  if(act==='save') saveAll();
+  else if(act==='distance') startMeasure('distance');
+  else if(act==='area') startMeasure('area');
+  else if(act==='clearMeasure') clearAllMeasure();
+  else if(act==='clearPin') clearSearchPin();
+  else if(act==='savePos') saveMapPos();
+}
+
 // ══ 미터↔위경도 ══
 var M_LAT=111320;
 function mLng(lat){return 111320*Math.cos(lat*Math.PI/180)}
@@ -501,6 +718,11 @@ function initMap(){
 
   // 지도 클릭
   kakao.maps.event.addListener(map,'click',function(e){
+    _hideCtxMenu();
+    if(_measure){
+      _measureClick(e.latLng);
+      return;
+    }
     if(_drawMode){
       _drawMode.points.push({lat:e.latLng.getLat(),lng:e.latLng.getLng()});
       updateDrawPreview();
@@ -509,17 +731,36 @@ function initMap(){
     deselectItem();
   });
 
-  // 더블클릭 → 그리기 완료
+  // 더블클릭 → 그리기/측정 완료
   kakao.maps.event.addListener(map,'dblclick',function(e){
+    if(_measure){
+      e.preventDefault && e.preventDefault();
+      _measureFinish();
+      return;
+    }
     if(_drawMode){
       e.preventDefault && e.preventDefault();
       finishDraw();
     }
   });
 
-  // ESC → 그리기 취소
+  // ESC → 그리기/측정 취소
   document.addEventListener('keydown',function(e){
-    if(e.key==='Escape'&&_drawMode)cancelDraw();
+    if(e.key==='Escape'){
+      if(_measure){cancelMeasureMode();return;}
+      if(_drawMode)cancelDraw();
+    }
+  });
+
+  // 우클릭 메뉴
+  var mapEl2=document.getElementById('map');
+  mapEl2.addEventListener('contextmenu',function(e){
+    e.preventDefault();
+    if(_measure||_drawMode)return;
+    _showCtxMenu(e.clientX,e.clientY);
+  });
+  document.addEventListener('click',function(e){
+    if(!document.getElementById('ctxMenu').contains(e.target))_hideCtxMenu();
   });
 
   // ── DOM 레벨 드래그 (마우스 + 터치) ──
