@@ -4,9 +4,9 @@
     {
       "name": "dano",
       "runtimeExecutable": "npx",
-      "runtimeArgs": ["http-server", ".", "-c-1"],
+      "runtimeArgs": ["http-server", ".", "-c-1", "-p", "8090"],
       "port": 8090,
-      "autoPort": true
+      "autoPort": false
     }
   ]
 }

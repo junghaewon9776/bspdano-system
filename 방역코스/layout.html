@@ -514,18 +514,7 @@ function initMap(){
     if(e.key==='Escape'&&_drawMode)cancelDraw();
   });
 
-  // ── 전역 드래그 핸들러 (카카오맵 이벤트 — DOM 핸들러와 병행) ──
-  kakao.maps.event.addListener(map,'mousemove',function(e){
-    if(!_drag.active)return;
-    var it=items[_drag.idx];if(!it)return;
-    _doDragMove(it,e.point.x,e.point.y);
-  });
-  kakao.maps.event.addListener(map,'mouseup',function(){
-    if(!_drag.active)return;
-    _doDragEnd();
-  });
-
-  // ── DOM 레벨 드래그 (터치 + 마우스 보완) ──
+  // ── DOM 레벨 드래그 (마우스 + 터치) ──
   var mapEl=document.getElementById('map');
   document.addEventListener('mousemove',function(ev){
     if(!_drag.active)return;
