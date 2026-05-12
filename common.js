@@ -903,7 +903,7 @@ function _apiNotifyLogin(p) {
   if (!botToken || !chatIds) return Promise.resolve({ok:true});
 
   // 역할 라벨
-  var roleMap = {super:"🔴 SUPER", admin:"🟠 관리자", subAdm:"🟡 부관리자"};
+  var roleMap = {super:"⚡ SUPER", admin:"👑 ADMIN", subAdm:"🛡️ SUBADMIN"};
   var roleLabel = roleMap[p.role] || "🟢 일반";
   // UA → 기기 파싱
   var dev = "";
