@@ -2894,8 +2894,8 @@ function applyConfigOpen(){
     var evtId = (CUR_EVT && CUR_EVT.evtId) || "";
     var webapp = String(r.webappUrl || "").trim();
     var baseUrl = location.href.split("?")[0].split("#")[0];
-    var _eid2=evtId||"DO2026";
-    var builtinLink = baseUrl+"?p=applyform&evtId="+encodeURIComponent(_eid2);
+    var _eid2=evtId||"SJ2026";
+    var builtinLink = baseUrl+"?apply=1&evtId="+encodeURIComponent(_eid2);
     var displayUrl = webapp || builtinLink;
     h+='<div class="card" style="background:#eff6ff;border:1px solid #bfdbfe;padding:10px 14px;margin-bottom:14px">';
     h+='<div style="font-weight:600;margin-bottom:6px">🔗 신청폼 URL <span class="mut" style="font-weight:400;font-size:12px">(카톡/문자로 공유)</span></div>';
@@ -2912,10 +2912,10 @@ function applyConfigOpen(){
     h+='</div>';
 
     h+='<label style="font-weight:600;display:block;margin-top:10px">📅 접수 시작일 <span class="mut" style="font-weight:400">(비우면 즉시 시작)</span></label>';
-    h+='<input id="cfgStart" type="date" value="'+esc(r.start||"")+'" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;margin-top:4px">';
+    h+='<input id="cfgStart" type="date" value="'+esc(r.startDt||r.start||"")+'" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;margin-top:4px">';
 
     h+='<label style="font-weight:600;display:block;margin-top:12px">⏰ 접수 마감일 <span class="mut" style="font-weight:400">(비우면 무기한, 해당일 23:59 까지)</span></label>';
-    h+='<input id="cfgDeadline" type="date" value="'+esc(r.deadline||"")+'" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;margin-top:4px">';
+    h+='<input id="cfgDeadline" type="date" value="'+esc(r.endDt||r.deadline||"")+'" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;margin-top:4px">';
 
     h+='<label style="font-weight:600;display:block;margin-top:12px">🔀 상태 오버라이드</label>';
     h+='<select id="cfgStatus" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;margin-top:4px">';
@@ -2943,6 +2943,10 @@ function applyConfigOpen(){
 
     h+='<label style="font-weight:600;display:block;margin-top:12px">📢 안내 메시지 <span class="mut" style="font-weight:400">(마감/대기 화면에 표시)</span></label>';
     h+='<textarea id="cfgNotice" rows="2" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;margin-top:4px;font-family:inherit" placeholder="예) 정원 마감되어 접수를 조기종료합니다. 문의: 010-...">'+esc(r.notice||"")+'</textarea>';
+
+    h+='<label style="font-weight:600;display:block;margin-top:12px">📤 Drive 업로드 URL <span class="mut" style="font-weight:400">(첨부파일 업로드용 Apps Script URL)</span></label>';
+    h+='<input id="cfgDriveUploadUrl" type="text" value="'+esc(r.driveUploadUrl||"")+'" placeholder="https://script.google.com/macros/s/.../exec" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;margin-top:4px">';
+    h+='<div class="mut" style="font-size:11px;margin-top:3px">· 참가신청서/통장사본/등본 파일을 Google Drive에 업로드하는 Apps Script 웹앱 URL · 미설정 시 파일 첨부 불가</div>';
 
     h+='<label style="font-weight:600;display:block;margin-top:12px">📥 참가신청서 양식 — HWP/주 (편집용) <span class="mut" style="font-weight:400">(구글드라이브 공유링크)</span></label>';
     h+='<input id="cfgFormUrl" type="text" value="'+esc(r.formUrl||"")+'" placeholder="https://drive.google.com/file/d/.../view?usp=sharing" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;margin-top:4px">';
@@ -2989,8 +2993,9 @@ function applyConfigSave(){
   var notice   = document.getElementById("cfgNotice").value;
   var formUrl  = document.getElementById("cfgFormUrl").value;
   var formUrlPdf = (document.getElementById("cfgFormUrlPdf")||{}).value || "";
+  var driveUploadUrl = (document.getElementById("cfgDriveUploadUrl")||{}).value || "";
   var wuEl = document.getElementById("cfgWebappUrl");
-  var payload = {id:CID,start:start,deadline:deadline,status:status,notice:notice,formUrl:formUrl,formUrlPdf:formUrlPdf};
+  var payload = {id:CID,startDt:start,endDt:deadline,status:status,notice:notice,formUrl:formUrl,formUrlPdf:formUrlPdf,driveUploadUrl:driveUploadUrl};
   if (wuEl) payload.webappUrl = (wuEl.value||"").trim();
   if(_cfgCats.length) payload.cats=_cfgCats;
   if (start && deadline && start > deadline){

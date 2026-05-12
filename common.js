@@ -284,7 +284,7 @@ function _dispatch(p) {
         case "listApply":      _apiListApply(p).then(resolve); return;
         case "getApplyConfig": _apiGetApplyConfig(p).then(resolve); return;
         case "setApplyConfig":
-        case "saveApplyConfig":{var _ac={status:p.status,startDt:p.startDt,endDt:p.endDt,notice:p.notice,webappUrl:p.webappUrl};if(p.cats)_ac.cats=p.cats;if(p.formUrl!==undefined)_ac.formUrl=p.formUrl;if(p.formUrlPdf!==undefined)_ac.formUrlPdf=p.formUrlPdf;_apiSetConfig(Object.assign({},p,{key:"APPLY_CONFIG",value:JSON.stringify(_ac)})).then(function(){resolve({ok:true})});return;}
+        case "saveApplyConfig":{var _ac={status:p.status,startDt:p.startDt,endDt:p.endDt,notice:p.notice,webappUrl:p.webappUrl};if(p.cats)_ac.cats=p.cats;if(p.formUrl!==undefined)_ac.formUrl=p.formUrl;if(p.formUrlPdf!==undefined)_ac.formUrlPdf=p.formUrlPdf;if(p.driveUploadUrl!==undefined)_ac.driveUploadUrl=p.driveUploadUrl;_apiSetConfig(Object.assign({},p,{key:"APPLY_CONFIG",value:JSON.stringify(_ac)})).then(function(){resolve({ok:true})});return;}
         case "addApply":      _apiAddApply(p).then(resolve); return;
         case "updateApplyRow": _apiUpdateApplyRow(p).then(resolve); return;
         case "updateApply":  _apiUpdateApplyBySeq(p).then(resolve); return;
