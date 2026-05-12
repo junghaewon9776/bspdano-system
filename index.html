@@ -493,6 +493,10 @@ var APPLY_EVT_ID = "";
     if (sp.get("apply") === "1") {
       IS_APPLY_MODE = true;
       APPLY_EVT_ID = sp.get("evtId") || "";
+      // 즉시 로그인페이지 숨기고 신청폼 표시 (DOMContentLoaded 전에 실행)
+      document.getElementById("loginPage").style.display = "none";
+      document.getElementById("mainPage").style.display = "none";
+      document.getElementById("applyPage").style.display = "block";
     }
   } catch(e){}
 })();
@@ -910,6 +914,7 @@ async function doLogin(id,pw,keep,silent){
   var single = (EVENTS.length === 1);
   CUR_EVT = single ? EVENTS[0] : null;
 
+  if (IS_APPLY_MODE) return false; // 신청폼 모드면 시스템 진입 차단
   document.getElementById("loginPage").style.display="none";
   document.getElementById("mainPage").style.display="block";
   document.getElementById("uBadge").textContent=isA()?"관리자":ME.nm;
