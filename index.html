@@ -738,6 +738,7 @@ function fixDates(){for(var i=0;i<acts.length;i++)acts[i].dt=normD(acts[i].dt);f
 function showPh(el){var big=el.src.replace(/sz=w\d+/,"sz=w2000");document.getElementById("pImg").src=big;document.getElementById("pModal").className="modal show"}
 function pb(p,c){p=Math.min(100,Math.max(0,p));return'<div class="pbar"><div class="pfill" style="width:'+p+"%;background:"+c+'"></div></div>'}
 function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+function telLink(v){var s=String(v||"");var d=s.replace(/[^0-9]/g,"");if(d.length<9)return esc(s)||"-";return '<a href="tel:'+d+'" style="color:inherit;text-decoration:underline dotted;cursor:pointer" onclick="event.stopPropagation()" title="📞 전화걸기">'+esc(s)+'</a>'}
 function openPopup(html,w){var b=document.getElementById("popBody");b.innerHTML=html;b.style.width=w?(w+"px"):"";b.style.maxWidth="100%";document.getElementById("popup").className="popup show"}
 // 2단계 팝업 (기존 팝업 위에 오버레이로 표시)
 function openPopup2(html,w){var b=document.getElementById("popBody2");b.innerHTML=html;b.style.width=w?(w+"px"):"";b.style.maxWidth="100%";document.getElementById("popup2").className="popup show";document.getElementById("popup2").style.zIndex="1000";}
@@ -1721,6 +1722,7 @@ function dApply(){
           h+='<td style="padding:8px;border-bottom:1px solid #f1f5f9;text-align:center" title="'+esc(hd)+'">'+cell+'</td>';
         } else {
           if(/^https?:\/\//.test(s)) cell='<a href="'+esc(s)+'" target="_blank" rel="noopener" onclick="event.stopPropagation()">열기</a>';
+          else if(/연락처|휴대폰|전화번호|핸드폰/.test(hd)) cell=telLink(s);
           else cell=esc(s);
           var absStyle=isAbsent?'color:#9ca3af;text-decoration:line-through;':'';
           h+='<td style="padding:8px;border-bottom:1px solid #f1f5f9;white-space:nowrap;max-width:220px;overflow:hidden;text-overflow:ellipsis;'+absStyle+'" title="'+esc(s)+'">'+cell+'</td>';
@@ -2477,6 +2479,7 @@ function applyDetail(seq){
     var s=String(row[i]==null?"":row[i]);
     var cell;
     if(/^https?:\/\//.test(s)) cell='<a href="'+esc(s)+'" target="_blank" rel="noopener">열기 ↗</a>';
+    else if(/연락처|휴대폰|전화번호|핸드폰/.test(hd)) cell=telLink(s);
     else cell=esc(s).replace(/\|/g,"<br>").replace(/\n/g,"<br>");
     h+='<tr>';
     h+='<td style="padding:8px;border-bottom:1px solid #eee;background:#f8fafc;width:140px;vertical-align:top;white-space:nowrap;font-weight:600">'+esc(hd)+'</td>';
@@ -3156,6 +3159,7 @@ function _applyRenderListBody(){
           bh+='<td style="padding:8px;border-bottom:1px solid #f1f5f9;text-align:center" title="'+esc(hd2)+'">'+cell+'</td>';
         } else {
           if(/^https?:\/\//.test(s)) cell='<a href="'+esc(s)+'" target="_blank" rel="noopener" onclick="event.stopPropagation()">열기</a>';
+          else if(/연락처|휴대폰|전화번호|핸드폰/.test(hd2)) cell=telLink(s);
           else cell=esc(s);
           var absStyle2=isAbsent2?'color:#9ca3af;text-decoration:line-through;':'';
           bh+='<td style="padding:8px;border-bottom:1px solid #f1f5f9;white-space:nowrap;max-width:220px;overflow:hidden;text-overflow:ellipsis;'+absStyle2+'" title="'+esc(s)+'">'+cell+'</td>';
@@ -3529,7 +3533,7 @@ function _applySmsRenderList(){
     html += '<span style="font-weight:600;min-width:70px">'+nmH+'</span>';
     if(team) html += '<span style="font-size:12px;color:#64748b;min-width:90px">'+teamH+'</span>';
     if(catDiv) html += '<span style="font-size:11px;background:#e0e7ff;color:#3730a3;padding:2px 8px;border-radius:10px">'+esc(catDiv)+'</span>';
-    html += '<span style="margin-left:auto;font-size:12px;color:'+(hasTel?"#64748b":"#dc2626")+';font-family:monospace">'+(hasTel?esc(tel):"❌ 없음")+'</span>';
+    html += '<span style="margin-left:auto;font-size:12px;color:'+(hasTel?"#64748b":"#dc2626")+';font-family:monospace">'+(hasTel?telLink(tel):"❌ 없음")+'</span>';
     html += '</label>';
   });
   var cntEl = document.getElementById("asms_cnt");
@@ -8588,7 +8592,7 @@ function dMem(){
       var bg = st==="left" ? "#fef2f2" : (st==="new" ? "#ecfdf5" : (m.adm?"#eff6ff":"#fff"));
       var badge = st==="new" ? ' <span class="tag" style="background:#10b981;color:#fff;font-size:10px">🆕 신규</span>' : (st==="left" ? ' <span class="tag" style="background:#ef4444;color:#fff;font-size:10px">🚪 탈퇴</span>' : '');
       h+='<tr style="background:'+bg+'"><td>'+(i+1)+"</td><td>"+esc(m.nm)+badge+"</td><td><span class=\"tag tag-b\">"+esc(m.ar||"-")+"</span></td>"+
-         '<td style="color:'+(m.tel?"#333":"#ccc")+'">'+esc(m.tel||"미입력")+'</td>'+
+         '<td style="color:'+(m.tel?"#333":"#ccc")+'">'+(m.tel?telLink(m.tel):'미입력')+'</td>'+
          '<td class="mobile-hide" style="color:'+(m.bd?"#333":"#ccc")+'">'+esc(m.bd||"미입력")+'</td>'+
          '<td class="mobile-hide" style="color:'+(m.addr?"#333":"#ccc")+';font-size:11px">'+esc(m.addr||"-")+(m.zip?' ('+esc(m.zip)+')':'')+'</td>'+
          '<td class="mobile-hide" style="color:'+(m.trad?"#333":"#ccc")+';font-size:11px">'+esc(m.trad||"-")+'</td>'+
@@ -8746,7 +8750,7 @@ function _memSmsRenderList(){
   var html = '';
   list.forEach(function(m){
     var checked = _memSmsSelIds[m.id] ? "checked" : "";
-    var tel = esc(m.tel||"-");
+    var tel = telLink(m.tel);
     html += '<label style="display:flex;align-items:center;gap:8px;padding:5px 4px;border-bottom:1px solid #e5e7eb;cursor:pointer;font-size:13px">';
     html += '<input type="checkbox" '+checked+' onchange="_memSmsSelToggle(\''+esc(m.id)+'\',this.checked)" style="width:16px;height:16px">';
     html += '<span style="flex:1"><b>'+esc(m.nm||"-")+'</b> <span class="mut" style="font-size:11px">· '+esc(m.ar||"")+' · '+tel+'</span></span>';
@@ -8933,7 +8937,7 @@ function _memSmsPreview(){
     var typeColor = bytes>90 ? "#2563eb" : "#16a34a";
     inner += '<div style="border:1px solid #e5e7eb;border-radius:8px;padding:12px;margin-bottom:10px;background:#fafafa">';
     inner += '  <div style="display:flex;justify-content:space-between;font-size:12px;color:#6b7280;margin-bottom:6px">';
-    inner += '    <span><b>📱 '+esc(m.nm||"-")+'</b> · '+esc(m.ar||"")+' · '+esc(m.tel||"")+'</span>';
+    inner += '    <span><b>📱 '+esc(m.nm||"-")+'</b> · '+esc(m.ar||"")+' · '+telLink(m.tel)+'</span>';
     inner += '    <span style="color:'+typeColor+';font-weight:600">'+type+' · '+bytes+'바이트</span>';
     inner += '  </div>';
     inner += '  <div style="background:#fff;border:1px solid #e5e7eb;border-radius:6px;padding:10px;font-size:13px;white-space:pre-wrap;line-height:1.5">'+esc(personMsg)+'</div>';
@@ -9581,7 +9585,7 @@ function _feePivotView(memsOrdered, memFees, curP){
     h += '<td style="padding:4px 6px;border:1px solid #ddd;text-align:center">'+(idx+1)+'</td>';
     h += '<td style="padding:4px 6px;border:1px solid #ddd">'+esc(m.ar||"")+'</td>';
     h += '<td style="padding:4px 6px;border:1px solid #ddd;font-weight:600">'+esc(m.nm||"")+'</td>';
-    h += '<td style="padding:4px 6px;border:1px solid #ddd;font-family:monospace">'+esc(m.tel||"")+'</td>';
+    h += '<td style="padding:4px 6px;border:1px solid #ddd;font-family:monospace">'+telLink(m.tel)+'</td>';
     h += '<td style="padding:4px 6px;border:1px solid #ddd;text-align:right;color:'+carryColor+';font-weight:600">'+carryTxt+'</td>';
     // 기간별 셀 (클릭시 인라인 입력)
     periods.forEach(function(p){
