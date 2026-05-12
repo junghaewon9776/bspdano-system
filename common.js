@@ -987,7 +987,7 @@ function _apiGetApplyConfig(p) {
       else if (ac.endDt && today > ac.endDt) effective = "closed";
       else effective = "open";
     }
-    return {ok:true, status:status, effective:effective, today:today, count:(applyArr||[]).length, webappUrl:ac.webappUrl||"", startDt:ac.startDt||"", endDt:ac.endDt||"", notice:ac.notice||"", cats:ac.cats||null};
+    return {ok:true, status:status, effective:effective, today:today, count:(applyArr||[]).length, webappUrl:ac.webappUrl||"", startDt:ac.startDt||"", endDt:ac.endDt||"", notice:ac.notice||"", cats:ac.cats||null, formUrl:ac.formUrl||"", formUrlPdf:ac.formUrlPdf||""};
   });
 }
 
