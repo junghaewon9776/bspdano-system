@@ -895,15 +895,10 @@ function _upsertCfgArr(arr, key, value) {
 
 // ───────── 텔레그램 알림 ─────────
 function _apiNotifyLogin(p) {
-  // Config에서 텔레그램 설정 읽기
-  var evtId = _getEvtId(p);
-  if (!evtId) return Promise.resolve({ok:true});
-  var data = _evtCaches[evtId];
-  if (!data) return Promise.resolve({ok:true});
-  var cfg = {};
-  (data.Config || []).forEach(function(c) { if(c&&c.k) cfg[c.k]=c.v; });
-  var botToken = cfg.TELEGRAM_BOT_TOKEN;
-  var chatIds = cfg.TELEGRAM_CHAT_IDS;
+  // 시스템 설정에서 텔레그램 읽기
+  var sys = (_cache && _cache.SysConfig) || {};
+  var botToken = sys.TELEGRAM_BOT_TOKEN;
+  var chatIds = sys.TELEGRAM_CHAT_IDS;
   if (!botToken || !chatIds) return Promise.resolve({ok:true});
 
   var text = "🔐 <b>로그인</b>\nID: " + (p.id||"") + "\n행사: " + (p.evtNm||"") + "\n시각: " + now_();
@@ -1148,12 +1143,10 @@ function _apiAddApply(p) {
 
 // 참가 접수 텔레그램 알림
 function _notifyApply(evtId, row, seq) {
-  var data = _evtCaches[evtId];
-  if (!data) return;
-  var cfg = {};
-  (data.Config || []).forEach(function(c) { if(c&&c.k) cfg[c.k]=c.v; });
-  var botToken = cfg.TELEGRAM_BOT_TOKEN;
-  var chatIds = cfg.TELEGRAM_CHAT_IDS;
+  // 시스템 설정에서 텔레그램 읽기
+  var sys = (_cache && _cache.SysConfig) || {};
+  var botToken = sys.TELEGRAM_BOT_TOKEN;
+  var chatIds = sys.TELEGRAM_CHAT_IDS;
   if (!botToken || !chatIds) return;
   var cat = row["구분"] || "";
   var div = row["참가구분"] || row[_fbSafeKey("참가구분")] || "";
