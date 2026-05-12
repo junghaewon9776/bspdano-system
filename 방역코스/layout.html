@@ -243,6 +243,7 @@ body{font-family:'Pretendard','Noto Sans KR',sans-serif;background:#1a1a2e;color
       <option value="circle">원형</option>
       <option value="line">선 (경로)</option>
       <option value="polygon">다각형 (올가미)</option>
+      <option value="text">텍스트 (라벨)</option>
     </select>
     <div id="ncRectSize">
       <label>기본 크기 (가로m × 세로m)</label>
@@ -265,6 +266,10 @@ body{font-family:'Pretendard','Noto Sans KR',sans-serif;background:#1a1a2e;color
       </select>
       <label>선 굵기 (px)</label>
       <input id="ncStrokeW" type="number" value="4" min="1" max="20">
+    </div>
+    <div id="ncTextOpts" style="display:none">
+      <label>글자 크기 (px)</label>
+      <input id="ncTextSize" type="number" value="16" min="10" max="60">
     </div>
     <label>색상</label>
     <div class="color-palette" id="ncPalette"></div>
@@ -297,6 +302,7 @@ body{font-family:'Pretendard','Noto Sans KR',sans-serif;background:#1a1a2e;color
       <option value="circle">원형</option>
       <option value="line">선 (경로)</option>
       <option value="polygon">다각형 (올가미)</option>
+      <option value="text">텍스트 (라벨)</option>
     </select>
     <div id="ecRectSize">
       <label>기본 크기 (가로m × 세로m)</label>
@@ -319,6 +325,10 @@ body{font-family:'Pretendard','Noto Sans KR',sans-serif;background:#1a1a2e;color
       </select>
       <label>선 굵기 (px)</label>
       <input id="ecStrokeW" type="number" min="1" max="20">
+    </div>
+    <div id="ecTextOpts" style="display:none">
+      <label>글자 크기 (px)</label>
+      <input id="ecTextSize" type="number" min="10" max="60">
     </div>
     <label>색상 (변경 시 전체 아이템 적용)</label>
     <div class="color-palette" id="ecPalette"></div>
@@ -462,10 +472,12 @@ function _doDragMove(it,mx,my){
   var nc=proj.coordsFromContainerPoint(np);
   var dLat=nc.getLat()-_drag.slat,dLng=nc.getLng()-_drag.slng;
   it.lat=_drag.slat+dLat;it.lng=_drag.slng+dLng;
-  if(it.path&&_drag.sPath){
+  if(it.shape==='text'){
+    // 텍스트는 라벨만 이동
+  } else if(it.path&&_drag.sPath){
     it.path=_drag.sPath.map(function(p){return{lat:p.lat+dLat,lng:p.lng+dLng}});
     it._poly.setPath(it.path.map(function(p){return new kakao.maps.LatLng(p.lat,p.lng)}));
-  } else {
+  } else if(it._poly){
     var pts2;
     if(it.shape==='circle')pts2=getCirclePts(it.lat,it.lng,(it.diameter||5)/2);
     else pts2=getRectPts(it.lat,it.lng,it.w,it.h);
@@ -878,6 +890,7 @@ function shapeLabel(cat){
     return '선'+dir+' '+cat.strokeWeight+'px';
   }
   if(cat.shape==='polygon')return '다각형'+opLabel;
+  if(cat.shape==='text')return '📝 텍스트';
   return '사각형 '+cat.w+'×'+cat.h+'m'+opLabel;
 }
 
@@ -935,6 +948,7 @@ function onShapeChange(prefix){
   document.getElementById(prefix+'RectSize').style.display=v==='rect'?'block':'none';
   document.getElementById(prefix+'CircleSize').style.display=v==='circle'?'block':'none';
   document.getElementById(prefix+'LineOpts').style.display=v==='line'?'block':'none';
+  document.getElementById(prefix+'TextOpts').style.display=v==='text'?'block':'none';
 }
 document.getElementById('ncShape').addEventListener('change',function(){onShapeChange('nc')});
 document.getElementById('ecShape').addEventListener('change',function(){onShapeChange('ec')});
@@ -949,6 +963,7 @@ function showNewCatModal(){
   document.getElementById('ncShowPrefix').checked=true;
   document.getElementById('ncDirection').value='none';
   document.getElementById('ncStrokeW').value=4;
+  document.getElementById('ncTextSize').value=16;
   onShapeChange('nc');
   renderPalette('ncPalette','ncColor','#FF6B6B');
   document.getElementById('newCatModal').style.display='flex';
@@ -970,7 +985,8 @@ function createCategory(){
     prefix:document.getElementById('ncPrefix').value.trim()||name.charAt(0),
     showPrefix:document.getElementById('ncShowPrefix').checked,
     direction:document.getElementById('ncDirection').value||'none',
-    strokeWeight:parseInt(document.getElementById('ncStrokeW').value)||4
+    strokeWeight:parseInt(document.getElementById('ncStrokeW').value)||4,
+    textSize:parseInt(document.getElementById('ncTextSize').value)||16
   };
   categories.push(cat);
   renderCategories();
@@ -994,6 +1010,7 @@ function showEditCat(catId){
   document.getElementById('ecShowPrefix').checked=cat.showPrefix!==false;
   document.getElementById('ecDirection').value=cat.direction||'none';
   document.getElementById('ecStrokeW').value=cat.strokeWeight||4;
+  document.getElementById('ecTextSize').value=cat.textSize||16;
   document.getElementById('ecOpacity').value=String(cat.opacity!=null?cat.opacity:0.4);
   onShapeChange('ec');
   renderPalette('ecPalette','ecColor',cat.color);
@@ -1013,6 +1030,7 @@ function updateCategory(){
   cat.showPrefix=document.getElementById('ecShowPrefix').checked;
   cat.direction=document.getElementById('ecDirection').value||'none';
   cat.strokeWeight=parseInt(document.getElementById('ecStrokeW').value)||4;
+  cat.textSize=parseInt(document.getElementById('ecTextSize').value)||16;
   cat.opacity=parseFloat(document.getElementById('ecOpacity').value);
 
   items.forEach(function(it,i){
@@ -1057,6 +1075,28 @@ function addItem(catId){
   if(cat.shape==='line'||cat.shape==='polygon'){
     if(_drawMode){toast('이미 그리기 모드입니다',true);return}
     startDrawMode(catId);
+    return;
+  }
+
+  // 텍스트 → 입력 후 추가
+  if(cat.shape==='text'){
+    var txt=prompt('텍스트 내용을 입력하세요:','');
+    if(!txt)return;
+    var cnt=items.filter(function(it2){return it2.catId===catId}).length;
+    var c=map.getCenter();
+    var it={
+      id:nextItemId++, catId:catId,
+      num:cat.prefix+'-'+String(cnt+1).padStart(2,'0'),
+      name:txt, duty:'', phone:'', memo:'',
+      lat:c.getLat(), lng:c.getLng(),
+      shape:'text', textSize:cat.textSize||16, rotation:0
+    };
+    items.push(it);
+    drawItem(items.length-1);
+    selectItem(items.length-1);
+    renderCategories();
+    toast('"'+txt+'" 텍스트 추가');
+    autoSave();
     return;
   }
 
@@ -1121,6 +1161,36 @@ function drawItem(idx){
 
   clearItemGfx(it);
   it._arrows=[];
+
+  // 텍스트 도형 — 폴리곤 없이 라벨만
+  if(it.shape==='text'){
+    var fontSize=it.textSize||16;
+    var labelEl=document.createElement('div');
+    labelEl.style.cssText='padding:4px 10px;border-radius:6px;font-size:'+fontSize+'px;font-weight:700;white-space:nowrap;cursor:grab;user-select:none;color:'+color+';text-shadow:0 1px 3px rgba(0,0,0,0.7);background:rgba(0,0,0,0.4);border:2px solid '+color+'88';
+    labelEl.textContent=it.name||it.num;
+    // 드래그 시작 (마우스)
+    labelEl.addEventListener('mousedown',function(ev){
+      ev.preventDefault();ev.stopPropagation();
+      var mapEl=document.getElementById('map');
+      var rect=mapEl.getBoundingClientRect();
+      _drag={active:true,moved:false,idx:idx,sx:ev.clientX-rect.left,sy:ev.clientY-rect.top,slat:it.lat,slng:it.lng,sPath:null};
+      map.setDraggable(false);
+    });
+    labelEl.addEventListener('touchstart',function(ev){
+      var touch=ev.touches[0];
+      var mapEl=document.getElementById('map');
+      var rect=mapEl.getBoundingClientRect();
+      _drag={active:true,moved:false,idx:idx,sx:touch.clientX-rect.left,sy:touch.clientY-rect.top,slat:it.lat,slng:it.lng,sPath:null};
+      map.setDraggable(false);
+    },{passive:false});
+    it._label=new kakao.maps.CustomOverlay({
+      position:new kakao.maps.LatLng(it.lat,it.lng),
+      content:labelEl, yAnchor:0.5
+    });
+    it._label.setMap(map);
+    it._poly=null;
+    return;
+  }
 
   var pts;
   if(it.shape==='line'){
@@ -1345,6 +1415,7 @@ function cloneItem(dx,dy){
   var szX,szY;
   if(it.shape==='rect'){szX=it.w;szY=it.h}
   else if(it.shape==='circle'){szX=it.diameter||5;szY=it.diameter||5}
+  else if(it.shape==='text'){szX=3;szY=2}
   else{szX=5;szY=5}
   // 도형 전체 크기 + 간격(0.3m)으로 이동 → 겹치지 않고 끝에 붙음
   var gap=0.3;
@@ -1353,8 +1424,8 @@ function cloneItem(dx,dy){
   var maxN=0;
   items.forEach(function(i){if(i.catId===it.catId){var m=i.num.match(/(\d+)$/);if(m)maxN=Math.max(maxN,parseInt(m[1]))}});
   var ni={id:nextItemId++,catId:it.catId,num:cat.prefix+'-'+String(maxN+1).padStart(2,'0'),
-    name:'',duty:'',phone:'',memo:'',lat:it.lat+dLat,lng:it.lng+dLng,
-    w:it.w,h:it.h,diameter:it.diameter,shape:it.shape,rotation:it.rotation||0};
+    name:it.shape==='text'?(it.name||''):'',duty:'',phone:'',memo:'',lat:it.lat+dLat,lng:it.lng+dLng,
+    w:it.w,h:it.h,diameter:it.diameter,shape:it.shape,rotation:it.rotation||0,textSize:it.textSize||16};
   if(it.path)ni.path=it.path.map(function(p){return{lat:p.lat+dLat,lng:p.lng+dLng}});
   items.push(ni);
   drawItem(items.length-1);
@@ -1668,11 +1739,13 @@ function saveAll(silent){
     if(c.shape==='rect'){d.w=c.w;d.h=c.h;}
     else if(c.shape==='circle'){d.diameter=c.diameter||5;}
     else if(c.shape==='line'){d.direction=c.direction||'none';d.strokeWeight=c.strokeWeight||4;}
+    else if(c.shape==='text'){d.textSize=c.textSize||16;}
     return d;
   });
   var itemData=items.map(function(it){
     var d={id:it.id,catId:it.catId,num:it.num,name:it.name,duty:it.duty||'',phone:it.phone,memo:it.memo||'',shape:it.shape,lat:it.lat,lng:it.lng,rotation:it.rotation||0};
-    if(it.shape==='line'||it.shape==='polygon'){d.path=it.path;}
+    if(it.shape==='text'){d.textSize=it.textSize||16;}
+    else if(it.shape==='line'||it.shape==='polygon'){d.path=it.path;}
     else{d.w=it.w;d.h=it.h;d.diameter=it.diameter||5;}
     return d;
   });
