@@ -378,6 +378,8 @@ var APPLY_F={cat:"",div:"",region:"",pre:"",fin:"",awd:"",att:"",abs:""};  // �
 var APPLY_SORT={col:-1,asc:true};            // 정렬 (기본: 접수순번 오름차순 — loadApply_ 에서 세팅)
 var APPLY_CATS=null;                         // 동적 카테고리 (null이면 기본값 사용)
 var APPLY_CATS_DEFAULT=["기악","판소리","무용","고법"];
+var APPLY_FORM_URL="";                       // 참가신청서 양식 HWP 다운로드 URL
+var APPLY_FORM_URL_PDF="";
 var APPLY_VIEW="compact";                    // "compact" | "full"
 // 컴팩트 모드에서 표시할 컬럼 (헤더 이름 기준, 해당 컬럼이 있을 때만 표시)
 var APPLY_KEYCOLS=["접수순번","접수일시","구분","참가구분","팀명","대표자","이름","연락처","시도별","지역","예선합격","최종합격","수상","불참","다회참가자"];
@@ -1896,7 +1898,23 @@ function dApform(){
   h+='<div class="card">';
   h+='<div style="background:#fff;border-radius:14px;padding:24px;border:1px solid #e2e8f0;box-shadow:0 2px 8px rgba(0,0,0,0.04)">';
   h+='<h2 style="font-size:20px;margin-bottom:4px;text-align:center;color:#1e293b">📝 참가 신청</h2>';
-  h+='<p style="text-align:center;color:#64748b;font-size:13px;margin-bottom:20px">'+esc(evtNm)+'</p>';
+  h+='<p style="text-align:center;color:#64748b;font-size:13px;margin-bottom:12px">'+esc(evtNm)+'</p>';
+
+  // 양식 다운로드 영역
+  if(APPLY_FORM_URL || APPLY_FORM_URL_PDF){
+    h+='<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:10px;padding:12px 14px;margin-bottom:16px;text-align:center">';
+    h+='<div style="font-size:13px;font-weight:700;color:#166534;margin-bottom:8px">📥 참가신청서 양식 다운로드</div>';
+    h+='<div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">';
+    if(APPLY_FORM_URL){
+      h+='<a href="'+esc(APPLY_FORM_URL)+'" target="_blank" style="display:inline-block;padding:8px 16px;background:#2563eb;color:#fff;border-radius:8px;font-size:13px;font-weight:700;text-decoration:none">📄 HWP 양식</a>';
+    }
+    if(APPLY_FORM_URL_PDF){
+      h+='<a href="'+esc(APPLY_FORM_URL_PDF)+'" target="_blank" style="display:inline-block;padding:8px 16px;background:#dc2626;color:#fff;border-radius:8px;font-size:13px;font-weight:700;text-decoration:none">📕 PDF 양식</a>';
+    }
+    h+='</div>';
+    h+='<div style="font-size:11px;color:#64748b;margin-top:6px">양식을 다운로드하여 작성 후 아래에서 첨부해 주세요</div>';
+    h+='</div>';
+  }
 
   h+='<label style="display:block;color:#64748b;font-size:12px;margin:0 0 4px;font-weight:600">구분 <span style="color:#ef4444">*</span></label>';
   h+='<select id="apf_cat" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px">';
@@ -1923,16 +1941,6 @@ function dApform(){
 
   h+='<label style="display:block;color:#64748b;font-size:12px;margin:12px 0 4px;font-weight:600">연락처 <span style="color:#ef4444">*</span></label>';
   h+='<input id="apf_phone" type="tel" placeholder="010-0000-0000" maxlength="13" oninput="(function(el){var v=el.value.replace(/[^0-9]/g,\'\');if(v.length<=3)el.value=v;else if(v.length<=7)el.value=v.slice(0,3)+\'-\'+v.slice(3);else el.value=v.slice(0,3)+\'-\'+v.slice(3,7)+\'-\'+v.slice(7,11)})(this)" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px">';
-
-  h+='<div style="display:flex;gap:8px;margin-top:12px">';
-  h+='<div style="flex:1"><label style="display:block;color:#64748b;font-size:12px;margin:0 0 4px;font-weight:600">시도</label>';
-  h+='<select id="apf_region" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px">';
-  h+='<option value="">선택</option>';
-  APSTAT_REGIONS.forEach(function(rg){h+='<option>'+esc(rg)+'</option>'});
-  h+='</select></div>';
-  h+='<div style="flex:1"><label style="display:block;color:#64748b;font-size:12px;margin:0 0 4px;font-weight:600">지역(시군구)</label>';
-  h+='<input id="apf_area" type="text" placeholder="예: 영광군" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px"></div>';
-  h+='</div>';
 
   // 파일 첨부
   h+='<label style="display:block;color:#64748b;font-size:12px;margin:12px 0 4px;font-weight:600">참가신청서 첨부</label>';
@@ -2005,14 +2013,13 @@ function submitApplyForm(){
     if(!cnt||parseInt(cnt)<2){ alert('인원수를 2명 이상 입력하세요'); return; }
   }
   var phone=document.getElementById('apf_phone').value.trim();
-  var region=document.getElementById('apf_region').value;
-  var area=document.getElementById('apf_area').value.trim();
-  var memo=document.getElementById('apf_memo').value.trim();
+  var memo=(document.getElementById('apf_memo')||{}).value||"";
+  memo=memo.trim();
   if(!phone){ alert('연락처를 입력하세요'); return; }
   var row={
     "구분":cat, "참가구분":div, "신청유형(명/팀)":gtype,
     "성명":name, "대표자":isTeam?name:"", "인원수":cnt,
-    "연락처":phone, "시도별":region, "주소":area, "비고":memo
+    "연락처":phone, "비고":memo
   };
   var btn=document.querySelector('#apf_cat').closest('.card').querySelector('button[onclick*="submitApplyForm"]');
   if(!btn) btn=document.querySelector('#apf_cat').closest('.card').querySelector('button');
@@ -2020,7 +2027,7 @@ function submitApplyForm(){
   api("addApply",Object.assign({id:CID},row)).then(function(r){
     if(r&&r.ok){
       toast('접수순번 '+r.seq+'번으로 신청되었습니다');
-      ['apf_cat','apf_div','apf_name','apf_phone','apf_region','apf_area','apf_memo','apf_cnt','apf_file1','apf_file2','apf_file_id','apf_file_reg'].forEach(function(id){
+      ['apf_cat','apf_div','apf_name','apf_phone','apf_memo','apf_cnt','apf_file1','apf_file2','apf_file_id','apf_file_reg'].forEach(function(id){
         var el=document.getElementById(id);
         if(el) el.tagName==='SELECT'?el.selectedIndex=0:el.value='';
       });
@@ -2534,6 +2541,7 @@ function loadApply_(silent){
     if(r && r.ok) APPLY=r;
     else APPLY={err:(r&&r.err)||"조회 실패",headers:[],rows:[]};
     if(cfg && cfg.cats && cfg.cats.length) APPLY_CATS=cfg.cats;
+    if(cfg){ APPLY_FORM_URL=cfg.formUrl||""; APPLY_FORM_URL_PDF=cfg.formUrlPdf||""; }
     if(!APPLY_CATS) APPLY_CATS=APPLY_CATS_DEFAULT;
     if(APPLY_SORT.col<0 && APPLY && APPLY.headers){
       var si=APPLY.headers.indexOf("접수순번");
