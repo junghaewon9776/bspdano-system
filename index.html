@@ -247,6 +247,168 @@ label{display:block;font-size:10px;color:#999;margin-bottom:3px}
   </div>
 </div>
 
+<!-- ========== 공개 참가신청 폼 (로그인 불필요, ?apply=1&evtId=XXX) ========== -->
+<div id="applyPage" style="display:none">
+<style>
+#applyPage{background:#f5f5f5;min-height:100vh;padding:0}
+.apf-wrap{max-width:680px;margin:0 auto;padding:18px 14px 60px}
+.apf-wrap h1{font-size:22px;margin:8px 0 4px;color:#111827;font-weight:800}
+.apf-wrap .apf-sub{color:#666;font-size:13px;margin-bottom:16px}
+.apf-sh{font-size:15px;font-weight:700;color:#1e3a8a;padding:14px 0 6px;margin:6px 0 10px;border-bottom:2px solid #2563eb;display:flex;align-items:baseline;gap:6px}
+.apf-sh .apf-hint-i{font-size:12px;color:#64748b;font-weight:500}
+.apf-card{background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:14px;margin-bottom:12px;box-shadow:0 1px 2px rgba(0,0,0,.03)}
+.apf-row{margin-bottom:12px}.apf-row:last-child{margin-bottom:0}
+.apf-row label{display:block;font-weight:600;font-size:14px;margin-bottom:5px;color:#1f2937}
+.apf-row label .req{color:#dc2626;font-weight:700;margin-left:3px}
+.apf-row label .opt{color:#9ca3af;font-weight:400;font-size:12px;margin-left:4px}
+.apf-row input[type=text],.apf-row input[type=tel],.apf-row select,.apf-row textarea{width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:15px;font-family:inherit;background:#fff;color:#111;box-sizing:border-box}
+.apf-row input:focus,.apf-row select:focus,.apf-row textarea:focus{outline:none;border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.12)}
+.apf-row input::placeholder,.apf-row textarea::placeholder{color:#9ca3af}
+.apf-row textarea{min-height:70px;resize:vertical}
+.apf-hint{font-size:12px;color:#6b7280;margin-top:4px}
+.apf-fw{border:1px dashed #d1d5db;border-radius:8px;padding:10px;background:#f9fafb}
+.apf-fw.has-file{border-style:solid;border-color:#16a34a;background:#f0fdf4}
+.apf-fw.err{border-color:#dc2626;background:#fef2f2}
+.apf-fw input[type=file]{width:100%;font-size:14px}
+.apf-fi{font-size:12px;color:#166534;margin-top:4px;word-break:break-all}
+.apf-chk{display:flex;align-items:flex-start;gap:8px}
+.apf-chk input[type=checkbox]{margin-top:4px;width:18px;height:18px;flex-shrink:0}
+.apf-chk label{margin-bottom:0;font-weight:500;font-size:14px;color:#1f2937}
+.apf-priv{font-size:12px;background:#eff6ff;border:1px solid #bfdbfe;border-left:3px solid #2563eb;border-radius:6px;padding:10px;max-height:140px;overflow:auto;margin-top:8px;color:#1e3a8a;line-height:1.55}
+.apf-btn{display:block;width:100%;padding:14px;background:#2563eb;color:#fff;border:none;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit}
+.apf-btn:disabled{background:#9ca3af;cursor:not-allowed}
+.apf-btn:hover:not(:disabled){background:#1d4ed8}
+.apf-toolbar{display:flex;gap:8px;margin-bottom:6px;flex-wrap:wrap}
+.apf-btn-s{padding:9px 14px;background:#fff;color:#2563eb;border:1px solid #2563eb;border-radius:8px;font-size:13px;font-weight:600;text-decoration:none;display:inline-block;cursor:pointer}
+.apf-btn-s:hover{background:#2563eb;color:#fff}
+.apf-status{padding:12px;border-radius:8px;margin-bottom:14px;font-size:14px;display:none}
+.apf-status.show{display:block}
+.apf-status.closed{background:#fef2f2;border:1px solid #fecaca;color:#991b1b}
+.apf-status.notyet{background:#fffbeb;border:1px solid #fde68a;color:#92400e}
+.apf-status.info{background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af}
+.apf-done{text-align:center;padding:40px 20px;display:none}
+.apf-done.show{display:block}
+.apf-done .mark{font-size:56px;color:#16a34a;margin-bottom:8px;line-height:1}
+.apf-done h2{color:#111827;margin:8px 0 10px;font-size:20px}
+.apf-done .seq{display:inline-block;background:#eff6ff;border:2px solid #2563eb;border-radius:8px;padding:8px 18px;font-size:18px;font-weight:800;color:#1e40af;margin:10px 0;letter-spacing:1px}
+.apf-footer{text-align:center;color:#9ca3af;font-size:12px;margin-top:24px}
+#apfLoading{position:fixed;inset:0;background:rgba(255,255,255,.88);display:none;align-items:center;justify-content:center;z-index:9999}
+#apfLoading.show{display:flex}
+#apfLoading .box{background:#fff;border-radius:12px;padding:22px 32px;box-shadow:0 8px 24px rgba(0,0,0,.18);text-align:center}
+#apfLoading .spin{display:inline-block;width:32px;height:32px;border:3px solid #e5e7eb;border-top-color:#2563eb;border-radius:50%;animation:apfSpin .8s linear infinite}
+@keyframes apfSpin{to{transform:rotate(360deg)}}
+</style>
+<div class="apf-wrap">
+  <h1 id="apfTitle">🎭 참가신청</h1>
+  <div class="apf-sub">아래 항목을 모두 작성하고 필수 파일을 업로드해주세요.</div>
+  <div id="apfStatus" class="apf-status"></div>
+  <div id="apfForm">
+    <div class="apf-sh">📝 필수 항목</div>
+    <div class="apf-card">
+      <div class="apf-row"><label>구분<span class="req">*</span></label>
+        <select id="apfCat"><option value="">선택해주세요</option><option value="기악">기악</option><option value="판소리">판소리</option><option value="무용">무용</option><option value="고법">고법</option></select></div>
+      <div class="apf-row"><label>참가구분<span class="req">*</span></label>
+        <select id="apfDiv" onchange="apfOnDivChange()"><option value="">선택해주세요</option><option value="학생부">학생부</option><option value="신인부">신인부</option><option value="일반부">일반부</option></select></div>
+      <div class="apf-row" id="apfRowGType" style="display:none"><label>신청유형<span class="req">*</span></label>
+        <select id="apfGType" onchange="apfOnGTypeChange()"><option value="개인">개인</option><option value="팀">팀</option></select>
+        <div class="apf-hint">신인부만 팀 참가 가능 (학생부·일반부는 개인 참가만)</div></div>
+      <div class="apf-row"><label>성명<span class="req">*</span></label>
+        <input id="apfName" type="text" placeholder="본명 (팀 참가 시 대표자명)"></div>
+      <div class="apf-row" id="apfRowCnt" style="display:none"><label>팀 인원수<span class="req">*</span></label>
+        <input id="apfCnt" type="number" min="2" max="99" placeholder="대표자 포함 총 인원수" inputmode="numeric">
+        <div class="apf-hint">예: 4명이면 4 입력 → "홍길동 외 3명" 으로 표시됩니다</div></div>
+      <div class="apf-row"><label>주민번호<span class="req">*</span></label>
+        <input id="apfRrn" type="text" placeholder="YYMMDD-NNNNNNN" inputmode="numeric" maxlength="14">
+        <div class="apf-hint">형식: 앞 6자리 - 뒤 7자리 (하이픈 포함)</div></div>
+      <div class="apf-row"><label>연락처<span class="req">*</span></label>
+        <input id="apfTel" type="tel" placeholder="010-0000-0000" inputmode="tel" maxlength="13">
+        <div class="apf-hint">형식: 010-0000-0000 (하이픈 포함)</div></div>
+      <div class="apf-row"><label>주소<span class="req">*</span></label>
+        <input id="apfAddr" type="text" placeholder="도로명 주소"></div>
+      <div class="apf-row"><label>시도별<span class="req">*</span></label>
+        <select id="apfRegion"><option value="">선택해주세요</option>
+          <option value="서울특별시">서울특별시</option><option value="부산광역시">부산광역시</option><option value="대구광역시">대구광역시</option>
+          <option value="인천광역시">인천광역시</option><option value="광주광역시">광주광역시</option><option value="대전광역시">대전광역시</option>
+          <option value="울산광역시">울산광역시</option><option value="세종특별자치시">세종특별자치시</option><option value="경기도">경기도</option>
+          <option value="강원특별자치도">강원특별자치도</option><option value="충청남도">충청남도</option><option value="충청북도">충청북도</option>
+          <option value="전라남도">전라남도</option><option value="전북특별자치도">전북특별자치도</option><option value="경상남도">경상남도</option>
+          <option value="경상북도">경상북도</option><option value="제주특별자치도">제주특별자치도</option></select></div>
+      <div class="apf-row"><label>은행명<span class="req">*</span></label>
+        <input id="apfBank" type="text" placeholder="예) 농협"></div>
+      <div class="apf-row"><label>계좌번호<span class="req">*</span></label>
+        <input id="apfAcct" type="text" placeholder="숫자/하이픈" inputmode="numeric"></div>
+      <div class="apf-row"><label>예금주<span class="req">*</span></label>
+        <input id="apfHolder" type="text" placeholder="계좌 명의자"></div>
+      <div class="apf-row"><label>신청인<span class="req">*</span></label>
+        <input id="apfApplicant" type="text" placeholder="본인 또는 보호자명"></div>
+      <div class="apf-row"><label>스승<span class="req">*</span></label>
+        <select id="apfTeacherYN" onchange="apfOnTeacherChange()"><option value="">선택해주세요</option><option value="없음">없음</option><option value="있음">있음</option></select>
+        <div id="apfRowTeacher" style="display:none;margin-top:8px">
+          <input id="apfTeacher" type="text" placeholder="스승 이름 (여러 명이면 쉼표로 구분)">
+          <div class="apf-hint">예: 홍길동, 김철수</div></div></div>
+    </div>
+    <div class="apf-sh">✏️ 선택 항목 <span class="apf-hint-i">(가급적 작성 부탁드립니다)</span></div>
+    <div class="apf-card">
+      <div class="apf-row"><label>소속<span class="opt">(선택)</span></label>
+        <input id="apfGroup" type="text" placeholder="소속 단체/학교"></div>
+      <div class="apf-row"><label>예선곡<span class="opt">(선택)</span></label>
+        <input id="apfPre" type="text" placeholder="예선곡 제목"></div>
+      <div class="apf-row"><label>본선곡<span class="opt">(선택)</span></label>
+        <input id="apfFin" type="text" placeholder="본선곡 제목"></div>
+      <div class="apf-row"><label>지정고수사용<span class="opt">(선택)</span></label>
+        <select id="apfDrummer"><option value="">선택해주세요</option><option value="사용">사용</option><option value="미사용">미사용</option><option value="해당없음">해당없음</option></select></div>
+      <div class="apf-row"><label>USB여부<span class="opt">(선택)</span></label>
+        <select id="apfUsb"><option value="">선택해주세요</option><option value="지참">지참</option><option value="미지참">미지참</option></select></div>
+    </div>
+    <div class="apf-sh">📎 첨부파일</div>
+    <div class="apf-card">
+      <div class="apf-row"><label>참가신청서<span class="req">*</span></label>
+        <div id="apfToolbar" class="apf-toolbar" style="display:none">
+          <a id="apfBtnForm" class="apf-btn-s" href="#" target="_blank">📄 양식 다운로드</a>
+          <a id="apfBtnFormPdf" class="apf-btn-s" href="#" target="_blank" style="display:none">👁️ PDF 미리보기</a>
+        </div>
+        <div class="apf-hint" style="margin-bottom:6px">양식 다운로드 후 작성해서 업로드 (HWP/PDF/이미지)</div>
+        <div id="apfFileForm" class="apf-fw">
+          <input type="file" onchange="apfPickFile(this,'apfFileForm','file_form')" accept=".hwp,.hwpx,.pdf,.doc,.docx,image/*">
+          <div id="apfInfo_form" class="apf-fi"></div></div></div>
+      <div class="apf-row"><label>통장사본<span class="opt">(선택)</span></label>
+        <div class="apf-hint" style="margin-bottom:6px">참가비 환급·포상금 지급용</div>
+        <div id="apfFileBank" class="apf-fw">
+          <input type="file" onchange="apfPickFile(this,'apfFileBank','file_bank')" accept=".pdf,image/*">
+          <div id="apfInfo_bank" class="apf-fi"></div></div></div>
+      <div class="apf-row"><label>주민등록등본 또는 신분증<span class="opt">(선택)</span></label>
+        <div class="apf-hint" style="margin-bottom:6px">본인 확인용 (주민등록등본/신분증 사본 중 하나)</div>
+        <div id="apfFileReg" class="apf-fw">
+          <input type="file" onchange="apfPickFile(this,'apfFileReg','file_reg')" accept=".pdf,image/*">
+          <div id="apfInfo_reg" class="apf-fi"></div></div></div>
+    </div>
+    <div class="apf-card">
+      <div class="apf-chk">
+        <input id="apfAgree" type="checkbox">
+        <label for="apfAgree">개인정보 수집·이용에 <strong>동의</strong>합니다<span class="req">*</span></label>
+      </div>
+      <div class="apf-priv">
+        <b>[수집항목]</b> 성명, 주민번호, 연락처, 주소, 은행/계좌정보, 예금주, 신청인, 소속, 스승, 참가곡 정보, 첨부파일(참가신청서·통장사본·신분증)<br>
+        <b>[이용목적]</b> 참가자 선정·확인, 결과 안내, 상금·포상금 지급, 행사 운영<br>
+        <b>[보유기간]</b> 행사 종료 후 1년 (관련 법령 보존 의무 외)<br>
+        <b>[거부 시]</b> 동의를 거부할 수 있으나 거부 시 참가신청이 접수되지 않습니다.
+      </div>
+    </div>
+    <button id="apfSubmitBtn" class="apf-btn" onclick="apfSubmit()">신청서 제출하기</button>
+  </div>
+  <div id="apfDone" class="apf-done">
+    <div class="mark">✓</div>
+    <h2>접수가 완료되었습니다</h2>
+    <div>아래 접수번호를 보관해주세요.</div>
+    <div id="apfDoneSeq" class="seq"></div>
+    <div style="color:#6b7280;font-size:13px" id="apfDoneTs"></div>
+    <div style="margin-top:22px"><button class="apf-btn-s" onclick="apfResetForm()">새로 접수하기</button></div>
+  </div>
+  <div class="apf-footer" id="apfFooter">법성포단오제보존회</div>
+</div>
+<div id="apfLoading"><div class="box"><div class="spin"></div><div id="apfLoadMsg" style="margin-top:10px;color:#333">제출 중...</div></div></div>
+</div>
+
 <div id="mainPage">
   <div class="topBar">
     <div><h2>🎎 법성포단오제 보존회 관리시스템</h2><small>법성포단오제보존회 | 축제 운영 통합시스템</small></div>
@@ -268,6 +430,7 @@ label{display:block;font-size:10px;color:#999;margin-bottom:3px}
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<!-- firebase-storage 불필요 (Drive 업로드 사용) -->
 <script src="firebase-config.js"></script>
 <script src="common.js"></script>
 
@@ -321,6 +484,19 @@ var SYS_ORG      = SYS_PARENT + " " + SYS_NAME;
 var SYS_SUBTITLE = SYS_PARENT + " | " + SYS_TAGLINE;
 var SYS_SMS_SIG  = "["+SYS_PARENT+"] ";
 // 로드 시 정적 HTML(타이틀/헤더)에도 반영
+// ===== 공개 신청폼 모드 감지 =====
+var IS_APPLY_MODE = false;
+var APPLY_EVT_ID = "";
+(function(){
+  try {
+    var sp = new URLSearchParams(window.location.search);
+    if (sp.get("apply") === "1") {
+      IS_APPLY_MODE = true;
+      APPLY_EVT_ID = sp.get("evtId") || "";
+    }
+  } catch(e){}
+})();
+
 document.addEventListener("DOMContentLoaded", function(){
   try{
     document.title = SYS_TITLE;
@@ -328,6 +504,21 @@ document.addEventListener("DOMContentLoaded", function(){
     var lp=document.querySelector("#loginBox p");  if(lp) lp.textContent=SYS_LOGIN_SUB;
     var mh=document.querySelector(".topBar h2");  if(mh) mh.textContent=SYS_ICON+" "+SYS_TITLE;
     var ms=document.querySelector(".topBar small"); if(ms) ms.textContent=SYS_SUBTITLE;
+
+    // ===== 공개 신청폼 모드 =====
+    if (IS_APPLY_MODE) {
+      document.getElementById("loginPage").style.display = "none";
+      document.getElementById("applyPage").style.display = "block";
+      document.title = SYS_NAME + " 참가신청";
+      var apfT = document.getElementById("apfTitle");
+      if (apfT) apfT.textContent = SYS_ICON + " " + SYS_NAME + " 참가신청";
+      var apfF = document.getElementById("apfFooter");
+      if (apfF) apfF.textContent = (SYS_PARENT || "") + " · " + SYS_NAME;
+      apfBindFormatters();
+      apfLoadStatus();
+      return; // 로그인 로직 스킵
+    }
+
     // 마지막 로그인 ID 자동 채움 (디바이스별 localStorage)
     try {
       var lastId = localStorage.getItem("lastLoginId");
@@ -380,6 +571,7 @@ var APPLY_CATS=null;                         // 동적 카테고리 (null이면 
 var APPLY_CATS_DEFAULT=["기악","판소리","무용","고법"];
 var APPLY_FORM_URL="";                       // 참가신청서 양식 HWP 다운로드 URL
 var APPLY_FORM_URL_PDF="";
+var DRIVE_UPLOAD_URL="";                     // Drive 업로드 Apps Script URL
 var APPLY_VIEW="compact";                    // "compact" | "full"
 // 컴팩트 모드에서 표시할 컬럼 (헤더 이름 기준, 해당 컬럼이 있을 때만 표시)
 var APPLY_KEYCOLS=["접수순번","접수일시","구분","참가구분","팀명","대표자","이름","연락처","시도별","지역","예선합격","최종합격","수상","불참","다회참가자"];
@@ -794,7 +986,7 @@ async function refreshData(showToast){
   if(r.evts) EVENTS=r.evts;
   if(r.curEvt) CUR_EVT=r.curEvt;
   if(r.LBL){LBL.leader=r.LBL.leader||"단장";LBL.member=r.LBL.member||"단원";}
-  acts=r.acts||[];purs=r.purs||[];exps=r.exps||[];mems=r.mems||[];notices=r.notices||[];pays=r.pays||[];dpst=r.dpst||[];inc=r.inc||[];incTypes=r.incTypes||[];expBG=r.expBG||[];txn=r.txn||[];expTypes=r.expTypes||[];gwanTypes=r.gwanTypes||[];incCards=r.incCards||[];awards=r.awards||[];memGroups=r.groups||[];vendors=r.vendors||vendors||[];fees=r.fees||[];assets=r.assets||[];rentals=r.rentals||[];assetCats=r.assetCats||[];assetLocs=r.assetLocs||[];fees=r.fees||fees||[];
+  acts=r.acts||[];purs=r.purs||[];exps=r.exps||[];mems=r.mems||[];notices=r.notices||[];pays=r.pays||[];dpst=r.dpst||[];inc=r.inc||[];incTypes=r.incTypes||[];expBG=r.expBG||[];txn=r.txn||[];expTypes=r.expTypes||[];gwanTypes=r.gwanTypes||[];incCards=r.incCards||[];awards=r.awards||[];memGroups=r.memGroups||r.groups||[];vendors=r.vendors||vendors||[];fees=r.fees||[];assets=r.assets||[];rentals=r.rentals||[];assetCats=r.assetCats||[];assetLocs=r.assetLocs||[];fees=r.fees||fees||[];
   SHARE_MEMS=!!r.shareMems;
   if(r.fieldMenu!=null) FIELD_MENU=r.fieldMenu||"on";
   if(r.accountantName!=null) ACCOUNTANT_NAME=r.accountantName||"";
@@ -823,7 +1015,7 @@ async function switchEvent(evtId){
   CUR_EVT = r.curEvt || (EVENTS.filter(function(e){return e.evtId===evtId;})[0]) || CUR_EVT;
   AR=r.AR||AR;BG=r.BG||BG;US=r.US||US;
   if(r.LBL){LBL.leader=r.LBL.leader||"단장";LBL.member=r.LBL.member||"단원";}
-  acts=r.acts||[];purs=r.purs||[];exps=r.exps||[];mems=r.mems||[];notices=r.notices||[];pays=r.pays||[];dpst=r.dpst||[];inc=r.inc||[];incTypes=r.incTypes||[];expBG=r.expBG||[];txn=r.txn||[];expTypes=r.expTypes||[];gwanTypes=r.gwanTypes||[];incCards=r.incCards||[];awards=r.awards||[];memGroups=r.groups||[];vendors=r.vendors||vendors||[];fees=r.fees||[];assets=r.assets||[];rentals=r.rentals||[];assetCats=r.assetCats||[];assetLocs=r.assetLocs||[];
+  acts=r.acts||[];purs=r.purs||[];exps=r.exps||[];mems=r.mems||[];notices=r.notices||[];pays=r.pays||[];dpst=r.dpst||[];inc=r.inc||[];incTypes=r.incTypes||[];expBG=r.expBG||[];txn=r.txn||[];expTypes=r.expTypes||[];gwanTypes=r.gwanTypes||[];incCards=r.incCards||[];awards=r.awards||[];memGroups=r.memGroups||r.groups||[];vendors=r.vendors||vendors||[];fees=r.fees||[];assets=r.assets||[];rentals=r.rentals||[];assetCats=r.assetCats||[];assetLocs=r.assetLocs||[];
   SHARE_MEMS=!!r.shareMems;
   fixDates();
   if(!_tabAllowedByEvt(CTAB)) CTAB="dash";
@@ -866,6 +1058,8 @@ async function tryAutoLogin(){
   if(!ok&&er){er.style.color="#dc2626";er.textContent="자동 로그인 실패 — 다시 로그인하세요";}
 }
 window.addEventListener("load",function(){
+  // 공개 신청폼 모드면 자동 로그인 스킵
+  if (IS_APPLY_MODE) return;
   // Firebase 실시간 동기화 시작
   initFirebaseSync();
   // 이전 로그아웃 메시지 복원
@@ -1181,7 +1375,7 @@ function _isUrlCell(v){
   v = String(v==null?"":v);
   if(!v) return false;
   // 한 셀에 여러 URL이 |, 줄바꿈, 공백으로 구분되어 있을 수 있음
-  return v.split(/[\|\n\r\s]+/).some(function(u){ return /^https?:\/\//.test(u); });
+  return v.split(/[\|\n\r\s]+/).some(function(u){ return /^https?:\/\//.test(u) || /^ENC::/.test(u); });
 }
 function _hasAnyAttach(row, cols){
   for(var i=0;i<(cols||[]).length;i++){ if(_isUrlCell(row[cols[i]])) return true; }
@@ -1916,54 +2110,114 @@ function dApform(){
     h+='</div>';
   }
 
-  h+='<label style="display:block;color:#64748b;font-size:12px;margin:0 0 4px;font-weight:600">구분 <span style="color:#ef4444">*</span></label>';
-  h+='<select id="apf_cat" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px">';
-  h+='<option value="">선택</option>';
+  // ===== 필수 항목 =====
+  var L='<label style="display:block;color:#1f2937;font-size:14px;font-weight:600;margin-bottom:5px">';
+  var R='<span style="color:#dc2626;font-weight:700;margin-left:3px">*</span>';
+  var O='<span style="color:#9ca3af;font-weight:400;font-size:12px;margin-left:4px">(선택)</span>';
+  var I='style="width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:15px;font-family:inherit"';
+  var HT='<div style="font-size:12px;color:#6b7280;margin-top:4px">';
+
+  h+='<div style="font-size:15px;font-weight:700;color:#1e3a8a;padding:14px 0 6px;margin:6px 0 10px;border-bottom:2px solid #2563eb">📝 필수 항목</div>';
+  h+='<div style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:14px;margin-bottom:12px">';
+  // 구분
+  h+='<div style="margin-bottom:12px">'+L+'구분'+R+'</label>';
+  h+='<select id="apf_cat" '+I+'><option value="">선택해주세요</option>';
   cats.forEach(function(c){h+='<option>'+esc(c)+'</option>'});
-  h+='</select>';
-
-  h+='<label style="display:block;color:#64748b;font-size:12px;margin:12px 0 4px;font-weight:600">참가구분 <span style="color:#ef4444">*</span></label>';
-  h+='<select id="apf_div" onchange="apfDivChg()" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px">';
-  h+='<option value="">선택</option>';
-  ["학생부","신인부","일반부"].forEach(function(d){h+='<option>'+d+'</option>'});
-  h+='</select>';
-  h+='<div id="apf_teamWrap" style="display:none">';
-  h+='<label style="display:block;color:#64748b;font-size:12px;margin:12px 0 4px;font-weight:600">신청유형</label>';
-  h+='<select id="apf_gtype" onchange="apfGtypeChg()" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px">';
-  h+='<option value="개인(명)">개인(명)</option><option value="단체(팀)">단체(팀)</option>';
   h+='</select></div>';
-  h+='<label id="apf_nameLabel" style="display:block;color:#64748b;font-size:12px;margin:12px 0 4px;font-weight:600">이름 <span style="color:#ef4444">*</span></label>';
-  h+='<input id="apf_name" type="text" placeholder="이름" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px">';
-  h+='<div id="apf_cntWrap" style="display:none">';
-  h+='<label style="display:block;color:#64748b;font-size:12px;margin:12px 0 4px;font-weight:600">인원수 (대표자 포함) <span style="color:#ef4444">*</span></label>';
-  h+='<input id="apf_cnt" type="number" min="2" value="2" placeholder="2" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px">';
-  h+='</div>';
+  // 참가구분
+  h+='<div style="margin-bottom:12px">'+L+'참가구분'+R+'</label>';
+  h+='<select id="apf_div" onchange="apfDivChg()" '+I+'><option value="">선택해주세요</option>';
+  ["학생부","신인부","일반부"].forEach(function(d){h+='<option>'+d+'</option>'});
+  h+='</select></div>';
+  // 신청유형 (신인부만)
+  h+='<div id="apf_teamWrap" style="display:none;margin-bottom:12px">'+L+'신청유형'+R+'</label>';
+  h+='<select id="apf_gtype" onchange="apfGtypeChg()" '+I+'><option value="개인(명)">개인</option><option value="단체(팀)">팀</option></select>';
+  h+=HT+'신인부만 팀 참가 가능 (학생부·일반부는 개인 참가만)</div></div>';
+  // 성명
+  h+='<div style="margin-bottom:12px"><label id="apf_nameLabel" style="display:block;color:#1f2937;font-size:14px;font-weight:600;margin-bottom:5px">성명'+R+'</label>';
+  h+='<input id="apf_name" type="text" placeholder="본명 (팀 참가 시 대표자명)" '+I+'></div>';
+  // 인원수 (팀)
+  h+='<div id="apf_cntWrap" style="display:none;margin-bottom:12px">'+L+'인원수 (대표자 포함)'+R+'</label>';
+  h+='<input id="apf_cnt" type="number" min="2" value="2" '+I+'></div>';
+  // 주민번호
+  h+='<div style="margin-bottom:12px">'+L+'주민번호'+R+'</label>';
+  h+='<input id="apf_rrn" type="text" placeholder="YYMMDD-NNNNNNN" inputmode="numeric" maxlength="14" '+I+'>';
+  h+=HT+'형식: 앞 6자리 - 뒤 7자리 (하이픈 포함)</div></div>';
+  // 연락처
+  h+='<div style="margin-bottom:12px">'+L+'연락처'+R+'</label>';
+  h+='<input id="apf_phone" type="tel" placeholder="010-0000-0000" inputmode="tel" maxlength="13" '+I+'>';
+  h+=HT+'형식: 010-0000-0000 (하이픈 포함)</div></div>';
+  // 주소
+  h+='<div style="margin-bottom:12px">'+L+'주소'+R+'</label>';
+  h+='<input id="apf_addr" type="text" placeholder="도로명 주소" '+I+'></div>';
+  // 시도별
+  h+='<div style="margin-bottom:12px">'+L+'시도별'+R+'</label>';
+  h+='<select id="apf_region" '+I+'><option value="">선택해주세요</option>';
+  ["서울특별시","부산광역시","대구광역시","인천광역시","광주광역시","대전광역시","울산광역시","세종특별자치시","경기도","강원특별자치도","충청남도","충청북도","전라남도","전북특별자치도","경상남도","경상북도","제주특별자치도"].forEach(function(rg){h+='<option>'+rg+'</option>'});
+  h+='</select></div>';
+  // 은행명
+  h+='<div style="margin-bottom:12px">'+L+'은행명'+R+'</label>';
+  h+='<input id="apf_bank" type="text" placeholder="예) 농협" '+I+'></div>';
+  // 계좌번호
+  h+='<div style="margin-bottom:12px">'+L+'계좌번호'+R+'</label>';
+  h+='<input id="apf_acct" type="text" placeholder="숫자/하이픈" inputmode="numeric" '+I+'></div>';
+  // 예금주
+  h+='<div style="margin-bottom:12px">'+L+'예금주'+R+'</label>';
+  h+='<input id="apf_holder" type="text" placeholder="계좌 명의자" '+I+'></div>';
+  // 신청인
+  h+='<div style="margin-bottom:12px">'+L+'신청인'+R+'</label>';
+  h+='<input id="apf_applicant" type="text" placeholder="본인 또는 보호자명" '+I+'></div>';
+  // 스승
+  h+='<div style="margin-bottom:12px">'+L+'스승'+R+'</label>';
+  h+='<select id="apf_teacherYN" onchange="apfTeacherChg()" '+I+'><option value="">선택해주세요</option><option value="없음">없음</option><option value="있음">있음</option></select>';
+  h+='<div id="apf_teacherRow" style="display:none;margin-top:8px"><input id="apf_teacher" type="text" placeholder="스승 이름 (여러 명이면 쉼표로 구분)" '+I+'>';
+  h+=HT+'예: 홍길동, 김철수</div></div></div>';
+  h+='</div>'; // 필수 카드 끝
 
-  h+='<label style="display:block;color:#64748b;font-size:12px;margin:12px 0 4px;font-weight:600">연락처 <span style="color:#ef4444">*</span></label>';
-  h+='<input id="apf_phone" type="tel" placeholder="010-0000-0000" maxlength="13" oninput="(function(el){var v=el.value.replace(/[^0-9]/g,\'\');if(v.length<=3)el.value=v;else if(v.length<=7)el.value=v.slice(0,3)+\'-\'+v.slice(3);else el.value=v.slice(0,3)+\'-\'+v.slice(3,7)+\'-\'+v.slice(7,11)})(this)" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px">';
+  // ===== 선택 항목 =====
+  h+='<div style="font-size:15px;font-weight:700;color:#1e3a8a;padding:14px 0 6px;margin:6px 0 10px;border-bottom:2px solid #2563eb;display:flex;align-items:baseline;gap:6px">✏️ 선택 항목 <span style="font-size:12px;color:#64748b;font-weight:500">(가급적 작성 부탁드립니다)</span></div>';
+  h+='<div style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:14px;margin-bottom:12px">';
+  h+='<div style="margin-bottom:12px">'+L+'소속'+O+'</label><input id="apf_group" type="text" placeholder="소속 단체/학교" '+I+'></div>';
+  h+='<div style="margin-bottom:12px">'+L+'예선곡'+O+'</label><input id="apf_pre" type="text" placeholder="예선곡 제목" '+I+'></div>';
+  h+='<div style="margin-bottom:12px">'+L+'본선곡'+O+'</label><input id="apf_fin" type="text" placeholder="본선곡 제목" '+I+'></div>';
+  h+='<div style="margin-bottom:12px">'+L+'지정고수사용'+O+'</label><select id="apf_drummer" '+I+'><option value="">선택해주세요</option><option value="사용">사용</option><option value="미사용">미사용</option><option value="해당없음">해당없음</option></select></div>';
+  h+='<div style="margin-bottom:0">'+L+'USB여부'+O+'</label><select id="apf_usb" '+I+'><option value="">선택해주세요</option><option value="지참">지참</option><option value="미지참">미지참</option></select></div>';
+  h+='</div>'; // 선택 카드 끝
 
-  h+='<label style="display:block;color:#64748b;font-size:12px;margin:12px 0 4px;font-weight:600">시도</label>';
-  h+='<select id="apf_region" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px">';
-  h+='<option value="">선택</option>';
-  var _regions=["서울","부산","대구","인천","광주","대전","울산","세종시","경기도","강원도","충청남도","충청북도","전라남도","전라북도","경상남도","경상북도","제주도"];
-  _regions.forEach(function(rg){h+='<option>'+esc(rg)+'</option>'});
-  h+='</select>';
+  // ===== 첨부파일 =====
+  h+='<div style="font-size:15px;font-weight:700;color:#1e3a8a;padding:14px 0 6px;margin:6px 0 10px;border-bottom:2px solid #2563eb">📎 첨부파일</div>';
+  h+='<div style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:14px;margin-bottom:12px">';
+  // 참가신청서 (필수)
+  h+='<div style="margin-bottom:12px">'+L+'참가신청서'+R+'</label>';
+  if(APPLY_FORM_URL||APPLY_FORM_URL_PDF){
+    h+='<div style="display:flex;gap:8px;margin-bottom:6px;flex-wrap:wrap">';
+    if(APPLY_FORM_URL) h+='<a href="'+esc(APPLY_FORM_URL)+'" target="_blank" style="padding:9px 14px;background:#fff;color:#2563eb;border:1px solid #2563eb;border-radius:8px;font-size:13px;font-weight:600;text-decoration:none">📄 양식 다운로드</a>';
+    if(APPLY_FORM_URL_PDF) h+='<a href="'+esc(APPLY_FORM_URL_PDF)+'" target="_blank" style="padding:9px 14px;background:#fff;color:#2563eb;border:1px solid #2563eb;border-radius:8px;font-size:13px;font-weight:600;text-decoration:none">👁️ PDF 미리보기</a>';
+    h+='</div>';
+  }
+  h+=HT+'양식 다운로드 후 작성해서 업로드 (HWP/PDF/이미지)</div>';
+  h+='<input id="apf_file1" type="file" accept=".hwp,.hwpx,.pdf,.doc,.docx,image/*" style="width:100%;font-size:14px;margin-top:6px"></div>';
+  // 통장사본 (선택)
+  h+='<div style="margin-bottom:12px">'+L+'통장사본'+O+'</label>';
+  h+=HT+'참가비 환급·포상금 지급용</div>';
+  h+='<input id="apf_file2" type="file" accept=".pdf,image/*" style="width:100%;font-size:14px;margin-top:6px"></div>';
+  // 주민등록등본 또는 신분증 (선택)
+  h+='<div style="margin-bottom:0">'+L+'주민등록등본 또는 신분증'+O+'</label>';
+  h+=HT+'본인 확인용 (주민등록등본/신분증 사본 중 하나)</div>';
+  h+='<input id="apf_file_reg" type="file" accept=".pdf,image/*" style="width:100%;font-size:14px;margin-top:6px"></div>';
+  h+='</div>'; // 첨부 카드 끝
 
-  // 파일 첨부
-  h+='<label style="display:block;color:#64748b;font-size:12px;margin:12px 0 4px;font-weight:600">참가신청서 첨부</label>';
-  h+='<input id="apf_file1" type="file" accept=".hwp,.pdf,.jpg,.jpeg,.png,.doc,.docx" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;background:#f8fafc">';
-  h+='<label style="display:block;color:#64748b;font-size:12px;margin:12px 0 4px;font-weight:600">통장사본 첨부</label>';
-  h+='<input id="apf_file2" type="file" accept=".jpg,.jpeg,.png,.pdf" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;background:#f8fafc">';
-  h+='<label style="display:block;color:#64748b;font-size:12px;margin:12px 0 4px;font-weight:600">신분증 사본 <span style="color:#64748b;font-weight:400">(주민등록증/운전면허증 등)</span></label>';
-  h+='<input id="apf_file_id" type="file" accept=".jpg,.jpeg,.png,.pdf" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;background:#f8fafc">';
-  h+='<label style="display:block;color:#64748b;font-size:12px;margin:12px 0 4px;font-weight:600">주민등록등본 <span style="color:#64748b;font-weight:400">(등본 스캔/촬영)</span></label>';
-  h+='<input id="apf_file_reg" type="file" accept=".jpg,.jpeg,.png,.pdf,.hwp,.doc,.docx" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;background:#f8fafc">';
-  h+='<div class="mut" style="font-size:11px;margin-top:4px">· HWP, PDF, JPG, PNG 가능 · 파일당 최대 5MB · 개인정보는 안전하게 관리됩니다</div>';
+  // ===== 개인정보 동의 =====
+  h+='<div style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:14px;margin-bottom:12px">';
+  h+='<div style="display:flex;align-items:flex-start;gap:8px"><input id="apf_agree" type="checkbox" style="margin-top:4px;width:18px;height:18px;flex-shrink:0"><label for="apf_agree" style="margin-bottom:0;font-weight:500;font-size:14px;color:#1f2937">개인정보 수집·이용에 <strong>동의</strong>합니다<span style="color:#dc2626;font-weight:700;margin-left:3px">*</span></label></div>';
+  h+='<div style="font-size:12px;background:#eff6ff;border:1px solid #bfdbfe;border-left:3px solid #2563eb;border-radius:6px;padding:10px;max-height:140px;overflow:auto;margin-top:8px;color:#1e3a8a;line-height:1.55">';
+  h+='<b>[수집항목]</b> 성명, 주민번호, 연락처, 주소, 은행/계좌정보, 예금주, 신청인, 소속, 스승, 참가곡 정보, 첨부파일(참가신청서·통장사본·신분증)<br>';
+  h+='<b>[이용목적]</b> 참가자 선정·확인, 결과 안내, 상금·포상금 지급, 행사 운영<br>';
+  h+='<b>[보유기간]</b> 행사 종료 후 1년 (관련 법령 보존 의무 외)<br>';
+  h+='<b>[거부 시]</b> 동의를 거부할 수 있으나 거부 시 참가신청이 접수되지 않습니다.';
+  h+='</div></div>';
 
-  h+='<label style="display:block;color:#64748b;font-size:12px;margin:12px 0 4px;font-weight:600">비고</label>';
-  h+='<textarea id="apf_memo" placeholder="기타 사항" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px;height:60px;resize:vertical"></textarea>';
-
-  h+='<button onclick="submitApplyForm()" style="width:100%;padding:14px;border:none;border-radius:10px;background:#3b82f6;color:#fff;font-size:15px;font-weight:700;cursor:pointer;margin-top:16px">신청하기</button>';
+  h+='<button onclick="submitApplyForm()" style="display:block;width:100%;padding:14px;background:#2563eb;color:#fff;border:none;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit">신청서 제출하기</button>';
   h+='</div></div>';
   h+='</div>';
   return h;
@@ -1997,54 +2251,122 @@ function apfGtypeChg(){
   var cw=document.getElementById('apf_cntWrap');
   var nl=document.getElementById('apf_nameLabel');
   if(cw)cw.style.display=isTeam?"":"none";
-  if(nl)nl.innerHTML=isTeam?'대표자 이름 <span style="color:#ef4444">*</span>':'이름 <span style="color:#ef4444">*</span>';
+  if(nl)nl.innerHTML=isTeam?'대표자 이름 <span style="color:#dc2626;font-weight:700;margin-left:3px">*</span>':'성명 <span style="color:#dc2626;font-weight:700;margin-left:3px">*</span>';
   var ni=document.getElementById('apf_name');
-  if(ni)ni.placeholder=isTeam?"대표자 이름":"이름";
+  if(ni)ni.placeholder=isTeam?"대표자 이름":"본명 (팀 참가 시 대표자명)";
+}
+// Google Drive 파일 업로드 (Apps Script 프록시)
+function _uploadToDrive(file, subFolder, label){
+  if(!DRIVE_UPLOAD_URL){return Promise.reject("Drive 업로드 URL이 설정되지 않았습니다.\n설정 → DRIVE_UPLOAD_URL 을 등록해주세요.");}
+  if(file.size>15*1024*1024){return Promise.reject("파일이 너무 큽니다 (최대 15MB): "+label);}
+  return new Promise(function(res,rej){
+    var reader=new FileReader();
+    reader.onload=function(e){
+      var m=e.target.result.match(/^data:([^;]+);base64,(.+)$/);
+      if(!m){rej("파일 읽기 실패: "+label);return;}
+      fetch(DRIVE_UPLOAD_URL,{
+        method:"POST",
+        headers:{"Content-Type":"text/plain"},
+        body:JSON.stringify({base64:m[2],filename:file.name,mime:m[1],subFolder:subFolder})
+      }).then(function(resp){return resp.json()})
+        .then(function(r){
+          if(r&&r.ok) res(r.url);
+          else rej("업로드 실패("+label+"): "+(r&&r.err||"알 수 없는 오류"));
+        }).catch(function(err){rej("업로드 오류("+label+"): "+(err.message||err));});
+    };
+    reader.onerror=function(){rej("파일 읽기 오류: "+label);};
+    reader.readAsDataURL(file);
+  });
+}
+
+function apfTeacherChg(){
+  var yn=(document.getElementById("apf_teacherYN")||{}).value;
+  var row=document.getElementById("apf_teacherRow");
+  if(yn==="있음"){if(row)row.style.display="block";var ti=document.getElementById("apf_teacher");if(ti)ti.focus();}
+  else{if(row)row.style.display="none";var ti2=document.getElementById("apf_teacher");if(ti2)ti2.value="";}
 }
 
 function submitApplyForm(){
-  var cat=document.getElementById('apf_cat').value;
-  var div=document.getElementById('apf_div').value;
-  if(!cat){ alert('구분을 선택하세요'); return; }
-  if(!div){ alert('참가구분을 선택하세요'); return; }
-  var gtype="개인(명)";
-  if(div==="신인부"){
-    gtype=(document.getElementById('apf_gtype')||{}).value||"개인(명)";
-  }
+  var _v=function(id){return String((document.getElementById(id)||{}).value||"").trim()};
+  var cat=_v('apf_cat'), div=_v('apf_div');
+  if(!cat){ alert('구분을 선택해주세요'); return; }
+  if(!div){ alert('참가구분을 선택해주세요'); return; }
+  var gtype=(div==="신인부"?_v("apf_gtype"):"개인(명)");
   var isTeam=(div==="신인부"&&/팀/.test(gtype));
-  var name=(document.getElementById('apf_name')||{}).value.trim();
-  if(!name){ alert(isTeam?'대표자 이름을 입력하세요':'이름을 입력하세요'); return; }
-  var cnt="";
-  if(isTeam){
-    cnt=String((document.getElementById('apf_cnt')||{}).value||"").trim();
-    if(!cnt||parseInt(cnt)<2){ alert('인원수를 2명 이상 입력하세요'); return; }
+  var name=_v('apf_name');
+  if(!name){ alert(isTeam?'대표자 이름을 입력하세요':'성명을 입력하세요'); return; }
+  if(isTeam){var cnt=parseInt(_v("apf_cnt")||"0");if(cnt<2){alert("인원수를 2명 이상 입력하세요");return;}}
+  // 필수 필드 검증
+  var reqFields=[
+    {id:"apf_rrn",l:"주민번호"},{id:"apf_phone",l:"연락처"},{id:"apf_addr",l:"주소"},
+    {id:"apf_region",l:"시도별"},{id:"apf_bank",l:"은행명"},{id:"apf_acct",l:"계좌번호"},
+    {id:"apf_holder",l:"예금주"},{id:"apf_applicant",l:"신청인"}
+  ];
+  for(var ri=0;ri<reqFields.length;ri++){
+    if(!_v(reqFields[ri].id)){alert(reqFields[ri].l+"을(를) 입력해주세요");var fel=document.getElementById(reqFields[ri].id);if(fel)fel.focus();return;}
   }
-  var phone=document.getElementById('apf_phone').value.trim();
-  var region=(document.getElementById('apf_region')||{}).value||"";
-  var memo=(document.getElementById('apf_memo')||{}).value||"";
-  memo=memo.trim();
-  if(!phone){ alert('연락처를 입력하세요'); return; }
+  // 스승 검증
+  var teacherYN=_v("apf_teacherYN");
+  if(!teacherYN){alert("스승 여부를 선택해주세요");return;}
+  if(teacherYN==="있음"&&!_v("apf_teacher")){alert("스승 이름을 입력해주세요");return;}
+  // 주민번호 형식
+  if(!/^\d{6}-\d{7}$/.test(_v("apf_rrn"))){alert("주민번호 형식을 확인해주세요 (YYMMDD-NNNNNNN)");document.getElementById("apf_rrn").focus();return;}
+  // 연락처 형식
+  if(!/^01[0-9]-\d{3,4}-\d{4}$/.test(_v("apf_phone"))){alert("연락처 형식을 확인해주세요 (010-0000-0000)");document.getElementById("apf_phone").focus();return;}
+  // 개인정보 동의
+  if(!document.getElementById("apf_agree").checked){alert("개인정보 수집·이용에 동의해주세요");return;}
+
   var row={
     "구분":cat, "참가구분":div, "신청유형(명/팀)":gtype,
-    "성명":name, "대표자":isTeam?name:"", "인원수":cnt,
-    "연락처":phone, "시도별":region, "비고":memo
+    "성명":isTeam?(name+" 외 "+(parseInt(_v("apf_cnt")||"0")-1)+"명"):name, "대표자":isTeam?name:"", "인원수":isTeam?_v("apf_cnt"):"",
+    "주민번호":_v("apf_rrn"), "연락처":_v("apf_phone"), "주소":_v("apf_addr"),
+    "시도별":_v("apf_region"), "은행명":_v("apf_bank"), "계좌번호":_v("apf_acct"),
+    "예금주":_v("apf_holder"), "신청인":_v("apf_applicant"),
+    "스승":teacherYN==="없음"?"없음":_v("apf_teacher"),
+    "소속":_v("apf_group"), "예선곡":_v("apf_pre"), "본선곡":_v("apf_fin"),
+    "지정고수사용":_v("apf_drummer"), "USB여부":_v("apf_usb"),
+    "개인정보동의":"Y", "비고":""
   };
-  var btn=document.querySelector('#apf_cat').closest('.card').querySelector('button[onclick*="submitApplyForm"]');
-  if(!btn) btn=document.querySelector('#apf_cat').closest('.card').querySelector('button');
-  if(btn){btn.disabled=true;btn.textContent='처리 중...';}
-  api("addApply",Object.assign({id:CID},row)).then(function(r){
+  var btn=document.querySelector('button[onclick*="submitApplyForm"]');
+  if(btn){btn.disabled=true;btn.textContent='파일 업로드 중...';}
+
+  // 파일 업로드 → Google Drive (Apps Script 프록시)
+  var fileFields=[
+    {inputId:"apf_file1", rowKey:"참가신청서", folder:"참가신청서"},
+    {inputId:"apf_file2", rowKey:"통장사본", folder:"통장사본"},
+    {inputId:"apf_file_reg", rowKey:"주민등록등본", folder:"주민등록등본"}
+  ];
+  var uploadPromises=[];
+  var subFolder=CID+"/"+name+"_"+new Date().getTime();
+  fileFields.forEach(function(ff){
+    var inp=document.getElementById(ff.inputId);
+    if(inp&&inp.files&&inp.files[0]){
+      var file=inp.files[0];
+      uploadPromises.push(_uploadToDrive(file, subFolder+"/"+ff.folder, ff.rowKey).then(function(url){
+        row[ff.rowKey]=_encUrl(url);
+      }));
+    }
+  });
+
+  Promise.all(uploadPromises).then(function(){
+    if(btn)btn.textContent='처리 중...';
+    return api("addApply",Object.assign({id:CID},row));
+  }).then(function(r){
     if(r&&r.ok){
       toast('접수순번 '+r.seq+'번으로 신청되었습니다');
-      ['apf_cat','apf_div','apf_name','apf_phone','apf_region','apf_memo','apf_cnt','apf_file1','apf_file2','apf_file_id','apf_file_reg'].forEach(function(id){
+      ['apf_cat','apf_div','apf_name','apf_phone','apf_region','apf_cnt','apf_rrn','apf_addr','apf_bank','apf_acct','apf_holder','apf_applicant','apf_teacherYN','apf_teacher','apf_group','apf_pre','apf_fin','apf_drummer','apf_usb','apf_file1','apf_file2','apf_file_reg'].forEach(function(id){
         var el=document.getElementById(id);
-        if(el) el.tagName==='SELECT'?el.selectedIndex=0:el.value='';
+        if(el){if(el.type==='checkbox')el.checked=false;else if(el.tagName==='SELECT')el.selectedIndex=0;else el.value='';}
       });
       var gt=document.getElementById('apf_gtype'); if(gt) gt.selectedIndex=0;
-      apfDivChg();
+      apfDivChg(); apfTeacherChg();
       APPLY=null; draw();
     } else {
       alert('신청 실패: '+(r&&r.err||'오류'));
     }
+    if(btn){btn.disabled=false;btn.textContent='신청하기';}
+  }).catch(function(err){
+    alert(typeof err==="string"?err:(err&&err.message||"파일 업로드 오류"));
     if(btn){btn.disabled=false;btn.textContent='신청하기';}
   });
 }
@@ -2229,8 +2551,11 @@ function applyEdit(seq){
     } else {
       // 파일 컬럼 (참가신청서/통장사본/주민등록등본) — 업로드 버튼 표시
       var isFileCol = /참가신청서|통장사본|주민등록등본|첨부/.test(hd);
-      // URL 이면 "열기" 링크 + 편집 가능한 textarea 같이 노출
-      if(/^https?:\/\//.test(v)){
+      // URL 이면 "열기" 링크, ENC:: 이면 로그인 사용자만 디코딩해서 열기
+      if(_isEncUrl(v)){
+        var _fname=_decUrl(v).split("/").pop()||"파일";
+        h+='<div style="margin-bottom:6px"><button type="button" class="btn btn-s btn-b" onclick="openEncFile(\''+esc(v).replace(/'/g,"\\'")+'\')">📂 파일 열기</button> <span class="mut" style="font-size:11px">'+esc(_fname)+'</span></div>';
+      } else if(/^https?:\/\//.test(v)){
         h+='<div style="margin-bottom:6px"><a href="'+esc(v)+'" target="_blank" rel="noopener">현재 파일 열기 ↗</a></div>';
       }
       // 파일 업로드 버튼
@@ -2317,43 +2642,31 @@ function applyFileUpload(idx, seq, field){
   var fldEl = document.getElementById("_apFld_"+idx);
   if(!fileEl || !fileEl.files || !fileEl.files.length){ return; }
   var file = fileEl.files[0];
-  if(file.size > 20*1024*1024){ alert("파일이 너무 큽니다 (최대 20MB)"); return; }
   if(statusEl) statusEl.textContent = "업로드 중... ("+Math.round(file.size/1024)+"KB)";
-  var reader = new FileReader();
-  reader.onload = function(){
-    var b64 = String(reader.result||"").replace(/^data:[^;]+;base64,/, "");
-    api("adminUploadFile", {
-      id: CID,
-      base64: b64,
-      filename: file.name,
-      mime: file.type || "application/octet-stream",
-      seq: seq,
-      field: field
-    }).then(function(r){
-      if(r && r.ok){
-        if(statusEl){ statusEl.style.color="#16a34a"; statusEl.textContent="✅ 업로드 완료: "+file.name; }
-        if(fldEl){ fldEl.value = r.url; }
-        // 로컬 데이터도 업데이트
-        if(APPLY){
-          var H=APPLY.headers||[], R=APPLY.rows||[];
-          var iSeq=H.indexOf("접수순번"), iF=H.indexOf(field);
-          if(iSeq>=0 && iF>=0){
-            for(var j=0;j<R.length;j++){
-              if(String(R[j][iSeq])===String(seq)){ R[j][iF]=r.url; break; }
-            }
-          }
+  _uploadToDrive(file, CID+"/"+seq, field).then(function(url){
+    var enc=_encUrl(url);
+    if(statusEl){ statusEl.style.color="#16a34a"; statusEl.textContent="✅ 업로드 완료: "+file.name; }
+    if(fldEl){ fldEl.value = enc; }
+    if(APPLY){
+      var H=APPLY.headers||[], R=APPLY.rows||[];
+      var iSeq=H.indexOf("접수순번"), iF=H.indexOf(field);
+      if(iSeq>=0 && iF>=0){
+        for(var j=0;j<R.length;j++){
+          if(String(R[j][iSeq])===String(seq)){ R[j][iF]=enc; break; }
         }
-      } else {
-        if(statusEl){ statusEl.style.color="#dc2626"; statusEl.textContent="❌ 실패: "+((r&&r.err)||"-"); }
       }
-    }).catch(function(e){
-      if(statusEl){ statusEl.style.color="#dc2626"; statusEl.textContent="❌ 예외: "+(e&&e.message||e); }
-    });
-  };
-  reader.onerror = function(){
-    if(statusEl){ statusEl.style.color="#dc2626"; statusEl.textContent="❌ 파일 읽기 실패"; }
-  };
-  reader.readAsDataURL(file);
+    }
+  }).catch(function(err){
+    if(statusEl){ statusEl.style.color="#dc2626"; statusEl.textContent="❌ "+(typeof err==="string"?err:err.message||"업로드 실패"); }
+  });
+}
+
+// ===== 치환된 파일 열기 (로그인 사용자만) =====
+function openEncFile(enc){
+  if(!ME){toast("로그인이 필요합니다",true);return;}
+  var url=_decUrl(enc);
+  if(!url||url===enc){toast("파일 URL을 복원할 수 없습니다",true);return;}
+  window.open(url,"_blank");
 }
 
 // ===== 상(수상 종류) 관리 팝업 =====
@@ -2549,7 +2862,7 @@ function loadApply_(silent){
     if(r && r.ok) APPLY=r;
     else APPLY={err:(r&&r.err)||"조회 실패",headers:[],rows:[]};
     if(cfg && cfg.cats && cfg.cats.length) APPLY_CATS=cfg.cats;
-    if(cfg){ APPLY_FORM_URL=cfg.formUrl||""; APPLY_FORM_URL_PDF=cfg.formUrlPdf||""; }
+    if(cfg){ APPLY_FORM_URL=cfg.formUrl||""; APPLY_FORM_URL_PDF=cfg.formUrlPdf||""; DRIVE_UPLOAD_URL=cfg.driveUploadUrl||""; }
     if(!APPLY_CATS) APPLY_CATS=APPLY_CATS_DEFAULT;
     if(APPLY_SORT.col<0 && APPLY && APPLY.headers){
       var si=APPLY.headers.indexOf("접수순번");
@@ -3896,7 +4209,7 @@ function draw(){
   var el=document.getElementById("mc");
   if(CTAB=="apply")el.innerHTML=dApply();
   else if(CTAB=="apstat")el.innerHTML=dApstat();
-  else if(CTAB=="apform")el.innerHTML=dApform();
+  else if(CTAB=="apform"){el.innerHTML=dApform();var _rrn=document.getElementById("apf_rrn");if(_rrn)_rrn.addEventListener("input",function(){var v=_rrn.value.replace(/[^\d]/g,"").slice(0,13);if(v.length>6)v=v.slice(0,6)+"-"+v.slice(6);_rrn.value=v;});var _tel=document.getElementById("apf_phone");if(_tel)_tel.addEventListener("input",function(){var v=_tel.value.replace(/[^\d]/g,"").slice(0,11);if(v.length<4)_tel.value=v;else if(v.length<8)_tel.value=v.slice(0,3)+"-"+v.slice(3);else if(v.length<=10)_tel.value=v.slice(0,3)+"-"+v.slice(3,6)+"-"+v.slice(6);else _tel.value=v.slice(0,3)+"-"+v.slice(3,7)+"-"+v.slice(7);});}
   else if(CTAB=="dash")el.innerHTML=dDash();
   else if(CTAB=="act")el.innerHTML=dAct();
   else if(CTAB=="pur")el.innerHTML=dPur();
@@ -14786,9 +15099,11 @@ async function doImp(inp){
           var rsB=await api("bulkReplaceMems",{rows:rowsOut,mode:"append"});
           if(rsB&&rsB.ok){
             c+=rsB.cnt||rowsOut.length;
+            if(rsB.newGroups) toast("소속 "+rsB.newGroups+"건 자동 생성");
             // 서버 정본이 바뀌었으니 apiRefresh로 동기화
             var ref=await api("refresh",{});
             if(ref&&ref.mems){mems=ref.mems}
+            if(ref&&ref.memGroups){memGroups=ref.memGroups}
           }else{
             fail+=rowsOut.length;
             toast("인원 일괄 저장 실패: "+(rsB&&rsB.err||"알 수 없는 오류"),true);
@@ -16036,7 +16351,7 @@ async function popGroups(){
   var r=await api("listGroups",{});
   hideLoading();
   if(!r||!r.ok){toast("조회 실패: "+(r&&r.err||""),true);return}
-  memGroups=r.groups||[];
+  memGroups=r.memGroups||r.groups||[];
   _renderGroupsModal();
 }
 function _renderGroupsModal(){
@@ -18307,7 +18622,7 @@ document.getElementById("lId").addEventListener("keydown",function(e){if(e.key==
     if(!cfg||!cfg.ok){ wrap.innerHTML='<div class="pf-wrap" style="text-align:center;padding-top:60px;color:#dc2626;font-size:16px">신청폼을 불러올 수 없습니다.</div>'; return; }
     if(cfg.cats&&cfg.cats.length) APPLY_CATS=cfg.cats;
     if(!APPLY_CATS) APPLY_CATS=APPLY_CATS_DEFAULT;
-    APPLY_FORM_URL=cfg.formUrl||"";
+    APPLY_FORM_URL=cfg.formUrl||""; DRIVE_UPLOAD_URL=cfg.driveUploadUrl||"";
     APPLY_FORM_URL_PDF=cfg.formUrlPdf||"";
 
     fbDb.ref('/evtData/'+evtId+'/Config').once('value',function(snap){
@@ -18535,7 +18850,7 @@ document.getElementById("lId").addEventListener("keydown",function(e){if(e.key==
 
     var row={
       "구분":_v("apf_cat"),"참가구분":div,"신청유형(명/팀)":gtype,
-      "성명":_v("apf_name"),"대표자":isTeam?_v("apf_name"):"","인원수":isTeam?_v("apf_cnt"):"",
+      "성명":isTeam?(_v("apf_name")+" 외 "+(parseInt(_v("apf_cnt")||"0")-1)+"명"):_v("apf_name"),"대표자":isTeam?_v("apf_name"):"","인원수":isTeam?_v("apf_cnt"):"",
       "주민번호":_v("apf_rrn"),"연락처":_v("apf_phone"),"주소":_v("apf_addr"),
       "시도별":_v("apf_region"),"은행명":_v("apf_bank"),"계좌번호":_v("apf_acct"),
       "예금주":_v("apf_holder"),"신청인":_v("apf_applicant"),
@@ -18544,7 +18859,35 @@ document.getElementById("lId").addEventListener("keydown",function(e){if(e.key==
       "지정고수사용":_v("apf_drummer"),"USB여부":_v("apf_usb"),
       "개인정보동의":"Y","비고":""
     };
-    api("addApply",Object.assign({id:CID},row)).then(function(r){
+
+    // 파일 업로드 → Google Drive (Apps Script 프록시)
+    var fileKeys=["form","bank","reg"];
+    var rowKeys={"form":"참가신청서","bank":"통장사본","reg":"주민등록등본"};
+    var uploadPromises=[];
+    var subFolder=CID+"/"+_v("apf_name")+"_"+new Date().getTime();
+    fileKeys.forEach(function(key){
+      var fObj=_PF_FILES["file_"+key];
+      if(fObj&&fObj.dataUrl){
+        uploadPromises.push(new Promise(function(res,rej){
+          var m2=fObj.dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+          if(!m2){rej("파일 읽기 실패: "+rowKeys[key]);return;}
+          if(!DRIVE_UPLOAD_URL){rej("Drive 업로드 URL 미설정");return;}
+          fetch(DRIVE_UPLOAD_URL,{
+            method:"POST",
+            headers:{"Content-Type":"text/plain"},
+            body:JSON.stringify({base64:m2[2],filename:fObj.name,mime:m2[1],subFolder:subFolder+"/"+rowKeys[key]})
+          }).then(function(resp){return resp.json()})
+            .then(function(r2){
+              if(r2&&r2.ok){row[rowKeys[key]]=_encUrl(r2.url);res();}
+              else rej("업로드 실패("+rowKeys[key]+"): "+(r2&&r2.err||"오류"));
+            }).catch(function(err){rej("업로드 오류("+rowKeys[key]+"): "+(err.message||err));});
+        }));
+      }
+    });
+
+    Promise.all(uploadPromises).then(function(){
+      return api("addApply",Object.assign({id:CID},row));
+    }).then(function(r){
       if(ld)ld.classList.remove("show");
       if(btn)btn.disabled=false;
       if(r&&r.ok){
@@ -18556,6 +18899,10 @@ document.getElementById("lId").addEventListener("keydown",function(e){if(e.key==
       } else {
         alert("제출 실패: "+(r&&r.err||"알 수 없는 오류"));
       }
+    }).catch(function(err){
+      if(ld)ld.classList.remove("show");
+      if(btn)btn.disabled=false;
+      alert(typeof err==="string"?err:(err&&err.message||"파일 업로드 오류"));
     });
   };
 
@@ -18574,6 +18921,221 @@ document.getElementById("lId").addEventListener("keydown",function(e){if(e.key==
     window.scrollTo(0,0);
   };
 })();
+
+// ========================================================================
+// ===== 공개 참가신청 폼 (Firebase API 기반, 로그인 불필요) =====
+// ========================================================================
+var APF_FILES = { file_form:null, file_bank:null, file_reg:null };
+var APF_DRIVE_URL = ""; // apfLoadStatus에서 설정
+
+function apfShowLoading(msg){ var el=document.getElementById("apfLoadMsg"); if(el) el.textContent=msg||"처리 중..."; var ld=document.getElementById("apfLoading"); if(ld) ld.classList.add("show"); }
+function apfHideLoading(){ var ld=document.getElementById("apfLoading"); if(ld) ld.classList.remove("show"); }
+function apfEscHtml(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+
+// 주민번호·연락처 자동 포맷
+function apfFmtRrn(el){ var v=String(el.value||"").replace(/[^\d]/g,"").slice(0,13); if(v.length>6) v=v.slice(0,6)+"-"+v.slice(6); el.value=v; }
+function apfFmtTel(el){ var v=String(el.value||"").replace(/[^\d]/g,"").slice(0,11); if(v.length<4) el.value=v; else if(v.length<8) el.value=v.slice(0,3)+"-"+v.slice(3); else if(v.length<=10) el.value=v.slice(0,3)+"-"+v.slice(3,6)+"-"+v.slice(6); else el.value=v.slice(0,3)+"-"+v.slice(3,7)+"-"+v.slice(7); }
+function apfBindFormatters(){
+  var rrn=document.getElementById("apfRrn");
+  if(rrn){ rrn.addEventListener("input",function(){apfFmtRrn(rrn);}); rrn.addEventListener("blur",function(){apfFmtRrn(rrn);}); }
+  var tel=document.getElementById("apfTel");
+  if(tel){ tel.addEventListener("input",function(){apfFmtTel(tel);}); tel.addEventListener("blur",function(){apfFmtTel(tel);}); }
+}
+function apfOnDivChange(){ var d=document.getElementById("apfDiv").value; var r=document.getElementById("apfRowGType"); var s=document.getElementById("apfGType"); if(d==="신인부"){r.style.display="block";}else{r.style.display="none";s.value="개인";apfOnGTypeChange();} }
+function apfOnGTypeChange(){ var g=document.getElementById("apfGType").value; var r=document.getElementById("apfRowCnt"); if(g==="팀"){r.style.display="block";}else{r.style.display="none";document.getElementById("apfCnt").value="";} }
+function apfOnTeacherChange(){ var yn=document.getElementById("apfTeacherYN").value; var r=document.getElementById("apfRowTeacher"); if(yn==="있음"){r.style.display="block";document.getElementById("apfTeacher").focus();}else{r.style.display="none";document.getElementById("apfTeacher").value="";} }
+
+function apfPickFile(input,wrapId,key){
+  var wrap=document.getElementById(wrapId);
+  var info=document.getElementById("apfInfo_"+key.split("_")[1]);
+  var file=input.files[0];
+  if(!file){ APF_FILES[key]=null; if(wrap)wrap.classList.remove("has-file","err"); if(info)info.textContent=""; return; }
+  if(file.size>15*1024*1024){ APF_FILES[key]=null; if(wrap)wrap.classList.add("err"); if(info){info.style.color="#dc2626";info.textContent="파일이 너무 큽니다 (최대 15MB). 현재: "+(file.size/1024/1024).toFixed(1)+"MB";} input.value=""; return; }
+  // base64로 읽어두기 (Drive 업로드용)
+  APF_FILES[key] = file; // File 객체 보관
+  if(wrap)wrap.classList.add("has-file"); if(wrap)wrap.classList.remove("err");
+  if(info){info.style.color="#166534";info.textContent="✓ "+file.name+" ("+(file.size/1024).toFixed(0)+" KB)";}
+}
+
+// 상태 조회 (Firebase에서 Config 읽기)
+function apfLoadStatus(){
+  if(!APPLY_EVT_ID) return;
+  // common.js의 api() 사용 — evtId 직접 전달
+  api("getApplyConfig",{evtId:APPLY_EVT_ID}).then(function(res){
+    if(!res||!res.ok) return;
+    var bar=document.getElementById("apfStatus");
+    var form=document.getElementById("apfForm");
+    var tb=document.getElementById("apfToolbar");
+    // Drive 업로드 URL 저장
+    APF_DRIVE_URL = res.driveUploadUrl||"";
+    // 양식 다운로드 링크
+    if(res.formUrl){ tb.style.display="flex"; document.getElementById("apfBtnForm").href=res.formUrl; }
+    if(res.formUrlPdf){ var b2=document.getElementById("apfBtnFormPdf"); b2.href=res.formUrlPdf; b2.style.display="inline-block"; }
+    // 접수 상태 표시
+    if(res.effective==="closed"){
+      bar.className="apf-status closed show";
+      bar.innerHTML="<strong>접수가 마감되었습니다.</strong>"+(res.endDt?"<br>마감일: "+res.endDt:"")+(res.notice?"<br>"+apfEscHtml(res.notice):"");
+      form.style.display="none";
+    } else if(res.effective==="notyet"){
+      bar.className="apf-status notyet show";
+      bar.innerHTML="<strong>아직 접수 시작 전입니다.</strong>"+(res.startDt?"<br>시작일: "+res.startDt:"")+(res.notice?"<br>"+apfEscHtml(res.notice):"");
+      form.style.display="none";
+    } else {
+      if(res.endDt||res.notice){
+        bar.className="apf-status info show";
+        bar.innerHTML=(res.endDt?"📅 마감일: <strong>"+res.endDt+"</strong>까지":"")+(res.notice?((res.endDt?"<br>":"")+apfEscHtml(res.notice)):"");
+      }
+    }
+  }).catch(function(e){ console.warn("apfLoadStatus:",e); });
+}
+
+// 유효성 검사
+function apfV(id){ return String((document.getElementById(id)||{}).value||"").trim(); }
+function apfValidate(){
+  var required=[
+    {id:"apfCat",label:"구분"},{id:"apfDiv",label:"참가구분"},{id:"apfName",label:"성명"},
+    {id:"apfRrn",label:"주민번호"},{id:"apfTel",label:"연락처"},{id:"apfAddr",label:"주소"},
+    {id:"apfRegion",label:"시도별"},{id:"apfBank",label:"은행명"},{id:"apfAcct",label:"계좌번호"},
+    {id:"apfHolder",label:"예금주"},{id:"apfApplicant",label:"신청인"}
+  ];
+  for(var i=0;i<required.length;i++){
+    if(!apfV(required[i].id)){ alert(required[i].label+"을(를) 입력해주세요"); document.getElementById(required[i].id).focus(); return false; }
+  }
+  var teacherYN=apfV("apfTeacherYN");
+  if(!teacherYN){ alert("스승 여부를 선택해주세요"); document.getElementById("apfTeacherYN").focus(); return false; }
+  if(teacherYN==="있음"&&!apfV("apfTeacher")){ alert("스승 이름을 입력해주세요"); document.getElementById("apfTeacher").focus(); return false; }
+  if(!/^\d{6}-\d{7}$/.test(apfV("apfRrn"))){ alert("주민번호 형식을 확인해주세요 (YYMMDD-NNNNNNN)"); document.getElementById("apfRrn").focus(); return false; }
+  if(!/^01[0-9]-\d{3,4}-\d{4}$/.test(apfV("apfTel"))){ alert("연락처 형식을 확인해주세요 (010-0000-0000)"); document.getElementById("apfTel").focus(); return false; }
+  // 팀일 때 인원수 검증
+  if(apfV("apfDiv")==="신인부"&&apfV("apfGType")==="팀"){
+    var cnt=parseInt(apfV("apfCnt")||"0");
+    if(!cnt||cnt<2){ alert("팀 인원수를 2명 이상 입력해주세요"); document.getElementById("apfCnt").focus(); return false; }
+  }
+  if(!APF_FILES.file_form){ alert("참가신청서 파일을 첨부해주세요"); return false; }
+  if(!document.getElementById("apfAgree").checked){ alert("개인정보 수집·이용에 동의해주세요"); return false; }
+  return true;
+}
+
+// Drive 업로드 헬퍼 (공개폼 전용)
+function apfUploadToDrive(file, subFolder, label){
+  var driveUrl = APF_DRIVE_URL;
+  if(!driveUrl) return Promise.reject("Drive 업로드 URL이 설정되지 않았습니다. 관리자에게 문의하세요.");
+  if(file.size>15*1024*1024) return Promise.reject("파일이 너무 큽니다 (최대 15MB): "+label);
+  return new Promise(function(res,rej){
+    var reader=new FileReader();
+    reader.onload=function(e){
+      var m=e.target.result.match(/^data:([^;]+);base64,(.+)$/);
+      if(!m){rej("파일 읽기 실패: "+label);return;}
+      fetch(driveUrl,{
+        method:"POST",
+        headers:{"Content-Type":"text/plain"},
+        body:JSON.stringify({base64:m[2],filename:file.name,mime:m[1],subFolder:subFolder})
+      }).then(function(resp){return resp.json()})
+        .then(function(r){
+          if(r&&r.ok) res(r.url);
+          else rej("업로드 실패("+label+"): "+(r&&r.err||"알 수 없는 오류"));
+        }).catch(function(err){rej("업로드 오류("+label+"): "+(err.message||err));});
+    };
+    reader.onerror=function(){rej("파일 읽기 실패: "+label);};
+    reader.readAsDataURL(file);
+  });
+}
+
+// 제출
+function apfSubmit(){
+  if(!apfValidate()) return;
+  if(!APPLY_EVT_ID){ alert("행사 정보가 없습니다. URL을 확인해주세요."); return; }
+  var btn=document.getElementById("apfSubmitBtn");
+  btn.disabled=true;
+  apfShowLoading("제출 중... (파일 업로드에 시간이 걸릴 수 있어요)");
+
+  var teacherVal=apfV("apfTeacherYN")==="없음"?"없음":apfV("apfTeacher");
+  var name=apfV("apfName");
+  var isTeam=(apfV("apfDiv")==="신인부"&&apfV("apfGType")==="팀");
+  var teamCnt=parseInt(apfV("apfCnt")||"0");
+  var displayName=isTeam&&teamCnt>=2?(name+" 외 "+(teamCnt-1)+"명"):name;
+  var ts=Date.now();
+  var subFolder=APPLY_EVT_ID+"/"+name+"_"+ts;
+
+  // 1) 파일 업로드 (Drive → URL 받기 → ENC:: 치환)
+  var uploads=[];
+  var fileUrls={참가신청서:"",통장사본:"",주민등록등본:""};
+  if(APF_FILES.file_form) uploads.push(apfUploadToDrive(APF_FILES.file_form,subFolder+"/참가신청서","참가신청서").then(function(url){fileUrls["참가신청서"]=_encUrl(url);}));
+  if(APF_FILES.file_bank) uploads.push(apfUploadToDrive(APF_FILES.file_bank,subFolder+"/통장사본","통장사본").then(function(url){fileUrls["통장사본"]=_encUrl(url);}));
+  if(APF_FILES.file_reg) uploads.push(apfUploadToDrive(APF_FILES.file_reg,subFolder+"/주민등록등본","주민등록등본").then(function(url){fileUrls["주민등록등본"]=_encUrl(url);}));
+
+  Promise.all(uploads).then(function(){
+    // 2) Firebase에 데이터 저장
+    var row={
+      evtId:APPLY_EVT_ID,
+      구분:apfV("apfCat"),
+      참가구분:apfV("apfDiv"),
+      "신청유형(명/팀)":(apfV("apfDiv")==="신인부"?(apfV("apfGType")||"개인"):"개인"),
+      성명:displayName,
+      주민번호:apfV("apfRrn"),
+      연락처:apfV("apfTel"),
+      주소:apfV("apfAddr"),
+      시도별:apfV("apfRegion"),
+      은행명:apfV("apfBank"),
+      계좌번호:apfV("apfAcct"),
+      예금주:apfV("apfHolder"),
+      신청인:apfV("apfApplicant"),
+      소속:apfV("apfGroup"),
+      스승:teacherVal,
+      예선곡:apfV("apfPre"),
+      본선곡:apfV("apfFin"),
+      지정고수사용:apfV("apfDrummer"),
+      USB여부:apfV("apfUsb"),
+      개인정보동의:"동의",
+      참가신청서:fileUrls["참가신청서"],
+      통장사본:fileUrls["통장사본"],
+      주민등록등본:fileUrls["주민등록등본"]
+    };
+    return api("addApply",row);
+  }).then(function(res){
+    apfHideLoading();
+    btn.disabled=false;
+    if(res&&res.ok){
+      document.getElementById("apfForm").style.display="none";
+      document.getElementById("apfDoneSeq").textContent=res.seq||"-";
+      document.getElementById("apfDoneTs").textContent=new Date().toLocaleString("ko-KR");
+      document.getElementById("apfDone").classList.add("show");
+      window.scrollTo(0,0);
+    } else {
+      alert("제출 실패: "+(res&&res.err?res.err:"알 수 없는 오류"));
+    }
+  }).catch(function(err){
+    apfHideLoading();
+    btn.disabled=false;
+    alert("제출 실패: "+(err&&err.message?err.message:err));
+  });
+}
+
+// 새로 접수하기
+function apfResetForm(){
+  try{
+    document.getElementById("apfDone").classList.remove("show");
+    var formEl=document.getElementById("apfForm");
+    if(formEl){
+      formEl.style.display="";
+      var inputs=formEl.querySelectorAll("input,textarea,select");
+      for(var i=0;i<inputs.length;i++){
+        var el=inputs[i];
+        if(el.type==="checkbox"||el.type==="radio") el.checked=false;
+        else if(el.type==="file") el.value="";
+        else el.value="";
+      }
+    }
+    APF_FILES={file_form:null,file_bank:null,file_reg:null};
+    var infos=document.querySelectorAll(".apf-fi");
+    for(var j=0;j<infos.length;j++){infos[j].textContent="";infos[j].style.color="";}
+    var wraps=document.querySelectorAll(".apf-fw");
+    for(var k=0;k<wraps.length;k++){wraps[k].classList.remove("has-file","err");}
+    document.getElementById("apfRowTeacher").style.display="none";
+    document.getElementById("apfRowGType").style.display="none";
+    window.scrollTo(0,0);
+  }catch(e){ try{window.location.reload();}catch(e2){} }
+}
 </script>
 </body>
 </html>

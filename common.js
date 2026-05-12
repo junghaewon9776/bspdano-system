@@ -1,6 +1,24 @@
 // 단오시스템 — Firebase 기반 공통 라이브러리
 // 기존 GAS api() 인터페이스를 유지하면서 Firebase RTDB로 전환
 
+// ───────── URL 치환 (인코딩/디코딩) ─────────
+// DB에 저장할 때: _encUrl(url) → "ENC::base64문자열"
+// 파일 열 때:    _decUrl(val) → 원래 URL
+function _encUrl(url) {
+  if (!url) return "";
+  try { return "ENC::" + btoa(unescape(encodeURIComponent(url))); }
+  catch(e) { return url; }
+}
+function _decUrl(val) {
+  if (!val) return "";
+  var s = String(val);
+  if (s.indexOf("ENC::") !== 0) return s; // 치환 안 된 레거시
+  try { return decodeURIComponent(escape(atob(s.slice(5)))); }
+  catch(e) { return s; }
+}
+// 값이 치환된 파일인지 확인
+function _isEncUrl(v) { return String(v||"").indexOf("ENC::") === 0; }
+
 // ───────── Firebase 동기화 캐시 ─────────
 var _cache = null;
 var _cacheReady = false;
@@ -158,7 +176,6 @@ function _dispatch(p) {
         case "addMem":    _apiAddRow(p, "Mems").then(resolve); return;
         case "updateMem": _apiUpdateRow(p, "Mems").then(resolve); return;
         case "deleteMem": _apiDeleteRow(p, "Mems").then(resolve); return;
-        case "bulkReplaceMems": _apiBulkReplace(p, "Mems").then(resolve); return;
 
         // 활동
         case "addAct":    _apiAddRow(p, "Acts").then(resolve); return;
@@ -987,7 +1004,7 @@ function _apiGetApplyConfig(p) {
       else if (ac.endDt && today > ac.endDt) effective = "closed";
       else effective = "open";
     }
-    return {ok:true, status:status, effective:effective, today:today, count:(applyArr||[]).length, webappUrl:ac.webappUrl||"", startDt:ac.startDt||"", endDt:ac.endDt||"", notice:ac.notice||"", cats:ac.cats||null, formUrl:ac.formUrl||"", formUrlPdf:ac.formUrlPdf||""};
+    return {ok:true, status:status, effective:effective, today:today, count:(applyArr||[]).length, webappUrl:ac.webappUrl||"", startDt:ac.startDt||"", endDt:ac.endDt||"", notice:ac.notice||"", cats:ac.cats||null, formUrl:ac.formUrl||"", formUrlPdf:ac.formUrlPdf||"", driveUploadUrl:ac.driveUploadUrl||cfg.DRIVE_UPLOAD_URL||""};
   });
 }
 
@@ -1102,23 +1119,62 @@ function _apiAddApply(p) {
       var arr = [];
       if (Array.isArray(raw)) arr = raw.filter(function(r){return r!=null;});
       else if (raw && typeof raw === 'object') Object.keys(raw).forEach(function(k){if(raw[k])arr.push(raw[k]);});
-      var maxSeq = 0;
+      // 접수순번: 2026-0001 형식 (YYYY-NNNN만 카운트)
+      var year = new Date().getFullYear().toString();
+      var maxNum = 0;
+      var re = new RegExp("^" + year + "-(\\d+)$");
       arr.forEach(function(r) {
-        var s = parseInt(r["접수순번"] || r[_fbSafeKey("접수순번")] || 0);
-        if (s > maxSeq) maxSeq = s;
+        var s = String(r["접수순번"] || r[_fbSafeKey("접수순번")] || "");
+        var m = s.match(re);
+        if (m) { var n = parseInt(m[1], 10); if (n > maxNum) maxNum = n; }
       });
+      var seq = year + "-" + ("0000" + (maxNum + 1)).slice(-4);
       var row = {};
       Object.keys(p).forEach(function(k) {
         if (k === 'action' || k === 'evtId' || k === 'by' || k === 'id') return;
         row[k] = p[k];
       });
-      row["접수순번"] = maxSeq + 1;
+      row["접수순번"] = seq;
       row["접수일시"] = now_();
       arr.push(_fbSafeRow(row));
       fbDb.ref('/evtData/' + evtId + '/Apply').set(arr).then(function() {
-        resolve({ok:true, seq: maxSeq + 1});
+        // 텔레그램 알림
+        _notifyApply(evtId, row, seq);
+        resolve({ok:true, seq: seq});
       });
     });
+  });
+}
+
+// 참가 접수 텔레그램 알림
+function _notifyApply(evtId, row, seq) {
+  var data = _evtCaches[evtId];
+  if (!data) return;
+  var cfg = {};
+  (data.Config || []).forEach(function(c) { if(c&&c.k) cfg[c.k]=c.v; });
+  var botToken = cfg.TELEGRAM_BOT_TOKEN;
+  var chatIds = cfg.TELEGRAM_CHAT_IDS;
+  if (!botToken || !chatIds) return;
+  var cat = row["구분"] || "";
+  var div = row["참가구분"] || row[_fbSafeKey("참가구분")] || "";
+  var nm = row["성명"] || row[_fbSafeKey("성명")] || "";
+  var phone = row["연락처"] || row[_fbSafeKey("연락처")] || "";
+  var region = row["시도별"] || row[_fbSafeKey("시도별")] || "";
+  var text = "📋 <b>참가 접수</b>"
+    + "\n접수번호: " + seq
+    + "\n구분: " + cat + " / " + div
+    + "\n성명: " + nm
+    + "\n연락처: " + phone
+    + "\n시도: " + region
+    + "\n시각: " + now_();
+  var url = "https://api.telegram.org/bot" + botToken + "/sendMessage";
+  var ids = chatIds.split(/[,\s]+/).filter(Boolean);
+  ids.forEach(function(chatId) {
+    fetch(url, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({chat_id:chatId, text:text, parse_mode:'HTML'})
+    }).catch(function(e) { console.warn('텔레그램 접수알림 실패:', e); });
   });
 }
 
