@@ -250,6 +250,7 @@ body{font-family:'Pretendard','Noto Sans KR',sans-serif;background:#1a1a2e;color
     </select>
     <label>번호 접두어</label>
     <input id="ncPrefix" type="text" placeholder="예: B" maxlength="5">
+    <div class="cat-setting" style="margin-top:6px"><label style="width:auto;flex:none;cursor:pointer"><input id="ncShowPrefix" type="checkbox" checked style="margin-right:4px;vertical-align:middle">라벨에 접두어 표시 (해제 시 숫자만)</label></div>
     <div class="modal-btns">
       <button style="background:#10b981;color:#fff" onclick="createCategory()">생성</button>
       <button style="background:#475569;color:#fff" onclick="document.getElementById('newCatModal').style.display='none'">취소</button>
@@ -303,6 +304,7 @@ body{font-family:'Pretendard','Noto Sans KR',sans-serif;background:#1a1a2e;color
     </select>
     <label>번호 접두어</label>
     <input id="ecPrefix" type="text" maxlength="5">
+    <div class="cat-setting" style="margin-top:6px"><label style="width:auto;flex:none;cursor:pointer"><input id="ecShowPrefix" type="checkbox" style="margin-right:4px;vertical-align:middle">라벨에 접두어 표시 (해제 시 숫자만)</label></div>
     <div class="modal-btns">
       <button style="background:#3b82f6;color:#fff" onclick="updateCategory()">적용</button>
       <button style="background:#dc2626;color:#fff" onclick="deleteCategory()">카테고리 삭제</button>
@@ -466,6 +468,16 @@ function _doDragEnd(){
     if(_drag.sPath)it.path=_drag.sPath.map(function(p){return{lat:p.lat,lng:p.lng}});
     drawItem(idx);
   }
+}
+
+// 라벨 텍스트: showPrefix가 꺼져있으면 숫자만 표시
+function getDisplayNum(it){
+  var cat=categories.find(function(c){return c.id===it.catId});
+  if(cat&&cat.showPrefix===false){
+    var m=it.num.match(/\d+$/);
+    return m?m[0]:it.num;
+  }
+  return it.num;
 }
 
 // ══ 검색 핀 ══
@@ -639,6 +651,7 @@ function showNewCatModal(){
   document.getElementById('ncDiam').value=5;
   document.getElementById('ncColor').value='#3b82f6';
   document.getElementById('ncPrefix').value='';
+  document.getElementById('ncShowPrefix').checked=true;
   document.getElementById('ncDirection').value='none';
   document.getElementById('ncStrokeW').value=4;
   onShapeChange('nc');
@@ -660,6 +673,7 @@ function createCategory(){
     color:document.getElementById('ncColor').value,
     opacity:parseFloat(document.getElementById('ncOpacity').value),
     prefix:document.getElementById('ncPrefix').value.trim()||name.charAt(0),
+    showPrefix:document.getElementById('ncShowPrefix').checked,
     direction:document.getElementById('ncDirection').value||'none',
     strokeWeight:parseInt(document.getElementById('ncStrokeW').value)||4
   };
@@ -682,6 +696,7 @@ function showEditCat(catId){
   document.getElementById('ecDiam').value=cat.diameter||5;
   document.getElementById('ecColor').value=cat.color;
   document.getElementById('ecPrefix').value=cat.prefix;
+  document.getElementById('ecShowPrefix').checked=cat.showPrefix!==false;
   document.getElementById('ecDirection').value=cat.direction||'none';
   document.getElementById('ecStrokeW').value=cat.strokeWeight||4;
   document.getElementById('ecOpacity').value=String(cat.opacity!=null?cat.opacity:0.4);
@@ -700,6 +715,7 @@ function updateCategory(){
   cat.diameter=parseFloat(document.getElementById('ecDiam').value)||5;
   cat.color=document.getElementById('ecColor').value;
   cat.prefix=document.getElementById('ecPrefix').value.trim()||cat.name.charAt(0);
+  cat.showPrefix=document.getElementById('ecShowPrefix').checked;
   cat.direction=document.getElementById('ecDirection').value||'none';
   cat.strokeWeight=parseInt(document.getElementById('ecStrokeW').value)||4;
   cat.opacity=parseFloat(document.getElementById('ecOpacity').value);
@@ -864,7 +880,7 @@ function drawItem(idx){
   var labelEl=document.createElement('div');
   labelEl.className='f-label';
   labelEl.style.background=color+'cc';
-  labelEl.textContent=it.num;
+  labelEl.textContent=getDisplayNum(it);
 
   // 드래그 시작 (마우스)
   labelEl.addEventListener('mousedown',function(ev){
@@ -1353,7 +1369,7 @@ function renderLegend(){
 function autoSave(){saveAll(true)}
 function saveAll(silent){
   var catData=categories.map(function(c){
-    var d={id:c.id,name:c.name,shape:c.shape,color:c.color,prefix:c.prefix,opacity:c.opacity!=null?c.opacity:0.4};
+    var d={id:c.id,name:c.name,shape:c.shape,color:c.color,prefix:c.prefix,showPrefix:c.showPrefix!==false,opacity:c.opacity!=null?c.opacity:0.4};
     if(c.shape==='rect'){d.w=c.w;d.h=c.h;}
     else if(c.shape==='circle'){d.diameter=c.diameter||5;}
     else if(c.shape==='line'){d.direction=c.direction||'none';d.strokeWeight=c.strokeWeight||4;}
@@ -1379,6 +1395,7 @@ function loadData(){
         c.direction=c.direction||'none';
         c.strokeWeight=c.strokeWeight||4;
         c.opacity=c.opacity!=null?c.opacity:0.4;
+        if(c.showPrefix===undefined)c.showPrefix=true;
         c.w=c.w||3;c.h=c.h||6;c.diameter=c.diameter||5;
         return c;
       });
