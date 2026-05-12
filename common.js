@@ -913,12 +913,30 @@ function _apiNotifyLogin(p) {
     var os = /Windows/.test(ua)?"Windows":/Mac OS/.test(ua)?"Mac":/Android/.test(ua)?"Android":/iPhone|iPad/.test(ua)?"iOS":/Linux/.test(ua)?"Linux":"";
     dev = br + (os ? " on " + os : "");
   }
-  var text = "✅ <b>로그인 성공</b>"
-    + "\n• 계정: " + (p.id||"") + (p.nm ? " (" + p.nm + ")" : "")
-    + "\n• 역할: " + roleLabel
-    + "\n• IP: " + (p.ip||"-")
-    + (dev ? "\n• 기기: " + dev : "")
-    + "\n• 시각: " + now_();
+  var text;
+  if (p.logout) {
+    text = "🔒 <b>로그아웃</b>"
+      + "\n• 계정: " + (p.id||"") + (p.nm ? " (" + p.nm + ")" : "")
+      + "\n• 역할: " + roleLabel
+      + "\n• 사유: " + (p.reason||"수동")
+      + "\n• IP: " + (p.ip||"-")
+      + (dev ? "\n• 기기: " + dev : "")
+      + "\n• 시각: " + now_();
+  } else if (p.fail) {
+    text = "❌ <b>로그인 실패</b>"
+      + "\n• 계정: " + (p.id||"")
+      + "\n• 사유: " + (p.err||"")
+      + "\n• IP: " + (p.ip||"-")
+      + (dev ? "\n• 기기: " + dev : "")
+      + "\n• 시각: " + now_();
+  } else {
+    text = "✅ <b>로그인 성공</b>"
+      + "\n• 계정: " + (p.id||"") + (p.nm ? " (" + p.nm + ")" : "")
+      + "\n• 역할: " + roleLabel
+      + "\n• IP: " + (p.ip||"-")
+      + (dev ? "\n• 기기: " + dev : "")
+      + "\n• 시각: " + now_();
+  }
   var url = "https://api.telegram.org/bot" + botToken + "/sendMessage";
   var ids = chatIds.split(/[,\s]+/).filter(Boolean);
 

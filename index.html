@@ -1086,12 +1086,14 @@ function logout(msg){
   try {
     if(logoutId){
       var ua = navigator.userAgent||"";
+      var logoutNm = (ME&&ME.nm)||"";
+      var logoutRole = (ME&&ME.r)||"";
       _fetchIp_().then(function(ip){
-        api("notifyLogin",{id:logoutId, logout:true, reason:reason, ip:ip||"", ua:ua}).catch(function(){});
+        api("notifyLogin",{id:logoutId, nm:logoutNm, role:logoutRole, logout:true, reason:reason, ip:ip||"", ua:ua}).catch(function(){});
         // 알림 발송 후 짧게 대기 후 리로드 (네트워크 요청이 브라우저 언로드로 취소되지 않게)
         setTimeout(function(){ _doLogoutReload_(msg); }, 600);
       }).catch(function(){
-        api("notifyLogin",{id:logoutId, logout:true, reason:reason, ip:"", ua:ua}).catch(function(){});
+        api("notifyLogin",{id:logoutId, nm:logoutNm, role:logoutRole, logout:true, reason:reason, ip:"", ua:ua}).catch(function(){});
         setTimeout(function(){ _doLogoutReload_(msg); }, 600);
       });
       return;
