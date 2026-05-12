@@ -242,6 +242,12 @@ body{font-family:'Pretendard','Noto Sans KR',sans-serif;background:#1a1a2e;color
     <label>색상</label>
     <div class="color-palette" id="ncPalette"></div>
     <input id="ncColor" type="hidden" value="#FF6B6B">
+    <label>투명도</label>
+    <select id="ncOpacity">
+      <option value="0.4">반투명</option>
+      <option value="0.8">불투명</option>
+      <option value="0">투명 (테두리만)</option>
+    </select>
     <label>번호 접두어</label>
     <input id="ncPrefix" type="text" placeholder="예: B" maxlength="5">
     <div class="modal-btns">
@@ -289,6 +295,12 @@ body{font-family:'Pretendard','Noto Sans KR',sans-serif;background:#1a1a2e;color
     <label>색상 (변경 시 전체 아이템 적용)</label>
     <div class="color-palette" id="ecPalette"></div>
     <input id="ecColor" type="hidden">
+    <label>투명도</label>
+    <select id="ecOpacity">
+      <option value="0.4">반투명</option>
+      <option value="0.8">불투명</option>
+      <option value="0">투명 (테두리만)</option>
+    </select>
     <label>번호 접두어</label>
     <input id="ecPrefix" type="text" maxlength="5">
     <div class="modal-btns">
@@ -563,13 +575,14 @@ function switchTab(tab,btn){
 //  카테고리 관리
 // ══════════════════════════════════════
 function shapeLabel(cat){
-  if(cat.shape==='circle')return '원형 ⌀'+cat.diameter+'m';
+  var opLabel=cat.opacity>=0.8?' 불투명':cat.opacity===0?' 투명':' 반투명';
+  if(cat.shape==='circle')return '원형 ⌀'+cat.diameter+'m'+opLabel;
   if(cat.shape==='line'){
     var dir=cat.direction==='oneway'?' 일방→':cat.direction==='twoway'?' 양방↔':'';
     return '선'+dir+' '+cat.strokeWeight+'px';
   }
-  if(cat.shape==='polygon')return '다각형';
-  return '사각형 '+cat.w+'×'+cat.h+'m';
+  if(cat.shape==='polygon')return '다각형'+opLabel;
+  return '사각형 '+cat.w+'×'+cat.h+'m'+opLabel;
 }
 
 function renderCategories(){
@@ -656,6 +669,7 @@ function createCategory(){
     h:parseFloat(document.getElementById('ncH').value)||6,
     diameter:parseFloat(document.getElementById('ncDiam').value)||5,
     color:document.getElementById('ncColor').value,
+    opacity:parseFloat(document.getElementById('ncOpacity').value),
     prefix:document.getElementById('ncPrefix').value.trim()||name.charAt(0),
     direction:document.getElementById('ncDirection').value||'none',
     strokeWeight:parseInt(document.getElementById('ncStrokeW').value)||4
@@ -681,6 +695,7 @@ function showEditCat(catId){
   document.getElementById('ecPrefix').value=cat.prefix;
   document.getElementById('ecDirection').value=cat.direction||'none';
   document.getElementById('ecStrokeW').value=cat.strokeWeight||4;
+  document.getElementById('ecOpacity').value=String(cat.opacity!=null?cat.opacity:0.4);
   onShapeChange('ec');
   renderPalette('ecPalette','ecColor',cat.color);
   document.getElementById('editCatModal').style.display='flex';
@@ -698,6 +713,7 @@ function updateCategory(){
   cat.prefix=document.getElementById('ecPrefix').value.trim()||cat.name.charAt(0);
   cat.direction=document.getElementById('ecDirection').value||'none';
   cat.strokeWeight=parseInt(document.getElementById('ecStrokeW').value)||4;
+  cat.opacity=parseFloat(document.getElementById('ecOpacity').value);
 
   items.forEach(function(it,i){
     if(it.catId===cat.id) drawItem(i);
@@ -801,6 +817,7 @@ function drawItem(idx){
   var cat=categories.find(function(c){return c.id===it.catId});
   if(!cat)return;
   var color=cat.color;
+  var fillOp=cat.opacity!=null?cat.opacity:0.4;
 
   clearItemGfx(it);
   it._arrows=[];
@@ -811,7 +828,7 @@ function drawItem(idx){
     if(!it.path||it.path.length<2)return;
     pts=it.path.map(function(p){return new kakao.maps.LatLng(p.lat,p.lng)});
     it._poly=new kakao.maps.Polyline({
-      path:pts,strokeWeight:cat.strokeWeight||4,strokeColor:color,strokeOpacity:0.9,strokeStyle:'solid'
+      path:pts,strokeWeight:cat.strokeWeight||4,strokeColor:color,strokeOpacity:fillOp>0?0.9:0.5,strokeStyle:'solid'
     });
     it._poly.setMap(map);
     // 방향 화살표
@@ -829,7 +846,7 @@ function drawItem(idx){
     pts=it.path.map(function(p){return new kakao.maps.LatLng(p.lat,p.lng)});
     it._poly=new kakao.maps.Polygon({
       path:pts,strokeWeight:2,strokeColor:color,strokeOpacity:0.9,
-      fillColor:color,fillOpacity:0.4
+      fillColor:color,fillOpacity:fillOp
     });
     it._poly.setMap(map);
     var cen=pathCenter(it.path);
@@ -840,7 +857,7 @@ function drawItem(idx){
     if(it.rotation)pts=rotatePoints(it.lat,it.lng,pts,it.rotation);
     it._poly=new kakao.maps.Polygon({
       path:pts,strokeWeight:2,strokeColor:color,strokeOpacity:0.9,
-      fillColor:color,fillOpacity:0.4
+      fillColor:color,fillOpacity:fillOp
     });
     it._poly.setMap(map);
 
@@ -849,7 +866,7 @@ function drawItem(idx){
     if(it.rotation)pts=rotatePoints(it.lat,it.lng,pts,it.rotation);
     it._poly=new kakao.maps.Polygon({
       path:pts,strokeWeight:2,strokeColor:color,strokeOpacity:0.9,
-      fillColor:color,fillOpacity:0.4
+      fillColor:color,fillOpacity:fillOp
     });
     it._poly.setMap(map);
   }
@@ -1029,8 +1046,10 @@ function cloneItem(dx,dy){
   if(it.shape==='rect'){szX=it.w;szY=it.h}
   else if(it.shape==='circle'){szX=it.diameter||5;szY=it.diameter||5}
   else{szX=5;szY=5}
-  var dLat=dy*szY/M_LAT;
-  var dLng=dx*szX/mLng(it.lat);
+  // 도형 전체 크기 + 간격(0.3m)으로 이동 → 겹치지 않고 끝에 붙음
+  var gap=0.3;
+  var dLat=dy*(szY+gap)/M_LAT;
+  var dLng=dx*(szX+gap)/mLng(it.lat);
   var maxN=0;
   items.forEach(function(i){if(i.catId===it.catId){var m=i.num.match(/(\d+)$/);if(m)maxN=Math.max(maxN,parseInt(m[1]))}});
   var ni={id:nextItemId++,catId:it.catId,num:cat.prefix+'-'+String(maxN+1).padStart(2,'0'),
@@ -1345,7 +1364,7 @@ function renderLegend(){
 function autoSave(){saveAll(true)}
 function saveAll(silent){
   var catData=categories.map(function(c){
-    var d={id:c.id,name:c.name,shape:c.shape,color:c.color,prefix:c.prefix};
+    var d={id:c.id,name:c.name,shape:c.shape,color:c.color,prefix:c.prefix,opacity:c.opacity!=null?c.opacity:0.4};
     if(c.shape==='rect'){d.w=c.w;d.h=c.h;}
     else if(c.shape==='circle'){d.diameter=c.diameter||5;}
     else if(c.shape==='line'){d.direction=c.direction||'none';d.strokeWeight=c.strokeWeight||4;}
@@ -1370,6 +1389,7 @@ function loadData(){
       categories=d.categories.map(function(c){
         c.direction=c.direction||'none';
         c.strokeWeight=c.strokeWeight||4;
+        c.opacity=c.opacity!=null?c.opacity:0.4;
         c.w=c.w||3;c.h=c.h||6;c.diameter=c.diameter||5;
         return c;
       });
