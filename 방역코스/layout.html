@@ -10,8 +10,6 @@ body{font-family:'Pretendard','Noto Sans KR',sans-serif;background:#1a1a2e;color
 
 /* 왼쪽 사이드바 */
 #sidebar{width:320px;min-width:320px;height:100vh;background:#0f172a;border-right:1px solid #1e293b;display:flex;flex-direction:column;z-index:100;overflow:hidden}
-#sidebar.collapsed{width:44px;min-width:44px}
-#sidebar.collapsed .sb-body,#sidebar.collapsed .sb-header span,#sidebar.collapsed .sb-header .hbtn:not(.toggle-btn){display:none}
 .sb-header{padding:10px 12px;background:#1e293b;display:flex;align-items:center;gap:8px;flex-shrink:0}
 .sb-header h3{font-size:14px;flex:1;white-space:nowrap}
 .hbtn{background:none;border:none;color:#94a3b8;cursor:pointer;font-size:16px;padding:4px;border-radius:4px}
@@ -127,7 +125,6 @@ body{font-family:'Pretendard','Noto Sans KR',sans-serif;background:#1a1a2e;color
 /* 반응형 */
 @media(max-width:700px){
   #sidebar{position:fixed;left:0;top:0;z-index:300;width:280px;min-width:280px;box-shadow:4px 0 20px rgba(0,0,0,0.5)}
-  #sidebar.collapsed{width:44px;min-width:44px;box-shadow:none}
   #searchBox{width:200px}
 }
 </style>
@@ -142,7 +139,6 @@ body{font-family:'Pretendard','Noto Sans KR',sans-serif;background:#1a1a2e;color
       <button class="hbtn" onclick="saveAll()" title="전체 저장">💾</button>
       <button class="hbtn" onclick="location.href='index.html'" title="메인으로">🏠</button>
     </span>
-    <button class="hbtn toggle-btn" onclick="toggleSidebar()" title="접기/펼치기">☰</button>
   </div>
   <div class="sb-tabs">
     <button class="sb-tab active" onclick="switchTab('layout',this)">🗺️ 배치도</button>
@@ -563,8 +559,6 @@ function initMap(){
 // ══════════════════════════════════════
 //  사이드바 / 탭
 // ══════════════════════════════════════
-function toggleSidebar(){document.getElementById('sidebar').classList.toggle('collapsed');setTimeout(function(){if(map)map.relayout()},300)}
-
 function switchTab(tab,btn){
   document.querySelectorAll('.sb-tab').forEach(function(t){t.classList.remove('active')});
   btn.classList.add('active');
