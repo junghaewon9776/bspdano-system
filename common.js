@@ -1033,7 +1033,21 @@ function _apiGetApplyConfig(p) {
       else if (ac.endDt && today > ac.endDt) effective = "closed";
       else effective = "open";
     }
-    return {ok:true, status:status, effective:effective, today:today, count:(applyArr||[]).length, webappUrl:ac.webappUrl||"", startDt:ac.startDt||"", endDt:ac.endDt||"", notice:ac.notice||"", cats:ac.cats||null, formUrl:ac.formUrl||"", formUrlPdf:ac.formUrlPdf||"", driveUploadUrl:ac.driveUploadUrl||cfg.DRIVE_UPLOAD_URL||""};
+    // 행사명 조회 (캐시 있으면 캐시, 없으면 Firebase 직접)
+    var evtNm = "";
+    try { var evts = (_cache && _cache.Events) || []; for(var i=0;i<evts.length;i++){if(evts[i].evtId===evtId){evtNm=evts[i].nm||"";break;}} } catch(e){}
+    if (evtNm) {
+      return {ok:true, status:status, effective:effective, today:today, count:(applyArr||[]).length, webappUrl:ac.webappUrl||"", startDt:ac.startDt||"", endDt:ac.endDt||"", notice:ac.notice||"", cats:ac.cats||null, formUrl:ac.formUrl||"", formUrlPdf:ac.formUrlPdf||"", driveUploadUrl:ac.driveUploadUrl||cfg.DRIVE_UPLOAD_URL||"", evtNm:evtNm};
+    }
+    // apply 모드 등 캐시 없을 때 Firebase에서 직접 조회
+    return new Promise(function(res2){
+      fbDb.ref('/main/Events').once('value', function(snap){
+        var evts2 = snap.val() || [];
+        if (!Array.isArray(evts2)) evts2 = Object.values(evts2);
+        for(var j=0;j<evts2.length;j++){if(evts2[j]&&evts2[j].evtId===evtId){evtNm=evts2[j].nm||"";break;}}
+        res2({ok:true, status:status, effective:effective, today:today, count:(applyArr||[]).length, webappUrl:ac.webappUrl||"", startDt:ac.startDt||"", endDt:ac.endDt||"", notice:ac.notice||"", cats:ac.cats||null, formUrl:ac.formUrl||"", formUrlPdf:ac.formUrlPdf||"", driveUploadUrl:ac.driveUploadUrl||cfg.DRIVE_UPLOAD_URL||"", evtNm:evtNm});
+      });
+    });
   });
 }
 

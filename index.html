@@ -490,6 +490,13 @@ var APPLY_EVT_ID = "";
 (function(){
   try {
     var sp = new URLSearchParams(window.location.search);
+    // 구 URL(?p=applyform) → 새 URL(?apply=1) 리다이렉트
+    if (sp.get("p") === "applyform") {
+      var eid = sp.get("evtId") || "";
+      var newUrl = location.href.split("?")[0] + "?apply=1" + (eid ? "&evtId=" + encodeURIComponent(eid) : "");
+      location.replace(newUrl);
+      return;
+    }
     if (sp.get("apply") === "1") {
       IS_APPLY_MODE = true;
       APPLY_EVT_ID = sp.get("evtId") || "";
@@ -18613,6 +18620,12 @@ function apfLoadStatus(){
     var bar=document.getElementById("apfStatus");
     var form=document.getElementById("apfForm");
     var tb=document.getElementById("apfToolbar");
+    // 행사명으로 타이틀 변경
+    if(res.evtNm){
+      document.title = "🎭 " + res.evtNm + " 참가신청";
+      var apfT = document.getElementById("apfTitle");
+      if(apfT) apfT.textContent = "🎭 " + res.evtNm + " 참가신청";
+    }
     // Drive 업로드 URL 저장
     APF_DRIVE_URL = res.driveUploadUrl||"";
     // 양식 다운로드 링크
