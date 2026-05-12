@@ -1869,52 +1869,7 @@ function dApstat(){
   }
   h+='</div>';  // card end
 
-  // 오른쪽: 참가신청폼
-  var fm='';
-  fm+='<div class="card" style="position:sticky;top:60px">';
-  fm+='<div style="background:#fff;border-radius:14px;padding:24px;border:1px solid #e2e8f0;box-shadow:0 2px 8px rgba(0,0,0,0.04)">';
-  fm+='<h2 style="font-size:18px;margin-bottom:16px;text-align:center;color:#1e293b">📝 참가 신청</h2>';
-  fm+='<label style="display:block;color:#64748b;font-size:12px;margin:0 0 4px;font-weight:600">구분 <span style="color:#ef4444">*</span></label>';
-  fm+='<select id="apf_cat" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px">';
-  fm+='<option value="">선택</option>';
-  _getApplyCats().forEach(function(c){fm+='<option>'+esc(c)+'</option>'});
-  fm+='</select>';
-  fm+='<label style="display:block;color:#64748b;font-size:12px;margin:12px 0 4px;font-weight:600">참가구분 <span style="color:#ef4444">*</span></label>';
-  fm+='<select id="apf_div" onchange="apfDivChg()" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px">';
-  fm+='<option value="">선택</option>';
-  ["학생부","신인부","일반부"].forEach(function(d){fm+='<option>'+d+'</option>'});
-  fm+='</select>';
-  fm+='<div id="apf_teamWrap" style="display:none">';
-  fm+='<label style="display:block;color:#64748b;font-size:12px;margin:12px 0 4px;font-weight:600">신청유형</label>';
-  fm+='<select id="apf_gtype" onchange="apfGtypeChg()" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px">';
-  fm+='<option value="개인(명)">개인(명)</option><option value="단체(팀)">단체(팀)</option>';
-  fm+='</select></div>';
-  fm+='<label id="apf_nameLabel" style="display:block;color:#64748b;font-size:12px;margin:12px 0 4px;font-weight:600">이름 <span style="color:#ef4444">*</span></label>';
-  fm+='<input id="apf_name" type="text" placeholder="이름" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px">';
-  fm+='<div id="apf_cntWrap" style="display:none">';
-  fm+='<label style="display:block;color:#64748b;font-size:12px;margin:12px 0 4px;font-weight:600">인원수 (대표자 포함) <span style="color:#ef4444">*</span></label>';
-  fm+='<input id="apf_cnt" type="number" min="2" value="2" placeholder="2" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px">';
-  fm+='</div>';
-  fm+='<label style="display:block;color:#64748b;font-size:12px;margin:12px 0 4px;font-weight:600">연락처 <span style="color:#ef4444">*</span></label>';
-  fm+='<input id="apf_phone" type="tel" placeholder="010-0000-0000" maxlength="13" oninput="(function(el){var v=el.value.replace(/[^0-9]/g,\'\');if(v.length<=3)el.value=v;else if(v.length<=7)el.value=v.slice(0,3)+\'-\'+v.slice(3);else el.value=v.slice(0,3)+\'-\'+v.slice(3,7)+\'-\'+v.slice(7,11)})(this)" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px">';
-  fm+='<div style="display:flex;gap:8px;margin-top:12px">';
-  fm+='<div style="flex:1"><label style="display:block;color:#64748b;font-size:12px;margin:0 0 4px;font-weight:600">시도</label>';
-  fm+='<select id="apf_region" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px">';
-  fm+='<option value="">선택</option>';
-  APSTAT_REGIONS.forEach(function(rg){fm+='<option>'+esc(rg)+'</option>'});
-  fm+='</select></div>';
-  fm+='<div style="flex:1"><label style="display:block;color:#64748b;font-size:12px;margin:0 0 4px;font-weight:600">지역(시군구)</label>';
-  fm+='<input id="apf_area" type="text" placeholder="예: 영광군" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px"></div>';
-  fm+='</div>';
-  fm+='<label style="display:block;color:#64748b;font-size:12px;margin:12px 0 4px;font-weight:600">비고</label>';
-  fm+='<textarea id="apf_memo" placeholder="기타 사항" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px;height:60px;resize:vertical"></textarea>';
-  fm+='<button onclick="submitApplyForm()" style="width:100%;padding:14px;border:none;border-radius:10px;background:#3b82f6;color:#fff;font-size:15px;font-weight:700;cursor:pointer;margin-top:16px">신청하기</button>';
-  fm+='</div></div>';
-
-  return '<div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap">'
-    +'<div style="flex:1;min-width:600px">'+_top+h+'</div>'
-    +'<div style="width:360px;min-width:300px;flex-shrink:0">'+fm+'</div>'
-    +'</div>';
+  return _top+h;
 }
 
 // ===== 신청폼 독립 탭 =====
@@ -1984,7 +1939,11 @@ function dApform(){
   h+='<input id="apf_file1" type="file" accept=".hwp,.pdf,.jpg,.jpeg,.png,.doc,.docx" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;background:#f8fafc">';
   h+='<label style="display:block;color:#64748b;font-size:12px;margin:12px 0 4px;font-weight:600">통장사본 첨부</label>';
   h+='<input id="apf_file2" type="file" accept=".jpg,.jpeg,.png,.pdf" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;background:#f8fafc">';
-  h+='<div class="mut" style="font-size:11px;margin-top:4px">· HWP, PDF, JPG, PNG 가능 · 파일당 최대 5MB</div>';
+  h+='<label style="display:block;color:#64748b;font-size:12px;margin:12px 0 4px;font-weight:600">신분증 사본 <span style="color:#64748b;font-weight:400">(주민등록증/운전면허증 등)</span></label>';
+  h+='<input id="apf_file_id" type="file" accept=".jpg,.jpeg,.png,.pdf" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;background:#f8fafc">';
+  h+='<label style="display:block;color:#64748b;font-size:12px;margin:12px 0 4px;font-weight:600">주민등록등본 <span style="color:#64748b;font-weight:400">(등본 스캔/촬영)</span></label>';
+  h+='<input id="apf_file_reg" type="file" accept=".jpg,.jpeg,.png,.pdf,.hwp,.doc,.docx" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;background:#f8fafc">';
+  h+='<div class="mut" style="font-size:11px;margin-top:4px">· HWP, PDF, JPG, PNG 가능 · 파일당 최대 5MB · 개인정보는 안전하게 관리됩니다</div>';
 
   h+='<label style="display:block;color:#64748b;font-size:12px;margin:12px 0 4px;font-weight:600">비고</label>';
   h+='<textarea id="apf_memo" placeholder="기타 사항" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px;height:60px;resize:vertical"></textarea>';
@@ -2061,7 +2020,7 @@ function submitApplyForm(){
   api("addApply",Object.assign({id:CID},row)).then(function(r){
     if(r&&r.ok){
       toast('접수순번 '+r.seq+'번으로 신청되었습니다');
-      ['apf_cat','apf_div','apf_name','apf_phone','apf_region','apf_area','apf_memo','apf_cnt'].forEach(function(id){
+      ['apf_cat','apf_div','apf_name','apf_phone','apf_region','apf_area','apf_memo','apf_cnt','apf_file1','apf_file2','apf_file_id','apf_file_reg'].forEach(function(id){
         var el=document.getElementById(id);
         if(el) el.tagName==='SELECT'?el.selectedIndex=0:el.value='';
       });
