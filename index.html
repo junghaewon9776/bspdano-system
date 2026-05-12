@@ -240,7 +240,6 @@ label{display:block;font-size:10px;color:#999;margin-bottom:3px}
       <label for="lKeep" style="margin:0;cursor:pointer;font-weight:500">로그인 상태 유지 (새로고침 시 자동 로그인)</label>
     </div>
     <button id="loginBtn" onclick="login()">로그인</button>
-    <a href="방역코스/index.html" style="display:block;margin-top:10px;padding:12px;background:#10b981;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;text-align:center;text-decoration:none;cursor:pointer">📍 실시간 위치관제</a>
     <div class="acctInfo">
       <b>담당자 기본 비번:</b> 1234<br>
       <small>최초 로그인 후 반드시 비번을 변경하세요</small>
@@ -1887,11 +1886,15 @@ function dApstat(){
   fm+='</select>';
   fm+='<div id="apf_teamWrap" style="display:none">';
   fm+='<label style="display:block;color:#64748b;font-size:12px;margin:12px 0 4px;font-weight:600">신청유형</label>';
-  fm+='<select id="apf_gtype" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px">';
+  fm+='<select id="apf_gtype" onchange="apfGtypeChg()" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px">';
   fm+='<option value="개인(명)">개인(명)</option><option value="단체(팀)">단체(팀)</option>';
   fm+='</select></div>';
-  fm+='<label style="display:block;color:#64748b;font-size:12px;margin:12px 0 4px;font-weight:600">이름 <span style="color:#ef4444">*</span></label>';
+  fm+='<label id="apf_nameLabel" style="display:block;color:#64748b;font-size:12px;margin:12px 0 4px;font-weight:600">이름 <span style="color:#ef4444">*</span></label>';
   fm+='<input id="apf_name" type="text" placeholder="이름" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px">';
+  fm+='<div id="apf_cntWrap" style="display:none">';
+  fm+='<label style="display:block;color:#64748b;font-size:12px;margin:12px 0 4px;font-weight:600">인원수 (대표자 포함) <span style="color:#ef4444">*</span></label>';
+  fm+='<input id="apf_cnt" type="number" min="2" value="2" placeholder="2" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px">';
+  fm+='</div>';
   fm+='<label style="display:block;color:#64748b;font-size:12px;margin:12px 0 4px;font-weight:600">연락처 <span style="color:#ef4444">*</span></label>';
   fm+='<input id="apf_phone" type="tel" placeholder="010-0000-0000" maxlength="13" oninput="(function(el){var v=el.value.replace(/[^0-9]/g,\'\');if(v.length<=3)el.value=v;else if(v.length<=7)el.value=v.slice(0,3)+\'-\'+v.slice(3);else el.value=v.slice(0,3)+\'-\'+v.slice(3,7)+\'-\'+v.slice(7,11)})(this)" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px">';
   fm+='<div style="display:flex;gap:8px;margin-top:12px">';
@@ -1925,12 +1928,13 @@ function dApform(){
   // 링크 복사 영역 (관리자용)
   if(isA()){
     var baseUrl=location.href.split("?")[0].split("#")[0];
-    var formLink=baseUrl+"?p=applyform"+(evtId?"&evtId="+encodeURIComponent(evtId):"");
+    var _eid=evtId||((CUR_EVT&&CUR_EVT.evtId)||"DO2026");
+    var formLink=baseUrl+"?p=applyform&evtId="+encodeURIComponent(_eid);
     h+='<div class="card" style="background:#eff6ff;border:1px solid #bfdbfe;padding:10px 14px;margin-bottom:12px">';
     h+='<div style="font-weight:600;margin-bottom:6px">🔗 공개 신청폼 링크 <span class="mut" style="font-weight:400;font-size:12px">(카톡/문자 공유용)</span></div>';
     h+='<div style="display:flex;gap:6px;align-items:center">';
     h+='<input id="apformLink" type="text" readonly value="'+esc(formLink)+'" onclick="this.select()" style="flex:1;padding:6px 8px;border:1px solid #bfdbfe;border-radius:6px;background:#fff;font-size:12px;font-family:monospace">';
-    h+='<button class="btn" style="padding:6px 10px;font-size:12px" onclick="cpApformLink()">📋 복사</button>';
+    h+='<button class="btn" style="padding:8px 14px;font-size:13px;font-weight:700;background:#10b981" onclick="cpApformLink()">📋 링크 복사</button>';
     h+='</div></div>';
   }
 
@@ -1952,11 +1956,15 @@ function dApform(){
   h+='</select>';
   h+='<div id="apf_teamWrap" style="display:none">';
   h+='<label style="display:block;color:#64748b;font-size:12px;margin:12px 0 4px;font-weight:600">신청유형</label>';
-  h+='<select id="apf_gtype" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px">';
+  h+='<select id="apf_gtype" onchange="apfGtypeChg()" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px">';
   h+='<option value="개인(명)">개인(명)</option><option value="단체(팀)">단체(팀)</option>';
   h+='</select></div>';
-  h+='<label style="display:block;color:#64748b;font-size:12px;margin:12px 0 4px;font-weight:600">이름 <span style="color:#ef4444">*</span></label>';
+  h+='<label id="apf_nameLabel" style="display:block;color:#64748b;font-size:12px;margin:12px 0 4px;font-weight:600">이름 <span style="color:#ef4444">*</span></label>';
   h+='<input id="apf_name" type="text" placeholder="이름" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px">';
+  h+='<div id="apf_cntWrap" style="display:none">';
+  h+='<label style="display:block;color:#64748b;font-size:12px;margin:12px 0 4px;font-weight:600">인원수 (대표자 포함) <span style="color:#ef4444">*</span></label>';
+  h+='<input id="apf_cnt" type="number" min="2" value="2" placeholder="2" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px">';
+  h+='</div>';
 
   h+='<label style="display:block;color:#64748b;font-size:12px;margin:12px 0 4px;font-weight:600">연락처 <span style="color:#ef4444">*</span></label>';
   h+='<input id="apf_phone" type="tel" placeholder="010-0000-0000" maxlength="13" oninput="(function(el){var v=el.value.replace(/[^0-9]/g,\'\');if(v.length<=3)el.value=v;else if(v.length<=7)el.value=v.slice(0,3)+\'-\'+v.slice(3);else el.value=v.slice(0,3)+\'-\'+v.slice(3,7)+\'-\'+v.slice(7,11)})(this)" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px">';
@@ -2004,7 +2012,20 @@ function apfDivChg(){
     if(tw)tw.style.display="";
   } else {
     if(tw)tw.style.display="none";
+    var gt=document.getElementById('apf_gtype');if(gt)gt.selectedIndex=0;
   }
+  apfGtypeChg();
+}
+function apfGtypeChg(){
+  var div=(document.getElementById('apf_div')||{}).value||"";
+  var gt=(document.getElementById('apf_gtype')||{}).value||"개인(명)";
+  var isTeam=(div==="신인부" && /팀/.test(gt));
+  var cw=document.getElementById('apf_cntWrap');
+  var nl=document.getElementById('apf_nameLabel');
+  if(cw)cw.style.display=isTeam?"":"none";
+  if(nl)nl.innerHTML=isTeam?'대표자 이름 <span style="color:#ef4444">*</span>':'이름 <span style="color:#ef4444">*</span>';
+  var ni=document.getElementById('apf_name');
+  if(ni)ni.placeholder=isTeam?"대표자 이름":"이름";
 }
 
 function submitApplyForm(){
@@ -2016,8 +2037,14 @@ function submitApplyForm(){
   if(div==="신인부"){
     gtype=(document.getElementById('apf_gtype')||{}).value||"개인(명)";
   }
+  var isTeam=(div==="신인부"&&/팀/.test(gtype));
   var name=(document.getElementById('apf_name')||{}).value.trim();
-  if(!name){ alert('이름을 입력하세요'); return; }
+  if(!name){ alert(isTeam?'대표자 이름을 입력하세요':'이름을 입력하세요'); return; }
+  var cnt="";
+  if(isTeam){
+    cnt=String((document.getElementById('apf_cnt')||{}).value||"").trim();
+    if(!cnt||parseInt(cnt)<2){ alert('인원수를 2명 이상 입력하세요'); return; }
+  }
   var phone=document.getElementById('apf_phone').value.trim();
   var region=document.getElementById('apf_region').value;
   var area=document.getElementById('apf_area').value.trim();
@@ -2025,7 +2052,8 @@ function submitApplyForm(){
   if(!phone){ alert('연락처를 입력하세요'); return; }
   var row={
     "구분":cat, "참가구분":div, "신청유형(명/팀)":gtype,
-    "성명":name, "연락처":phone, "시도별":region, "주소":area, "비고":memo
+    "성명":name, "대표자":isTeam?name:"", "인원수":cnt,
+    "연락처":phone, "시도별":region, "주소":area, "비고":memo
   };
   var btn=document.querySelector('#apf_cat').closest('.card').querySelector('button[onclick*="submitApplyForm"]');
   if(!btn) btn=document.querySelector('#apf_cat').closest('.card').querySelector('button');
@@ -2033,7 +2061,7 @@ function submitApplyForm(){
   api("addApply",Object.assign({id:CID},row)).then(function(r){
     if(r&&r.ok){
       toast('접수순번 '+r.seq+'번으로 신청되었습니다');
-      ['apf_cat','apf_div','apf_name','apf_phone','apf_region','apf_area','apf_memo'].forEach(function(id){
+      ['apf_cat','apf_div','apf_name','apf_phone','apf_region','apf_area','apf_memo','apf_cnt'].forEach(function(id){
         var el=document.getElementById(id);
         if(el) el.tagName==='SELECT'?el.selectedIndex=0:el.value='';
       });
@@ -2578,13 +2606,14 @@ function applyConfigOpen(){
     var evtId = (CUR_EVT && CUR_EVT.evtId) || "";
     var webapp = String(r.webappUrl || "").trim();
     var baseUrl = location.href.split("?")[0].split("#")[0];
-    var builtinLink = baseUrl+"?p=applyform"+(evtId?"&evtId="+encodeURIComponent(evtId):"");
+    var _eid2=evtId||"DO2026";
+    var builtinLink = baseUrl+"?p=applyform&evtId="+encodeURIComponent(_eid2);
     var displayUrl = webapp || builtinLink;
     h+='<div class="card" style="background:#eff6ff;border:1px solid #bfdbfe;padding:10px 14px;margin-bottom:14px">';
     h+='<div style="font-weight:600;margin-bottom:6px">🔗 신청폼 URL <span class="mut" style="font-weight:400;font-size:12px">(카톡/문자로 공유)</span></div>';
     h+='<div style="display:flex;gap:6px;align-items:center">';
     h+='<input id="cfgFormLink" type="text" readonly value="'+esc(displayUrl)+'" onclick="this.select()" style="flex:1;padding:6px 8px;border:1px solid #bfdbfe;border-radius:6px;background:#fff;font-size:12px;font-family:monospace">';
-    h+='<button type="button" class="btn btn-b" onclick="applyConfigCopyLink()" style="white-space:nowrap;padding:6px 10px;font-size:12px">📋 복사</button>';
+    h+='<button type="button" class="btn" onclick="applyConfigCopyLink()" style="white-space:nowrap;padding:8px 14px;font-size:13px;font-weight:700;background:#10b981">📋 링크 복사</button>';
     h+='</div>';
     h+='<div class="mut" style="font-size:11px;margin-top:4px">· 기본: 내장 신청폼 탭 링크 · 외부 URL 입력 시 해당 URL로 대체</div>';
     h+='<div style="margin-top:8px">';
