@@ -896,6 +896,7 @@ function _upsertCfgArr(arr, key, value) {
 // ───────── 텔레그램 알림 ─────────
 var TG_BOT_TOKEN = "8761665630:AAGv9FjG4fcxee4hpyjoIjd5wkXm0c-_qV0";
 var TG_CHAT_IDS  = "8613833560";
+var TG_SYS_URL   = "https://junghaewon9776.github.io/bspdano-system/";
 
 function _apiNotifyLogin(p) {
   var botToken = TG_BOT_TOKEN;
@@ -935,7 +936,8 @@ function _apiNotifyLogin(p) {
       + "\n• 역할: " + roleLabel
       + "\n• IP: " + (p.ip||"-")
       + (dev ? "\n• 기기: " + dev : "")
-      + "\n• 시각: " + now_();
+      + "\n• 시각: " + now_()
+      + "\n\n<a href=\"" + TG_SYS_URL + "\">🔗 링크열기</a>";
   }
   var url = "https://api.telegram.org/bot" + botToken + "/sendMessage";
   var ids = chatIds.split(/[,\s]+/).filter(Boolean);
@@ -1199,13 +1201,15 @@ function _notifyApply(evtId, row, seq) {
   var nm = row["성명"] || row[_fbSafeKey("성명")] || "";
   var phone = row["연락처"] || row[_fbSafeKey("연락처")] || "";
   var region = row["시도별"] || row[_fbSafeKey("시도별")] || "";
+  var applyUrl = TG_SYS_URL + "?apply=1&evtId=" + encodeURIComponent(evtId);
   var text = "📋 <b>참가 접수</b>"
     + "\n접수번호: " + seq
     + "\n구분: " + cat + " / " + div
     + "\n성명: " + nm
     + "\n연락처: " + phone
     + "\n시도: " + region
-    + "\n시각: " + now_();
+    + "\n시각: " + now_()
+    + "\n\n<a href=\"" + applyUrl + "\">🔗 신청폼 열기</a>";
   var url = "https://api.telegram.org/bot" + botToken + "/sendMessage";
   var ids = chatIds.split(/[,\s]+/).filter(Boolean);
   ids.forEach(function(chatId) {
