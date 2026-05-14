@@ -1559,11 +1559,17 @@ function dApply(){
   h+='<span style="position:relative;display:inline-block">';
   h+='<button class="btn" style="background:#0d9488;color:#fff;font-weight:700" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display===\'block\'?\'none\':\'block\'" title="현재 필터된 참가자의 첨부파일을 ZIP으로">📥 첨부파일 다운로드 ▾</button>';
   h+='<div style="display:none;position:absolute;top:100%;left:0;z-index:100;background:#fff;border:1px solid #e5e7eb;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:200px;padding:4px 0;margin-top:2px">';
+  h+='<div style="padding:6px 14px;font-size:11px;color:#94a3b8;font-weight:600">ZIP (접수번호 파일명)</div>';
   h+='<div style="padding:8px 14px;cursor:pointer;font-size:13px;color:#333" onmouseover="this.style.background=\'#f1f5f9\'" onmouseout="this.style.background=\'#fff\'" onclick="this.parentElement.style.display=\'none\';applyDownloadByType(\'form\')">📝 참가신청서</div>';
   h+='<div style="padding:8px 14px;cursor:pointer;font-size:13px;color:#333" onmouseover="this.style.background=\'#f1f5f9\'" onmouseout="this.style.background=\'#fff\'" onclick="this.parentElement.style.display=\'none\';applyDownloadByType(\'bank\')">💳 통장사본</div>';
   h+='<div style="padding:8px 14px;cursor:pointer;font-size:13px;color:#333" onmouseover="this.style.background=\'#f1f5f9\'" onmouseout="this.style.background=\'#fff\'" onclick="this.parentElement.style.display=\'none\';applyDownloadByType(\'reg\')">📋 등본</div>';
-  h+='<div style="border-top:1px solid #e5e7eb;margin:4px 0"></div>';
   h+='<div style="padding:8px 14px;cursor:pointer;font-size:13px;color:#333" onmouseover="this.style.background=\'#f1f5f9\'" onmouseout="this.style.background=\'#fff\'" onclick="this.parentElement.style.display=\'none\';applyDownloadAllFiles()">📦 전체 일괄</div>';
+  h+='<div style="border-top:1px solid #e5e7eb;margin:4px 0"></div>';
+  h+='<div style="padding:6px 14px;font-size:11px;color:#94a3b8;font-weight:600">개별 다운로드 (빠름)</div>';
+  h+='<div style="padding:8px 14px;cursor:pointer;font-size:13px;color:#333" onmouseover="this.style.background=\'#f1f5f9\'" onmouseout="this.style.background=\'#fff\'" onclick="this.parentElement.style.display=\'none\';applyDownloadDirect(\'form\')">📝 참가신청서</div>';
+  h+='<div style="padding:8px 14px;cursor:pointer;font-size:13px;color:#333" onmouseover="this.style.background=\'#f1f5f9\'" onmouseout="this.style.background=\'#fff\'" onclick="this.parentElement.style.display=\'none\';applyDownloadDirect(\'bank\')">💳 통장사본</div>';
+  h+='<div style="padding:8px 14px;cursor:pointer;font-size:13px;color:#333" onmouseover="this.style.background=\'#f1f5f9\'" onmouseout="this.style.background=\'#fff\'" onclick="this.parentElement.style.display=\'none\';applyDownloadDirect(\'reg\')">📋 등본</div>';
+  h+='<div style="padding:8px 14px;cursor:pointer;font-size:13px;color:#333" onmouseover="this.style.background=\'#f1f5f9\'" onmouseout="this.style.background=\'#fff\'" onclick="this.parentElement.style.display=\'none\';applyDownloadDirect(\'all\')">📦 전체</div>';
   h+='</div></span>';
   h+='</div>';
 
@@ -3899,6 +3905,122 @@ function applyDownloadByType(type){
     });
   }
   next();
+}
+
+// 첨부파일 개별 다운로드 (GAS 프록시 → 하나씩 바로 저장, 파일명=접수번호)
+function applyDownloadDirect(type){
+  if(!APPLY||!(APPLY.headers||[]).length){ alert("데이터가 없습니다."); return; }
+  var H=APPLY.headers, R=APPLY.rows||[];
+  var AC=_attachCols(H);
+  var cols;
+  var typeNames={form:"참가신청서",bank:"통장사본",reg:"등본",all:"전체"};
+  var typeName=typeNames[type]||type;
+  if(type==="all"){
+    cols=[]; H.forEach(function(h,i){ var v=String(h||""); if(/신청서|통장|등본/i.test(v)) cols.push(i); });
+  } else {
+    cols=AC[type]||[];
+  }
+  if(!cols.length){ alert(typeName+" 컬럼이 없습니다."); return; }
+
+  var iSeq=H.indexOf("접수순번");
+  var iCat=H.indexOf("구분"),iDiv=H.indexOf("참가구분"),iReg=H.indexOf("시도별");
+  var iPreH=H.indexOf("예선합격"),iFinH=H.indexOf("최종합격"),iAwdH=H.indexOf("수상"),iAbsH=H.indexOf("불참");
+  var q=(APPLY_Q||"").trim().toLowerCase();
+  var isYes=function(v){v=String(v==null?"":v);return v==="O"||v==="Y"||v==="true"||v==="1";};
+
+  var rows=R.filter(function(r){
+    if(APPLY_F.cat&&iCat>=0&&String(r[iCat]||"")!==APPLY_F.cat)return false;
+    if(APPLY_F.div&&iDiv>=0&&String(r[iDiv]||"")!==APPLY_F.div)return false;
+    if(APPLY_F.region&&iReg>=0&&String(r[iReg]||"")!==APPLY_F.region)return false;
+    if(APPLY_F.pre&&iPreH>=0){var y=isYes(r[iPreH]);if(APPLY_F.pre==="합격"&&!y)return false;if(APPLY_F.pre==="불합격"&&y)return false;}
+    if(APPLY_F.fin&&iFinH>=0){var y2=isYes(r[iFinH]);if(APPLY_F.fin==="합격"&&!y2)return false;if(APPLY_F.fin==="불합격"&&y2)return false;}
+    if(APPLY_F.abs&&iAbsH>=0){var ya=isYes(r[iAbsH]);if(APPLY_F.abs==="불참"&&!ya)return false;if(APPLY_F.abs==="참석"&&ya)return false;}
+    if(APPLY_F.awd&&iAwdH>=0){var aw=String(r[iAwdH]||"").trim();if(APPLY_F.awd==="__any__"){if(!aw)return false;}else if(APPLY_F.awd==="__none__"){if(aw)return false;}else{if(aw!==APPLY_F.awd)return false;}}
+    if(APPLY_F.att && !_matchAttachFilter(r, AC, APPLY_F.att)) return false;
+    if(q){return r.some(function(v){return jamoMatch(v,q);});}
+    return true;
+  });
+
+  // URL 추출
+  var items=[];
+  rows.forEach(function(r){
+    var seq=iSeq>=0?String(r[iSeq]||""):"";
+    if(!seq) seq="no_seq";
+    cols.forEach(function(ci){
+      var v=String(r[ci]==null?"":r[ci]);
+      if(typeof _decUrl==="function") v=_decUrl(v);
+      var hd=H[ci]||"";
+      var urls=v.split(/[\|\n\r\s]+/).filter(function(u){return /^https?:\/\//.test(u)&&/drive\.google|docs\.google/.test(u);});
+      urls.forEach(function(u,ui){
+        var label=seq+(type==="all"?"_"+String(hd).replace(/[\/\\:*?"<>|]/g,"_"):"");
+        if(urls.length>1) label+="_"+(ui+1);
+        items.push({u:u,label:label});
+      });
+    });
+  });
+
+  if(!items.length){ alert(typeName+" 파일이 없습니다. (현재 필터 기준 "+rows.length+"명)"); return; }
+  if(!confirm(typeName+" "+rows.length+"명 / "+items.length+"개 파일을 개별 다운로드합니다.\n(접수번호 파일명, 하나씩 저장)\n진행할까요?")) return;
+
+  var proxyUrl=(typeof DRIVE_UPLOAD_URL!=="undefined"&&DRIVE_UPLOAD_URL)?DRIVE_UPLOAD_URL:"";
+  if(!proxyUrl){ alert("DRIVE_UPLOAD_URL이 설정되지 않았습니다."); return; }
+
+  var total=items.length, doneCount=0, failCount=0;
+
+  function dlNext(idx){
+    if(idx>=total){
+      hideLoading();
+      toast("✅ "+typeName+" "+doneCount+"/"+total+"개 다운로드 완료"+(failCount?" ("+failCount+"개 실패)":""));
+      return;
+    }
+    var item=items[idx];
+    var fileId=_extractDriveFileId(item.u);
+    if(!fileId){ failCount++; dlNext(idx+1); return; }
+
+    showLoading(typeName+" 개별 다운로드 중... ("+(idx+1)+"/"+total+") "+item.label);
+
+    var timer=setTimeout(function(){ failCount++; dlNext(idx+1); }, 60000);
+    fetch(proxyUrl,{
+      method:"POST",
+      headers:{"Content-Type":"text/plain;charset=utf-8"},
+      body:JSON.stringify({action:"download",fileId:fileId})
+    }).then(function(resp){
+      clearTimeout(timer);
+      if(!resp.ok) throw new Error("HTTP "+resp.status);
+      return resp.text();
+    }).then(function(txt){
+      var r;
+      try{ r=JSON.parse(txt); }catch(e){ throw new Error("JSON 파싱 실패"); }
+      if(!r||!r.ok||!r.base64){ failCount++; dlNext(idx+1); return; }
+      // 확장자
+      var ext="";
+      var origName=r.name||"";
+      var dotIdx=origName.lastIndexOf(".");
+      if(dotIdx>0) ext=origName.substring(dotIdx);
+      else{
+        var mime=r.mime||"";
+        if(mime.indexOf("pdf")>=0) ext=".pdf";
+        else if(mime.indexOf("jpeg")>=0||mime.indexOf("jpg")>=0) ext=".jpg";
+        else if(mime.indexOf("png")>=0) ext=".png";
+        else if(mime.indexOf("word")>=0||mime.indexOf("docx")>=0) ext=".docx";
+        else if(mime.indexOf("sheet")>=0||mime.indexOf("xlsx")>=0) ext=".xlsx";
+        else if(mime.indexOf("hwp")>=0) ext=".hwp";
+        else ext=".bin";
+      }
+      var a=document.createElement("a");
+      a.href="data:"+(r.mime||"application/octet-stream")+";base64,"+r.base64;
+      a.download=item.label+ext;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      doneCount++;
+      setTimeout(function(){ dlNext(idx+1); }, 500);
+    }).catch(function(e){
+      clearTimeout(timer);
+      console.error("[개별DL] 실패:",item.label,e);
+      failCount++;
+      dlNext(idx+1);
+    });
+  }
+  dlNext(0);
 }
 
 // 참가자 엑셀 양식 다운로드
