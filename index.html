@@ -3782,6 +3782,8 @@ function applyDownloadAllFiles(){
     var nm=iNm>=0?String(r[iNm]||""):"";
     H.forEach(function(hd,ci){
       var v=String(r[ci]==null?"":r[ci]);
+      // ENC:: 치환된 URL 디코딩
+      if(typeof _decUrl==="function") v=_decUrl(v);
       // 한 셀에 여러 URL이 |, 줄바꿈, 공백으로 구분되어 있을 수 있음
       var urls=v.split(/[\|\n\r\s]+/).filter(function(u){return /^https?:\/\//.test(u)&&/drive\.google|docs\.google/.test(u);});
       urls.forEach(function(u,ui){
@@ -3857,6 +3859,8 @@ function applyDownloadByType(type){
     if(!seq) seq="no_seq";
     cols.forEach(function(ci){
       var v=String(r[ci]==null?"":r[ci]);
+      // ENC:: 치환된 URL 디코딩
+      if(typeof _decUrl==="function") v=_decUrl(v);
       var urls=v.split(/[\|\n\r\s]+/).filter(function(u){return /^https?:\/\//.test(u)&&/drive\.google|docs\.google/.test(u);});
       urls.forEach(function(u,ui){
         var label=seq;
