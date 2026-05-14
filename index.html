@@ -3794,7 +3794,7 @@ function applyDownloadAllFiles(){
     });
   });
   if(!items.length){ alert("다운로드할 첨부파일(드라이브 링크)이 없습니다."); return; }
-  var CHUNK=100;
+  var CHUNK=50;
   var total=items.length, batches=Math.ceil(total/CHUNK);
   if(!confirm(rows.length+"명 / "+total+"개 파일"+(batches>1?" ("+CHUNK+"개씩 "+batches+"묶음 ZIP)":"")+"\n다운로드할까요?")) return;
   var bi=0, doneFiles=0;
