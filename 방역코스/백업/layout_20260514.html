@@ -201,10 +201,7 @@ body{font-family:'Pretendard','Noto Sans KR',sans-serif;background:#1a1a2e;color
     <div id="searchResults"></div>
   </div>
   <!-- 그리기 모드 표시 -->
-  <div id="drawIndicator">🖊 그리기 모드 — 클릭으로 점 추가, 더블클릭으로 완료 (ESC 취소)
-    <button id="drawPreviewToggle" onclick="toggleDrawPreview()" style="margin-left:8px;padding:2px 8px;border:none;border-radius:4px;background:#fff3;color:#fff;font-size:11px;font-weight:700;cursor:pointer" title="미리보기 선/점 표시 토글">👁 미리보기</button>
-    <button onclick="undoDrawPoint()" style="margin-left:4px;padding:2px 8px;border:none;border-radius:4px;background:#fff3;color:#fff;font-size:11px;font-weight:700;cursor:pointer" title="마지막 점 되돌리기">↩ 뒤로</button>
-  </div>
+  <div id="drawIndicator">🖊 그리기 모드 — 클릭으로 점 추가, 더블클릭으로 완료 (ESC 취소)</div>
   <!-- 측정 모드 표시 -->
   <div id="measureIndicator"></div>
   <!-- 면적 합계 패널 -->
@@ -459,7 +456,6 @@ var trackers=[], livePos={}, gpsMarkers={}, gpsLabels={}, gpsWatchId=null;
 
 // ══ 그리기 모드 ══
 var _drawMode=null; // {type,catId,points:[{lat,lng}],tempLine,tempMarkers:[],tempDots:[]}
-var _drawPreviewVisible=true; // 미리보기 토글
 
 // ══ 드래그 전역 상태 ══
 var _drag={active:false,moved:false,idx:-1,sx:0,sy:0,slat:0,slng:0,sPath:null};
@@ -502,7 +498,7 @@ function _doDragMove(it,mx,my){
 function _doDragEnd(){
   var idx=_drag.idx,it=items[idx],moved=_drag.moved;
   _drag.active=false;map.setDraggable(true);
-  if(!moved){selectItem(idx);map.setCenter(new kakao.maps.LatLng(it.lat,it.lng));return}
+  if(!moved){showItemInfo(idx);return}
   if(confirm(it.num+' 위치를 이동하시겠습니까?')){
     toast(it.num+' 이동됨');
     autoSave();
@@ -561,7 +557,7 @@ function clearAllMeasure(){
 
 // 마지막 측정 하나 지우기
 function clearLastMeasure(){
-  if(!_measureResults.length){toast('지울 측정이 없습니다');return;}
+  if(!_measureResults.length){toast('지울 측정이 없습니다',true);return;}
   var last=_measureResults.pop();
   last.gfx.forEach(function(g){try{g.setMap(null);}catch(e){}});
   _updateMeasureTotal();
@@ -634,18 +630,6 @@ function _measureClick(latLng){
 
 function _measureFinish(){
   if(!_measure)return;
-  // 더블클릭 시 click 이벤트가 먼저 발생하여 마지막 점이 중복 추가됨 → 제거
-  if(_measure.points.length>=2){
-    var last=_measure.points[_measure.points.length-1],prev=_measure.points[_measure.points.length-2];
-    if(Math.abs(last.lat-prev.lat)<1e-9&&Math.abs(last.lng-prev.lng)<1e-9){
-      _measure.points.pop();
-      // 중복 점에 대한 그래픽도 제거
-      if(_measure.dots.length>_measure.points.length){
-        var extraDot=_measure.dots.pop();
-        if(extraDot)try{extraDot.setMap(null);}catch(e){}
-      }
-    }
-  }
   var pts=_measure.points;
   // 이 측정의 모든 그래픽을 수집
   var gfx=[].concat(_measure.dots).concat(_measure.lines).concat(_measure.labels);
@@ -655,16 +639,9 @@ function _measureFinish(){
     var total=0;
     for(var i=1;i<pts.length;i++) total+=_calcDist(pts[i-1],pts[i]);
     var last=pts[pts.length-1];
-    var mIdx=_measureResults.length;
-    var lblEl=document.createElement('div');
-    lblEl.className='measure-label';
-    lblEl.style.background='#10b981';
-    lblEl.style.fontSize='13px';
-    lblEl.style.cursor='default';
-    lblEl.innerHTML='📏 총 '+_fmtDist(total)+' <span onclick="_delMeasure('+mIdx+')" style="cursor:pointer;margin-left:4px;color:#fca5a5" title="이 측정 삭제">✕</span>';
     var lbl=new kakao.maps.CustomOverlay({
       position:new kakao.maps.LatLng(last.lat,last.lng),
-      content:lblEl,
+      content:'<div class="measure-label" style="background:#10b981;font-size:13px">📏 총 '+_fmtDist(total)+'</div>',
       yAnchor:2.2
     });
     lbl.setMap(map);
@@ -940,7 +917,6 @@ function renderCategories(){
         html+='<div class="cat-item'+(selectedItemIdx===idx?' active':'')+'" onclick="selectItem('+idx+')">';
         html+='<div class="cat-item-num">'+it.num+'</div>';
         html+='<div class="cat-item-name">'+(it.name||cat.name)+'</div>';
-        html+='<button onclick="event.stopPropagation();focusItem('+idx+')" style="background:none;border:none;cursor:pointer;font-size:12px;padding:2px 4px;flex-shrink:0" title="위치로 이동">📍</button>';
         html+='</div>';
       });
       html+='</div>';
@@ -1541,13 +1517,6 @@ function deleteItem(){
 
 function closeItem(){deselectItem();renderCategories()}
 
-function focusItem(idx){
-  var it=items[idx];
-  if(!it)return;
-  map.setCenter(new kakao.maps.LatLng(it.lat,it.lng));
-  map.setLevel(2);
-}
-
 // ══════════════════════════════════════
 //  그리기 모드 (선 / 다각형)
 // ══════════════════════════════════════
@@ -1569,8 +1538,6 @@ function updateDrawPreview(){
   if(_drawMode.tempLine){_drawMode.tempLine.setMap(null);_drawMode.tempLine=null;}
   _drawMode.tempMarkers.forEach(function(m){m.setMap(null)});
   _drawMode.tempMarkers=[];
-
-  if(!_drawPreviewVisible)return;
 
   var pts=_drawMode.points.map(function(p){return new kakao.maps.LatLng(p.lat,p.lng)});
 
@@ -1602,15 +1569,6 @@ function updateDrawPreview(){
 
 function finishDraw(){
   if(!_drawMode)return;
-  // 더블클릭 시 click 이벤트가 먼저 발생하여 마지막 점이 중복 추가됨 → 제거
-  if(_drawMode.points.length>=2){
-    var pts=_drawMode.points;
-    var last=pts[pts.length-1],prev=pts[pts.length-2];
-    if(Math.abs(last.lat-prev.lat)<1e-9&&Math.abs(last.lng-prev.lng)<1e-9){
-      pts.pop();
-      updateDrawPreview();
-    }
-  }
   var minPts=_drawMode.type==='line'?2:3;
   if(_drawMode.points.length<minPts){
     toast((_drawMode.type==='line'?'최소 2개':'최소 3개')+' 점이 필요합니다',true);
@@ -1656,20 +1614,6 @@ function cleanupDraw(){
   _drawMode.tempMarkers.forEach(function(m){m.setMap(null)});
   _drawMode=null;
   document.getElementById('drawIndicator').style.display='none';
-}
-
-function toggleDrawPreview(){
-  _drawPreviewVisible=!_drawPreviewVisible;
-  var btn=document.getElementById('drawPreviewToggle');
-  if(btn) btn.textContent=_drawPreviewVisible?'👁 미리보기':'🚫 미리보기';
-  updateDrawPreview();
-}
-
-function undoDrawPoint(){
-  if(!_drawMode||!_drawMode.points.length)return;
-  _drawMode.points.pop();
-  updateDrawPreview();
-  toast('마지막 점 제거 (남은 점: '+_drawMode.points.length+')');
 }
 
 // ══════════════════════════════════════
