@@ -17,10 +17,41 @@ var FOLDER_ID = "";  // 예: "1AbC_dEf..."
 function doPost(e) {
   try {
     var data = JSON.parse(e.postData.contents);
-    var base64 = data.base64 || "";
-    var filename = data.filename || "file";
+    var action = data.action || "upload";
+
+    // ─── 파일 다운로드 프록시 ───
+    if (action === "download") {
+      var fileId = data.fileId || "";
+      if (!fileId) return _json({ok:false, err:"fileId 누락"});
+      try {
+        var dlFile = DriveApp.getFileById(fileId);
+        var dlBlob = dlFile.getBlob();
+        var dlB64 = Utilities.base64Encode(dlBlob.getBytes());
+        return _json({
+          ok: true,
+          name: dlFile.getName(),
+          mime: dlBlob.getContentType(),
+          size: dlBlob.getBytes().length,
+          base64: dlB64
+        });
+      } catch (dlErr) {
+        return _json({ok:false, err:dlErr.message || String(dlErr)});
+      }
+    }
+
+    // ─── 파일 업로드 (기존) ───
+    var base64 = data.base64 || data.dataUrl || "";
+    var filename = data.filename || data.fileName || "file";
     var mime = data.mime || "application/octet-stream";
     var subFolder = data.subFolder || "uploads";
+
+    // dataUrl 형식이면 base64 추출
+    if (base64.indexOf("data:") === 0) {
+      var m = base64.match(/^data:([^;]+);base64,(.+)$/);
+      if (m) { mime = m[1]; base64 = m[2]; }
+    }
+
+    if (!base64) return _json({ok:false, err:"base64 데이터 누락"});
 
     // 메인 폴더
     var root = FOLDER_ID ? DriveApp.getFolderById(FOLDER_ID) : DriveApp.getRootFolder();
@@ -44,47 +75,26 @@ function doPost(e) {
 
     var url = "https://drive.google.com/file/d/" + file.getId() + "/view";
 
-    return ContentService.createTextOutput(JSON.stringify({
+    return _json({
       ok: true,
       url: url,
       fileId: file.getId(),
       name: file.getName()
-    })).setMimeType(ContentService.MimeType.JSON);
+    });
 
   } catch (err) {
-    return ContentService.createTextOutput(JSON.stringify({
+    return _json({
       ok: false,
       err: err.message || String(err)
-    })).setMimeType(ContentService.MimeType.JSON);
+    });
   }
 }
 
+function _json(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
 function doGet(e) {
-  var p = e && e.parameter ? e.parameter : {};
-
-  // 파일 다운로드 프록시: ?action=download&fileId=xxx
-  if (p.action === "download" && p.fileId) {
-    try {
-      var file = DriveApp.getFileById(p.fileId);
-      var blob = file.getBlob();
-      var b64 = Utilities.base64Encode(blob.getBytes());
-      return ContentService.createTextOutput(JSON.stringify({
-        ok: true,
-        name: file.getName(),
-        mime: blob.getContentType(),
-        size: blob.getBytes().length,
-        base64: b64
-      })).setMimeType(ContentService.MimeType.JSON);
-    } catch (err) {
-      return ContentService.createTextOutput(JSON.stringify({
-        ok: false,
-        err: err.message || String(err)
-      })).setMimeType(ContentService.MimeType.JSON);
-    }
-  }
-
-  return ContentService.createTextOutput(JSON.stringify({
-    ok: true,
-    msg: "Drive Upload/Download Proxy is running"
-  })).setMimeType(ContentService.MimeType.JSON);
+  return _json({ok: true, msg: "Drive Upload/Download Proxy is running"});
 }

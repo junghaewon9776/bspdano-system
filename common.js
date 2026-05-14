@@ -1526,9 +1526,13 @@ function _apiBuildGalleryZip(p) {
       }
 
       var label = item.label || ("file_" + (idx+1));
-      var fetchUrl = proxyUrl + "?action=download&fileId=" + encodeURIComponent(fileId);
 
-      fetch(fetchUrl, {method:"GET", redirect:"follow"})
+      fetch(proxyUrl, {
+        method: "POST",
+        headers: {"Content-Type":"text/plain;charset=utf-8"},
+        body: JSON.stringify({action:"download", fileId:fileId}),
+        redirect: "follow"
+      })
         .then(function(resp) {
           if (!resp.ok) throw new Error("HTTP " + resp.status);
           return resp.json();
