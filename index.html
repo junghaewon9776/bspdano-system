@@ -1556,7 +1556,15 @@ function dApply(){
   h+='<button class="btn btn-b" onclick="applyXLSX()">⬇ 엑셀 내보내기</button>';
   h+='<button class="btn" style="background:#8b5cf6;color:#fff;font-weight:700" onclick="applyImpTmpl()" title="엑셀 양식 다운로드">📋 양식</button>';
   h+='<button class="btn" style="background:#ea580c;color:#fff;font-weight:700" onclick="applyImpExcel()" title="엑셀로 참가자 일괄 추가">⬆ 엑셀 가져오기</button>';
-  h+='<button class="btn" style="background:#0d9488;color:#fff;font-weight:700" onclick="applyDownloadAllFiles()" title="현재 필터된 참가자의 첨부파일 전체를 ZIP으로">📥 첨부파일 일괄 다운로드</button>';
+  h+='<span style="position:relative;display:inline-block">';
+  h+='<button class="btn" style="background:#0d9488;color:#fff;font-weight:700" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display===\'block\'?\'none\':\'block\'" title="현재 필터된 참가자의 첨부파일을 ZIP으로">📥 첨부파일 다운로드 ▾</button>';
+  h+='<div style="display:none;position:absolute;top:100%;left:0;z-index:100;background:#fff;border:1px solid #e5e7eb;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:200px;padding:4px 0;margin-top:2px">';
+  h+='<div style="padding:8px 14px;cursor:pointer;font-size:13px;color:#333" onmouseover="this.style.background=\'#f1f5f9\'" onmouseout="this.style.background=\'#fff\'" onclick="this.parentElement.style.display=\'none\';applyDownloadByType(\'form\')">📝 참가신청서</div>';
+  h+='<div style="padding:8px 14px;cursor:pointer;font-size:13px;color:#333" onmouseover="this.style.background=\'#f1f5f9\'" onmouseout="this.style.background=\'#fff\'" onclick="this.parentElement.style.display=\'none\';applyDownloadByType(\'bank\')">💳 통장사본</div>';
+  h+='<div style="padding:8px 14px;cursor:pointer;font-size:13px;color:#333" onmouseover="this.style.background=\'#f1f5f9\'" onmouseout="this.style.background=\'#fff\'" onclick="this.parentElement.style.display=\'none\';applyDownloadByType(\'reg\')">📋 등본</div>';
+  h+='<div style="border-top:1px solid #e5e7eb;margin:4px 0"></div>';
+  h+='<div style="padding:8px 14px;cursor:pointer;font-size:13px;color:#333" onmouseover="this.style.background=\'#f1f5f9\'" onmouseout="this.style.background=\'#fff\'" onclick="this.parentElement.style.display=\'none\';applyDownloadAllFiles()">📦 전체 일괄</div>';
+  h+='</div></span>';
   h+='</div>';
 
   // 검색바 (단독 라인)
@@ -3807,6 +3815,82 @@ function applyDownloadAllFiles(){
     }).catch(function(e){
       hideLoading();
       if(confirm("배치 "+(bi+1)+" 실패: "+e+"\n다음 배치로 계속할까요?")){ bi++; next(); }
+    });
+  }
+  next();
+}
+
+// 첨부파일 종류별 다운로드 (현재 필터 적용, 파일명=접수번호)
+function applyDownloadByType(type){
+  if(!APPLY||!(APPLY.headers||[]).length){ alert("데이터가 없습니다."); return; }
+  var H=APPLY.headers, R=APPLY.rows||[];
+  var AC=_attachCols(H);
+  var cols=AC[type]||[];
+  var typeNames={form:"참가신청서",bank:"통장사본",reg:"등본"};
+  var typeName=typeNames[type]||type;
+  if(!cols.length){ alert(typeName+" 컬럼이 없습니다."); return; }
+
+  var iSeq=H.indexOf("접수순번");
+  var iCat=H.indexOf("구분"),iDiv=H.indexOf("참가구분"),iReg=H.indexOf("시도별");
+  var iPreH=H.indexOf("예선합격"),iFinH=H.indexOf("최종합격"),iAwdH=H.indexOf("수상"),iAbsH=H.indexOf("불참");
+  var q=(APPLY_Q||"").trim().toLowerCase();
+  var isYes=function(v){v=String(v==null?"":v);return v==="O"||v==="Y"||v==="true"||v==="1";};
+
+  // 현재 필터 적용
+  var rows=R.filter(function(r){
+    if(APPLY_F.cat&&iCat>=0&&String(r[iCat]||"")!==APPLY_F.cat)return false;
+    if(APPLY_F.div&&iDiv>=0&&String(r[iDiv]||"")!==APPLY_F.div)return false;
+    if(APPLY_F.region&&iReg>=0&&String(r[iReg]||"")!==APPLY_F.region)return false;
+    if(APPLY_F.pre&&iPreH>=0){var y=isYes(r[iPreH]);if(APPLY_F.pre==="합격"&&!y)return false;if(APPLY_F.pre==="불합격"&&y)return false;}
+    if(APPLY_F.fin&&iFinH>=0){var y2=isYes(r[iFinH]);if(APPLY_F.fin==="합격"&&!y2)return false;if(APPLY_F.fin==="불합격"&&y2)return false;}
+    if(APPLY_F.abs&&iAbsH>=0){var ya=isYes(r[iAbsH]);if(APPLY_F.abs==="불참"&&!ya)return false;if(APPLY_F.abs==="참석"&&ya)return false;}
+    if(APPLY_F.awd&&iAwdH>=0){var aw=String(r[iAwdH]||"").trim();if(APPLY_F.awd==="__any__"){if(!aw)return false;}else if(APPLY_F.awd==="__none__"){if(aw)return false;}else{if(aw!==APPLY_F.awd)return false;}}
+    if(APPLY_F.att && !_matchAttachFilter(r, AC, APPLY_F.att)) return false;
+    if(q){return r.some(function(v){return jamoMatch(v,q);});}
+    return true;
+  });
+
+  // 해당 종류 URL 추출 — 파일명은 접수번호
+  var items=[];
+  rows.forEach(function(r){
+    var seq=iSeq>=0?String(r[iSeq]||""):"";
+    if(!seq) seq="no_seq";
+    cols.forEach(function(ci){
+      var v=String(r[ci]==null?"":r[ci]);
+      var urls=v.split(/[\|\n\r\s]+/).filter(function(u){return /^https?:\/\//.test(u)&&/drive\.google|docs\.google/.test(u);});
+      urls.forEach(function(u,ui){
+        var label=seq;
+        if(urls.length>1) label+="_"+(ui+1);
+        items.push({u:u,label:label});
+      });
+    });
+  });
+
+  if(!items.length){ alert(typeName+" 파일이 없습니다. (현재 필터 기준 "+rows.length+"명)"); return; }
+  var CHUNK=100;
+  var total=items.length, batches=Math.ceil(total/CHUNK);
+  if(!confirm(typeName+" "+total+"개 파일을 다운로드합니다.\n(현재 필터 "+rows.length+"명)\n진행할까요?")) return;
+
+  var bi=0;
+  function next(){
+    if(bi>=batches){ hideLoading(); toast("✅ "+typeName+" "+total+"개 다운로드 완료"); return; }
+    var slice=items.slice(bi*CHUNK,(bi+1)*CHUNK);
+    showLoading(typeName+" 다운로드 중... ("+(bi+1)+"/"+batches+")");
+    var zipName=typeName+"_"+today()+(batches>1?"_part"+(bi+1)+"of"+batches:"");
+    api("buildGalleryZip",{items:slice,zipName:zipName}).then(function(r){
+      if(r&&r.ok&&r.dataUrl){
+        var a=document.createElement("a");
+        a.href=r.dataUrl; a.download=r.name||(zipName+".zip");
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        bi++;
+        setTimeout(next, 800);
+      } else {
+        hideLoading();
+        if(confirm("배치 "+(bi+1)+" 실패: "+((r&&r.err)||"오류")+"\n계속할까요?")){ bi++; next(); }
+      }
+    }).catch(function(e){
+      hideLoading();
+      if(confirm("실패: "+e+"\n계속할까요?")){ bi++; next(); }
     });
   }
   next();
