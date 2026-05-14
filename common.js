@@ -348,6 +348,9 @@ function _dispatch(p) {
         // 텔레그램 알림
         case "notifyLogin": _apiNotifyLogin(p).then(resolve); return;
 
+        // 첨부파일 ZIP 다운로드
+        case "buildGalleryZip": _apiBuildGalleryZip(p).then(resolve); return;
+
         default:
           console.warn("미구현 action:", action);
           resolve({ok:false, err:"미구현: " + action});
@@ -1461,5 +1464,111 @@ function _apiDeleteFile(p) {
         resolve({ok:true});
       });
     });
+  });
+}
+
+// ───────── 첨부파일 ZIP 다운로드 (클라이언트 JSZip) ─────────
+function _extractDriveFileId(url) {
+  if (!url) return null;
+  // https://drive.google.com/file/d/FILE_ID/view
+  var m = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+  if (m) return m[1];
+  // https://drive.google.com/open?id=FILE_ID
+  m = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+  if (m) return m[1];
+  return null;
+}
+
+function _apiBuildGalleryZip(p) {
+  var items = p.items || [];
+  var zipName = p.zipName || "download";
+
+  if (!items.length) return Promise.resolve({ok:false, err:"다운로드할 파일이 없습니다"});
+
+  // DRIVE_UPLOAD_URL 확인 (index.html 전역변수)
+  var proxyUrl = (typeof DRIVE_UPLOAD_URL !== "undefined" && DRIVE_UPLOAD_URL) ? DRIVE_UPLOAD_URL : "";
+  if (!proxyUrl) {
+    return Promise.resolve({ok:false, err:"Drive 업로드 URL(GAS 프록시)이 설정되지 않았습니다.\n설정 → 참가접수 설정에서 DRIVE_UPLOAD_URL을 등록해주세요.\n\n또한 GAS 스크립트를 최신 버전으로 재배포해주세요.\n(DriveUpload_GAS.js 참고)"});
+  }
+
+  if (typeof JSZip === "undefined") {
+    return Promise.resolve({ok:false, err:"JSZip 라이브러리가 로딩되지 않았습니다. 페이지를 새로고침 후 다시 시도해주세요."});
+  }
+
+  var zip = new JSZip();
+  var failed = [];
+  var done = 0;
+
+  // 순차 다운로드 (GAS 프록시 부하 방지)
+  return new Promise(function(resolve) {
+    function processNext(idx) {
+      if (idx >= items.length) {
+        // ZIP 생성
+        if (done === 0) {
+          resolve({ok:false, err:"모든 파일 다운로드에 실패했습니다.\nGAS 스크립트가 최신 버전인지 확인해주세요."});
+          return;
+        }
+        zip.generateAsync({type:"base64"}).then(function(b64) {
+          var dataUrl = "data:application/zip;base64," + b64;
+          resolve({ok:true, dataUrl:dataUrl, name:zipName + ".zip", total:items.length, success:done, failed:failed.length});
+        }).catch(function(e) {
+          resolve({ok:false, err:"ZIP 생성 실패: " + e});
+        });
+        return;
+      }
+
+      var item = items[idx];
+      var fileId = _extractDriveFileId(item.u);
+      if (!fileId) {
+        failed.push({label:item.label||"", err:"파일ID 추출 실패"});
+        processNext(idx + 1);
+        return;
+      }
+
+      var label = item.label || ("file_" + (idx+1));
+      var fetchUrl = proxyUrl + "?action=download&fileId=" + encodeURIComponent(fileId);
+
+      fetch(fetchUrl, {method:"GET", redirect:"follow"})
+        .then(function(resp) {
+          if (!resp.ok) throw new Error("HTTP " + resp.status);
+          return resp.json();
+        })
+        .then(function(r) {
+          if (!r || !r.ok || !r.base64) {
+            failed.push({label:label, err:r && r.err ? r.err : "응답 오류"});
+          } else {
+            // 파일 확장자 결정
+            var ext = "";
+            var origName = r.name || "";
+            var dotIdx = origName.lastIndexOf(".");
+            if (dotIdx > 0) ext = origName.substring(dotIdx);
+            else {
+              // MIME으로 추정
+              var mime = r.mime || "";
+              if (mime.indexOf("pdf") >= 0) ext = ".pdf";
+              else if (mime.indexOf("jpeg") >= 0 || mime.indexOf("jpg") >= 0) ext = ".jpg";
+              else if (mime.indexOf("png") >= 0) ext = ".png";
+              else if (mime.indexOf("gif") >= 0) ext = ".gif";
+              else if (mime.indexOf("word") >= 0 || mime.indexOf("docx") >= 0) ext = ".docx";
+              else if (mime.indexOf("sheet") >= 0 || mime.indexOf("xlsx") >= 0) ext = ".xlsx";
+              else if (mime.indexOf("hwp") >= 0) ext = ".hwp";
+              else ext = ".bin";
+            }
+            var fileName = label + ext;
+            // base64 → binary
+            var raw = atob(r.base64);
+            var uint8 = new Uint8Array(raw.length);
+            for (var i = 0; i < raw.length; i++) uint8[i] = raw.charCodeAt(i);
+            zip.file(fileName, uint8);
+            done++;
+          }
+          processNext(idx + 1);
+        })
+        .catch(function(e) {
+          failed.push({label:label, err:String(e)});
+          processNext(idx + 1);
+        });
+    }
+    processNext(0);
   });
 }

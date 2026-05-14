@@ -60,8 +60,31 @@ function doPost(e) {
 }
 
 function doGet(e) {
+  var p = e && e.parameter ? e.parameter : {};
+
+  // 파일 다운로드 프록시: ?action=download&fileId=xxx
+  if (p.action === "download" && p.fileId) {
+    try {
+      var file = DriveApp.getFileById(p.fileId);
+      var blob = file.getBlob();
+      var b64 = Utilities.base64Encode(blob.getBytes());
+      return ContentService.createTextOutput(JSON.stringify({
+        ok: true,
+        name: file.getName(),
+        mime: blob.getContentType(),
+        size: blob.getBytes().length,
+        base64: b64
+      })).setMimeType(ContentService.MimeType.JSON);
+    } catch (err) {
+      return ContentService.createTextOutput(JSON.stringify({
+        ok: false,
+        err: err.message || String(err)
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+  }
+
   return ContentService.createTextOutput(JSON.stringify({
     ok: true,
-    msg: "Drive Upload Proxy is running"
+    msg: "Drive Upload/Download Proxy is running"
   })).setMimeType(ContentService.MimeType.JSON);
 }
