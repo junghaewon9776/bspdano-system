@@ -3794,32 +3794,23 @@ function applyDownloadAllFiles(){
     });
   });
   if(!items.length){ alert("다운로드할 첨부파일(드라이브 링크)이 없습니다."); return; }
-  var CHUNK=100;
-  var total=items.length, batches=Math.ceil(total/CHUNK);
-  if(!confirm("총 "+total+"개 파일을 "+batches+"개 ZIP으로 나눠 다운로드합니다.\n시간이 오래 걸릴 수 있어요. 진행할까요?")) return;
-  var bi=0;
-  function next(){
-    if(bi>=batches){ hideLoading(); toast("✅ 전체 "+total+"개 다운로드 완료"); return; }
-    var slice=items.slice(bi*CHUNK,(bi+1)*CHUNK);
-    showLoading("다운로드 중... ("+(bi+1)+"/"+batches+") "+slice.length+"개");
-    var zipName="첨부파일_"+today()+"_part"+(bi+1)+"of"+batches;
-    api("buildGalleryZip",{items:slice,zipName:zipName}).then(function(r){
-      if(r&&r.ok&&r.dataUrl){
-        var a=document.createElement("a");
-        a.href=r.dataUrl; a.download=r.name||(zipName+".zip");
-        document.body.appendChild(a); a.click(); document.body.removeChild(a);
-        bi++;
-        setTimeout(next, 800); // 잠깐 쉬고 다음 배치
-      } else {
-        hideLoading();
-        if(confirm("배치 "+(bi+1)+" 실패: "+((r&&r.err)||"오류")+"\n다음 배치로 계속할까요?")){ bi++; next(); }
-      }
-    }).catch(function(e){
-      hideLoading();
-      if(confirm("배치 "+(bi+1)+" 실패: "+e+"\n다음 배치로 계속할까요?")){ bi++; next(); }
-    });
-  }
-  next();
+  if(!confirm("총 "+rows.length+"명, "+items.length+"개 파일을 다운로드합니다.\n시간이 오래 걸릴 수 있어요. 진행할까요?")) return;
+  showLoading("첨부파일 "+items.length+"개 다운로드 준비 중...");
+  var zipName="첨부파일_"+today();
+  api("buildGalleryZip",{items:items,zipName:zipName}).then(function(r){
+    hideLoading();
+    if(r&&r.ok&&r.dataUrl){
+      var a=document.createElement("a");
+      a.href=r.dataUrl; a.download=r.name||(zipName+".zip");
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      toast("✅ "+r.success+"개 다운로드 완료"+(r.failed?" ("+r.failed+"개 실패)":""));
+    } else {
+      alert("다운로드 실패: "+((r&&r.err)||"오류"));
+    }
+  }).catch(function(e){
+    hideLoading();
+    alert("다운로드 실패: "+e);
+  });
 }
 
 // 첨부파일 종류별 다운로드 (현재 필터 적용, 파일명=접수번호)
@@ -3871,33 +3862,23 @@ function applyDownloadByType(type){
   });
 
   if(!items.length){ alert(typeName+" 파일이 없습니다. (현재 필터 기준 "+rows.length+"명)"); return; }
-  var CHUNK=100;
-  var total=items.length, batches=Math.ceil(total/CHUNK);
-  if(!confirm(typeName+" "+total+"개 파일을 다운로드합니다.\n(현재 필터 "+rows.length+"명)\n진행할까요?")) return;
-
-  var bi=0;
-  function next(){
-    if(bi>=batches){ hideLoading(); toast("✅ "+typeName+" "+total+"개 다운로드 완료"); return; }
-    var slice=items.slice(bi*CHUNK,(bi+1)*CHUNK);
-    showLoading(typeName+" 다운로드 중... ("+(bi+1)+"/"+batches+")");
-    var zipName=typeName+"_"+today()+(batches>1?"_part"+(bi+1)+"of"+batches:"");
-    api("buildGalleryZip",{items:slice,zipName:zipName}).then(function(r){
-      if(r&&r.ok&&r.dataUrl){
-        var a=document.createElement("a");
-        a.href=r.dataUrl; a.download=r.name||(zipName+".zip");
-        document.body.appendChild(a); a.click(); document.body.removeChild(a);
-        bi++;
-        setTimeout(next, 800);
-      } else {
-        hideLoading();
-        if(confirm("배치 "+(bi+1)+" 실패: "+((r&&r.err)||"오류")+"\n계속할까요?")){ bi++; next(); }
-      }
-    }).catch(function(e){
-      hideLoading();
-      if(confirm("실패: "+e+"\n계속할까요?")){ bi++; next(); }
-    });
-  }
-  next();
+  if(!confirm(typeName+" "+rows.length+"명, "+items.length+"개 파일을 다운로드합니다.\n진행할까요?")) return;
+  showLoading(typeName+" "+items.length+"개 다운로드 준비 중...");
+  var zipName=typeName+"_"+today();
+  api("buildGalleryZip",{items:items,zipName:zipName}).then(function(r){
+    hideLoading();
+    if(r&&r.ok&&r.dataUrl){
+      var a=document.createElement("a");
+      a.href=r.dataUrl; a.download=r.name||(zipName+".zip");
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      toast("✅ "+typeName+" "+r.success+"개 다운로드 완료"+(r.failed?" ("+r.failed+"개 실패)":""));
+    } else {
+      alert(typeName+" 다운로드 실패: "+((r&&r.err)||"오류"));
+    }
+  }).catch(function(e){
+    hideLoading();
+    alert(typeName+" 다운로드 실패: "+e);
+  });
 }
 
 // 참가자 엑셀 양식 다운로드
