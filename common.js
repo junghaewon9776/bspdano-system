@@ -1499,13 +1499,26 @@ function _apiBuildGalleryZip(p) {
   var failed = [];
   var done = 0;
 
+  // 타임아웃 fetch 래퍼 (60초)
+  function fetchWithTimeout(url, opts, ms) {
+    ms = ms || 60000;
+    return new Promise(function(resolve, reject) {
+      var timer = setTimeout(function() { reject(new Error("타임아웃 ("+Math.round(ms/1000)+"초)")); }, ms);
+      fetch(url, opts).then(function(r) { clearTimeout(timer); resolve(r); })
+                      .catch(function(e) { clearTimeout(timer); reject(e); });
+    });
+  }
+
   // 순차 다운로드 (GAS 프록시 부하 방지)
   return new Promise(function(resolve) {
     function processNext(idx) {
       if (idx >= items.length) {
         // ZIP 생성
         if (done === 0) {
-          resolve({ok:false, err:"모든 파일 다운로드에 실패했습니다.\nGAS 스크립트가 최신 버전인지 확인해주세요."});
+          var errMsg = "모든 파일 다운로드에 실패했습니다.";
+          if (failed.length) errMsg += "\n첫 번째 오류: " + (failed[0].err||"") + " (" + (failed[0].label||"") + ")";
+          errMsg += "\n\nGAS 스크립트가 최신 버전으로 배포되었는지 확인해주세요.";
+          resolve({ok:false, err:errMsg});
           return;
         }
         zip.generateAsync({type:"base64"}).then(function(b64) {
@@ -1520,26 +1533,42 @@ function _apiBuildGalleryZip(p) {
       var item = items[idx];
       var fileId = _extractDriveFileId(item.u);
       if (!fileId) {
-        failed.push({label:item.label||"", err:"파일ID 추출 실패"});
+        console.warn("[ZIP] 파일ID 추출 실패:", item.u);
+        failed.push({label:item.label||"", err:"파일ID 추출 실패: " + (item.u||"").substring(0,60)});
         processNext(idx + 1);
         return;
       }
 
       var label = item.label || ("file_" + (idx+1));
+      console.log("[ZIP] " + (idx+1) + "/" + items.length + " 다운로드:", label, "fileId=" + fileId);
 
-      fetch(proxyUrl, {
+      // 로딩 메시지 업데이트
+      if (typeof showLoading === "function") {
+        showLoading("파일 다운로드 중... (" + (idx+1) + "/" + items.length + ") " + label);
+      }
+
+      fetchWithTimeout(proxyUrl, {
         method: "POST",
         headers: {"Content-Type":"text/plain;charset=utf-8"},
-        body: JSON.stringify({action:"download", fileId:fileId}),
-        redirect: "follow"
-      })
+        body: JSON.stringify({action:"download", fileId:fileId})
+      }, 60000)
         .then(function(resp) {
+          console.log("[ZIP] 응답 status:", resp.status, resp.statusText);
           if (!resp.ok) throw new Error("HTTP " + resp.status);
-          return resp.json();
+          return resp.text();
         })
-        .then(function(r) {
+        .then(function(txt) {
+          // JSON 파싱 시도
+          var r;
+          try { r = JSON.parse(txt); }
+          catch(pe) {
+            console.error("[ZIP] JSON 파싱 실패:", txt.substring(0, 200));
+            throw new Error("응답이 JSON이 아닙니다: " + txt.substring(0, 100));
+          }
           if (!r || !r.ok || !r.base64) {
-            failed.push({label:label, err:r && r.err ? r.err : "응답 오류"});
+            var errDetail = r && r.err ? r.err : "base64 데이터 없음";
+            console.warn("[ZIP] 실패:", label, errDetail);
+            failed.push({label:label, err:errDetail});
           } else {
             // 파일 확장자 결정
             var ext = "";
@@ -1547,7 +1576,6 @@ function _apiBuildGalleryZip(p) {
             var dotIdx = origName.lastIndexOf(".");
             if (dotIdx > 0) ext = origName.substring(dotIdx);
             else {
-              // MIME으로 추정
               var mime = r.mime || "";
               if (mime.indexOf("pdf") >= 0) ext = ".pdf";
               else if (mime.indexOf("jpeg") >= 0 || mime.indexOf("jpg") >= 0) ext = ".jpg";
@@ -1559,16 +1587,17 @@ function _apiBuildGalleryZip(p) {
               else ext = ".bin";
             }
             var fileName = label + ext;
-            // base64 → binary
             var raw = atob(r.base64);
             var uint8 = new Uint8Array(raw.length);
             for (var i = 0; i < raw.length; i++) uint8[i] = raw.charCodeAt(i);
             zip.file(fileName, uint8);
             done++;
+            console.log("[ZIP] ✅ 성공:", fileName, "(" + r.size + " bytes)");
           }
           processNext(idx + 1);
         })
         .catch(function(e) {
+          console.error("[ZIP] ❌ 오류:", label, String(e));
           failed.push({label:label, err:String(e)});
           processNext(idx + 1);
         });
