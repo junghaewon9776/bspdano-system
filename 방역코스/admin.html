@@ -537,30 +537,54 @@ function resetToDefaults() {
   location.reload();
 }
 
-// ────── 거점 CSV 다운로드 ──────
+// ────── 거점 CSV 다운로드 (거점 + 민원 + 방역금지 통합) ──────
 function exportAnchorsCSV() {
   const data = loadData();
-  if (!data.anchors.length) { alert('거점이 없습니다'); return; }
+  const hasAnchors = (data.anchors || []).length > 0;
+  const hasComplaints = (data.complaints || []).length > 0;
+  const hasNoSpray = (data.noSprayZones || []).length > 0;
+  if (!hasAnchors && !hasComplaints && !hasNoSpray) { alert('데이터가 없습니다'); return; }
 
-  const lines = ['﻿행사,코스,거점명,주소,위도,경도,메모,순서'];
+  const lines = ['﻿유형,행사,코스,거점명,주소,위도,경도,메모,순서,상태'];
+  let total = 0;
+
+  // 거점
   for (const event of (data.events || [])) {
     for (const course of (event.courses || [])) {
       const anchors = getCourseAnchors(data, course.id);
       for (const a of anchors) {
-        const row = [
-          csvEscape(event.name),
-          csvEscape(course.name),
-          csvEscape(a.name),
-          '', // 주소 비워둠 (좌표 우선)
-          a.lat,
-          a.lng,
-          csvEscape(a.memo || ''),
-          a.order
-        ].join(',');
-        lines.push(row);
+        lines.push([
+          '거점', csvEscape(event.name), csvEscape(course.name),
+          csvEscape(a.name), '', a.lat, a.lng,
+          csvEscape(a.memo || ''), a.order, ''
+        ].join(','));
+        total++;
       }
     }
   }
+
+  // 민원
+  for (const c of (data.complaints || [])) {
+    const ev = (data.events || []).find(e => e.id === c.eventId);
+    lines.push([
+      '민원', csvEscape(ev?.name || ''), '',
+      csvEscape(c.phone || ''), '', c.lat, c.lng,
+      csvEscape(c.content || ''), '',
+      c.status === 'resolved' ? '처리완료' : '대기'
+    ].join(','));
+    total++;
+  }
+
+  // 방역금지구역
+  for (const z of (data.noSprayZones || [])) {
+    lines.push([
+      '방역금지', '', '',
+      csvEscape(z.name || ''), '', z.lat, z.lng,
+      csvEscape(z.reason || ''), '', ''
+    ].join(','));
+    total++;
+  }
+
   const blob = new Blob([lines.join('\n')], {type:'text/csv;charset=utf-8'});
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -568,7 +592,7 @@ function exportAnchorsCSV() {
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
-  setTimeout(() => alert(`다운로드 완료 (${data.anchors.length}개 거점)`), 200);
+  setTimeout(() => alert(`다운로드 완료 (총 ${total}건: 거점 ${(data.anchors||[]).length} · 민원 ${(data.complaints||[]).length} · 방역금지 ${(data.noSprayZones||[]).length})`), 200);
 }
 
 function csvEscape(s) {
