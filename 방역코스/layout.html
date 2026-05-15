@@ -122,6 +122,12 @@ body{font-family:'Pretendard','Noto Sans KR',sans-serif;background:#1a1a2e;color
 .pin-close{background:none;border:none;color:#94a3b8;cursor:pointer;font-size:12px;margin-left:4px}
 .pin-close:hover{color:#fff}
 
+/* 도형 정보 버블 */
+.item-bubble{background:#fffbe6;color:#1e293b;padding:10px 14px;border-radius:8px;font-size:12px;line-height:1.6;box-shadow:0 4px 16px rgba(0,0,0,0.4);max-width:220px;position:relative;border:1px solid #e2c94a;pointer-events:auto}
+.item-bubble::after{content:'';position:absolute;bottom:-8px;left:50%;transform:translateX(-50%);border-left:8px solid transparent;border-right:8px solid transparent;border-top:8px solid #fffbe6}
+.item-bubble b{color:#92400e}
+.item-bubble .bubble-close{position:absolute;top:2px;right:6px;background:none;border:none;color:#92400e;cursor:pointer;font-size:14px;font-weight:700;line-height:1}
+
 /* 측정 모드 표시 */
 #measureIndicator{position:absolute;top:52px;left:50%;transform:translateX(-50%);z-index:50;background:rgba(16,185,129,0.92);color:#fff;padding:8px 16px;border-radius:8px;font-size:12px;font-weight:700;display:none;backdrop-filter:blur(8px);white-space:nowrap}
 .measure-label{background:rgba(0,0,0,0.75);color:#fff;padding:4px 8px;border-radius:4px;font-size:12px;font-weight:700;white-space:nowrap;pointer-events:auto;cursor:default}
@@ -172,6 +178,18 @@ body{font-family:'Pretendard','Noto Sans KR',sans-serif;background:#1a1a2e;color
       <input id="iPhone" type="text" placeholder="010-0000-0000">
       <label>메모</label>
       <textarea id="iMemo" placeholder="비고"></textarea>
+      <!-- 회전 컨트롤 -->
+      <div id="panelRotation" style="margin-top:10px;padding-top:10px;border-top:1px solid #334155">
+        <div style="color:#94a3b8;font-size:11px;font-weight:600;margin-bottom:4px">🔄 회전 <span id="panelRotVal" style="color:#64748b"></span></div>
+        <div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center">
+          <button onclick="panelRotate(-90)" style="padding:4px 8px;border:none;border-radius:4px;font-size:11px;font-weight:700;cursor:pointer;background:#334155;color:#fff">↺-90°</button>
+          <button onclick="panelRotate(90)" style="padding:4px 8px;border:none;border-radius:4px;font-size:11px;font-weight:700;cursor:pointer;background:#334155;color:#fff">↻+90°</button>
+          <button onclick="panelRotate(180)" style="padding:4px 8px;border:none;border-radius:4px;font-size:11px;font-weight:700;cursor:pointer;background:#334155;color:#fff">↻180°</button>
+          <input id="panelRotAngle" type="number" value="0" step="5" style="width:50px;padding:4px 6px;border:1px solid #334155;border-radius:4px;background:#0f172a;color:#fff;font-size:11px;text-align:center">
+          <span style="color:#64748b;font-size:11px">°</span>
+          <button onclick="panelSetRotation()" style="padding:4px 8px;border:none;border-radius:4px;font-size:11px;font-weight:700;cursor:pointer;background:#3b82f6;color:#fff">적용</button>
+        </div>
+      </div>
       <!-- 이동 + 복제 컨트롤 -->
       <div id="panelMoveClone" style="margin-top:10px;padding-top:10px;border-top:1px solid #334155;display:flex;gap:12px;justify-content:center">
         <div style="text-align:center">
@@ -529,7 +547,7 @@ function _doDragMove(it,mx,my){
 function _doDragEnd(){
   var idx=_drag.idx,it=items[idx],moved=_drag.moved;
   _drag.active=false;map.setDraggable(true);
-  if(!moved){selectItem(idx);showItemInfo(idx);map.setCenter(new kakao.maps.LatLng(it.lat,it.lng));return}
+  if(!moved){selectItem(idx);showItemBubble(idx);map.setCenter(new kakao.maps.LatLng(it.lat,it.lng));return}
   if(confirm(it.num+' 위치를 이동하시겠습니까?')){
     toast(it.num+' 이동됨');
     autoSave();
@@ -1398,6 +1416,38 @@ function addArrow(it,from,to,color){
   it._arrows.push(arrow);
 }
 
+// ═══ 도형 위 메모 버블 ═══
+var _itemBubble=null;
+function showItemBubble(idx){
+  closeItemBubble();
+  var it=items[idx];
+  var cat=categories.find(function(c){return c.id===it.catId});
+  var h='<button class="bubble-close" onclick="closeItemBubble()">✕</button>';
+  h+='<div style="font-weight:700;font-size:13px;margin-bottom:4px;padding-right:14px">'+it.num+(cat?' · '+cat.name:'')+'</div>';
+  if(it.name)h+='<div><b>이름:</b> '+it.name+'</div>';
+  if(it.duty)h+='<div><b>담당자:</b> '+it.duty+'</div>';
+  if(it.phone)h+='<div><b>연락처:</b> '+it.phone+'</div>';
+  if(it.memo)h+='<div><b>메모:</b> '+it.memo+'</div>';
+  if(it.shape==='rect')h+='<div><b>크기:</b> '+it.w+'×'+it.h+'m</div>';
+  else if(it.shape==='circle')h+='<div><b>지름:</b> '+(it.diameter||5)+'m</div>';
+  else if(it.shape==='line')h+='<div><b>구간:</b> '+(it.path?it.path.length:0)+'개 점</div>';
+  else if(it.shape==='polygon')h+='<div><b>꼭짓점:</b> '+(it.path?it.path.length:0)+'개</div>';
+  if(it.rotation)h+='<div><b>회전:</b> '+it.rotation+'°</div>';
+  if(!it.name&&!it.duty&&!it.phone&&!it.memo)h+='<div style="color:#78716c">정보 없음</div>';
+  var el=document.createElement('div');
+  el.className='item-bubble';
+  el.innerHTML=h;
+  _itemBubble=new kakao.maps.CustomOverlay({
+    position:new kakao.maps.LatLng(it.lat,it.lng),
+    content:el,
+    yAnchor:1.4
+  });
+  _itemBubble.setMap(map);
+}
+function closeItemBubble(){
+  if(_itemBubble){try{_itemBubble.setMap(null);}catch(e){}_itemBubble=null;}
+}
+
 var _infoIdx=-1;
 function showItemInfo(idx){
   _infoIdx=idx;
@@ -1534,6 +1584,34 @@ function cloneItem(dx,dy){
   toast(ni.num+' 추가됨');
   autoSave();
 }
+// 사이드바 패널용 회전
+function panelRotate(deg){
+  if(selectedItemIdx<0)return;
+  var it=items[selectedItemIdx];
+  if(it.shape==='line'||it.shape==='polygon'){
+    var cen=pathCenter(it.path);
+    var rad=deg*Math.PI/180,cosA=Math.cos(rad),sinA=Math.sin(rad),cosLat=Math.cos(cen.lat*Math.PI/180);
+    it.path=it.path.map(function(p){
+      var dy2=p.lat-cen.lat,dx2=(p.lng-cen.lng)*cosLat;
+      return{lat:cen.lat+dx2*sinA+dy2*cosA, lng:cen.lng+(dx2*cosA-dy2*sinA)/cosLat};
+    });
+  }
+  it.rotation=((it.rotation||0)+deg)%360;
+  if(it.rotation<0)it.rotation+=360;
+  drawItem(selectedItemIdx);
+  document.getElementById('panelRotAngle').value=it.rotation;
+  document.getElementById('panelRotVal').textContent='(현재 '+it.rotation+'°)';
+  autoSave();
+}
+function panelSetRotation(){
+  if(selectedItemIdx<0)return;
+  var it=items[selectedItemIdx];
+  var newR=parseInt(document.getElementById('panelRotAngle').value)||0;
+  var diff=newR-(it.rotation||0);
+  if(diff===0)return;
+  panelRotate(diff);
+}
+
 // 사이드바 패널용 이동/복제 (selectedItemIdx 기반)
 function panelMoveItem(dx,dy){
   if(selectedItemIdx<0)return;
@@ -1615,11 +1693,14 @@ function selectItem(idx){
   document.getElementById('iDuty').value=it.duty||'';
   document.getElementById('iPhone').value=it.phone;
   document.getElementById('iMemo').value=it.memo||'';
+  document.getElementById('panelRotAngle').value=it.rotation||0;
+  document.getElementById('panelRotVal').textContent='(현재 '+(it.rotation||0)+'°)';
   p.style.display='block';
   renderCategories();
 }
 
 function deselectItem(){
+  closeItemBubble();
   if(selectedItemIdx>=0&&items[selectedItemIdx]){
     var it=items[selectedItemIdx];
     var cat=categories.find(function(c){return c.id===it.catId});
