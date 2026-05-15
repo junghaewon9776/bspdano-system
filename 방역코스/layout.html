@@ -218,6 +218,7 @@ body{font-family:'Pretendard','Noto Sans KR',sans-serif;background:#1a1a2e;color
     <button onclick="clearAllMeasure()" title="측정 전부 삭제">🗑️ 측정 지우기</button>
     <button onclick="saveMapPos()">📍 현재위치 기본설정</button>
     <button onclick="clearSearchPin()">🔍 핀 제거</button>
+    <button onclick="saveMapImage()">📷 이미지 저장</button>
   </div>
   <!-- 우클릭 메뉴 -->
   <div id="ctxMenu">
@@ -418,6 +419,7 @@ body{font-family:'Pretendard','Noto Sans KR',sans-serif;background:#1a1a2e;color
 </div>
 
 <!-- Firebase -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
@@ -1676,6 +1678,30 @@ function undoDrawPoint(){
 }
 
 // ══════════════════════════════════════
+// 이미지 저장
+function saveMapImage(){
+  if(typeof html2canvas==='undefined'){toast('이미지 라이브러리 로딩중... 잠시 후 다시',true);return;}
+  toast('이미지 캡쳐 중...');
+  var mapEl=document.getElementById('map');
+  html2canvas(mapEl,{
+    useCORS:true,
+    allowTaint:true,
+    scale:2,
+    logging:false
+  }).then(function(canvas){
+    var a=document.createElement('a');
+    a.download='배치도_'+new Date().toISOString().slice(0,10)+'.png';
+    a.href=canvas.toDataURL('image/png');
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    toast('✅ 이미지 저장 완료');
+  }).catch(function(e){
+    console.error('이미지 캡쳐 실패:',e);
+    toast('이미지 캡쳐 실패: '+e,true);
+  });
+}
+
 //  주소 검색
 // ══════════════════════════════════════
 function searchAddr(){
