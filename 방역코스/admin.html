@@ -1774,13 +1774,21 @@ function renderEvtAssign() {
   if (!teams.length) {
     h += '<div class="empty" style="font-size:12px;">조가 없습니다. 아래에서 추가하세요</div>';
   } else {
+    const mems = data.members || [];
     h += teams.map(t => {
       const on = cfg.teams.indexOf(t.id) >= 0;
-      return `<label style="display:flex;align-items:center;gap:8px;padding:6px 8px;margin:3px 0;border:1.5px solid ${on ? '#7c3aed' : '#e5e7eb'};border-radius:8px;background:${on ? '#f5f3ff' : '#fff'};cursor:pointer;font-size:13px;">
-        <input type="checkbox" ${on ? 'checked' : ''} onchange="toggleEvtTeam('${eventId}','${t.id}')">
-        <span style="font-weight:600;">${t.name}</span>
-        <span style="color:#888;font-size:11px;">${t.vehicle ? '🚗' + t.vehicle : ''} ${t.leader ? '👑' + t.leader : ''} ${(t.members||t.memberIds||[]).length}명</span>
-      </label>`;
+      const ids = t.memberIds || [];
+      const leadMem = mems.find(m => m.id === t.leaderId);
+      const memNames = ids.map(mid => { const m = mems.find(x => x.id === mid); return m ? m.name : ''; }).filter(Boolean);
+      const leaderName = leadMem ? leadMem.name : (t.leader || '');
+      return `<div style="padding:6px 8px;margin:3px 0;border:1.5px solid ${on ? '#7c3aed' : '#e5e7eb'};border-radius:8px;background:${on ? '#f5f3ff' : '#fff'};">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;">
+          <input type="checkbox" ${on ? 'checked' : ''} onchange="toggleEvtTeam('${eventId}','${t.id}')">
+          <span style="font-weight:600;">${t.name}</span>
+          <span style="color:#888;font-size:11px;">${t.vehicle ? '🚗' + t.vehicle : ''} ${leaderName ? '👑' + leaderName : ''} ${ids.length}명</span>
+        </label>
+        ${ids.length ? '<div style="margin:4px 0 0 28px;font-size:11px;color:#666;">' + memNames.join(', ') + '</div>' : ''}
+      </div>`;
     }).join('');
   }
   h += '</div>';
