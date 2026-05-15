@@ -812,38 +812,43 @@ function initMap(){
   });
 
   // 지도 클릭
+  var _lastClickTime=0;
   kakao.maps.event.addListener(map,'click',function(e){
     _hideCtxMenu();
+    var now=Date.now();
+    var isDbl=(now-_lastClickTime)<350;
+    _lastClickTime=now;
+
     if(_measure){
-      _measureClick(e.latLng);
+      if(isDbl){ _measureFinish(); }
+      else { _measureClick(e.latLng); }
       return;
     }
     if(_drawMode){
-      _drawMode.points.push({lat:e.latLng.getLat(),lng:e.latLng.getLng()});
-      updateDrawPreview();
+      if(isDbl){ finishDraw(); }
+      else {
+        _drawMode.points.push({lat:e.latLng.getLat(),lng:e.latLng.getLng()});
+        updateDrawPreview();
+      }
       return;
     }
     deselectItem();
   });
 
-  // 더블클릭 → 그리기/측정 완료
+  // 카카오맵 dblclick 기본동작(확대) 방지
   kakao.maps.event.addListener(map,'dblclick',function(e){
-    if(_measure){
-      e.preventDefault && e.preventDefault();
-      _measureFinish();
-      return;
-    }
-    if(_drawMode){
-      e.preventDefault && e.preventDefault();
-      finishDraw();
-    }
+    if(_measure||_drawMode){ e.preventDefault && e.preventDefault(); }
   });
 
-  // ESC → 그리기/측정 취소
+  // ESC → 그리기/측정 완료 (점이 충분하면 저장, 아니면 취소)
   document.addEventListener('keydown',function(e){
     if(e.key==='Escape'){
-      if(_measure){cancelMeasureMode();return;}
-      if(_drawMode)cancelDraw();
+      if(_measure){_measureFinish();return;}
+      if(_drawMode){
+        var minPts=_drawMode.type==='line'?2:3;
+        if(_drawMode.points.length>=minPts) finishDraw();
+        else cancelDraw();
+      }
     }
   });
 
@@ -1602,15 +1607,6 @@ function updateDrawPreview(){
 
 function finishDraw(){
   if(!_drawMode)return;
-  // 더블클릭 시 click 이벤트가 먼저 발생하여 마지막 점이 중복 추가됨 → 제거
-  if(_drawMode.points.length>=2){
-    var pts=_drawMode.points;
-    var last=pts[pts.length-1],prev=pts[pts.length-2];
-    if(Math.abs(last.lat-prev.lat)<1e-9&&Math.abs(last.lng-prev.lng)<1e-9){
-      pts.pop();
-      updateDrawPreview();
-    }
-  }
   var minPts=_drawMode.type==='line'?2:3;
   if(_drawMode.points.length<minPts){
     toast((_drawMode.type==='line'?'최소 2개':'최소 3개')+' 점이 필요합니다',true);
