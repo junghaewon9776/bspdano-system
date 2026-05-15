@@ -201,8 +201,9 @@ body{font-family:'Pretendard','Noto Sans KR',sans-serif;background:#1a1a2e;color
     <div id="searchResults"></div>
   </div>
   <!-- 그리기 모드 표시 -->
-  <div id="drawIndicator">🖊 그리기 모드 — 클릭으로 점 추가, 더블클릭으로 완료 (ESC 취소)
-    <button id="drawPreviewToggle" onclick="toggleDrawPreview()" style="margin-left:8px;padding:2px 8px;border:none;border-radius:4px;background:#fff3;color:#fff;font-size:11px;font-weight:700;cursor:pointer" title="미리보기 선/점 표시 토글">👁 미리보기</button>
+  <div id="drawIndicator">🖊 그리기 모드 — 클릭으로 점 추가, 더블클릭/ESC로 완료
+    <button id="drawPreviewToggle" onclick="toggleDrawPreview()" style="margin-left:8px;padding:2px 8px;border:none;border-radius:4px;background:#fff3;color:#fff;font-size:11px;font-weight:700;cursor:pointer" title="미리보기 선 표시 토글">👁 선</button>
+    <button id="drawDotsToggle" onclick="toggleDrawDots()" style="margin-left:4px;padding:2px 8px;border:none;border-radius:4px;background:#fff3;color:#fff;font-size:11px;font-weight:700;cursor:pointer" title="점 표시 토글">⬤ 점</button>
     <button onclick="undoDrawPoint()" style="margin-left:4px;padding:2px 8px;border:none;border-radius:4px;background:#fff3;color:#fff;font-size:11px;font-weight:700;cursor:pointer" title="마지막 점 되돌리기">↩ 뒤로</button>
   </div>
   <!-- 측정 모드 표시 -->
@@ -459,7 +460,8 @@ var trackers=[], livePos={}, gpsMarkers={}, gpsLabels={}, gpsWatchId=null;
 
 // ══ 그리기 모드 ══
 var _drawMode=null; // {type,catId,points:[{lat,lng}],tempLine,tempMarkers:[],tempDots:[]}
-var _drawPreviewVisible=true; // 미리보기 토글
+var _drawPreviewVisible=true; // 선 미리보기 토글
+var _drawDotsVisible=true;    // 점 미리보기 토글
 
 // ══ 드래그 전역 상태 ══
 var _drag={active:false,moved:false,idx:-1,sx:0,sy:0,slat:0,slng:0,sPath:null};
@@ -840,15 +842,11 @@ function initMap(){
     if(_measure||_drawMode){ e.preventDefault && e.preventDefault(); }
   });
 
-  // ESC → 그리기/측정 완료 (점이 충분하면 저장, 아니면 취소)
+  // ESC → 그리기/측정 완료 (항상 저장 시도)
   document.addEventListener('keydown',function(e){
     if(e.key==='Escape'){
       if(_measure){_measureFinish();return;}
-      if(_drawMode){
-        var minPts=_drawMode.type==='line'?2:3;
-        if(_drawMode.points.length>=minPts) finishDraw();
-        else cancelDraw();
-      }
+      if(_drawMode) finishDraw();
     }
   });
 
@@ -1575,11 +1573,10 @@ function updateDrawPreview(){
   _drawMode.tempMarkers.forEach(function(m){m.setMap(null)});
   _drawMode.tempMarkers=[];
 
-  if(!_drawPreviewVisible)return;
-
   var pts=_drawMode.points.map(function(p){return new kakao.maps.LatLng(p.lat,p.lng)});
 
-  if(pts.length>=2){
+  // 선 미리보기
+  if(_drawPreviewVisible && pts.length>=2){
     if(_drawMode.type==='line'){
       _drawMode.tempLine=new kakao.maps.Polyline({
         path:pts,strokeWeight:cat.strokeWeight||4,strokeColor:color,strokeOpacity:0.8,strokeStyle:'solid'
@@ -1592,17 +1589,20 @@ function updateDrawPreview(){
     _drawMode.tempLine.setMap(map);
   }
 
-  pts.forEach(function(pt,i){
-    var dotSize=i===0?'10px':'8px';
-    var dotBorder=i===0?'3px':'2px';
-    var m=new kakao.maps.CustomOverlay({
-      position:pt,
-      content:'<div style="width:'+dotSize+';height:'+dotSize+';background:#fff;border:'+dotBorder+' solid '+color+';border-radius:50%;cursor:pointer"></div>',
-      yAnchor:0.5,xAnchor:0.5
+  // 점 미리보기
+  if(_drawDotsVisible){
+    pts.forEach(function(pt,i){
+      var dotSize=i===0?'10px':'8px';
+      var dotBorder=i===0?'3px':'2px';
+      var m=new kakao.maps.CustomOverlay({
+        position:pt,
+        content:'<div style="width:'+dotSize+';height:'+dotSize+';background:#fff;border:'+dotBorder+' solid '+color+';border-radius:50%;cursor:pointer"></div>',
+        yAnchor:0.5,xAnchor:0.5
+      });
+      m.setMap(map);
+      _drawMode.tempMarkers.push(m);
     });
-    m.setMap(map);
-    _drawMode.tempMarkers.push(m);
-  });
+  }
 }
 
 function finishDraw(){
@@ -1657,7 +1657,14 @@ function cleanupDraw(){
 function toggleDrawPreview(){
   _drawPreviewVisible=!_drawPreviewVisible;
   var btn=document.getElementById('drawPreviewToggle');
-  if(btn) btn.textContent=_drawPreviewVisible?'👁 미리보기':'🚫 미리보기';
+  if(btn) btn.textContent=_drawPreviewVisible?'👁 선':'🚫 선';
+  updateDrawPreview();
+}
+
+function toggleDrawDots(){
+  _drawDotsVisible=!_drawDotsVisible;
+  var btn=document.getElementById('drawDotsToggle');
+  if(btn) btn.textContent=_drawDotsVisible?'⬤ 점':'◯ 점';
   updateDrawPreview();
 }
 
