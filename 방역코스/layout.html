@@ -158,7 +158,7 @@ body{font-family:'Pretendard','Noto Sans KR',sans-serif;background:#1a1a2e;color
   </div>
   <div class="sb-tabs">
     <button class="sb-tab active" onclick="switchTab('layout',this)">🗺️ 배치도</button>
-    <button class="sb-tab" onclick="switchTab('track',this)">📡 위치추적</button>
+    <button class="sb-tab" onclick="switchTab('track',this)">📡 운영</button>
   </div>
 
   <!-- 배치도 탭 바디 -->
@@ -221,13 +221,16 @@ body{font-family:'Pretendard','Noto Sans KR',sans-serif;background:#1a1a2e;color
     </div>
   </div>
 
-  <!-- 추적 탭 바디 -->
+  <!-- 운영 탭 바디 -->
   <div class="sb-body" id="trackBody" style="display:none">
-    <div style="display:flex;gap:4px;margin-bottom:8px">
-      <button onclick="showRegModal('person')" style="flex:1;padding:7px;border:none;border-radius:6px;background:#10b981;color:#fff;font-size:11px;font-weight:700;cursor:pointer">＋ 인원</button>
-      <button onclick="showRegModal('vehicle')" style="flex:1;padding:7px;border:none;border-radius:6px;background:#3b82f6;color:#fff;font-size:11px;font-weight:700;cursor:pointer">＋ 차량</button>
-      <button onclick="showGPSModal()" style="flex:1;padding:7px;border:none;border-radius:6px;background:#f59e0b;color:#000;font-size:11px;font-weight:700;cursor:pointer">📍 GPS공유</button>
+    <div id="joinArea">
+      <button id="joinBtn" onclick="showJoinModal()" style="width:100%;padding:10px;border:none;border-radius:8px;background:#10b981;color:#fff;font-size:13px;font-weight:700;cursor:pointer;margin-bottom:8px">📍 오늘의 운영 참여</button>
+      <div id="myGpsStatus" style="display:none;padding:6px 10px;border-radius:6px;background:#0f172a;border:1px solid #334155;margin-bottom:8px;font-size:11px;color:#10b981;text-align:center">
+        <span id="myGpsText">📍 위치 공유 중...</span>
+        <button onclick="leaveOps()" style="margin-left:6px;padding:2px 8px;border:none;border-radius:4px;background:#dc2626;color:#fff;font-size:10px;font-weight:700;cursor:pointer">종료</button>
+      </div>
     </div>
+    <div style="color:#94a3b8;font-size:11px;font-weight:600;margin-bottom:4px">참여중인 인원</div>
     <div id="trackList"></div>
   </div>
 </div>
@@ -397,36 +400,20 @@ body{font-family:'Pretendard','Noto Sans KR',sans-serif;background:#1a1a2e;color
 </div>
 
 <!-- 등록 모달 (추적) -->
-<div id="regModal" class="modal-bg" style="display:none" onclick="if(event.target===this)this.style.display='none'">
+<!-- 운영 참여 모달 -->
+<div id="joinModal" class="modal-bg" style="display:none" onclick="if(event.target===this)this.style.display='none'">
   <div class="modal">
-    <h3 id="rmTitle">등록</h3>
-    <label>이름 / 차량번호</label>
-    <input id="rmName" type="text">
-    <label>유형</label>
-    <select id="rmType"><option value="person">인원</option><option value="vehicle">차량</option></select>
+    <h3>📍 오늘의 운영 참여</h3>
+    <p style="color:#94a3b8;font-size:12px;margin-bottom:10px">참여하면 내 위치가 실시간으로 공유됩니다</p>
+    <label>이름</label>
+    <input id="joinName" type="text" placeholder="홍길동">
     <label>연락처</label>
-    <input id="rmPhone" type="text" placeholder="010-0000-0000">
-    <label>메모</label>
-    <input id="rmMemo" type="text" placeholder="역할, 소속">
+    <input id="joinPhone" type="tel" placeholder="010-0000-0000">
+    <label>역할 / 메모</label>
+    <input id="joinMemo" type="text" placeholder="본부, 주차안내 등">
     <div class="modal-btns">
-      <button style="background:#10b981;color:#fff" onclick="registerTracker()">등록</button>
-      <button style="background:#475569;color:#fff" onclick="document.getElementById('regModal').style.display='none'">취소</button>
-    </div>
-  </div>
-</div>
-
-<!-- GPS 공유 모달 -->
-<div id="gpsModal" class="modal-bg" style="display:none" onclick="if(event.target===this)this.style.display='none'">
-  <div class="modal">
-    <h3>📍 내 위치 공유</h3>
-    <p style="color:#94a3b8;font-size:12px;margin-bottom:10px">본부에서 내 위치를 실시간으로 확인합니다</p>
-    <label>대상 선택</label>
-    <select id="gpsSel" style="margin-bottom:8px"></select>
-    <div id="gpsStat" style="text-align:center;padding:12px;color:#94a3b8;font-size:13px">GPS 대기 중...</div>
-    <div class="modal-btns">
-      <button id="gpsStartBtn" style="background:#10b981;color:#fff" onclick="startGPS()">📍 공유 시작</button>
-      <button id="gpsStopBtn" style="background:#dc2626;color:#fff;display:none" onclick="stopGPS()">⏹ 중지</button>
-      <button style="background:#475569;color:#fff" onclick="document.getElementById('gpsModal').style.display='none'">닫기</button>
+      <button style="background:#10b981;color:#fff" onclick="joinOps()">📍 참여 시작</button>
+      <button style="background:#475569;color:#fff" onclick="document.getElementById('joinModal').style.display='none'">취소</button>
     </div>
   </div>
 </div>
@@ -942,7 +929,7 @@ function initMap(){
   loadData();
   loadTrackers();
   listenGPS();
-  if(location.search.indexOf('gps=1')>=0)setTimeout(showGPSModal,500);
+  if(location.search.indexOf('gps=1')>=0)setTimeout(function(){switchTab('track',document.querySelectorAll('.sb-tab')[1]);showJoinModal()},500);
 }
 
 // ══════════════════════════════════════
@@ -1426,7 +1413,7 @@ function showItemBubble(idx){
   h+='<div style="font-weight:700;font-size:13px;margin-bottom:4px;padding-right:14px">'+it.num+(cat?' · '+cat.name:'')+'</div>';
   if(it.name)h+='<div><b>이름:</b> '+it.name+'</div>';
   if(it.duty)h+='<div><b>담당자:</b> '+it.duty+'</div>';
-  if(it.phone)h+='<div><b>연락처:</b> '+it.phone+'</div>';
+  if(it.phone)h+='<div><a href="tel:'+it.phone+'" style="color:#1e40af;text-decoration:none;font-weight:600">📞 '+it.phone+'</a> <button onclick="event.stopPropagation();copyPhone(\''+it.phone+'\')" style="background:none;border:none;cursor:pointer;font-size:11px;color:#92400e;padding:0" title="복사">📋</button></div>';
   if(it.memo)h+='<div><b>메모:</b> '+it.memo+'</div>';
   if(it.shape==='rect')h+='<div><b>크기:</b> '+it.w+'×'+it.h+'m</div>';
   else if(it.shape==='circle')h+='<div><b>지름:</b> '+(it.diameter||5)+'m</div>';
@@ -2065,54 +2052,102 @@ function loadData(){
 }
 
 // ══════════════════════════════════════
-//  추적
+//  운영 참여 (GPS 공유)
 // ══════════════════════════════════════
-function showRegModal(type){
-  document.getElementById('rmType').value=type;
-  document.getElementById('rmTitle').textContent=type==='vehicle'?'🚗 차량 등록':'👤 인원 등록';
-  document.getElementById('rmName').value='';document.getElementById('rmPhone').value='';document.getElementById('rmMemo').value='';
-  document.getElementById('regModal').style.display='flex';
+var _myTrackerId=null; // 내가 참여 중인 ID
+
+function showJoinModal(){
+  document.getElementById('joinName').value='';
+  document.getElementById('joinPhone').value='';
+  document.getElementById('joinMemo').value='';
+  document.getElementById('joinModal').style.display='flex';
 }
 
-function registerTracker(){
-  var name=document.getElementById('rmName').value.trim();
+function joinOps(){
+  var name=document.getElementById('joinName').value.trim();
   if(!name){toast('이름을 입력하세요',true);return}
-  var t={id:Date.now(),type:document.getElementById('rmType').value,name:name,phone:document.getElementById('rmPhone').value.trim(),memo:document.getElementById('rmMemo').value.trim(),created:new Date().toISOString()};
-  fbDb.ref('/layout/trackers/'+t.id).set(t).then(function(){
-    toast(name+' 등록 완료');document.getElementById('regModal').style.display='none';
+  if(!navigator.geolocation){toast('GPS를 지원하지 않는 브라우저입니다',true);return}
+  var id=Date.now();
+  var t={id:id,name:name,phone:document.getElementById('joinPhone').value.trim(),memo:document.getElementById('joinMemo').value.trim(),created:new Date().toISOString()};
+  fbDb.ref('/layout/trackers/'+id).set(t).then(function(){
+    _myTrackerId=id;
+    document.getElementById('joinModal').style.display='none';
+    document.getElementById('joinBtn').style.display='none';
+    document.getElementById('myGpsStatus').style.display='block';
+    document.getElementById('myGpsText').textContent='📍 '+name+' — 위치 공유 중';
+    // GPS 자동 시작
+    gpsWatchId=navigator.geolocation.watchPosition(function(p){
+      fbDb.ref('/layout/gps/'+id).set({lat:p.coords.latitude,lng:p.coords.longitude,ts:Date.now(),acc:p.coords.accuracy||0});
+    },function(e){
+      document.getElementById('myGpsText').textContent='⚠ GPS 오류: '+e.message;
+    },{enableHighAccuracy:true,maximumAge:5000,timeout:15000});
+    toast(name+' 참여 시작!');
   }).catch(function(e){toast('등록 실패',true)});
+}
+
+function leaveOps(){
+  if(!confirm('운영 참여를 종료하시겠습니까?'))return;
+  if(gpsWatchId!==null){navigator.geolocation.clearWatch(gpsWatchId);gpsWatchId=null}
+  if(_myTrackerId){
+    fbDb.ref('/layout/gps/'+_myTrackerId).remove();
+    fbDb.ref('/layout/trackers/'+_myTrackerId).remove();
+    _myTrackerId=null;
+  }
+  document.getElementById('joinBtn').style.display='block';
+  document.getElementById('myGpsStatus').style.display='none';
+  toast('운영 참여 종료');
 }
 
 function loadTrackers(){
   fbDb.ref('/layout/trackers').on('value',function(snap){
     trackers=[];var d=snap.val()||{};
     Object.keys(d).forEach(function(k){trackers.push(d[k])});
-    renderTrackList();updateGPSSel();
+    renderTrackList();
   });
 }
 
 function renderTrackList(){
   var el=document.getElementById('trackList');
-  if(!trackers.length){el.innerHTML='<div style="color:#94a3b8;padding:12px;font-size:12px;text-align:center">등록된 대상이 없습니다</div>';return}
+  if(!trackers.length){el.innerHTML='<div style="color:#94a3b8;padding:12px;font-size:12px;text-align:center">참여중인 인원이 없습니다</div>';return}
   var html='';
   trackers.forEach(function(t){
     var pos=livePos[t.id];
     var on=pos&&(Date.now()-pos.ts<120000);
-    html+='<div class="track-item">';
+    var isMine=_myTrackerId&&String(t.id)===String(_myTrackerId);
+    html+='<div class="track-item" style="'+(isMine?'border:1px solid #10b981;':'border:1px solid #1e293b;')+'">';
     html+='<div class="dot '+(on?'on':'off')+'"></div>';
-    html+='<div style="flex:1;font-size:12px"><div style="font-weight:700">'+(t.type==='vehicle'?'🚗':'👤')+' '+t.name+'</div>';
-    html+='<div style="color:#94a3b8;font-size:10px">'+(t.phone||'')+(t.memo?' · '+t.memo:'')+'</div>';
+    html+='<div style="flex:1;font-size:12px">';
+    html+='<div style="font-weight:700">👤 '+t.name+(isMine?' <span style="color:#10b981;font-size:10px">(나)</span>':'')+'</div>';
+    if(t.phone)html+='<div style="font-size:10px;margin-top:2px"><a href="tel:'+t.phone+'" style="color:#60a5fa;text-decoration:none">📞 '+t.phone+'</a> <button onclick="event.stopPropagation();copyPhone(\''+t.phone+'\')" style="background:none;border:none;cursor:pointer;font-size:10px;color:#94a3b8;padding:0" title="복사">📋</button></div>';
+    if(t.memo)html+='<div style="color:#94a3b8;font-size:10px">'+t.memo+'</div>';
     if(on){var d=new Date(pos.ts);html+='<div style="color:#10b981;font-size:10px">📍 '+d.getHours()+':'+String(d.getMinutes()).padStart(2,'0')+'</div>'}
     html+='</div>';
-    if(on)html+='<button onclick="focusT('+t.id+')" style="background:#0ea5e9;color:#fff;border:none;padding:3px 6px;border-radius:4px;font-size:10px;font-weight:700;cursor:pointer">위치</button>';
-    html+='<button onclick="delTracker('+t.id+')" style="background:#dc2626;color:#fff;border:none;padding:3px 5px;border-radius:4px;font-size:10px;cursor:pointer;margin-left:2px">✕</button>';
+    if(on)html+='<button onclick="focusT('+t.id+')" style="background:#0ea5e9;color:#fff;border:none;padding:4px 8px;border-radius:4px;font-size:10px;font-weight:700;cursor:pointer" title="위치로 이동">📍</button>';
+    if(isMine)html+='<button onclick="leaveOps()" style="background:#dc2626;color:#fff;border:none;padding:4px 6px;border-radius:4px;font-size:10px;cursor:pointer;margin-left:2px" title="종료">✕</button>';
     html+='</div>';
   });
   el.innerHTML=html;
 }
 
-function focusT(id){var p=livePos[id];if(p){map.setCenter(new kakao.maps.LatLng(p.lat,p.lng));map.setLevel(2)}}
-function delTracker(id){if(!confirm('삭제?'))return;fbDb.ref('/layout/trackers/'+id).remove();fbDb.ref('/layout/gps/'+id).remove();toast('삭제됨')}
+function focusT(id){
+  var p=livePos[id];if(!p)return;
+  map.setCenter(new kakao.maps.LatLng(p.lat,p.lng));map.setLevel(2);
+  // 해당 인원 버블 표시
+  var tk=trackers.find(function(t){return String(t.id)===String(id)});
+  if(tk){
+    closeItemBubble();
+    var h='<button class="bubble-close" onclick="closeItemBubble()">✕</button>';
+    h+='<div style="font-weight:700;font-size:13px;margin-bottom:4px;padding-right:14px">👤 '+tk.name+'</div>';
+    if(tk.phone)h+='<div><a href="tel:'+tk.phone+'" style="color:#1e40af;text-decoration:none;font-weight:600">📞 '+tk.phone+'</a></div>';
+    if(tk.memo)h+='<div><b>역할:</b> '+tk.memo+'</div>';
+    var d=new Date(p.ts);h+='<div style="color:#78716c;font-size:11px">📍 '+d.getHours()+':'+String(d.getMinutes()).padStart(2,'0')+' 업데이트</div>';
+    var el=document.createElement('div');
+    el.className='item-bubble';
+    el.innerHTML=h;
+    _itemBubble=new kakao.maps.CustomOverlay({position:new kakao.maps.LatLng(p.lat,p.lng),content:el,yAnchor:1.4});
+    _itemBubble.setMap(map);
+  }
+}
 
 function listenGPS(){
   fbDb.ref('/layout/gps').on('value',function(snap){
@@ -2126,41 +2161,19 @@ function renderGPSMarkers(){
   Object.keys(livePos).forEach(function(id){
     var p=livePos[id];if(!p||!p.lat||Date.now()-p.ts>120000)return;
     var tk=trackers.find(function(t){return String(t.id)===String(id)});
-    var isV=tk&&tk.type==='vehicle';
     var nm=tk?tk.name:id;
     var img=new kakao.maps.MarkerImage('https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/markerStar.png',new kakao.maps.Size(24,35));
     var m=new kakao.maps.Marker({position:new kakao.maps.LatLng(p.lat,p.lng),image:img,map:map});
     gpsMarkers[id]=m;
-    var lb=new kakao.maps.CustomOverlay({position:new kakao.maps.LatLng(p.lat,p.lng),content:'<div class="gps-label'+(isV?' vehicle':'')+'">'+(isV?'🚗':'👤')+' '+nm+'</div>',yAnchor:2.2});
+    var lb=new kakao.maps.CustomOverlay({position:new kakao.maps.LatLng(p.lat,p.lng),content:'<div class="gps-label">👤 '+nm+'</div>',yAnchor:2.2});
     lb.setMap(map);gpsLabels[id]=lb;
   });
 }
 
-function showGPSModal(){updateGPSSel();document.getElementById('gpsModal').style.display='flex'}
-function updateGPSSel(){
-  var s=document.getElementById('gpsSel');s.innerHTML='';
-  trackers.forEach(function(t){var o=document.createElement('option');o.value=t.id;o.textContent=(t.type==='vehicle'?'🚗':'👤')+' '+t.name;s.appendChild(o)});
-}
-
-function startGPS(){
-  if(!navigator.geolocation){toast('GPS 불가',true);return}
-  var id=document.getElementById('gpsSel').value;if(!id){toast('대상 선택 필요',true);return}
-  document.getElementById('gpsStartBtn').style.display='none';
-  document.getElementById('gpsStopBtn').style.display='block';
-  document.getElementById('gpsStat').innerHTML='<div style="color:#10b981">📍 위치 공유 중...</div>';
-  gpsWatchId=navigator.geolocation.watchPosition(function(p){
-    var d={lat:p.coords.latitude,lng:p.coords.longitude,ts:Date.now(),acc:p.coords.accuracy||0};
-    fbDb.ref('/layout/gps/'+id).set(d);
-    document.getElementById('gpsStat').innerHTML='<div style="color:#10b981;font-size:13px">📍 공유 중<br><span style="font-size:11px;color:#94a3b8">'+d.lat.toFixed(5)+', '+d.lng.toFixed(5)+'</span></div>';
-  },function(e){document.getElementById('gpsStat').innerHTML='<div style="color:#ef4444">오류: '+e.message+'</div>';
-  },{enableHighAccuracy:true,maximumAge:5000,timeout:15000});
-}
-
-function stopGPS(){
-  if(gpsWatchId!==null){navigator.geolocation.clearWatch(gpsWatchId);gpsWatchId=null}
-  var id=document.getElementById('gpsSel').value;if(id)fbDb.ref('/layout/gps/'+id).remove();
-  document.getElementById('gpsStartBtn').style.display='block';document.getElementById('gpsStopBtn').style.display='none';
-  document.getElementById('gpsStat').innerHTML='GPS 대기 중...';toast('공유 중지');
+function copyPhone(phone){
+  navigator.clipboard.writeText(phone).then(function(){toast('📋 '+phone+' 복사됨')}).catch(function(){
+    var t=document.createElement('textarea');t.value=phone;document.body.appendChild(t);t.select();document.execCommand('copy');t.remove();toast('📋 '+phone+' 복사됨');
+  });
 }
 
 function toast(m,err){
