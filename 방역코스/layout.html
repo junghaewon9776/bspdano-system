@@ -17,7 +17,17 @@ body{font-family:'Pretendard','Noto Sans KR',sans-serif;background:#1a1a2e;color
 
 /* 탭 */
 .sb-tabs{display:flex;border-bottom:1px solid #1e293b;flex-shrink:0}
-.sb-tab{flex:1;padding:8px;border:none;background:transparent;color:#64748b;font-size:12px;font-weight:700;cursor:pointer;border-bottom:2px solid transparent}
+.sb-tab{flex:1;padding:8px;border:none;background:transparent;color:#64748b;font-size:11px;font-weight:700;cursor:pointer;border-bottom:2px solid transparent}
+.vf-btn{padding:4px 8px;border:1px solid #334155;border-radius:4px;background:transparent;color:#94a3b8;font-size:10px;font-weight:700;cursor:pointer}
+.vf-btn.active{background:#0ea5e9;color:#fff;border-color:#0ea5e9}
+.grp-card{padding:8px;border:1px solid #334155;border-radius:6px;margin-bottom:4px;display:flex;align-items:center;justify-content:space-between}
+.grp-card .grp-nm{font-weight:700;color:#e2e8f0}
+.grp-card .grp-cnt{font-size:10px;color:#64748b}
+.veh-card{padding:8px;border:1px solid #334155;border-radius:6px;margin-bottom:4px}
+.veh-card.inactive{opacity:0.5}
+.veh-card .veh-plate{font-weight:700;color:#e2e8f0;font-family:monospace}
+.veh-card .veh-info{font-size:10px;color:#94a3b8;margin-top:2px}
+.mem-chip{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;margin:2px;border-radius:10px;background:#1e293b;border:1px solid #334155;font-size:11px;color:#e2e8f0}
 .sb-tab.active{color:#3b82f6;border-bottom-color:#3b82f6}
 .sb-body{flex:1;overflow-y:auto;padding:8px}
 
@@ -172,9 +182,11 @@ body{font-family:'Pretendard','Noto Sans KR',sans-serif;background:#1a1a2e;color
       <button class="hbtn" onclick="location.href='index.html'" title="메인으로">🏠</button>
     </span>
   </div>
-  <div class="sb-tabs">
+  <div class="sb-tabs" style="flex-wrap:wrap">
     <button class="sb-tab active" onclick="switchTab('layout',this)">🗺️ 배치도</button>
     <button class="sb-tab" onclick="switchTab('track',this)">📡 운영</button>
+    <button class="sb-tab" onclick="switchTab('groups',this)">🏷 조</button>
+    <button class="sb-tab" onclick="switchTab('vehicles',this)">🚗 차량</button>
   </div>
 
   <!-- 배치도 탭 바디 -->
@@ -248,6 +260,39 @@ body{font-family:'Pretendard','Noto Sans KR',sans-serif;background:#1a1a2e;color
     </div>
     <div style="color:#94a3b8;font-size:11px;font-weight:600;margin-bottom:4px">참여중인 인원</div>
     <div id="trackList"></div>
+  </div>
+
+  <!-- 조 편성 탭 -->
+  <div class="sb-body" id="groupsBody" style="display:none">
+    <div id="evtTeamInfo" style="padding:6px 8px;border-radius:6px;background:#1e1b4b;border:1px solid #4338ca;margin-bottom:8px;font-size:11px;color:#a5b4fc;text-align:center"></div>
+    <div style="color:#94a3b8;font-size:10px;font-weight:600;margin-bottom:4px">이 행사에 사용할 조 선택</div>
+    <div id="groupToggleList" style="font-size:12px;margin-bottom:8px"></div>
+    <div style="border-top:1px solid #1e293b;padding-top:8px;margin-top:8px">
+      <div style="color:#94a3b8;font-size:10px;font-weight:600;margin-bottom:4px">조 추가/관리</div>
+      <div style="display:flex;gap:4px;margin-bottom:6px">
+        <input id="newGroupName" type="text" placeholder="조 이름 (예: 1조)" style="flex:1;padding:6px 8px;border:1px solid #334155;border-radius:6px;background:#0f172a;color:#fff;font-size:12px">
+        <button onclick="addGroup()" style="padding:6px 10px;border:none;border-radius:6px;background:#7c3aed;color:#fff;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap">+ 추가</button>
+      </div>
+      <div id="groupMembers" style="font-size:11px"></div>
+    </div>
+  </div>
+
+  <!-- 차량 관리 탭 -->
+  <div class="sb-body" id="vehiclesBody" style="display:none">
+    <div id="evtVehInfo" style="padding:6px 8px;border-radius:6px;background:#0c2d48;border:1px solid #0ea5e9;margin-bottom:8px;font-size:11px;color:#7dd3fc;text-align:center"></div>
+    <div style="color:#94a3b8;font-size:10px;font-weight:600;margin-bottom:4px">이 행사에 사용할 차량 선택</div>
+    <div id="vehToggleList" style="font-size:12px;margin-bottom:8px"></div>
+    <div style="border-top:1px solid #1e293b;padding-top:8px;margin-top:8px">
+      <div style="color:#94a3b8;font-size:10px;font-weight:600;margin-bottom:4px">차량 추가</div>
+      <div style="display:flex;gap:4px;margin-bottom:6px">
+        <input id="newVehPlate" type="text" placeholder="차량번호/이름" style="flex:1;padding:6px 8px;border:1px solid #334155;border-radius:6px;background:#0f172a;color:#fff;font-size:12px">
+        <button onclick="addVehicle()" style="padding:6px 10px;border:none;border-radius:6px;background:#0ea5e9;color:#fff;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap">+ 등록</button>
+      </div>
+      <div style="display:flex;gap:4px;margin-bottom:6px">
+        <input id="newVehOwner" type="text" placeholder="운전자" style="flex:1;padding:5px 8px;border:1px solid #334155;border-radius:5px;background:#0f172a;color:#fff;font-size:11px">
+        <input id="newVehPhone" type="text" placeholder="연락처" style="flex:1;padding:5px 8px;border:1px solid #334155;border-radius:5px;background:#0f172a;color:#fff;font-size:11px">
+      </div>
+    </div>
   </div>
 </div>
 
@@ -955,8 +1000,14 @@ function initMap(){
 function switchTab(tab,btn){
   document.querySelectorAll('.sb-tab').forEach(function(t){t.classList.remove('active')});
   btn.classList.add('active');
-  document.getElementById('layoutBody').style.display=tab==='layout'?'block':'none';
-  document.getElementById('trackBody').style.display=tab==='track'?'block':'none';
+  ['layoutBody','trackBody','groupsBody','vehiclesBody'].forEach(function(id){
+    var el=document.getElementById(id);if(el)el.style.display='none';
+  });
+  var bodyMap={layout:'layoutBody',track:'trackBody',groups:'groupsBody',vehicles:'vehiclesBody'};
+  var target=document.getElementById(bodyMap[tab]);
+  if(target) target.style.display='block';
+  if(tab==='groups') renderGroups();
+  if(tab==='vehicles') renderVehicles();
 }
 
 // ══════════════════════════════════════
@@ -2231,12 +2282,213 @@ function toast(m,err){
   document.body.appendChild(t);setTimeout(function(){t.remove()},2500);
 }
 
+// ══════════════════════════════════════
+//  방역코스 데이터 연동 (조/차량 행사별 선택)
+// ══════════════════════════════════════
+var _evtId=(function(){var p=new URLSearchParams(location.search);return p.get('evtId')||'DEFAULT'})();
+var _bsData=null;
+var _evtCfg={teams:[],vehicles:[]};
+
+function _loadBsData(){
+  fbDb.ref('/').on('value',function(snap){
+    _bsData=snap.val()||{};
+    if(_bsData.teams&&!Array.isArray(_bsData.teams)) _bsData.teams=Object.values(_bsData.teams);
+    if(_bsData.vehicles&&!Array.isArray(_bsData.vehicles)) _bsData.vehicles=Object.values(_bsData.vehicles);
+    if(!_bsData.teams) _bsData.teams=[];
+    if(!_bsData.vehicles) _bsData.vehicles=[];
+    renderGroups();renderVehicles();
+  });
+  fbDb.ref('/eventConfig/'+_evtId).on('value',function(snap){
+    var d=snap.val()||{};
+    _evtCfg.teams=d.teams||[];
+    _evtCfg.vehicles=d.vehicles||[];
+    if(!Array.isArray(_evtCfg.teams)) _evtCfg.teams=Object.values(_evtCfg.teams);
+    if(!Array.isArray(_evtCfg.vehicles)) _evtCfg.vehicles=Object.values(_evtCfg.vehicles);
+    renderGroups();renderVehicles();
+  });
+}
+function _saveEvtCfg(){
+  fbDb.ref('/eventConfig/'+_evtId).set({teams:_evtCfg.teams,vehicles:_evtCfg.vehicles});
+}
+function _saveBsField(field){
+  if(!_bsData)return;
+  fbDb.ref('/'+field).set(_bsData[field]);
+}
+
+// ── 조: 행사별 선택 토글 ──
+function isTeamSelected(teamId){return _evtCfg.teams.indexOf(teamId)>=0}
+function toggleTeamForEvt(teamId){
+  var idx=_evtCfg.teams.indexOf(teamId);
+  if(idx>=0) _evtCfg.teams.splice(idx,1);
+  else _evtCfg.teams.push(teamId);
+  _saveEvtCfg();
+}
+function renderGroups(){
+  var el=document.getElementById('groupToggleList');if(!el||!_bsData)return;
+  var info=document.getElementById('evtTeamInfo');
+  var selCnt=_evtCfg.teams.length;
+  if(info) info.innerHTML='📋 <b>'+_evtId+'</b> 행사 — '+selCnt+'개 조 선택됨';
+  var teams=_bsData.teams||[];
+  if(!teams.length){el.innerHTML='<div style="color:#64748b;font-size:11px;padding:8px;text-align:center">등록된 조가 없습니다</div>';return}
+  el.innerHTML=teams.map(function(t){
+    var on=isTeamSelected(t.id);
+    var memCnt=(t.members||[]).length;
+    return '<div class="grp-card" style="border-color:'+(on?'#7c3aed':'#334155')+';background:'+(on?'#1e1b4b':'transparent')+'">'
+      +'<div style="display:flex;align-items:center;gap:8px;flex:1;cursor:pointer" onclick="toggleTeamForEvt(\''+t.id+'\')">'
+      +'<span style="font-size:18px">'+(on?'✅':'⬜')+'</span>'
+      +'<div><span class="grp-nm">'+esc(t.name)+'</span>'
+      +(t.vehicle?' <span style="font-size:10px;color:#0ea5e9">🚗'+esc(t.vehicle)+'</span>':'')
+      +'<div style="font-size:10px;color:#94a3b8">'
+      +(t.leader?'👑'+esc(t.leader)+' ':'')+memCnt+'명'
+      +'</div></div></div>'
+      +'<div style="display:flex;gap:2px">'
+      +'<button onclick="showGroupDetail(\''+t.id+'\')" style="border:none;background:transparent;color:#94a3b8;font-size:11px;cursor:pointer" title="상세">👤</button>'
+      +'<button onclick="editTeam(\''+t.id+'\')" style="border:none;background:transparent;color:#3b82f6;font-size:11px;cursor:pointer">✏️</button>'
+      +'<button onclick="removeTeam(\''+t.id+'\')" style="border:none;background:transparent;color:#dc2626;font-size:11px;cursor:pointer">🗑</button>'
+      +'</div></div>';
+  }).join('');
+}
+function showGroupDetail(teamId){
+  var t=null;for(var i=0;i<_bsData.teams.length;i++){if(_bsData.teams[i].id===teamId){t=_bsData.teams[i];break}}
+  if(!t)return;
+  var el=document.getElementById('groupMembers');
+  var h='<div style="color:#a5b4fc;font-size:11px;font-weight:700;margin-bottom:4px">'+esc(t.name)+' 상세</div>';
+  if(t.leader) h+='<span class="mem-chip" style="border-color:#f59e0b">👑 '+esc(t.leader)+'</span>';
+  (t.members||[]).forEach(function(m,mi){
+    h+='<span class="mem-chip">'+esc(m)
+      +' <button onclick="removeTeamMember(\''+teamId+'\','+mi+')" style="border:none;background:transparent;color:#dc2626;font-size:10px;cursor:pointer;padding:0">✕</button></span>';
+  });
+  if(!t.leader&&!(t.members||[]).length) h+='<div style="color:#64748b;font-size:11px">조원 없음</div>';
+  h+='<div style="display:flex;gap:4px;margin-top:6px">';
+  h+='<input id="_addMemName" type="text" placeholder="이름" style="flex:1;padding:4px 6px;border:1px solid #334155;border-radius:4px;background:#0f172a;color:#fff;font-size:11px">';
+  h+='<button onclick="addTeamMember(\''+teamId+'\')" style="padding:4px 8px;border:none;border-radius:4px;background:#3b82f6;color:#fff;font-size:10px;font-weight:700;cursor:pointer">추가</button></div>';
+  el.innerHTML=h;
+}
+function addGroup(){
+  var inp=document.getElementById('newGroupName');
+  var nm=inp.value.trim();
+  if(!nm){toast('조 이름을 입력하세요',true);return}
+  var newId='t_'+Date.now();
+  _bsData.teams.push({id:newId,name:nm,vehicle:'',leader:'',members:[]});
+  _evtCfg.teams.push(newId);
+  _saveBsField('teams');_saveEvtCfg();
+  inp.value='';toast(nm+' 추가 + 선택됨');
+}
+function editTeam(teamId){
+  var t=null;for(var i=0;i<_bsData.teams.length;i++){if(_bsData.teams[i].id===teamId){t=_bsData.teams[i];break}}
+  if(!t)return;
+  var nm=prompt('조 이름',t.name);if(nm===null)return;
+  var veh=prompt('차량 (예: 라보, 트럭)',t.vehicle||'');if(veh===null)return;
+  var leader=prompt('조장',t.leader||'');if(leader===null)return;
+  t.name=nm;t.vehicle=veh;t.leader=leader;
+  _saveBsField('teams');
+}
+function removeTeam(teamId){
+  var t=null;for(var i=0;i<_bsData.teams.length;i++){if(_bsData.teams[i].id===teamId){t=_bsData.teams[i];break}}
+  if(!t)return;
+  if(!confirm('"'+t.name+'" 조를 삭제할까요?'))return;
+  _bsData.teams=_bsData.teams.filter(function(x){return x.id!==teamId});
+  _evtCfg.teams=_evtCfg.teams.filter(function(x){return x!==teamId});
+  _saveBsField('teams');_saveEvtCfg();
+}
+function addTeamMember(teamId){
+  var inp=document.getElementById('_addMemName');if(!inp)return;
+  var nm=inp.value.trim();if(!nm){toast('이름을 입력하세요',true);return}
+  var t=null;for(var i=0;i<_bsData.teams.length;i++){if(_bsData.teams[i].id===teamId){t=_bsData.teams[i];break}}
+  if(!t)return;
+  if(!t.members) t.members=[];
+  t.members.push(nm);
+  _saveBsField('teams');
+  inp.value='';toast(nm+' → '+t.name);
+  showGroupDetail(teamId);
+}
+function removeTeamMember(teamId,mIdx){
+  var t=null;for(var i=0;i<_bsData.teams.length;i++){if(_bsData.teams[i].id===teamId){t=_bsData.teams[i];break}}
+  if(!t||!t.members)return;
+  t.members.splice(mIdx,1);
+  _saveBsField('teams');
+  showGroupDetail(teamId);
+}
+
+// ── 차량: 행사별 선택 토글 ──
+function isVehSelected(vehId){return _evtCfg.vehicles.indexOf(vehId)>=0}
+function toggleVehForEvt(vehId){
+  var idx=_evtCfg.vehicles.indexOf(vehId);
+  if(idx>=0) _evtCfg.vehicles.splice(idx,1);
+  else _evtCfg.vehicles.push(vehId);
+  _saveEvtCfg();
+}
+function renderVehicles(){
+  var el=document.getElementById('vehToggleList');if(!el||!_bsData)return;
+  var info=document.getElementById('evtVehInfo');
+  var vehs=_bsData.vehicles||[];
+  var activeCnt=vehs.filter(function(v){return v.active!==false}).length;
+  var selCnt=_evtCfg.vehicles.length;
+  if(info) info.innerHTML='🚗 <b>'+_evtId+'</b> 행사 — '+selCnt+'대 선택 / 전체 '+vehs.length+'대 (활성 '+activeCnt+')';
+  if(!vehs.length){el.innerHTML='<div style="color:#64748b;font-size:11px;padding:8px;text-align:center">등록된 차량이 없습니다</div>';return}
+  el.innerHTML=vehs.map(function(v){
+    var on=isVehSelected(v.id);
+    var inactive=v.active===false;
+    return '<div class="veh-card" style="border-color:'+(on?'#0ea5e9':'#334155')+';background:'+(on?'#0c2d48':'transparent')+(inactive?';opacity:0.45':'')+'">'
+      +'<div style="display:flex;align-items:center;gap:8px">'
+      +'<span style="font-size:18px;cursor:pointer" onclick="toggleVehForEvt(\''+v.id+'\')" title="행사 선택">'+(on?'✅':'⬜')+'</span>'
+      +'<div style="flex:1"><span class="veh-plate">'+esc(v.plate||v.name||'')+'</span>'
+      +(inactive?' <span style="font-size:9px;color:#ef4444;font-weight:700">비활성</span>':'')
+      +(v.driver?' <span style="font-size:10px;color:#94a3b8">'+esc(v.driver)+'</span>':'')
+      +(v.color?' <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:'+v.color+';vertical-align:middle"></span>':'')
+      +'</div>'
+      +'<div style="display:flex;gap:2px">'
+      +'<button onclick="toggleVehActive(\''+v.id+'\')" style="border:none;background:transparent;font-size:13px;cursor:pointer" title="'+(inactive?'활성화':'비활성화')+'">'+(inactive?'⛔':'🟢')+'</button>'
+      +'<button onclick="editVehicle(\''+v.id+'\')" style="border:none;background:transparent;color:#3b82f6;font-size:11px;cursor:pointer">✏️</button>'
+      +'<button onclick="removeVehicle(\''+v.id+'\')" style="border:none;background:transparent;color:#dc2626;font-size:11px;cursor:pointer">🗑</button>'
+      +'</div></div></div>';
+  }).join('');
+}
+function toggleVehActive(vehId){
+  var v=null;for(var i=0;i<_bsData.vehicles.length;i++){if(_bsData.vehicles[i].id===vehId){v=_bsData.vehicles[i];break}}
+  if(!v)return;
+  v.active=v.active===false?true:false;
+  _saveBsField('vehicles');
+  toast((v.plate||v.name)+' '+(v.active?'활성화':'비활성화'));
+}
+function addVehicle(){
+  var plate=document.getElementById('newVehPlate').value.trim();
+  var owner=document.getElementById('newVehOwner').value.trim();
+  var phone=document.getElementById('newVehPhone').value.trim();
+  if(!plate){toast('차량번호/이름을 입력하세요',true);return}
+  var newId='v_'+Date.now();
+  if(!_bsData.vehicles) _bsData.vehicles=[];
+  _bsData.vehicles.push({id:newId,name:plate,plate:plate,driver:owner,phone:phone,color:'#3498db',active:true});
+  _evtCfg.vehicles.push(newId);
+  _saveBsField('vehicles');_saveEvtCfg();
+  document.getElementById('newVehPlate').value='';
+  document.getElementById('newVehOwner').value='';
+  document.getElementById('newVehPhone').value='';
+  toast(plate+' 등록 + 선택됨');
+}
+function editVehicle(vehId){
+  var v=null;for(var i=0;i<_bsData.vehicles.length;i++){if(_bsData.vehicles[i].id===vehId){v=_bsData.vehicles[i];break}}
+  if(!v)return;
+  var plate=prompt('차량번호/이름',v.plate||v.name||'');if(plate===null)return;
+  var driver=prompt('운전자',v.driver||'');if(driver===null)return;
+  v.plate=plate;v.name=plate;v.driver=driver;
+  _saveBsField('vehicles');
+}
+function removeVehicle(vehId){
+  var v=null;for(var i=0;i<_bsData.vehicles.length;i++){if(_bsData.vehicles[i].id===vehId){v=_bsData.vehicles[i];break}}
+  if(!v)return;
+  if(!confirm((v.plate||v.name)+' 차량을 삭제하시겠습니까?'))return;
+  _bsData.vehicles=_bsData.vehicles.filter(function(x){return x.id!==vehId});
+  _evtCfg.vehicles=_evtCfg.vehicles.filter(function(x){return x!==vehId});
+  _saveBsField('vehicles');_saveEvtCfg();
+}
+
 // 익명 인증 후 카카오맵 로드
 (function(){
   var off=fbAuth.onAuthStateChanged(function(u){
     off();
-    if(u){loadKakao();return}
-    fbAuth.signInAnonymously().then(function(){loadKakao()}).catch(function(e){
+    if(u){loadKakao();_loadBsData();return}
+    fbAuth.signInAnonymously().then(function(){loadKakao();_loadBsData()}).catch(function(e){
       console.error('인증 실패:',e);
       toast('Firebase 인증 실패',true);
       loadKakao();

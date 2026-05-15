@@ -1248,12 +1248,13 @@ function mkTabs(){
 
   // ── 현장 ──
   if(FIELD_MENU==="on"){
-    cats.push({id:"field",label:"📍 현장",items:[
+    var fieldItems=[
       {k:"field_layout",l:"축제 배치도",frame:"방역코스/layout.html"},
-      {k:"field_monitor",l:"본부 모니터링",frame:"방역코스/monitor.html"},
-      {k:"field_vehicle",l:"행사차량 관리",frame:"방역코스/vehicle.html"},
-      {k:"field_today",l:"오늘의 운영",frame:"방역코스/today.html"}
-    ]});
+      {k:"field_monitor",l:"본부 모니터링",frame:"방역코스/monitor.html"}
+    ];
+    if(HM("vehicle")) fieldItems.push({k:"field_vehicle",l:"행사차량 관리",frame:"방역코스/vehicle.html"});
+    fieldItems.push({k:"field_today",l:"오늘의 운영",frame:"방역코스/today.html"});
+    cats.push({id:"field",label:"📍 현장",items:fieldItems});
   }
 
   // _curCat이 유효한 카테고리인지 확인, 아니면 CTAB 기반으로 자동 선택
@@ -1356,7 +1357,7 @@ function drawEventBar(){
   var role = (CUR_EVT && CUR_EVT.role) || "viewer";
   var roleLbl = role==="admin"?"관리자":(role==="user"?"사용자":"보기");
   // 모듈 요약
-  var mlabel = {apply:"참가자", budget:"세입세출", purchase:"구매", act:"활동", mem:"인원관리", fee:"💵 회비", rental:"📦 대여자산", files:"📁 자료실"};
+  var mlabel = {apply:"참가자", budget:"세입세출", purchase:"구매", act:"활동", mem:"인원관리", fee:"💵 회비", rental:"📦 대여자산", files:"📁 자료실", groups:"🏷 조 편성", vehicle:"🚗 행사차량"};
   var mods = CUR_EVT ? (typeof CUR_EVT.modules==="string" ? CUR_EVT.modules.split(",") : (CUR_EVT.modules||[])) : [];
   mods = mods.map(function(s){return String(s||"").trim();}).filter(Boolean);
   var modsTxt = mods.length ? mods.map(function(m){return mlabel[m]||m;}).join(" · ") : "(모듈 미설정)";
@@ -4517,7 +4518,9 @@ function draw(){
 function _getFrameUrl(tabKey){
   if(FIELD_MENU!=="on")return null;
   var map={field_layout:"방역코스/layout.html",field_monitor:"방역코스/monitor.html",field_vehicle:"방역코스/vehicle.html",field_today:"방역코스/today.html"};
-  return map[tabKey]||null;
+  var url=map[tabKey]||null;
+  if(url && CUR_EVT && CUR_EVT.evtId) url += (url.indexOf('?')>=0?'&':'?')+'evtId='+encodeURIComponent(CUR_EVT.evtId);
+  return url;
 }
 
 // ===== 바 =====
@@ -8793,7 +8796,7 @@ function dMem(){
     var mainEvtNm = (EVENTS&&EVENTS[0])?EVENTS[0].nm:"메인 행사";
     h+='<div class="card" style="background:#eff6ff;border:1.5px solid #2563eb;padding:12px"><span style="font-size:13px;color:#2563eb;font-weight:700">🔗 인원공유 모드</span> <span style="font-size:12px;color:#475569">— <b>'+esc(mainEvtNm)+'</b>의 인원 명단을 공유 중입니다. 인원 수정은 메인 행사에서 해주세요.</span></div>';
   }
-  h+='<div class="exbar">'+(SHARE_MEMS?'':'<button class="btn btn-b" onclick="popAddMem()">+ 인원 추가</button> ')+'<button class="btn-out btn-tp" onclick="tmplMem()">📋 양식</button> <button class="btn-out btn-ex" onclick="expMem()">엑셀 내보내기</button>'+(isA()&&!SHARE_MEMS?' <button class="btn-out btn-im" onclick="impClick(\'mem\')">엑셀 가져오기</button> <button class="btn btn-s" style="background:#0ea5e9;color:#fff;font-weight:700" onclick="_memNormalizePhones()" title="010 누락/하이픈 없는 번호를 한번에 수정">📞 연락처 정규화</button>':'')+(isA()?' <button class="btn" style="background:#f59e0b;color:#fff;font-weight:700" onclick="popMemSms()">💬 문자 발송</button>':'')+(isSuper()&&!SHARE_MEMS?' <button class="btn" style="background:#10b981;color:#fff" onclick="openSheet(\'Mems\')">📊 스프레드시트 열기</button>':'')+(isA()&&!SHARE_MEMS?' <button class="btn" style="background:#a855f7;color:#fff" onclick="popGroups()">🏷 소속 관리</button>':'')+'</div>';
+  h+='<div class="exbar">'+(SHARE_MEMS?'':'<button class="btn btn-b" onclick="popAddMem()">+ 인원 추가</button> ')+'<button class="btn-out btn-tp" onclick="tmplMem()">📋 양식</button> <button class="btn-out btn-ex" onclick="expMem()">엑셀 내보내기</button>'+(isA()&&!SHARE_MEMS?' <button class="btn-out btn-im" onclick="impClick(\'mem\')">엑셀 가져오기</button> <button class="btn btn-s" style="background:#0ea5e9;color:#fff;font-weight:700" onclick="_memNormalizePhones()" title="010 누락/하이픈 없는 번호를 한번에 수정">📞 연락처 정규화</button>':'')+(isA()?' <button class="btn" style="background:#f59e0b;color:#fff;font-weight:700" onclick="popMemSms()">💬 문자 발송</button>':'')+(isSuper()&&!SHARE_MEMS?' <button class="btn" style="background:#10b981;color:#fff" onclick="openSheet(\'Mems\')">📊 스프레드시트 열기</button>':'')+(isA()&&!SHARE_MEMS&&_hasModule("groups")?' <button class="btn" style="background:#a855f7;color:#fff" onclick="popGroups()">🏷 소속 관리</button>':'')+'</div>';
   h+='<div class="card" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px"><div><h3 style="margin:0">인원 관리</h3><span style="font-size:11px;color:#999">'+(isA()?"총 "+mems.length+"명":myar()+" "+fm2.length+"명")+"</span></div>"+(isA()?memFiltSel():"")+"</div>";
   // 상태 필터 바
   function fBtn(k,lbl,cnt,col){
@@ -15585,7 +15588,7 @@ function _evtMgrHtml(){
 }
 
 // 전역: 행사에서 활성화 가능한 모든 모듈 — 새 모듈 추가 시 여기만 수정
-var ALL_MODS = ["apply","budget","purchase","act","mem","fee","rental","files"];
+var ALL_MODS = ["apply","budget","purchase","act","mem","fee","rental","files","groups","vehicle"];
 
 // 행사 추가/수정 팝업
 function toggleFieldMenu(){
@@ -15618,7 +15621,8 @@ function popEvtEdit(evtId){
   };
   var modSection = grpBox("📋 행사 운영",        cb("apply","참가자")    +cb("budget","세입세출")+cb("purchase","구매")+cb("act","활동"))
                  + grpBox("👥 회원 관리",        cb("mem","인원관리")    +cb("fee","💵 회비"))
-                 + grpBox("📦 조직 공용",        cb("rental","📦 대여자산")+cb("files","📁 자료실"));
+                 + grpBox("📦 조직 공용",        cb("rental","📦 대여자산")+cb("files","📁 자료실"))
+                 + grpBox("📍 현장 운영",        cb("groups","🏷 조 편성")+cb("vehicle","🚗 행사차량"));
   var ssHint = isNew ? '' : '<div class="fr"><label>데이터</label><button type="button" class="btn btn-s" style="background:#10b981;color:#fff" onclick="closePopup();openSheet(\'Mems\')">📊 시트 보기</button></div>';
   var h='<div class="pop-head"><h3>'+(isNew?"➕ 새 행사 추가":"✏️ 행사 수정 — "+esc(e.evtId))+'</h3></div>'
     +'<div style="padding:14px">'
