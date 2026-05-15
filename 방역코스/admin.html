@@ -1792,15 +1792,11 @@ function renderEvtAssign() {
   } else {
     h += vehs.map(v => {
       const on = cfg.vehicles.indexOf(v.id) >= 0;
-      const inactive = v.active === false;
-      return `<div style="display:flex;align-items:center;gap:6px;padding:6px 8px;margin:3px 0;border:1.5px solid ${on ? '#0ea5e9' : '#e5e7eb'};border-radius:8px;background:${on ? '#f0f9ff' : '#fff'};${inactive ? 'opacity:0.5;' : ''}">
-        <label style="display:flex;align-items:center;gap:6px;flex:1;cursor:pointer;font-size:13px;">
-          <input type="checkbox" ${on ? 'checked' : ''} onchange="toggleEvtVehicle('${eventId}','${v.id}')">
-          <span style="font-weight:600;">${v.plate || v.name || v.id}</span>
-          <span style="color:#888;font-size:11px;">${v.driver || ''}${inactive ? ' ⛔비활성' : ''}</span>
-        </label>
-        <button class="small ${inactive ? 'gray' : 'success'}" onclick="toggleVehActive('${v.id}')" style="font-size:11px;padding:3px 8px;" title="${inactive ? '활성화' : '비활성화'}">${inactive ? '⛔' : '🟢'}</button>
-      </div>`;
+      return `<label style="display:flex;align-items:center;gap:8px;padding:6px 8px;margin:3px 0;border:1.5px solid ${on ? '#0ea5e9' : '#e5e7eb'};border-radius:8px;background:${on ? '#f0f9ff' : '#fff'};cursor:pointer;font-size:13px;">
+        <input type="checkbox" ${on ? 'checked' : ''} onchange="toggleEvtVehicle('${eventId}','${v.id}')">
+        <span style="font-weight:600;">${v.plate || v.name || v.id}</span>
+        <span style="color:#888;font-size:11px;">${v.driver || ''}</span>
+      </label>`;
     }).join('');
   }
   h += '</div>';
