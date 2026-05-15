@@ -977,6 +977,12 @@ function _applyItemVis(idx){
 }
 
 function renderCategories(){
+  // 열린 카테고리 상태 보존
+  var openCats={};
+  categories.forEach(function(cat){
+    var body=document.getElementById('catBody_'+cat.id);
+    if(body&&body.classList.contains('open')) openCats[cat.id]=true;
+  });
   var el=document.getElementById('catList');
   var html='';
   categories.forEach(function(cat){
@@ -1016,6 +1022,13 @@ function renderCategories(){
     html+='</div></div>';
   });
   el.innerHTML=html;
+  // 열린 카테고리 복원
+  Object.keys(openCats).forEach(function(catId){
+    var body=document.getElementById('catBody_'+catId);
+    var arrow=document.getElementById('catArrow_'+catId);
+    if(body)body.classList.add('open');
+    if(arrow)arrow.classList.add('open');
+  });
   renderLegend();
 }
 
