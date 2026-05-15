@@ -172,6 +172,29 @@ body{font-family:'Pretendard','Noto Sans KR',sans-serif;background:#1a1a2e;color
       <input id="iPhone" type="text" placeholder="010-0000-0000">
       <label>메모</label>
       <textarea id="iMemo" placeholder="비고"></textarea>
+      <!-- 이동 + 복제 컨트롤 -->
+      <div id="panelMoveClone" style="margin-top:10px;padding-top:10px;border-top:1px solid #334155;display:flex;gap:12px;justify-content:center">
+        <div style="text-align:center">
+          <div style="color:#94a3b8;font-size:11px;font-weight:600;margin-bottom:4px">🔀 이동</div>
+          <div style="display:grid;grid-template-columns:28px 28px 28px;grid-template-rows:24px 24px 24px;gap:2px;width:fit-content;margin:0 auto">
+            <div></div><button onclick="panelMoveItem(0,1)" style="border:none;border-radius:4px;font-size:12px;cursor:pointer;color:#fff;background:#475569;display:flex;align-items:center;justify-content:center">▲</button><div></div>
+            <button onclick="panelMoveItem(-1,0)" style="border:none;border-radius:4px;font-size:12px;cursor:pointer;color:#fff;background:#475569;display:flex;align-items:center;justify-content:center">◀</button>
+            <div></div>
+            <button onclick="panelMoveItem(1,0)" style="border:none;border-radius:4px;font-size:12px;cursor:pointer;color:#fff;background:#475569;display:flex;align-items:center;justify-content:center">▶</button>
+            <div></div><button onclick="panelMoveItem(0,-1)" style="border:none;border-radius:4px;font-size:12px;cursor:pointer;color:#fff;background:#475569;display:flex;align-items:center;justify-content:center">▼</button><div></div>
+          </div>
+        </div>
+        <div style="text-align:center">
+          <div style="color:#94a3b8;font-size:11px;font-weight:600;margin-bottom:4px">➕ 붙여추가</div>
+          <div style="display:grid;grid-template-columns:28px 28px 28px;grid-template-rows:24px 24px 24px;gap:2px;width:fit-content;margin:0 auto">
+            <div></div><button onclick="panelCloneItem(0,1)" style="border:none;border-radius:4px;font-size:12px;cursor:pointer;color:#fff;background:#2563eb;display:flex;align-items:center;justify-content:center">▲</button><div></div>
+            <button onclick="panelCloneItem(-1,0)" style="border:none;border-radius:4px;font-size:12px;cursor:pointer;color:#fff;background:#2563eb;display:flex;align-items:center;justify-content:center">◀</button>
+            <div></div>
+            <button onclick="panelCloneItem(1,0)" style="border:none;border-radius:4px;font-size:12px;cursor:pointer;color:#fff;background:#2563eb;display:flex;align-items:center;justify-content:center">▶</button>
+            <div></div><button onclick="panelCloneItem(0,-1)" style="border:none;border-radius:4px;font-size:12px;cursor:pointer;color:#fff;background:#2563eb;display:flex;align-items:center;justify-content:center">▼</button><div></div>
+          </div>
+        </div>
+      </div>
       <div class="item-btns">
         <button style="background:#3b82f6;color:#fff" onclick="applyItem()">적용</button>
         <button style="background:#dc2626;color:#fff" onclick="deleteItem()">삭제</button>
@@ -506,7 +529,7 @@ function _doDragMove(it,mx,my){
 function _doDragEnd(){
   var idx=_drag.idx,it=items[idx],moved=_drag.moved;
   _drag.active=false;map.setDraggable(true);
-  if(!moved){selectItem(idx);map.setCenter(new kakao.maps.LatLng(it.lat,it.lng));return}
+  if(!moved){selectItem(idx);showItemInfo(idx);map.setCenter(new kakao.maps.LatLng(it.lat,it.lng));return}
   if(confirm(it.num+' 위치를 이동하시겠습니까?')){
     toast(it.num+' 이동됨');
     autoSave();
@@ -1460,6 +1483,49 @@ function cloneItem(dx,dy){
   drawItem(items.length-1);
   renderCategories();
   showItemInfo(items.length-1);
+  toast(ni.num+' 추가됨');
+  autoSave();
+}
+// 사이드바 패널용 이동/복제 (selectedItemIdx 기반)
+function panelMoveItem(dx,dy){
+  if(selectedItemIdx<0)return;
+  var it=items[selectedItemIdx];
+  var szX=1,szY=1;
+  if(it.shape==='rect'){szX=it.w;szY=it.h}
+  else if(it.shape==='circle'){szX=it.diameter||5;szY=it.diameter||5}
+  var step=Math.min(szX,szY)*0.5;
+  var dLat=dy*step/M_LAT;
+  var dLng=dx*step/mLng(it.lat);
+  it.lat+=dLat;it.lng+=dLng;
+  if(it.path)it.path=it.path.map(function(p){return{lat:p.lat+dLat,lng:p.lng+dLng}});
+  drawItem(selectedItemIdx);
+  map.setCenter(new kakao.maps.LatLng(it.lat,it.lng));
+  autoSave();
+}
+function panelCloneItem(dx,dy){
+  if(selectedItemIdx<0)return;
+  var it=items[selectedItemIdx];
+  var cat=categories.find(function(c){return c.id===it.catId});
+  if(!cat)return;
+  var szX,szY;
+  if(it.shape==='rect'){szX=it.w;szY=it.h}
+  else if(it.shape==='circle'){szX=it.diameter||5;szY=it.diameter||5}
+  else if(it.shape==='text'){szX=3;szY=2}
+  else{szX=5;szY=5}
+  var gap=0.3;
+  var dLat=dy*(szY+gap)/M_LAT;
+  var dLng=dx*(szX+gap)/mLng(it.lat);
+  var maxN=0;
+  items.forEach(function(i){if(i.catId===it.catId){var m=i.num.match(/(\d+)$/);if(m)maxN=Math.max(maxN,parseInt(m[1]))}});
+  var ni={id:nextItemId++,catId:it.catId,num:cat.prefix+'-'+String(maxN+1).padStart(2,'0'),
+    name:it.shape==='text'?(it.name||''):'',duty:'',phone:'',memo:'',lat:it.lat+dLat,lng:it.lng+dLng,
+    w:it.w,h:it.h,diameter:it.diameter,shape:it.shape,rotation:it.rotation||0,textSize:it.textSize||16};
+  if(it.path)ni.path=it.path.map(function(p){return{lat:p.lat+dLat,lng:p.lng+dLng}});
+  items.push(ni);
+  drawItem(items.length-1);
+  renderCategories();
+  deselectItem();
+  selectItem(items.length-1);
   toast(ni.num+' 추가됨');
   autoSave();
 }
