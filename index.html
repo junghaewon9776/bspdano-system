@@ -1252,6 +1252,7 @@ function mkTabs(){
       {k:"field_layout",l:"축제 배치도",frame:"방역코스/layout.html"},
       {k:"field_monitor",l:"본부 모니터링",frame:"방역코스/monitor.html"}
     ];
+    if(HM("groups")) fieldItems.push({k:"field_members",l:"조 편성 관리",frame:"방역코스/members.html"});
     if(HM("vehicle")) fieldItems.push({k:"field_vehicle",l:"행사차량 관리",frame:"방역코스/vehicle.html"});
     fieldItems.push({k:"field_today",l:"오늘의 운영",frame:"방역코스/today.html"});
     cats.push({id:"field",label:"📍 현장",items:fieldItems});
@@ -4517,7 +4518,7 @@ function draw(){
 
 function _getFrameUrl(tabKey){
   if(FIELD_MENU!=="on")return null;
-  var map={field_layout:"방역코스/layout.html",field_monitor:"방역코스/monitor.html",field_vehicle:"방역코스/vehicle.html",field_today:"방역코스/today.html"};
+  var map={field_layout:"방역코스/layout.html",field_monitor:"방역코스/monitor.html",field_members:"방역코스/members.html",field_vehicle:"방역코스/vehicle.html",field_today:"방역코스/today.html"};
   var url=map[tabKey]||null;
   if(url && CUR_EVT && CUR_EVT.evtId) url += (url.indexOf('?')>=0?'&':'?')+'evtId='+encodeURIComponent(CUR_EVT.evtId);
   return url;
