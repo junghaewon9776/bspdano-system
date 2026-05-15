@@ -138,14 +138,30 @@ body{font-family:'Pretendard','Noto Sans KR',sans-serif;background:#1a1a2e;color
 #ctxMenu .ctx-item:hover{background:rgba(59,130,246,0.2)}
 #ctxMenu .ctx-sep{height:1px;background:#334155;margin:4px 0}
 
+/* 모바일 토글 버튼 */
+#sbToggle{display:none;position:fixed;top:8px;left:8px;z-index:400;width:40px;height:40px;border:none;border-radius:10px;background:rgba(15,23,42,0.92);color:#fff;font-size:20px;cursor:pointer;backdrop-filter:blur(8px);box-shadow:0 2px 10px rgba(0,0,0,0.4);border:1px solid #334155}
+#sbOverlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:250}
+
 /* 반응형 */
 @media(max-width:700px){
-  #sidebar{position:fixed;left:0;top:0;z-index:300;width:280px;min-width:280px;box-shadow:4px 0 20px rgba(0,0,0,0.5)}
-  #searchBox{width:200px}
+  #sidebar{position:fixed;left:-300px;top:0;z-index:300;width:280px;min-width:280px;box-shadow:4px 0 20px rgba(0,0,0,0.5);transition:left .25s ease}
+  #sidebar.open{left:0}
+  #sbToggle{display:block}
+  #sbOverlay.open{display:block}
+  #searchBox{width:200px;left:auto;right:10px;transform:none}
+  #mapBtns{top:56px;right:6px}
+  #mapBtns button{padding:5px 8px;font-size:10px}
+  #legend{right:6px;bottom:6px;font-size:9px;padding:6px 8px}
+  .item-bubble{max-width:180px;font-size:11px;padding:8px 10px}
+  #drawIndicator,#measureIndicator{font-size:10px;padding:6px 10px;top:56px;max-width:90vw;white-space:normal;text-align:center}
 }
 </style>
 </head>
 <body>
+
+<!-- 모바일 사이드바 토글 -->
+<button id="sbToggle" onclick="toggleSidebar()">☰</button>
+<div id="sbOverlay" onclick="toggleSidebar()"></div>
 
 <!-- 사이드바 -->
 <div id="sidebar">
@@ -256,6 +272,7 @@ body{font-family:'Pretendard','Noto Sans KR',sans-serif;background:#1a1a2e;color
   <div id="measureTotal" style="position:absolute;bottom:50px;left:50%;transform:translateX(-50%);z-index:50;background:rgba(139,92,246,0.92);color:#fff;padding:8px 16px;border-radius:8px;font-size:13px;font-weight:700;display:none;backdrop-filter:blur(8px);white-space:nowrap"></div>
   <!-- 지도 버튼들 -->
   <div id="mapBtns">
+    <button onclick="toggleMapType()">🗺️ 지도 전환</button>
     <button onclick="startMeasure('distance')">📏 거리 측정</button>
     <button onclick="startMeasure('area')">📐 면적 측정</button>
     <button onclick="clearLastMeasure()" title="마지막 측정 하나 삭제">🧹 되돌리기</button>
@@ -1860,28 +1877,53 @@ function undoDrawPoint(){
 }
 
 // ══════════════════════════════════════
-// 이미지 저장
+// 지도 타입 전환
+function toggleMapType(){
+  var types=[
+    {id:kakao.maps.MapTypeId.ROADMAP, label:'일반'},
+    {id:kakao.maps.MapTypeId.HYBRID, label:'위성+도로'},
+    {id:kakao.maps.MapTypeId.SKYVIEW, label:'위성'}
+  ];
+  var cur=map.getMapTypeId();
+  var idx=0;
+  for(var i=0;i<types.length;i++){if(types[i].id===cur){idx=(i+1)%types.length;break}}
+  map.setMapTypeId(types[idx].id);
+  toast('🗺️ '+types[idx].label+' 지도');
+}
+
+// ══════════════════════════════════════
+// 이미지 저장 — 일반지도로 전환 후 캡쳐 (위성 타일은 CORS 제한)
 function saveMapImage(){
   if(typeof html2canvas==='undefined'){toast('이미지 라이브러리 로딩중... 잠시 후 다시',true);return;}
-  toast('이미지 캡쳐 중...');
-  var mapEl=document.getElementById('map');
-  html2canvas(mapEl,{
-    useCORS:true,
-    allowTaint:true,
-    scale:2,
-    logging:false
-  }).then(function(canvas){
-    var a=document.createElement('a');
-    a.download='배치도_'+new Date().toISOString().slice(0,10)+'.png';
-    a.href=canvas.toDataURL('image/png');
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    toast('✅ 이미지 저장 완료');
-  }).catch(function(e){
-    console.error('이미지 캡쳐 실패:',e);
-    toast('이미지 캡쳐 실패: '+e,true);
-  });
+  var origType=map.getMapTypeId();
+  var wasSat=(origType===kakao.maps.MapTypeId.HYBRID||origType===kakao.maps.MapTypeId.SKYVIEW);
+  if(wasSat){
+    map.setMapTypeId(kakao.maps.MapTypeId.ROADMAP);
+    toast('📷 일반지도로 전환 후 캡쳐 중...');
+  } else {
+    toast('📷 이미지 캡쳐 중...');
+  }
+  setTimeout(function(){
+    var mapEl=document.getElementById('map');
+    html2canvas(mapEl,{
+      useCORS:true,
+      scale:2,
+      logging:false
+    }).then(function(canvas){
+      var a=document.createElement('a');
+      a.download='배치도_'+new Date().toISOString().slice(0,10)+'.png';
+      a.href=canvas.toDataURL('image/png');
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      if(wasSat) map.setMapTypeId(origType);
+      toast('✅ 이미지 저장 완료');
+    }).catch(function(e){
+      if(wasSat) map.setMapTypeId(origType);
+      console.error('이미지 캡쳐 실패:',e);
+      toast('이미지 캡쳐 실패',true);
+    });
+  }, wasSat?1500:300);
 }
 
 //  주소 검색
@@ -2174,6 +2216,13 @@ function copyPhone(phone){
   navigator.clipboard.writeText(phone).then(function(){toast('📋 '+phone+' 복사됨')}).catch(function(){
     var t=document.createElement('textarea');t.value=phone;document.body.appendChild(t);t.select();document.execCommand('copy');t.remove();toast('📋 '+phone+' 복사됨');
   });
+}
+
+function toggleSidebar(){
+  var sb=document.getElementById('sidebar');
+  var ov=document.getElementById('sbOverlay');
+  sb.classList.toggle('open');
+  ov.classList.toggle('open');
 }
 
 function toast(m,err){

@@ -4507,7 +4507,7 @@ function draw(){
     // frame 탭 처리
     var frameUrl=_getFrameUrl(CTAB);
     if(frameUrl){
-      el.innerHTML='<div style="margin:-16px -20px;overflow:hidden"><iframe id="fieldFrame" src="'+frameUrl+'" style="width:100%;height:calc(100vh - 105px);border:none;display:block"></iframe></div>';
+      el.innerHTML='<div style="margin:-16px -20px;overflow:hidden"><iframe id="fieldFrame" src="'+frameUrl+'" style="width:100%;height:calc(100vh - 105px);min-height:500px;border:none;display:block" allow="geolocation"></iframe></div>';
     } else {
       el.innerHTML='<div class="card"><div class="empty2">해당 탭을 찾을 수 없습니다</div></div>';
     }
