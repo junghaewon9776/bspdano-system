@@ -124,7 +124,7 @@ body{font-family:'Pretendard','Noto Sans KR',sans-serif;background:#1a1a2e;color
 
 /* 측정 모드 표시 */
 #measureIndicator{position:absolute;top:52px;left:50%;transform:translateX(-50%);z-index:50;background:rgba(16,185,129,0.92);color:#fff;padding:8px 16px;border-radius:8px;font-size:12px;font-weight:700;display:none;backdrop-filter:blur(8px);white-space:nowrap}
-.measure-label{background:rgba(0,0,0,0.75);color:#fff;padding:4px 8px;border-radius:4px;font-size:12px;font-weight:700;white-space:nowrap;pointer-events:none}
+.measure-label{background:rgba(0,0,0,0.75);color:#fff;padding:4px 8px;border-radius:4px;font-size:12px;font-weight:700;white-space:nowrap;pointer-events:auto;cursor:default}
 
 /* 우클릭 메뉴 */
 #ctxMenu{position:fixed;z-index:600;background:#1e293b;border:1px solid #334155;border-radius:10px;padding:4px 0;min-width:180px;box-shadow:0 8px 30px rgba(0,0,0,0.5);display:none}
@@ -569,8 +569,15 @@ function startMeasure(type){
   _updateMeasureTotal();
 }
 
-function cancelMeasureMode(){
+function cancelMeasureMode(keepGfx){
   if(!_measure)return;
+  if(!keepGfx){
+    // 미완료 측정 그래픽 정리
+    _measure.dots.forEach(function(g){try{g.setMap(null);}catch(e){}});
+    _measure.lines.forEach(function(g){try{g.setMap(null);}catch(e){}});
+    _measure.labels.forEach(function(g){try{g.setMap(null);}catch(e){}});
+    if(_measure.polygon)try{_measure.polygon.setMap(null);}catch(e){}
+  }
   _measure=null;
   map.setCursor('');
   document.getElementById('measureIndicator').style.display='none';
@@ -739,7 +746,7 @@ function _measureFinish(){
     _measureResults.push({type:'area',area:area,dist:peri,gfx:gfx});
     toast('📐 면적: '+_fmtArea(area)+' / 둘레: '+_fmtDist(peri));
   }
-  cancelMeasureMode();
+  cancelMeasureMode(true);
   _updateMeasureTotal();
 }
 
@@ -945,15 +952,41 @@ function shapeLabel(cat){
   return '사각형 '+cat.w+'×'+cat.h+'m'+opLabel;
 }
 
+// ═══ 도형 표시/숨김 ═══
+var _hiddenCats={};   // catId → true (카테고리 전체 숨김)
+var _hiddenItems={};   // itemIdx → true (개별 아이템 숨김)
+
+function toggleCatVis(catId){
+  if(_hiddenCats[catId]){delete _hiddenCats[catId];} else {_hiddenCats[catId]=true;}
+  items.forEach(function(it,idx){
+    if(it.catId===catId) _applyItemVis(idx);
+  });
+  renderCategories();
+}
+function toggleItemVis(idx){
+  if(_hiddenItems[idx]){delete _hiddenItems[idx];} else {_hiddenItems[idx]=true;}
+  _applyItemVis(idx);
+  renderCategories();
+}
+function _applyItemVis(idx){
+  var it=items[idx];if(!it)return;
+  var hidden=!!_hiddenCats[it.catId]||!!_hiddenItems[idx];
+  if(it._poly)try{it._poly.setMap(hidden?null:map);}catch(e){}
+  if(it._label)try{it._label.setMap(hidden?null:map);}catch(e){}
+  if(it._arrows)it._arrows.forEach(function(a){try{a.setMap(hidden?null:map);}catch(e){}});
+}
+
 function renderCategories(){
   var el=document.getElementById('catList');
   var html='';
   categories.forEach(function(cat){
     var catItems=items.filter(function(it){return it.catId===cat.id});
+    var catHidden=!!_hiddenCats[cat.id];
     html+='<div class="cat-card" id="cat_'+cat.id+'">';
     html+='<div class="cat-head" onclick="toggleCat('+cat.id+')">';
+    html+='<button class="hbtn" onclick="event.stopPropagation();toggleCatVis('+cat.id+')" title="보이기/숨기기" style="font-size:13px;opacity:'+(catHidden?'0.4':'1')+'">'+(catHidden?'🙈':'👁')+'</button>';
     html+='<div class="cat-color" style="background:'+cat.color+'" onclick="event.stopPropagation();showEditCat('+cat.id+')"></div>';
-    html+='<div class="cat-title">'+cat.name+'</div>';
+    html+='<div class="cat-title"'+(catHidden?' style="opacity:0.4;text-decoration:line-through"':'')+'>'+cat.name+'</div>';
     html+='<div class="cat-count">'+catItems.length+'</div>';
     html+='<button class="hbtn" onclick="event.stopPropagation();showEditCat('+cat.id+')" title="설정">⚙</button>';
     html+='<div class="cat-toggle" id="catArrow_'+cat.id+'">▶</div>';
@@ -965,9 +998,11 @@ function renderCategories(){
       html+='<div class="cat-items">';
       catItems.forEach(function(it){
         var idx=items.indexOf(it);
+        var itemHidden=catHidden||!!_hiddenItems[idx];
         html+='<div class="cat-item'+(selectedItemIdx===idx?' active':'')+'" onclick="selectItem('+idx+')">';
-        html+='<div class="cat-item-num">'+it.num+'</div>';
-        html+='<div class="cat-item-name">'+(it.name||cat.name)+'</div>';
+        html+='<button onclick="event.stopPropagation();toggleItemVis('+idx+')" style="background:none;border:none;cursor:pointer;font-size:11px;padding:0 2px;flex-shrink:0;opacity:'+(itemHidden?'0.4':'0.7')+'" title="보이기/숨기기">'+(itemHidden?'🙈':'👁')+'</button>';
+        html+='<div class="cat-item-num"'+(itemHidden?' style="opacity:0.4"':'')+'>'+it.num+'</div>';
+        html+='<div class="cat-item-name"'+(itemHidden?' style="opacity:0.4"':'')+'>'+(it.name||cat.name)+'</div>';
         html+='<button onclick="event.stopPropagation();focusItem('+idx+')" style="background:none;border:none;cursor:pointer;font-size:12px;padding:2px 4px;flex-shrink:0" title="위치로 이동">📍</button>';
         html+='</div>';
       });
