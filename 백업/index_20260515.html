@@ -1249,10 +1249,10 @@ function mkTabs(){
   // ── 현장 ──
   if(FIELD_MENU==="on"){
     cats.push({id:"field",label:"📍 현장",items:[
-      {k:"field_layout",l:"축제 배치도",frame:"방역코스/layout.html"},
-      {k:"field_monitor",l:"본부 모니터링",frame:"방역코스/monitor.html"},
-      {k:"field_vehicle",l:"행사차량 관리",frame:"방역코스/vehicle.html"},
-      {k:"field_today",l:"오늘의 운영",frame:"방역코스/today.html"}
+      {k:"_field_layout",l:"축제 배치도",ext:"방역코스/layout.html"},
+      {k:"_field_monitor",l:"본부 모니터링",ext:"방역코스/monitor.html"},
+      {k:"_field_vehicle",l:"행사차량 관리",ext:"방역코스/vehicle.html"},
+      {k:"_field_today",l:"오늘의 운영",ext:"방역코스/today.html"}
     ]});
   }
 
@@ -1280,8 +1280,6 @@ function mkTabs(){
     activeCat.items.forEach(function(t){
       if(t.ext){
         h2+='<button class="ext" onclick="location.href=\''+t.ext+'\'">'+t.l+'</button>';
-      } else if(t.frame){
-        h2+='<button class="'+(t.k===CTAB?'on':'')+'" onclick="switchTab(\''+t.k+'\')">'+t.l+'</button>';
       } else {
         h2+='<button class="'+(t.k===CTAB?'on':'')+'" onclick="switchTab(\''+t.k+'\')">'+t.l+'</button>';
       }
@@ -4503,21 +4501,6 @@ function draw(){
   else if(CTAB=="notice")el.innerHTML=dNotice();
   else if(CTAB=="stat")el.innerHTML=dStat();
   else if(CTAB=="evtMgr"){ dEvtMgr(); }   // 행사관리 (super admin 전용, 비동기 렌더)
-  else {
-    // frame 탭 처리
-    var frameUrl=_getFrameUrl(CTAB);
-    if(frameUrl){
-      el.innerHTML='<div style="margin:-16px -20px"><iframe id="fieldFrame" src="'+frameUrl+'" style="width:100%;height:calc(100vh - 140px);border:none;display:block"></iframe></div>';
-    } else {
-      el.innerHTML='<div class="card"><div class="empty2">해당 탭을 찾을 수 없습니다</div></div>';
-    }
-  }
-}
-
-function _getFrameUrl(tabKey){
-  if(FIELD_MENU!=="on")return null;
-  var map={field_layout:"방역코스/layout.html",field_monitor:"방역코스/monitor.html",field_vehicle:"방역코스/vehicle.html",field_today:"방역코스/today.html"};
-  return map[tabKey]||null;
 }
 
 // ===== 바 =====
