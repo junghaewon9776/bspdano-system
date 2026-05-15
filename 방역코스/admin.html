@@ -1779,7 +1779,7 @@ function renderEvtAssign() {
       return `<label style="display:flex;align-items:center;gap:8px;padding:6px 8px;margin:3px 0;border:1.5px solid ${on ? '#7c3aed' : '#e5e7eb'};border-radius:8px;background:${on ? '#f5f3ff' : '#fff'};cursor:pointer;font-size:13px;">
         <input type="checkbox" ${on ? 'checked' : ''} onchange="toggleEvtTeam('${eventId}','${t.id}')">
         <span style="font-weight:600;">${t.name}</span>
-        <span style="color:#888;font-size:11px;">${t.vehicle ? '🚗' + t.vehicle : ''} ${t.leader ? '👑' + t.leader : ''} ${(t.members||[]).length}명</span>
+        <span style="color:#888;font-size:11px;">${t.vehicle ? '🚗' + t.vehicle : ''} ${t.leader ? '👑' + t.leader : ''} ${(t.members||t.memberIds||[]).length}명</span>
       </label>`;
     }).join('');
   }
