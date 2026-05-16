@@ -3221,6 +3221,31 @@ function _applyPendingCount(){ var n=0; for(var k in APPLY_CHK_PENDING) n++; ret
 // 목록에서 인라인 체크박스 클릭 → 로컬만 변경, 저장은 버튼으로
 function applyInlineChk(seq, field, checked){
   var val = checked ? "O" : "";
+  // 불참 체크 시 예선합격/최종합격 자동 해제
+  if(field==="불참" && checked){
+    applyInlineChk(seq,"예선합격",false);
+    applyInlineChk(seq,"최종합격",false);
+  }
+  // 불참 상태에서 예선/최종 체크 막기
+  if((field==="예선합격"||field==="최종합격") && checked){
+    if(APPLY){
+      var H0=APPLY.headers||[], R0=APPLY.rows||[];
+      var iSeq0=H0.indexOf("접수순번"), iAbs=H0.indexOf("불참");
+      if(iSeq0>=0 && iAbs>=0){
+        for(var j=0;j<R0.length;j++){
+          if(String(R0[j][iSeq0])===String(seq)){
+            var absVal=String(R0[j][iAbs]||"");
+            if(absVal==="O"||absVal==="Y"||absVal==="true"||absVal==="1"){
+              toast("불참 상태에서는 합격 체크를 할 수 없습니다",true);
+              draw();
+              return;
+            }
+            break;
+          }
+        }
+      }
+    }
+  }
   // 로컬 데이터 업데이트
   if(APPLY){
     var H=APPLY.headers||[], R=APPLY.rows||[];
