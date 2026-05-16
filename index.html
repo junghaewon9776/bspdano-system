@@ -1105,7 +1105,7 @@ function logout(msg){
       var logoutNm = (ME&&ME.nm)||"";
       var logoutRole = (ME&&ME.r)||"";
       // 로그인 때 캐시한 IP 사용 (외부 조회 없이 바로 발송)
-      api("notifyLogin",{id:logoutId, nm:logoutNm, role:logoutRole, logout:true, reason:reason, ip:LAST_IP||"", ua:ua}).catch(function(){});
+      api("notifyLogin",{id:logoutId, nm:logoutNm, role:logoutRole, logout:true, reason:reason, ip:LAST_IP||"", ua:ua, evtNm:(CUR_EVT&&CUR_EVT.nm)||""}).catch(function(){});
       setTimeout(function(){ _doLogoutReload_(msg); }, 800);
       return;
     }

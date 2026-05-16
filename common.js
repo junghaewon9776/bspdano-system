@@ -931,6 +931,7 @@ function _apiNotifyLogin(p) {
     text = "🔒 <b>로그아웃</b>"
       + "\n• 계정: " + (p.id||"") + (p.nm ? " (" + p.nm + ")" : "")
       + "\n• 역할: " + roleLabel
+      + (p.evtNm ? "\n• 행사: " + p.evtNm : "")
       + "\n• 사유: " + (p.reason||"수동")
       + "\n• IP: " + (p.ip||"-")
       + (dev ? "\n• 기기: " + dev : "")
@@ -946,6 +947,7 @@ function _apiNotifyLogin(p) {
     text = "✅ <b>로그인 성공</b>"
       + "\n• 계정: " + (p.id||"") + (p.nm ? " (" + p.nm + ")" : "")
       + "\n• 역할: " + roleLabel
+      + (p.evtNm ? "\n• 행사: " + p.evtNm : "")
       + "\n• IP: " + (p.ip||"-")
       + (dev ? "\n• 기기: " + dev : "")
       + "\n• 시각: " + now_()
