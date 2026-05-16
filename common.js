@@ -1244,8 +1244,29 @@ function _apiBulkAddApply(p) {
       var arr = [];
       if (Array.isArray(raw)) arr = raw.filter(function(r){return r!=null;});
       else if (raw && typeof raw === 'object') Object.keys(raw).forEach(function(k){if(raw[k])arr.push(raw[k]);});
+      // 접수순번 자동 생성 (기존 최대값 기반)
+      var year = new Date().getFullYear().toString();
+      var maxNum = 0;
+      var re = new RegExp("^" + year + "-(\\d+)$");
+      arr.forEach(function(r) {
+        var s = String(r["접수순번"] || r[_fbSafeKey("접수순번")] || "");
+        var m = s.match(re);
+        if (m) { var n = parseInt(m[1], 10); if (n > maxNum) maxNum = n; }
+      });
       var newRows = p.rows || [];
-      newRows.forEach(function(r) { arr.push(_fbSafeRow(r)); });
+      var ts = now_();
+      newRows.forEach(function(r) {
+        // 접수순번이 없으면 자동 생성
+        if (!r["접수순번"] && !r[_fbSafeKey("접수순번")]) {
+          maxNum++;
+          r["접수순번"] = year + "-" + ("0000" + maxNum).slice(-4);
+        }
+        // 접수일시가 없으면 자동 생성
+        if (!r["접수일시"] && !r[_fbSafeKey("접수일시")]) {
+          r["접수일시"] = ts;
+        }
+        arr.push(_fbSafeRow(r));
+      });
       fbDb.ref('/evtData/' + evtId + '/Apply').set(arr).then(function() {
         resolve({ok:true, count:newRows.length});
       });
