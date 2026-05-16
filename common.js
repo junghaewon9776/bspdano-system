@@ -143,7 +143,16 @@ function uid() {
 }
 
 function now_() {
-  return new Date().toISOString().replace("T"," ").slice(0,19);
+  var d = new Date();
+  var off = d.getTime() + (d.getTimezoneOffset() * 60000) + (9 * 3600000);
+  var k = new Date(off);
+  var Y = k.getFullYear();
+  var M = String(k.getMonth()+1).padStart(2,"0");
+  var D = String(k.getDate()).padStart(2,"0");
+  var h = String(k.getHours()).padStart(2,"0");
+  var m = String(k.getMinutes()).padStart(2,"0");
+  var s = String(k.getSeconds()).padStart(2,"0");
+  return Y+"-"+M+"-"+D+" "+h+":"+m+":"+s;
 }
 
 // ───────── api() 호환 레이어 ─────────
