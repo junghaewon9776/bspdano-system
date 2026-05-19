@@ -9415,7 +9415,7 @@ function dMem(){
      '</div>'+sinceUI+'</div>';
   // 소속 나열 순서: memGroups 의 sort 값 우선 → 없으면 이름순
   var _grSort = {};
-  (memGroups||[]).forEach(function(g){ _grSort[g.n] = Number(g.sort||999); });
+  (memGroups||[]).forEach(function(g){ _grSort[g.n] = g.sort!=null ? Number(g.sort) : 999; });
   var keys=Object.keys(gr).sort(function(a,b){
     var sa = _grSort[a]!=null?_grSort[a]:999;
     var sb = _grSort[b]!=null?_grSort[b]:999;
