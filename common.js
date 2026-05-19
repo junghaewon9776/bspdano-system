@@ -182,8 +182,8 @@ function _dispatch(p) {
         case "refresh": _apiRefresh(p).then(resolve); return;
 
         // 인원관리
-        case "addMem":    _apiAddRow(p, "Mems").then(resolve); return;
-        case "updateMem": _apiUpdateRow(p, "Mems").then(resolve); return;
+        case "addMem":    _apiAddMem(p).then(resolve); return;
+        case "updateMem": _apiUpdateMem(p).then(resolve); return;
         case "deleteMem": _apiDeleteRow(p, "Mems").then(resolve); return;
 
         // 활동
@@ -574,6 +574,63 @@ function _apiDeleteRow(p, nodeName) {
     return saveEvtNode(evtId, nodeName, arr).then(function() {
       _evtCaches[evtId][nodeName] = arr;
       return {ok:true};
+    });
+  });
+}
+
+// ───────── 인원 추가/수정 (소속 자동 등록 포함) ─────────
+function _autoRegisterGroup(evtId, arName) {
+  if (!arName) return Promise.resolve();
+  var data = _evtCaches[evtId];
+  if (!data) return Promise.resolve();
+  var groups = data.Groups || [];
+  for (var i = 0; i < groups.length; i++) {
+    if (groups[i].n === arName) return Promise.resolve(); // 이미 존재
+  }
+  groups.push({id:uid(), n:arName, sort:groups.length, note:""});
+  return saveEvtNode(evtId, "Groups", groups).then(function() {
+    _evtCaches[evtId].Groups = groups;
+  });
+}
+function _apiAddMem(p) {
+  var evtId = _getEvtId(p);
+  if (!evtId) return Promise.resolve({ok:false, err:"행사 미선택"});
+  return loadEvtData(evtId).then(function(data) {
+    var arr = data.Mems || [];
+    var row = Object.assign({}, p);
+    delete row.action; delete row.evtId; delete row.by;
+    if (!row.id) row.id = uid();
+    if (!row.createdAt) row.createdAt = now_();
+    row.evtId = evtId;
+    arr.push(row);
+    return saveEvtNode(evtId, "Mems", arr).then(function() {
+      _evtCaches[evtId].Mems = arr;
+      return _autoRegisterGroup(evtId, row.ar).then(function() {
+        return {ok:true, id:row.id};
+      });
+    });
+  });
+}
+function _apiUpdateMem(p) {
+  var evtId = _getEvtId(p);
+  if (!evtId) return Promise.resolve({ok:false, err:"행사 미선택"});
+  return loadEvtData(evtId).then(function(data) {
+    var arr = data.Mems || [];
+    var idx = -1;
+    for (var i = 0; i < arr.length; i++) {
+      if (arr[i].id === p.id) { idx = i; break; }
+    }
+    if (idx < 0) return {ok:false, err:"항목을 찾을 수 없습니다"};
+    var row = arr[idx];
+    Object.keys(p).forEach(function(k) {
+      if (k !== 'action' && k !== 'by') row[k] = p[k];
+    });
+    arr[idx] = row;
+    return saveEvtNode(evtId, "Mems", arr).then(function() {
+      _evtCaches[evtId].Mems = arr;
+      return _autoRegisterGroup(evtId, row.ar).then(function() {
+        return {ok:true};
+      });
     });
   });
 }
