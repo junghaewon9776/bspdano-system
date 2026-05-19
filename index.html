@@ -3043,17 +3043,17 @@ function dAwards(){
     awDivMap[key].push(r);
   });
 
-  // 열 조합별 최대 인원수 (셀 수 결정)
-  var colMax={};
-  colList.forEach(function(col){ colMax[col.key]=1; });
+  // 상별 최대 행 수 (세로로 쌓기)
+  var awRowMax={};
   awList.forEach(function(a){
+    var mx=1;
     colList.forEach(function(col){
       var cnt=(awDivMap[_awLabel(a)+"||"+col.key]||[]).length;
-      if(cnt+1>colMax[col.key]) colMax[col.key]=cnt+1;
+      if(cnt+1>mx) mx=cnt+1; // +1 for add button row
     });
+    awRowMax[_awLabel(a)]=mx;
   });
-  var totalCols=0;
-  colList.forEach(function(col){ totalCols+=colMax[col.key]; });
+  var totalCols=colList.length;
 
   var totalWinners=0;
   Object.keys(awDivMap).forEach(function(k){ totalWinners+=awDivMap[k].length; });
@@ -3108,7 +3108,7 @@ function dAwards(){
   // 대분류별 colspan 계산
   var catColSpan={};
   catList.forEach(function(c){ catColSpan[c]=0; });
-  colList.forEach(function(col){ catColSpan[col.cat]+=colMax[col.key]; });
+  colList.forEach(function(col){ catColSpan[col.cat]+=1; });
   h+='<thead>';
   // 1행: 대분류(구분)
   h+='<tr>';
@@ -3120,7 +3120,7 @@ function dAwards(){
   // 2행: 중분류(참가구분)
   h+='<tr>';
   colList.forEach(function(col){
-    h+='<th colspan="'+colMax[col.key]+'" style="padding:6px 8px;border:1px solid #e5e7eb;text-align:center;background:#f5f3ff;color:#5b21b6;font-weight:600;font-size:13px">'+esc(col.div)+'</th>';
+    h+='<th style="padding:6px 8px;border:1px solid #e5e7eb;text-align:center;background:#f5f3ff;color:#5b21b6;font-weight:600;font-size:13px;min-width:120px">'+esc(col.div)+'</th>';
   });
   h+='</tr>';
   h+='</thead><tbody>';
@@ -3130,42 +3130,49 @@ function dAwards(){
     awList.forEach(function(a,ai){
       var label=_awLabel(a);
       var bg=ai%2?'#faf5ff':'#fff';
-      h+='<tr>';
       var nEscL=esc(a.n).replace(/\\/g,"\\\\").replace(/'/g,"\\'");
       var gEscL=esc(a.giver||"").replace(/\\/g,"\\\\").replace(/'/g,"\\'");
-      h+='<td style="padding:8px 12px;border:1px solid #e5e7eb;background:#f5f3ff;font-weight:700;color:#5b21b6;white-space:nowrap;vertical-align:top;position:sticky;left:0;z-index:1">';
-      h+='<div style="display:flex;align-items:center;gap:6px">🏅 '+esc(label);
-      h+=' <button onclick="awardAssignPopup(\''+nEscL+'\',\''+gEscL+'\',\'전체\',\'전체\')" title="구분 무관 수상자 추가" style="border:1px dashed #c4b5fd;background:#faf5ff;color:#7c3aed;cursor:pointer;border-radius:4px;padding:1px 6px;font-size:11px;flex-shrink:0">+전체</button>';
-      h+='</div></td>';
-      colList.forEach(function(col){
-        var winners=awDivMap[label+"||"+col.key]||[];
-        var nEsc=esc(a.n).replace(/\\/g,"\\\\").replace(/'/g,"\\'");
-        var gEsc=esc(a.giver||"").replace(/\\/g,"\\\\").replace(/'/g,"\\'");
-        var catEsc=esc(col.cat).replace(/\\/g,"\\\\").replace(/'/g,"\\'");
-        var divEsc=esc(col.div).replace(/\\/g,"\\\\").replace(/'/g,"\\'");
-        // 수상자 각각 한 셀
-        winners.forEach(function(r){
-          var sq=iSeq2>=0?String(r[iSeq2]||""):"";
-          var sqEsc=sq?esc(sq).replace(/\\/g,"\\\\").replace(/'/g,"\\'"):"";
-          h+='<td style="padding:6px 8px;border:1px solid #e5e7eb;vertical-align:top;background:'+bg+';line-height:1.5;min-width:120px">';
-          h+='<div style="display:flex;align-items:flex-start;gap:3px">';
-          h+='<div style="flex:1;cursor:'+(sq?'pointer':'default')+'" onmouseover="this.style.background=\'#eff6ff\'" onmouseout="this.style.background=\'\'"'+(sq?' ondblclick="CTAB=\'apply\';APPLY_Q=\''+sqEsc+'\';mkTabs();draw()" title="더블클릭→참가자 관리"':'')+'>';
-          h+=_cellHtml(r);
-          h+='</div>';
-          if(sq) h+='<button onclick="awardUnassign(\''+sqEsc+'\')" title="수상 취소" style="border:none;background:none;color:#dc2626;cursor:pointer;font-size:12px;padding:0;flex-shrink:0">✕</button>';
+      var rowMax=awRowMax[label]||1;
+      // 각 열의 수상자 배열 미리 준비
+      var colWinners={};
+      colList.forEach(function(col){ colWinners[col.key]=awDivMap[label+"||"+col.key]||[]; });
+      for(var ri=0;ri<rowMax;ri++){
+        h+='<tr>';
+        // 첫 행에만 상 이름 (rowspan)
+        if(ri===0){
+          h+='<td rowspan="'+rowMax+'" style="padding:8px 12px;border:1px solid #e5e7eb;background:#f5f3ff;font-weight:700;color:#5b21b6;white-space:nowrap;vertical-align:top;position:sticky;left:0;z-index:1">';
+          h+='<div style="display:flex;align-items:center;gap:6px">🏅 '+esc(label);
+          h+=' <button onclick="awardAssignPopup(\''+nEscL+'\',\''+gEscL+'\',\'전체\',\'전체\')" title="구분 무관 수상자 추가" style="border:1px dashed #c4b5fd;background:#faf5ff;color:#7c3aed;cursor:pointer;border-radius:4px;padding:1px 6px;font-size:11px;flex-shrink:0">+전체</button>';
           h+='</div></td>';
-        });
-        // 나머지 빈 셀 (추가 버튼 포함 첫 빈칸만)
-        var remain=colMax[col.key]-winners.length;
-        for(var ei=0;ei<remain;ei++){
-          h+='<td style="padding:6px 8px;border:1px solid #e5e7eb;vertical-align:top;background:'+bg+';min-width:120px">';
-          if(ei===0){
-            h+='<button onclick="awardAssignPopup(\''+nEsc+'\',\''+gEsc+'\',\''+catEsc+'\',\''+divEsc+'\')" style="border:1px dashed #c4b5fd;background:#faf5ff;color:#7c3aed;cursor:pointer;border-radius:4px;padding:3px 8px;font-size:11px;width:100%" title="수상자 추가">+</button>';
-          }
-          h+='</td>';
         }
-      });
-      h+='</tr>';
+        colList.forEach(function(col){
+          var winners=colWinners[col.key];
+          var catEsc=esc(col.cat).replace(/\\/g,"\\\\").replace(/'/g,"\\'");
+          var divEsc=esc(col.div).replace(/\\/g,"\\\\").replace(/'/g,"\\'");
+          if(ri<winners.length){
+            // 수상자 셀
+            var r=winners[ri];
+            var sq=iSeq2>=0?String(r[iSeq2]||""):"";
+            var sqEsc=sq?esc(sq).replace(/\\/g,"\\\\").replace(/'/g,"\\'"):"";
+            h+='<td style="padding:6px 8px;border:1px solid #e5e7eb;vertical-align:top;background:'+bg+';line-height:1.5;min-width:120px">';
+            h+='<div style="display:flex;align-items:flex-start;gap:3px">';
+            h+='<div style="flex:1;cursor:'+(sq?'pointer':'default')+'" onmouseover="this.style.background=\'#eff6ff\'" onmouseout="this.style.background=\'\'"'+(sq?' ondblclick="CTAB=\'apply\';APPLY_Q=\''+sqEsc+'\';mkTabs();draw()" title="더블클릭→참가자 관리"':'')+'>';
+            h+=_cellHtml(r);
+            h+='</div>';
+            if(sq) h+='<button onclick="awardUnassign(\''+sqEsc+'\')" title="수상 취소" style="border:none;background:none;color:#dc2626;cursor:pointer;font-size:12px;padding:0;flex-shrink:0">✕</button>';
+            h+='</div></td>';
+          } else if(ri===winners.length){
+            // 추가 버튼 셀
+            h+='<td style="padding:6px 8px;border:1px solid #e5e7eb;vertical-align:top;background:'+bg+';min-width:120px">';
+            h+='<button onclick="awardAssignPopup(\''+nEscL+'\',\''+gEscL+'\',\''+catEsc+'\',\''+divEsc+'\')" style="border:1px dashed #c4b5fd;background:#faf5ff;color:#7c3aed;cursor:pointer;border-radius:4px;padding:3px 8px;font-size:11px;width:100%" title="수상자 추가">+</button>';
+            h+='</td>';
+          } else {
+            // 빈 셀
+            h+='<td style="padding:6px 8px;border:1px solid #e5e7eb;background:'+bg+'"></td>';
+          }
+        });
+        h+='</tr>';
+      }
     });
   }
   h+='</tbody></table></div>';
@@ -3217,8 +3224,16 @@ function awardsTableExport(){
     if(!awDivMap[key]) awDivMap[key]=[];
     awDivMap[key].push(r);
   });
-  var colMax={}; colList.forEach(function(col){colMax[col.key]=1;});
-  awList.forEach(function(a){ colList.forEach(function(col){ var c=(awDivMap[_awLabel(a)+"||"+col.key]||[]).length; if(c>colMax[col.key])colMax[col.key]=c; }); });
+  // 상별 최대 행 수 (세로 쌓기)
+  var awRowMax={};
+  awList.forEach(function(a){
+    var mx=1;
+    colList.forEach(function(col){
+      var cnt=(awDivMap[_awLabel(a)+"||"+col.key]||[]).length;
+      if(cnt>mx) mx=cnt;
+    });
+    awRowMax[_awLabel(a)]=mx;
+  });
   function _ct(r){
     var l=[];
     if(AC2.name){var nm=iName2>=0?String(r[iName2]||""):"";if(!nm&&iRep2>=0)nm=String(r[iRep2]||"");if(nm)l.push(nm);}
@@ -3233,20 +3248,37 @@ function awardsTableExport(){
   // 2행 헤더: 1행=대분류(구분), 2행=중분류(참가구분)
   var catColSpan={};
   catList.forEach(function(c){ catColSpan[c]=0; });
-  colList.forEach(function(col){ catColSpan[col.cat]+=colMax[col.key]; });
+  colList.forEach(function(col){ catColSpan[col.cat]+=1; });
   var h1=["상"]; catList.forEach(function(c){ if(catColSpan[c]>0){ h1.push(c); for(var i=1;i<catColSpan[c];i++) h1.push(""); } }); aoa.push(h1);
-  var h2=[""]; colList.forEach(function(col){ h2.push(col.div); for(var i=1;i<colMax[col.key];i++) h2.push(""); }); aoa.push(h2);
-  // 데이터
+  var h2=[""]; colList.forEach(function(col){ h2.push(col.div); }); aoa.push(h2);
+  // 데이터: 세로 쌓기 (상 이름은 첫 행만, 나머지 빈칸)
+  var merges=[];
+  // "상" 헤더 셀 머지 (A1:A2)
+  merges.push({s:{r:0,c:0},e:{r:1,c:0}});
+  // 1행: 대분류 머지
+  var ci=1;
+  catList.forEach(function(c){
+    if(catColSpan[c]>1) merges.push({s:{r:0,c:ci},e:{r:0,c:ci+catColSpan[c]-1}});
+    ci+=catColSpan[c];
+  });
+  var dataStartRow=2; // 헤더 2행 후
   awList.forEach(function(a){
     var label=_awLabel(a);
-    var row=[label];
-    colList.forEach(function(col){
-      var winners=awDivMap[label+"||"+col.key]||[];
-      for(var i=0;i<colMax[col.key];i++){
-        row.push(i<winners.length?_ct(winners[i]):"");
-      }
-    });
-    aoa.push(row);
+    var rowMax=awRowMax[label]||1;
+    var colWinners={};
+    colList.forEach(function(col){ colWinners[col.key]=awDivMap[label+"||"+col.key]||[]; });
+    for(var ri=0;ri<rowMax;ri++){
+      var row=[];
+      row.push(ri===0?label:"");
+      colList.forEach(function(col){
+        var winners=colWinners[col.key];
+        row.push(ri<winners.length?_ct(winners[ri]):"");
+      });
+      aoa.push(row);
+    }
+    // 상 이름 셀 세로 머지
+    if(rowMax>1) merges.push({s:{r:dataStartRow,c:0},e:{r:dataStartRow+rowMax-1,c:0}});
+    dataStartRow+=rowMax;
   });
   var ws=XLSX.utils.aoa_to_sheet(aoa);
   // 셀 줄바꿈 설정
@@ -3260,22 +3292,6 @@ function awardsTableExport(){
       }
     }
   }
-  // 머지: 1행 대분류(구분), 2행 중분류(참가구분), "상" 셀 rowspan
-  var merges=[];
-  // "상" 셀 머지 (A1:A2)
-  merges.push({s:{r:0,c:0},e:{r:1,c:0}});
-  // 1행: 대분류 머지
-  var ci=1;
-  catList.forEach(function(c){
-    if(catColSpan[c]>1) merges.push({s:{r:0,c:ci},e:{r:0,c:ci+catColSpan[c]-1}});
-    ci+=catColSpan[c];
-  });
-  // 2행: 중분류 머지
-  ci=1;
-  colList.forEach(function(col){
-    if(colMax[col.key]>1) merges.push({s:{r:1,c:ci},e:{r:1,c:ci+colMax[col.key]-1}});
-    ci+=colMax[col.key];
-  });
   ws['!merges']=merges;
   var wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,ws,"상장현황");
