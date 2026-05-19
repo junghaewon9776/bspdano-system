@@ -1553,6 +1553,7 @@ function dApply(){
   h+='<button class="btn" style="border-radius:0;border:none;background:'+(APPLY_VIEW==="compact"?"#2563eb":"#e2e8f0")+';color:'+(APPLY_VIEW==="compact"?"#fff":"#334155")+'" onclick="applyView(\'compact\')">간단</button>';
   h+='<button class="btn" style="border-radius:0;border:none;background:'+(APPLY_VIEW==="full"?"#2563eb":"#e2e8f0")+';color:'+(APPLY_VIEW==="full"?"#fff":"#334155")+'" onclick="applyView(\'full\')">상세</button>';
   h+='<button class="btn" style="border-radius:0;border:none;background:'+(APPLY_VIEW==="judge"?"#16a34a":"#e2e8f0")+';color:'+(APPLY_VIEW==="judge"?"#fff":"#334155")+';font-weight:700" onclick="applyView(\'judge\')">📱 심사</button>';
+  h+='<button class="btn" style="border-radius:0;border:none;background:'+(APPLY_VIEW==="awards"?"#7c3aed":"#e2e8f0")+';color:'+(APPLY_VIEW==="awards"?"#fff":"#334155")+';font-weight:700" onclick="applyView(\'awards\')">🏆 수상</button>';
   h+='</div>';
   if(isSuper()) h+='<button class="btn" style="background:#10b981;color:#fff;font-weight:700" onclick="openSheet(\'Apply\')" title="참가자 데이터를 시트 형태로 보기/편집">📊 시트 열기</button>';
   h+='<button class="btn" style="background:#f59e0b;color:#fff" onclick="applyConfigOpen()" title="신청기간/마감/양식 설정">⚙️ 신청 설정</button>';
@@ -1695,6 +1696,92 @@ function dApply(){
     h+='</div>';
     // 일괄생성 버튼 + 저장 버튼 등은 밑에 (생략)
     h+='<div class="mut" style="margin-top:8px;font-size:12px">💡 이름 더블 터치 시 전체 수정, 체크는 즉시 저장됩니다. (저장 버튼 쓰려면 일반 보기로)</div>';
+    h+='</div>'; // card end
+    return h;
+  }
+
+  // 🏆 수상 현황 뷰 — 상 높은 순(등록순) × 수상자 가로 나열
+  if(APPLY_VIEW==="awards"){
+    var awList=_awardsNorm();
+    var iAwd2=H.indexOf("수상"), iGvr2=H.indexOf("수여자");
+    var iName2=H.indexOf("성명"); if(iName2<0) iName2=H.indexOf("이름");
+    var iTeam2=H.indexOf("팀명"), iRep2=H.indexOf("대표자");
+    var iCat2=H.indexOf("구분"), iDiv2=H.indexOf("참가구분"), iReg2=H.indexOf("시도별");
+    var iSeq2=H.indexOf("접수순번"), iTel2=-1;
+    H.forEach(function(hh,ii){ if(iTel2<0 && /연락처|휴대폰|전화번호|핸드폰/.test(hh)) iTel2=ii; });
+    // 수상자 맵: {상라벨 → [행들]}
+    var awMap={};
+    awList.forEach(function(a){ awMap[_awLabel(a)]=[]; });
+    filtered.forEach(function(r){
+      var aw=iAwd2>=0?String(r[iAwd2]||""):"";
+      if(!aw) return;
+      var gv=iGvr2>=0?String(r[iGvr2]||""):"";
+      var label=gv?(aw+" — "+gv):aw;
+      // 정확히 매칭 안 되면 상 이름만으로 찾기
+      if(!awMap[label]){
+        var found=awList.find(function(a){return a.n===aw;});
+        if(found) label=_awLabel(found);
+        else{ awMap[label]=[]; }
+      }
+      if(!awMap[label]) awMap[label]=[];
+      awMap[label].push(r);
+    });
+    var totalWinners=0;
+    Object.keys(awMap).forEach(function(k){ totalWinners+=awMap[k].length; });
+    h+='<div style="margin-top:12px">';
+    h+='<div style="background:#7c3aed;color:#fff;padding:10px 14px;border-radius:8px 8px 0 0;font-weight:700;font-size:15px">🏆 수상 현황 — 총 '+totalWinners+'명</div>';
+    if(!awList.length){
+      h+='<div class="mut" style="text-align:center;padding:28px;background:#f8fafc;border:1px solid #e5e7eb;border-radius:0 0 8px 8px">등록된 상이 없습니다. 🏆 상 관리에서 추가하세요.</div>';
+    } else {
+      awList.forEach(function(a){
+        var label=_awLabel(a);
+        var winners=awMap[label]||[];
+        h+='<div style="border:1px solid #e5e7eb;border-top:none">';
+        h+='<div style="background:#f5f3ff;padding:10px 14px;font-weight:700;color:#5b21b6;border-bottom:1px solid #e5e7eb;display:flex;justify-content:space-between;align-items:center">';
+        h+='<span>🏅 '+esc(label)+'</span>';
+        h+='<span style="background:#7c3aed;color:#fff;border-radius:12px;padding:2px 10px;font-size:12px">'+winners.length+'명</span>';
+        h+='</div>';
+        if(!winners.length){
+          h+='<div class="mut" style="padding:14px;text-align:center;color:#94a3b8;font-size:13px">수상자 없음</div>';
+        } else {
+          h+='<div class="scrollx" style="overflow:auto">';
+          h+='<table style="width:100%;border-collapse:collapse;font-size:13px">';
+          h+='<thead><tr style="background:#f8fafc">';
+          h+='<th style="padding:8px;text-align:center;border-bottom:2px solid #e5e7eb;width:40px">#</th>';
+          if(iSeq2>=0) h+='<th style="padding:8px;text-align:left;border-bottom:2px solid #e5e7eb">접수순번</th>';
+          if(iCat2>=0) h+='<th style="padding:8px;text-align:left;border-bottom:2px solid #e5e7eb">구분</th>';
+          if(iDiv2>=0) h+='<th style="padding:8px;text-align:left;border-bottom:2px solid #e5e7eb">참가구분</th>';
+          h+='<th style="padding:8px;text-align:left;border-bottom:2px solid #e5e7eb">이름</th>';
+          if(iTeam2>=0) h+='<th style="padding:8px;text-align:left;border-bottom:2px solid #e5e7eb">팀명</th>';
+          if(iReg2>=0) h+='<th style="padding:8px;text-align:left;border-bottom:2px solid #e5e7eb">시도별</th>';
+          if(iTel2>=0) h+='<th style="padding:8px;text-align:left;border-bottom:2px solid #e5e7eb">연락처</th>';
+          h+='<th style="padding:8px;text-align:center;border-bottom:2px solid #e5e7eb">상세</th>';
+          h+='</tr></thead><tbody>';
+          winners.forEach(function(r,wi){
+            var nm=iName2>=0?String(r[iName2]||""):"";
+            if(!nm && iRep2>=0) nm=String(r[iRep2]||"");
+            var sq=iSeq2>=0?String(r[iSeq2]||""):"";
+            var sqEsc=sq?esc(sq).replace(/\\/g,"\\\\").replace(/'/g,"\\'"):"";
+            h+='<tr style="border-bottom:1px solid #f1f5f9" onmouseover="this.style.background=\'#eff6ff\'" onmouseout="this.style.background=\'\'">';
+            h+='<td style="padding:8px;text-align:center;font-weight:700;color:#7c3aed">'+(wi+1)+'</td>';
+            if(iSeq2>=0) h+='<td style="padding:8px;color:#4338ca;font-weight:600">'+esc(sq)+'</td>';
+            if(iCat2>=0) h+='<td style="padding:8px">'+esc(String(r[iCat2]||""))+'</td>';
+            if(iDiv2>=0) h+='<td style="padding:8px">'+esc(String(r[iDiv2]||""))+'</td>';
+            h+='<td style="padding:8px;font-weight:700">'+esc(nm)+'</td>';
+            if(iTeam2>=0) h+='<td style="padding:8px">'+esc(String(r[iTeam2]||""))+'</td>';
+            if(iReg2>=0) h+='<td style="padding:8px">'+esc(String(r[iReg2]||""))+'</td>';
+            if(iTel2>=0) h+='<td style="padding:8px">'+telLink(String(r[iTel2]||""))+'</td>';
+            h+='<td style="padding:8px;text-align:center">';
+            if(sq) h+='<button class="btn btn-b btn-s" onclick="applyDetail(\''+sqEsc+'\')">상세</button>';
+            h+='</td></tr>';
+          });
+          h+='</tbody></table></div>';
+        }
+        h+='</div>';
+      });
+      h+='<div style="border:1px solid #e5e7eb;border-top:none;border-radius:0 0 8px 8px;padding:0"></div>';
+    }
+    h+='</div>';
     h+='</div>'; // card end
     return h;
   }
