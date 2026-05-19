@@ -1209,6 +1209,7 @@ function mkTabs(){
   var c1=[];
   if(isA() && HM("apply"))  c1.push({k:"apply",l:"참가자 관리"});
   if(isA() && HM("apply"))  c1.push({k:"apstat",l:"참가자 현황"});
+  if(isA() && HM("apply"))  c1.push({k:"awards",l:"상장현황"});
   if(isA() && HM("apply"))  c1.push({k:"apform",l:"신청폼"});
   if(c1.length) cats.push({id:"apply",label:"👥 참가자",items:c1});
 
@@ -1326,7 +1327,7 @@ function _isEvtAdmin(){
 // 특정 탭이 현재 행사의 modules 에서 허용되는지
 function _tabAllowedByEvt(tab){
   switch(tab){
-    case "apply": case "apstat": case "apform":   return _hasModule("apply");
+    case "apply": case "apstat": case "apform": case "awards":   return _hasModule("apply");
     case "pur":                    return _hasModule("purchase");
     case "inc": case "exp":        return _hasModule("budget");
     case "act":                    return _hasModule("act");
@@ -2985,6 +2986,113 @@ function awardSortUpdate(name,giver,val){
   });
 }
 
+// ===== 상장현황 (독립 메뉴) =====
+function dAwards(){
+  if(!isA()) return '<div class="card">관리자 전용 메뉴입니다.</div>';
+  if(!APPLY){
+    loadApply_();
+    return '<div class="card"><div class="mut">불러오는 중...</div></div>';
+  }
+  if(APPLY.err) return '<div class="card" style="color:#dc2626">'+esc(APPLY.err)+'</div>';
+  var H=APPLY.headers||[], R=APPLY.rows||[];
+
+  if(!window._awCols) window._awCols={seq:false,cat:true,div:true,name:true,team:false,group:true,region:true,tel:false};
+  var AC2=window._awCols;
+  var awList=_awardsNorm();
+  var iAwd2=H.indexOf("수상"), iGvr2=H.indexOf("수여자");
+  var iName2=H.indexOf("성명"); if(iName2<0) iName2=H.indexOf("이름");
+  var iTeam2=H.indexOf("팀명"), iRep2=H.indexOf("대표자");
+  var iCat2=H.indexOf("구분"), iDiv2=H.indexOf("참가구분"), iReg2=H.indexOf("시도별");
+  var iSeq2=H.indexOf("접수순번"), iGrp2=H.indexOf("소속"), iTel2=-1;
+  H.forEach(function(hh,ii){ if(iTel2<0 && /연락처|휴대폰|전화번호|핸드폰/.test(hh)) iTel2=ii; });
+
+  // 수상자 맵
+  var awMap={};
+  awList.forEach(function(a){ awMap[_awLabel(a)]=[]; });
+  R.forEach(function(r){
+    var aw=iAwd2>=0?String(r[iAwd2]||""):"";
+    if(!aw) return;
+    var gv=iGvr2>=0?String(r[iGvr2]||""):"";
+    var label=gv?(aw+" — "+gv):aw;
+    if(!awMap[label]){
+      var found=awList.find(function(a){return a.n===aw;});
+      if(found) label=_awLabel(found);
+      else{ awMap[label]=[]; }
+    }
+    if(!awMap[label]) awMap[label]=[];
+    awMap[label].push(r);
+  });
+  var totalWinners=0;
+  Object.keys(awMap).forEach(function(k){ totalWinners+=awMap[k].length; });
+
+  var h='<div class="card">';
+  h+='<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px">';
+  h+='<strong style="font-size:16px">🏆 상장현황</strong>';
+  h+='<span class="mut">(총 '+totalWinners+'명 수상)</span>';
+  h+='<span style="flex:1"></span>';
+  h+='<button class="btn" style="background:#ea580c;color:#fff;font-weight:700" onclick="awardsManage()">🏆 상 관리</button>';
+  h+='<button class="btn" style="background:#0ea5e9;color:#fff;font-weight:700" onclick="APPLY=null;draw()" title="참가자 데이터 새로고침">🔄 새로고침</button>';
+  h+='</div>';
+
+  // 표시항목 체크박스
+  h+='<div style="display:flex;gap:8px;flex-wrap:wrap;font-size:12px;margin-bottom:10px;padding:8px 12px;background:#f8fafc;border-radius:6px;border:1px solid #e5e7eb">';
+  h+='<span style="font-weight:700;color:#475569;font-size:13px">표시항목:</span>';
+  var _awChk=function(k,lb){ return '<label style="cursor:pointer;display:flex;align-items:center;gap:3px"><input type="checkbox"'+(AC2[k]?' checked':'')+' onchange="window._awCols.'+k+'=this.checked;draw()"> '+lb+'</label>'; };
+  h+=_awChk("seq","접수순번")+_awChk("cat","구분")+_awChk("div","참가구분")+_awChk("name","이름")+_awChk("team","팀명")+_awChk("group","소속")+_awChk("region","시도별")+_awChk("tel","연락처");
+  h+='</div>';
+
+  if(!awList.length){
+    h+='<div class="mut" style="text-align:center;padding:28px;background:#f8fafc;border:1px solid #e5e7eb;border-radius:8px">등록된 상이 없습니다. 🏆 상 관리에서 추가하세요.</div>';
+  } else {
+    awList.forEach(function(a){
+      var label=_awLabel(a);
+      var winners=awMap[label]||[];
+      h+='<div style="border:1px solid #e5e7eb;border-radius:8px;margin-bottom:10px;overflow:hidden">';
+      h+='<div style="background:#f5f3ff;padding:10px 14px;font-weight:700;color:#5b21b6;border-bottom:1px solid #e5e7eb;display:flex;justify-content:space-between;align-items:center">';
+      h+='<span>🏅 '+esc(label)+'</span>';
+      h+='<span style="background:#7c3aed;color:#fff;border-radius:12px;padding:2px 10px;font-size:12px">'+winners.length+'명</span>';
+      h+='</div>';
+      if(!winners.length){
+        h+='<div class="mut" style="padding:14px;text-align:center;color:#94a3b8;font-size:13px">수상자 없음</div>';
+      } else {
+        h+='<div class="scrollx" style="overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:13px">';
+        h+='<thead><tr style="background:#f8fafc">';
+        h+='<th style="padding:6px 8px;border-bottom:2px solid #e5e7eb;text-align:center;width:36px">#</th>';
+        if(AC2.seq && iSeq2>=0) h+='<th style="padding:6px 8px;border-bottom:2px solid #e5e7eb;text-align:left">접수순번</th>';
+        if(AC2.cat && iCat2>=0) h+='<th style="padding:6px 8px;border-bottom:2px solid #e5e7eb;text-align:left">구분</th>';
+        if(AC2.div && iDiv2>=0) h+='<th style="padding:6px 8px;border-bottom:2px solid #e5e7eb;text-align:left">참가구분</th>';
+        if(AC2.name) h+='<th style="padding:6px 8px;border-bottom:2px solid #e5e7eb;text-align:left">이름</th>';
+        if(AC2.team && iTeam2>=0) h+='<th style="padding:6px 8px;border-bottom:2px solid #e5e7eb;text-align:left">팀명</th>';
+        if(AC2.group && iGrp2>=0) h+='<th style="padding:6px 8px;border-bottom:2px solid #e5e7eb;text-align:left">소속</th>';
+        if(AC2.region && iReg2>=0) h+='<th style="padding:6px 8px;border-bottom:2px solid #e5e7eb;text-align:left">시도별</th>';
+        if(AC2.tel && iTel2>=0) h+='<th style="padding:6px 8px;border-bottom:2px solid #e5e7eb;text-align:left">연락처</th>';
+        h+='</tr></thead><tbody>';
+        winners.forEach(function(r,wi){
+          var nm=iName2>=0?String(r[iName2]||""):"";
+          if(!nm && iRep2>=0) nm=String(r[iRep2]||"");
+          var sq=iSeq2>=0?String(r[iSeq2]||""):"";
+          var sqEsc=sq?esc(sq).replace(/\\/g,"\\\\").replace(/'/g,"\\'"):"";
+          h+='<tr style="border-bottom:1px solid #f1f5f9;cursor:'+(sq?'pointer':'default')+'" onmouseover="this.style.background=\'#eff6ff\'" onmouseout="this.style.background=\'\'"'+(sq?' ondblclick="CTAB=\'apply\';APPLY_Q=\''+sqEsc+'\';mkTabs();draw()" title="더블클릭→참가자 관리"':'')+'>';
+          h+='<td style="padding:6px 8px;text-align:center;font-weight:700;color:#7c3aed">'+(wi+1)+'</td>';
+          if(AC2.seq && iSeq2>=0) h+='<td style="padding:6px 8px;color:#4338ca;font-weight:600">'+esc(sq)+'</td>';
+          if(AC2.cat && iCat2>=0) h+='<td style="padding:6px 8px">'+esc(String(r[iCat2]||""))+'</td>';
+          if(AC2.div && iDiv2>=0) h+='<td style="padding:6px 8px">'+esc(String(r[iDiv2]||""))+'</td>';
+          if(AC2.name) h+='<td style="padding:6px 8px;font-weight:700">'+esc(nm)+'</td>';
+          if(AC2.team && iTeam2>=0) h+='<td style="padding:6px 8px">'+esc(String(r[iTeam2]||""))+'</td>';
+          if(AC2.group && iGrp2>=0) h+='<td style="padding:6px 8px">'+esc(String(r[iGrp2]||""))+'</td>';
+          if(AC2.region && iReg2>=0) h+='<td style="padding:6px 8px">'+esc(String(r[iReg2]||""))+'</td>';
+          if(AC2.tel && iTel2>=0) h+='<td style="padding:6px 8px">'+telLink(String(r[iTel2]||""))+'</td>';
+          h+='</tr>';
+        });
+        h+='</tbody></table></div>';
+      }
+      h+='</div>';
+    });
+  }
+  h+='</div>'; // card end
+  return h;
+}
+
 function loadApply_(silent){
   var evtId = (CUR_EVT && CUR_EVT.evtId) || "";
   var p1 = api("listApply",{id:CID, evtId:evtId, _t:Date.now()});
@@ -4607,6 +4715,7 @@ function st(af,df){
 function draw(){
   var el=document.getElementById("mc");
   if(CTAB=="apply")el.innerHTML=dApply();
+  else if(CTAB=="awards")el.innerHTML=dAwards();
   else if(CTAB=="apstat")el.innerHTML=dApstat();
   else if(CTAB=="apform"){el.innerHTML=dApform();var _rrn=document.getElementById("apf_rrn");if(_rrn)_rrn.addEventListener("input",function(){var v=_rrn.value.replace(/[^\d]/g,"").slice(0,13);if(v.length>6)v=v.slice(0,6)+"-"+v.slice(6);_rrn.value=v;});var _tel=document.getElementById("apf_phone");if(_tel)_tel.addEventListener("input",function(){var v=_tel.value.replace(/[^\d]/g,"").slice(0,11);if(v.length<4)_tel.value=v;else if(v.length<8)_tel.value=v.slice(0,3)+"-"+v.slice(3);else if(v.length<=10)_tel.value=v.slice(0,3)+"-"+v.slice(3,6)+"-"+v.slice(6);else _tel.value=v.slice(0,3)+"-"+v.slice(3,7)+"-"+v.slice(7);});}
   else if(CTAB=="dash")el.innerHTML=dDash();
