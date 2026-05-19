@@ -3325,14 +3325,14 @@ function awardsMergeExport(){
       var cat=iCat>=0?String(r[iCat]||""):"";
       var div=iDiv>=0?String(r[iDiv]||""):"";
       var grp=iGrp>=0?String(r[iGrp]||""):"";
-      rows.push({cat:cat, div:div, award:label, nm:nm, grp:grp});
+      rows.push({cat:cat, div:div, award:a.n, giver:gv, nm:nm, grp:grp});
     });
   });
   if(!rows.length){ toast("수상자가 없습니다",true); return; }
   var aoa=[];
-  aoa.push(["순번","상장번호","부문","부문별","상구분","이름","학교"]);
+  aoa.push(["순번","상장번호","부문","부문별","상구분","수여자","이름","학교"]);
   rows.forEach(function(r,i){
-    aoa.push([i+1, "", r.cat, r.div, r.award, r.nm, r.grp]);
+    aoa.push([i+1, "", r.cat, r.div, r.award, r.giver, r.nm, r.grp]);
   });
   var ws=XLSX.utils.aoa_to_sheet(aoa);
   var wb=XLSX.utils.book_new();
