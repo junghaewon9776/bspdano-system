@@ -17222,7 +17222,7 @@ async function popGroups(){
   var r=await api("listGroups",{});
   hideLoading();
   if(!r||!r.ok){toast("조회 실패: "+(r&&r.err||""),true);return}
-  memGroups=r.memGroups||r.groups||[];
+  memGroups=r.rows||r.memGroups||r.groups||[];
   _renderGroupsModal();
 }
 function _renderGroupsModal(){
