@@ -17261,7 +17261,10 @@ function _renderGroupsModal(){
     });
     h+='</tbody></table></div>';
   }
-  h+='<div style="margin-top:14px;text-align:right"><button class="btn" style="background:#94a3b8;color:#fff" onclick="closePopup()">닫기</button></div>';
+  h+='<div style="margin-top:14px;display:flex;justify-content:space-between">';
+  if(gs.length) h+='<button class="btn" style="background:#7c3aed;color:#fff;font-weight:700" onclick="saveAllGroupsX()">💾 일괄 저장</button>';
+  else h+='<span></span>';
+  h+='<button class="btn" style="background:#94a3b8;color:#fff" onclick="closePopup();draw()">닫기</button></div>';
   openPopup(h,720);
 }
 async function addGroupX(){
@@ -17303,6 +17306,26 @@ async function delGroupX(id,cnt){
   hideLoading();
   if(!r.ok){alert("❌ "+(r.err||"삭제 실패"));return}
   toast("🗑 삭제 완료");
+  await popGroups();
+}
+async function saveAllGroupsX(){
+  var rows=document.querySelectorAll('tr[data-gid]');
+  if(!rows.length) return;
+  showLoading("일괄 저장 중...");
+  var fail=0;
+  for(var i=0;i<rows.length;i++){
+    var row=rows[i];
+    var id=row.getAttribute('data-gid');
+    var n=row.querySelector('input[data-f="n"]').value.trim();
+    var sort=Number(row.querySelector('input[data-f="sort"]').value)||0;
+    if(!n) continue;
+    var r=await api("updateGroup",{id:id,n:n,sort:sort});
+    if(!r||!r.ok) fail++;
+  }
+  hideLoading();
+  if(fail) toast("⚠ "+fail+"건 저장 실패",true);
+  else toast("✅ 일괄 저장 완료");
+  await refreshData(false);
   await popGroups();
 }
 async function checkSmsCfg(){
