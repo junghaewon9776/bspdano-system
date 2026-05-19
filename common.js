@@ -243,11 +243,11 @@ function _dispatch(p) {
         case "bulkReplaceMems": _apiBulkReplaceMems(p).then(resolve); return;
         case "bulkReplaceAccounts": _apiBulkReplaceAccounts(p).then(resolve); return;
 
-        // 소속/그룹
-        case "listGroups":   _apiListEvtNode(p, "Groups").then(resolve); return;
-        case "addGroup":     _apiAddRow(p, "Groups").then(resolve); return;
-        case "updateGroup":  _apiUpdateRow(p, "Groups").then(resolve); return;
-        case "deleteGroup":  _apiDeleteRow(p, "Groups").then(resolve); return;
+        // 소속/그룹 (shareMems면 메인 행사에서 읽고/쓰기)
+        case "listGroups":   _apiListGroups(p).then(resolve); return;
+        case "addGroup":     _apiGroupWrite(p, "add").then(resolve); return;
+        case "updateGroup":  _apiGroupWrite(p, "update").then(resolve); return;
+        case "deleteGroup":  _apiGroupWrite(p, "delete").then(resolve); return;
 
         // 거래처
         case "listVendors":  _apiListMainNode(p, "Vendors").then(resolve); return;
@@ -655,6 +655,33 @@ function _apiUpdateMem(p) {
       });
     });
   });
+}
+
+// ───────── 소속/그룹 — shareMems면 메인 행사에서 읽고/쓰기 ─────────
+function _getGroupEvtId(p) {
+  var evtId = _getEvtId(p);
+  if (!evtId) return null;
+  var evts = _cache.Events || [];
+  var curEvt = null;
+  for (var i = 0; i < evts.length; i++) { if (evts[i].evtId === evtId) { curEvt = evts[i]; break; } }
+  var mainEvtId = evts.length ? evts[0].evtId : null;
+  if (curEvt && curEvt.shareMems && mainEvtId && mainEvtId !== evtId) return mainEvtId;
+  return evtId;
+}
+function _apiListGroups(p) {
+  var evtId = _getGroupEvtId(p);
+  if (!evtId) return Promise.resolve({ok:true, rows:[]});
+  return loadEvtData(evtId).then(function(data) {
+    return {ok:true, rows: data.Groups || []};
+  });
+}
+function _apiGroupWrite(p, mode) {
+  var evtId = _getGroupEvtId(p);
+  if (!evtId) return Promise.resolve({ok:false, err:"행사 미선택"});
+  if (mode === "add") return _apiAddRow(Object.assign({}, p, {evtId:evtId}), "Groups");
+  if (mode === "update") return _apiUpdateRow(Object.assign({}, p, {evtId:evtId}), "Groups");
+  if (mode === "delete") return _apiDeleteRow(Object.assign({}, p, {evtId:evtId}), "Groups");
+  return Promise.resolve({ok:false, err:"잘못된 모드"});
 }
 
 function _apiListEvtNode(p, nodeName) {
