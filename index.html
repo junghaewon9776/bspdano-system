@@ -3092,6 +3092,7 @@ function dAwards(){
   h+='<span style="flex:1"></span>';
   h+='<button class="btn" style="background:#ea580c;color:#fff;font-weight:700" onclick="awardsManage()">🏆 상 관리</button>';
   h+='<button class="btn btn-b" onclick="awardsTableExport()">⬇ 엑셀</button>';
+  h+='<button class="btn" style="background:#2563eb;color:#fff;font-weight:700" onclick="awardsMergeExport()">📄 메일머지</button>';
   h+='<button class="btn" style="background:#0ea5e9;color:#fff;font-weight:700" onclick="APPLY=null;draw()">🔄 새로고침</button>';
   h+='</div>';
 
@@ -3298,6 +3299,47 @@ function awardsTableExport(){
   var fname="상장현황_"+(CUR_EVT&&CUR_EVT.nm?CUR_EVT.nm:"")+"_"+today().replace(/-/g,"")+".xlsx";
   XLSX.writeFile(wb,fname);
   toast("엑셀 내보내기 완료");
+}
+
+// 메일머지용 엑셀 내보내기 (HWP 상장 메일머지)
+function awardsMergeExport(){
+  if(typeof XLSX==="undefined"){ toast("XLSX 로딩 중",true); return; }
+  if(!APPLY||!APPLY.headers) return;
+  var H=APPLY.headers, R=APPLY.rows||[];
+  var awList=_awardsNorm();
+  var iAwd=H.indexOf("수상"), iGvr=H.indexOf("수여자");
+  var iName=H.indexOf("성명"); if(iName<0) iName=H.indexOf("이름");
+  var iRep=H.indexOf("대표자");
+  var iCat=H.indexOf("구분"), iDiv=H.indexOf("참가구분");
+  var iGrp=H.indexOf("소속");
+  // 수상자만 수집 (상 순서대로 정렬)
+  var rows=[];
+  awList.forEach(function(a){
+    var label=_awLabel(a);
+    R.forEach(function(r){
+      var aw=iAwd>=0?String(r[iAwd]||""):"";
+      if(aw!==a.n) return;
+      var gv=iGvr>=0?String(r[iGvr]||""):"";
+      var nm=iName>=0?String(r[iName]||""):"";
+      if(!nm && iRep>=0) nm=String(r[iRep]||"");
+      var cat=iCat>=0?String(r[iCat]||""):"";
+      var div=iDiv>=0?String(r[iDiv]||""):"";
+      var grp=iGrp>=0?String(r[iGrp]||""):"";
+      rows.push({cat:cat, div:div, award:label, nm:nm, grp:grp});
+    });
+  });
+  if(!rows.length){ toast("수상자가 없습니다",true); return; }
+  var aoa=[];
+  aoa.push(["순번","상장번호","부문","부문별","상구분","이름","학교"]);
+  rows.forEach(function(r,i){
+    aoa.push([i+1, "", r.cat, r.div, r.award, r.nm, r.grp]);
+  });
+  var ws=XLSX.utils.aoa_to_sheet(aoa);
+  var wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,"메일머지");
+  var fname="상장_메일머지_"+(CUR_EVT&&CUR_EVT.nm?CUR_EVT.nm:"")+"_"+today().replace(/-/g,"")+".xlsx";
+  XLSX.writeFile(wb,fname);
+  toast("메일머지 엑셀 내보내기 완료");
 }
 
 // 수상자 배정 팝업 — 해당 구분의 미수상 참가자 목록에서 선택
