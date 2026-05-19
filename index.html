@@ -3006,7 +3006,7 @@ function dAwards(){
   var iSeq2=H.indexOf("접수순번"), iGrp2=H.indexOf("소속"), iTel2=-1;
   H.forEach(function(hh,ii){ if(iTel2<0 && /연락처|휴대폰|전화번호|핸드폰/.test(hh)) iTel2=ii; });
 
-  // 구분별 목록 수집 (열 헤더)
+  // 구분별 목록
   var divList=[];
   var divSeen={};
   if(iDiv2>=0){
@@ -3018,10 +3018,8 @@ function dAwards(){
   if(!divList.length) divList=["전체"];
 
   // 수상자를 상×구분별로 분류
-  var awDivMap={}; // key: "상라벨||구분" → [rows]
-  awList.forEach(function(a){
-    divList.forEach(function(d){ awDivMap[_awLabel(a)+"||"+d]=[]; });
-  });
+  var awDivMap={};
+  awList.forEach(function(a){ divList.forEach(function(d){ awDivMap[_awLabel(a)+"||"+d]=[]; }); });
   R.forEach(function(r){
     var aw=iAwd2>=0?String(r[iAwd2]||""):"";
     if(!aw) return;
@@ -3036,21 +3034,47 @@ function dAwards(){
     if(!awDivMap[key]) awDivMap[key]=[];
     awDivMap[key].push(r);
   });
+
+  // 구분별 최대 인원수 계산 (열 수 결정)
+  var divMax={};
+  divList.forEach(function(d){ divMax[d]=1; }); // 최소 1칸
+  awList.forEach(function(a){
+    divList.forEach(function(d){
+      var cnt=(awDivMap[_awLabel(a)+"||"+d]||[]).length;
+      if(cnt+1>divMax[d]) divMax[d]=cnt+1; // +1은 추가 버튼 칸
+    });
+  });
+  var totalCols=0;
+  divList.forEach(function(d){ totalCols+=divMax[d]; });
+
   var totalWinners=0;
   Object.keys(awDivMap).forEach(function(k){ totalWinners+=awDivMap[k].length; });
 
-  // 셀 내용 — 선택된 항목을 줄바꿈으로 쌓음
+  // 셀 내용
   function _cellHtml(r){
     var lines=[];
     if(AC2.seq && iSeq2>=0){ var v=String(r[iSeq2]||""); if(v) lines.push('<span style="color:#4338ca;font-size:11px">'+esc(v)+'</span>'); }
     if(AC2.cat && iCat2>=0){ var v=String(r[iCat2]||""); if(v) lines.push('<span style="color:#6b7280;font-size:11px">'+esc(v)+'</span>'); }
     if(AC2.div && iDiv2>=0){ var v=String(r[iDiv2]||""); if(v) lines.push('<span style="color:#6b7280;font-size:11px">'+esc(v)+'</span>'); }
-    if(AC2.name){ var nm=iName2>=0?String(r[iName2]||""):""; if(!nm&&iRep2>=0) nm=String(r[iRep2]||""); if(nm) lines.push('<b style="font-size:14px">'+esc(nm)+'</b>'); }
+    if(AC2.name){ var nm=iName2>=0?String(r[iName2]||""):""; if(!nm&&iRep2>=0) nm=String(r[iRep2]||""); if(nm) lines.push('<b style="font-size:13px">'+esc(nm)+'</b>'); }
     if(AC2.team && iTeam2>=0){ var v=String(r[iTeam2]||""); if(v) lines.push('<span style="color:#475569;font-size:12px">'+esc(v)+'</span>'); }
     if(AC2.group && iGrp2>=0){ var v=String(r[iGrp2]||""); if(v) lines.push('<span style="color:#0369a1;font-size:12px">'+esc(v)+'</span>'); }
     if(AC2.region && iReg2>=0){ var v=String(r[iReg2]||""); if(v) lines.push('<span style="color:#6b7280;font-size:11px">'+esc(v)+'</span>'); }
     if(AC2.tel && iTel2>=0){ var v=String(r[iTel2]||""); if(v) lines.push('<span style="font-size:12px">'+telLink(v)+'</span>'); }
     return lines.join('<br>');
+  }
+  // 셀 텍스트(엑셀용)
+  function _cellText(r){
+    var lines=[];
+    if(AC2.seq && iSeq2>=0){ var v=String(r[iSeq2]||""); if(v) lines.push(v); }
+    if(AC2.cat && iCat2>=0){ var v=String(r[iCat2]||""); if(v) lines.push(v); }
+    if(AC2.div && iDiv2>=0){ var v=String(r[iDiv2]||""); if(v) lines.push(v); }
+    if(AC2.name){ var nm=iName2>=0?String(r[iName2]||""):""; if(!nm&&iRep2>=0) nm=String(r[iRep2]||""); if(nm) lines.push(nm); }
+    if(AC2.team && iTeam2>=0){ var v=String(r[iTeam2]||""); if(v) lines.push(v); }
+    if(AC2.group && iGrp2>=0){ var v=String(r[iGrp2]||""); if(v) lines.push(v); }
+    if(AC2.region && iReg2>=0){ var v=String(r[iReg2]||""); if(v) lines.push(v); }
+    if(AC2.tel && iTel2>=0){ var v=String(r[iTel2]||""); if(v) lines.push(v); }
+    return lines.join("\n");
   }
 
   var h='<div class="card">';
@@ -3059,57 +3083,70 @@ function dAwards(){
   h+='<span class="mut">(총 '+totalWinners+'명 수상)</span>';
   h+='<span style="flex:1"></span>';
   h+='<button class="btn" style="background:#ea580c;color:#fff;font-weight:700" onclick="awardsManage()">🏆 상 관리</button>';
-  h+='<button class="btn" style="background:#0ea5e9;color:#fff;font-weight:700" onclick="APPLY=null;draw()" title="참가자 데이터 새로고침">🔄 새로고침</button>';
+  h+='<button class="btn btn-b" onclick="awardsTableExport()">⬇ 엑셀</button>';
+  h+='<button class="btn" style="background:#0ea5e9;color:#fff;font-weight:700" onclick="APPLY=null;draw()">🔄 새로고침</button>';
   h+='</div>';
 
-  // 표시항목 체크박스
+  // 셀 표시 체크박스
   h+='<div style="display:flex;gap:8px;flex-wrap:wrap;font-size:12px;margin-bottom:10px;padding:8px 12px;background:#f8fafc;border-radius:6px;border:1px solid #e5e7eb">';
   h+='<span style="font-weight:700;color:#475569;font-size:13px">셀 표시:</span>';
   var _awChk=function(k,lb){ return '<label style="cursor:pointer;display:flex;align-items:center;gap:3px"><input type="checkbox"'+(AC2[k]?' checked':'')+' onchange="window._awCols.'+k+'=this.checked;draw()"> '+lb+'</label>'; };
   h+=_awChk("seq","접수순번")+_awChk("cat","구분")+_awChk("div","참가구분")+_awChk("name","이름")+_awChk("team","팀명")+_awChk("group","소속")+_awChk("region","시도별")+_awChk("tel","연락처");
   h+='</div>';
 
-  // 표: 행=상(순서), 열=구분별, 항상 전체 그리드 표시
+  // 표: 행=상, 열=구분별×인원수 (한사람=한셀)
   h+='<div class="scrollx" style="overflow:auto">';
-  h+='<table style="width:100%;border-collapse:collapse;font-size:13px;border:1px solid #e5e7eb">';
+  h+='<table id="_awTable" style="border-collapse:collapse;font-size:13px;border:1px solid #e5e7eb">';
+  // 헤더 1행: 구분명 (colspan=해당구분 최대인원수)
   h+='<thead><tr>';
-  h+='<th style="padding:10px 14px;border:1px solid #e5e7eb;text-align:left;white-space:nowrap;min-width:120px;background:#7c3aed;color:#fff;font-size:14px;position:sticky;left:0;z-index:2">상</th>';
+  h+='<th rowspan="2" style="padding:10px 14px;border:1px solid #e5e7eb;text-align:left;white-space:nowrap;min-width:120px;background:#7c3aed;color:#fff;font-size:14px;position:sticky;left:0;z-index:3">상</th>';
   divList.forEach(function(d){
-    h+='<th style="padding:10px 14px;border:1px solid #e5e7eb;text-align:center;background:#f5f3ff;color:#5b21b6;font-weight:700;font-size:14px;min-width:160px">'+esc(d)+'</th>';
+    h+='<th colspan="'+divMax[d]+'" style="padding:8px 10px;border:1px solid #e5e7eb;text-align:center;background:#f5f3ff;color:#5b21b6;font-weight:700;font-size:14px">'+esc(d)+'</th>';
+  });
+  h+='</tr>';
+  // 헤더 2행: 번호 1,2,3...
+  h+='<tr>';
+  divList.forEach(function(d){
+    for(var ci=0;ci<divMax[d];ci++){
+      h+='<th style="padding:4px 8px;border:1px solid #e5e7eb;text-align:center;background:#ede9fe;color:#7c3aed;font-size:11px;min-width:120px;font-weight:400">'+(ci+1)+'</th>';
+    }
   });
   h+='</tr></thead><tbody>';
   if(!awList.length){
-    h+='<tr><td colspan="'+(divList.length+1)+'" style="padding:28px;text-align:center;border:1px solid #e5e7eb;color:#94a3b8">등록된 상이 없습니다. 🏆 상 관리에서 추가하세요.</td></tr>';
+    h+='<tr><td colspan="'+(totalCols+1)+'" style="padding:28px;text-align:center;border:1px solid #e5e7eb;color:#94a3b8">등록된 상이 없습니다. 🏆 상 관리에서 추가하세요.</td></tr>';
   } else {
     awList.forEach(function(a,ai){
       var label=_awLabel(a);
       var bg=ai%2?'#faf5ff':'#fff';
       h+='<tr>';
-      h+='<td style="padding:10px 14px;border:1px solid #e5e7eb;background:#f5f3ff;font-weight:700;color:#5b21b6;white-space:nowrap;vertical-align:top;position:sticky;left:0;z-index:1">';
+      h+='<td style="padding:8px 12px;border:1px solid #e5e7eb;background:#f5f3ff;font-weight:700;color:#5b21b6;white-space:nowrap;vertical-align:top;position:sticky;left:0;z-index:1">';
       h+='🏅 '+esc(label)+'</td>';
       divList.forEach(function(d){
         var winners=awDivMap[label+"||"+d]||[];
         var nEsc=esc(a.n).replace(/\\/g,"\\\\").replace(/'/g,"\\'");
         var gEsc=esc(a.giver||"").replace(/\\/g,"\\\\").replace(/'/g,"\\'");
         var dEsc=esc(d).replace(/\\/g,"\\\\").replace(/'/g,"\\'");
-        h+='<td style="padding:8px 10px;border:1px solid #e5e7eb;vertical-align:top;background:'+bg+';line-height:1.6;min-height:40px">';
-        // 수상자 목록
-        winners.forEach(function(r,wi){
-          if(wi>0) h+='<div style="border-top:1px dashed #ddd6fe;margin:5px 0"></div>';
+        // 수상자 각각 한 셀
+        winners.forEach(function(r){
           var sq=iSeq2>=0?String(r[iSeq2]||""):"";
           var sqEsc=sq?esc(sq).replace(/\\/g,"\\\\").replace(/'/g,"\\'"):"";
-          h+='<div style="display:flex;align-items:flex-start;gap:4px">';
+          h+='<td style="padding:6px 8px;border:1px solid #e5e7eb;vertical-align:top;background:'+bg+';line-height:1.5;min-width:120px">';
+          h+='<div style="display:flex;align-items:flex-start;gap:3px">';
           h+='<div style="flex:1;cursor:'+(sq?'pointer':'default')+'" onmouseover="this.style.background=\'#eff6ff\'" onmouseout="this.style.background=\'\'"'+(sq?' ondblclick="CTAB=\'apply\';APPLY_Q=\''+sqEsc+'\';mkTabs();draw()" title="더블클릭→참가자 관리"':'')+'>';
           h+=_cellHtml(r);
           h+='</div>';
-          if(sq) h+='<button onclick="awardUnassign(\''+sqEsc+'\')" title="수상 취소" style="border:none;background:none;color:#dc2626;cursor:pointer;font-size:14px;padding:0 2px;flex-shrink:0">✕</button>';
-          h+='</div>';
+          if(sq) h+='<button onclick="awardUnassign(\''+sqEsc+'\')" title="수상 취소" style="border:none;background:none;color:#dc2626;cursor:pointer;font-size:12px;padding:0;flex-shrink:0">✕</button>';
+          h+='</div></td>';
         });
-        // + 추가 버튼
-        h+='<div style="margin-top:'+(winners.length?'6':'0')+'px">';
-        h+='<button onclick="awardAssignPopup(\''+nEsc+'\',\''+gEsc+'\',\''+dEsc+'\')" style="border:1px dashed #c4b5fd;background:#faf5ff;color:#7c3aed;cursor:pointer;border-radius:4px;padding:3px 10px;font-size:12px;width:100%" title="수상자 추가">+ 추가</button>';
-        h+='</div>';
-        h+='</td>';
+        // 나머지 빈 셀 (추가 버튼 포함 첫 빈칸만)
+        var remain=divMax[d]-winners.length;
+        for(var ei=0;ei<remain;ei++){
+          h+='<td style="padding:6px 8px;border:1px solid #e5e7eb;vertical-align:top;background:'+bg+';min-width:120px">';
+          if(ei===0){
+            h+='<button onclick="awardAssignPopup(\''+nEsc+'\',\''+gEsc+'\',\''+dEsc+'\')" style="border:1px dashed #c4b5fd;background:#faf5ff;color:#7c3aed;cursor:pointer;border-radius:4px;padding:3px 8px;font-size:11px;width:100%" title="수상자 추가">+</button>';
+          }
+          h+='</td>';
+        }
       });
       h+='</tr>';
     });
@@ -3117,6 +3154,88 @@ function dAwards(){
   h+='</tbody></table></div>';
   h+='</div>'; // card end
   return h;
+}
+// 상장현황 엑셀 내보내기
+function awardsTableExport(){
+  if(typeof XLSX==="undefined"){ toast("XLSX 로딩 중",true); return; }
+  if(!APPLY||!APPLY.headers) return;
+  var H=APPLY.headers, R=APPLY.rows||[];
+  var AC2=window._awCols||{name:true,group:true,tel:true};
+  var awList=_awardsNorm();
+  var iAwd2=H.indexOf("수상"), iGvr2=H.indexOf("수여자");
+  var iName2=H.indexOf("성명"); if(iName2<0) iName2=H.indexOf("이름");
+  var iTeam2=H.indexOf("팀명"), iRep2=H.indexOf("대표자");
+  var iCat2=H.indexOf("구분"), iDiv2=H.indexOf("참가구분"), iReg2=H.indexOf("시도별");
+  var iSeq2=H.indexOf("접수순번"), iGrp2=H.indexOf("소속"), iTel2=-1;
+  H.forEach(function(hh,ii){ if(iTel2<0 && /연락처|휴대폰|전화번호|핸드폰/.test(hh)) iTel2=ii; });
+  var divList=[]; var divSeen={};
+  if(iDiv2>=0) R.forEach(function(r){ var v=String(r[iDiv2]||"").trim(); if(v&&!divSeen[v]){divSeen[v]=true;divList.push(v);} });
+  if(!divList.length) divList=["전체"];
+  var awDivMap={};
+  awList.forEach(function(a){ divList.forEach(function(d){ awDivMap[_awLabel(a)+"||"+d]=[]; }); });
+  R.forEach(function(r){
+    var aw=iAwd2>=0?String(r[iAwd2]||""):""; if(!aw) return;
+    var gv=iGvr2>=0?String(r[iGvr2]||""):"";
+    var label=gv?(aw+" — "+gv):aw;
+    if(!awDivMap[label+"||"+divList[0]]){ var found=awList.find(function(a){return a.n===aw;}); if(found) label=_awLabel(found); }
+    var dv=(iDiv2>=0?String(r[iDiv2]||"").trim():"")||"전체";
+    if(!awDivMap[label+"||"+dv]) awDivMap[label+"||"+dv]=[];
+    awDivMap[label+"||"+dv].push(r);
+  });
+  var divMax={}; divList.forEach(function(d){divMax[d]=1;});
+  awList.forEach(function(a){ divList.forEach(function(d){ var c=(awDivMap[_awLabel(a)+"||"+d]||[]).length; if(c>divMax[d])divMax[d]=c; }); });
+  function _ct(r){
+    var l=[];
+    if(AC2.name){var nm=iName2>=0?String(r[iName2]||""):"";if(!nm&&iRep2>=0)nm=String(r[iRep2]||"");if(nm)l.push(nm);}
+    if(AC2.group&&iGrp2>=0){var v=String(r[iGrp2]||"");if(v)l.push(v);}
+    if(AC2.tel&&iTel2>=0){var v=String(r[iTel2]||"");if(v)l.push(v);}
+    if(AC2.team&&iTeam2>=0){var v=String(r[iTeam2]||"");if(v)l.push(v);}
+    if(AC2.seq&&iSeq2>=0){var v=String(r[iSeq2]||"");if(v)l.push(v);}
+    if(AC2.region&&iReg2>=0){var v=String(r[iReg2]||"");if(v)l.push(v);}
+    return l.join("\n");
+  }
+  var aoa=[]; // array of arrays
+  // 헤더1: 상 + 구분명(colspan)
+  var h1=["상"]; divList.forEach(function(d){ for(var i=0;i<divMax[d];i++) h1.push(i===0?d:""); }); aoa.push(h1);
+  // 헤더2: 공백 + 번호
+  var h2=[""]; divList.forEach(function(d){ for(var i=0;i<divMax[d];i++) h2.push(String(i+1)); }); aoa.push(h2);
+  // 데이터
+  awList.forEach(function(a){
+    var label=_awLabel(a);
+    var row=[label];
+    divList.forEach(function(d){
+      var winners=awDivMap[label+"||"+d]||[];
+      for(var i=0;i<divMax[d];i++){
+        row.push(i<winners.length?_ct(winners[i]):"");
+      }
+    });
+    aoa.push(row);
+  });
+  var ws=XLSX.utils.aoa_to_sheet(aoa);
+  // 셀 줄바꿈 설정
+  var range=XLSX.utils.decode_range(ws['!ref']||"A1");
+  for(var rr=range.s.r;rr<=range.e.r;rr++){
+    for(var cc=range.s.c;cc<=range.e.c;cc++){
+      var addr=XLSX.utils.encode_cell({r:rr,c:cc});
+      if(ws[addr]&&typeof ws[addr].v==="string"&&ws[addr].v.indexOf("\n")>=0){
+        if(!ws[addr].s) ws[addr].s={};
+        ws[addr].s.alignment={wrapText:true};
+      }
+    }
+  }
+  // 머지: 헤더1의 구분명
+  var merges=[];
+  var ci=1;
+  divList.forEach(function(d){
+    if(divMax[d]>1) merges.push({s:{r:0,c:ci},e:{r:0,c:ci+divMax[d]-1}});
+    ci+=divMax[d];
+  });
+  ws['!merges']=merges;
+  var wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,"상장현황");
+  var fname="상장현황_"+(CUR_EVT&&CUR_EVT.nm?CUR_EVT.nm:"")+"_"+today().replace(/-/g,"")+".xlsx";
+  XLSX.writeFile(wb,fname);
+  toast("엑셀 내보내기 완료");
 }
 
 // 수상자 배정 팝업 — 해당 구분의 미수상 참가자 목록에서 선택
