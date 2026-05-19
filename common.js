@@ -501,12 +501,34 @@ function _apiRefresh(p) {
         });
       }
 
+      // 소속 자동 스캔: 인원의 ar 값이 Groups에 없으면 자동 등록
+      function _syncGroups(mems, groups, targetEvtId) {
+        var existNames = {};
+        groups.forEach(function(g) { existNames[g.n] = true; });
+        var newGroups = [];
+        mems.forEach(function(m) {
+          if (m.ar && !existNames[m.ar]) {
+            existNames[m.ar] = true;
+            newGroups.push({id:uid(), n:m.ar, sort:groups.length + newGroups.length, note:""});
+          }
+        });
+        if (newGroups.length) {
+          groups = groups.concat(newGroups);
+          saveEvtNode(targetEvtId, "Groups", groups).then(function() {
+            _evtCaches[targetEvtId].Groups = groups;
+          });
+        }
+        return groups;
+      }
+
       if (isShare && mainEvtId) {
         loadEvtData(mainEvtId).then(function(mainData) {
-          buildResult(mainData.Mems || [], mainData.Groups || []);
+          var grps = _syncGroups(mainData.Mems || [], mainData.Groups || [], mainEvtId);
+          buildResult(mainData.Mems || [], grps);
         });
       } else {
-        buildResult(data.Mems || [], data.Groups || []);
+        var grps = _syncGroups(data.Mems || [], data.Groups || [], p.evtId);
+        buildResult(data.Mems || [], grps);
       }
     });
   });
