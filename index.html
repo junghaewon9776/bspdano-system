@@ -3056,43 +3056,72 @@ function dAwards(){
   h+=_awChk("seq","접수순번")+_awChk("cat","구분")+_awChk("div","참가구분")+_awChk("name","이름")+_awChk("team","팀명")+_awChk("group","소속")+_awChk("region","시도별")+_awChk("tel","연락처");
   h+='</div>';
 
+  // 구분별 목록 수집 (열 헤더)
+  var divList=[];
+  var divSeen={};
+  if(iDiv2>=0){
+    R.forEach(function(r){
+      var v=String(r[iDiv2]||"").trim();
+      if(v && !divSeen[v]){ divSeen[v]=true; divList.push(v); }
+    });
+  }
+  if(!divList.length) divList=["전체"];
+
+  // 수상자를 상×구분별로 분류
+  var awDivMap={}; // key: "상라벨||구분" → [rows]
+  awList.forEach(function(a){
+    divList.forEach(function(d){ awDivMap[_awLabel(a)+"||"+d]=[]; });
+  });
+  R.forEach(function(r){
+    var aw=iAwd2>=0?String(r[iAwd2]||""):"";
+    if(!aw) return;
+    var gv=iGvr2>=0?String(r[iGvr2]||""):"";
+    var label=gv?(aw+" — "+gv):aw;
+    if(!awDivMap[label+"||"+divList[0]]){
+      var found=awList.find(function(a){return a.n===aw;});
+      if(found) label=_awLabel(found);
+    }
+    var dv=(iDiv2>=0?String(r[iDiv2]||"").trim():"")||"전체";
+    var key=label+"||"+dv;
+    if(!awDivMap[key]) awDivMap[key]=[];
+    awDivMap[key].push(r);
+  });
+
   if(!awList.length){
     h+='<div class="mut" style="text-align:center;padding:28px;background:#f8fafc;border:1px solid #e5e7eb;border-radius:8px">등록된 상이 없습니다. 🏆 상 관리에서 추가하세요.</div>';
   } else {
-    // 표 형식: 세로=상(순서), 가로=수상자, 한 셀에 정보 쌓임
+    // 표: 행=상(순서), 열=구분별, 셀=수상자 정보 쌓임
     h+='<div class="scrollx" style="overflow:auto">';
     h+='<table style="width:100%;border-collapse:collapse;font-size:13px;border:1px solid #e5e7eb">';
-    // 헤더: 상 이름 + 수상자 1,2,3...
-    h+='<thead><tr style="background:#f5f3ff">';
-    h+='<th style="padding:10px 14px;border:1px solid #e5e7eb;text-align:left;white-space:nowrap;min-width:120px;background:#7c3aed;color:#fff;font-size:14px">상</th>';
-    for(var ci=0;ci<Math.max(maxWinners,1);ci++){
-      h+='<th style="padding:10px 14px;border:1px solid #e5e7eb;text-align:center;background:#f5f3ff;color:#5b21b6;min-width:130px">'+(ci+1)+'</th>';
-    }
+    h+='<thead><tr>';
+    h+='<th style="padding:10px 14px;border:1px solid #e5e7eb;text-align:left;white-space:nowrap;min-width:120px;background:#7c3aed;color:#fff;font-size:14px;position:sticky;left:0;z-index:1">상</th>';
+    divList.forEach(function(d){
+      h+='<th style="padding:10px 14px;border:1px solid #e5e7eb;text-align:center;background:#f5f3ff;color:#5b21b6;font-weight:700;font-size:14px;min-width:150px">'+esc(d)+'</th>';
+    });
     h+='</tr></thead><tbody>';
     awList.forEach(function(a,ai){
       var label=_awLabel(a);
-      var winners=awMap[label]||[];
       var bg=ai%2?'#faf5ff':'#fff';
       h+='<tr>';
-      h+='<td style="padding:10px 14px;border:1px solid #e5e7eb;background:#f5f3ff;font-weight:700;color:#5b21b6;white-space:nowrap;vertical-align:top">';
-      h+='🏅 '+esc(label);
-      h+='<div style="font-size:11px;font-weight:400;color:#7c3aed;margin-top:2px">'+winners.length+'명</div>';
-      h+='</td>';
-      if(!winners.length){
-        h+='<td colspan="'+Math.max(maxWinners,1)+'" style="padding:10px 14px;border:1px solid #e5e7eb;color:#94a3b8;text-align:center;background:'+bg+'">수상자 없음</td>';
-      } else {
-        winners.forEach(function(r){
-          var sq=iSeq2>=0?String(r[iSeq2]||""):"";
-          var sqEsc=sq?esc(sq).replace(/\\/g,"\\\\").replace(/'/g,"\\'"):"";
-          h+='<td style="padding:8px 12px;border:1px solid #e5e7eb;vertical-align:top;background:'+bg+';cursor:'+(sq?'pointer':'default')+';line-height:1.6" onmouseover="this.style.background=\'#eff6ff\'" onmouseout="this.style.background=\''+bg+'\'"'+(sq?' ondblclick="CTAB=\'apply\';APPLY_Q=\''+sqEsc+'\';mkTabs();draw()" title="더블클릭→참가자 관리"':'')+'>';
-          h+=_cellHtml(r);
-          h+='</td>';
-        });
-        // 빈 셀 채우기
-        for(var ei=winners.length;ei<maxWinners;ei++){
-          h+='<td style="border:1px solid #e5e7eb;background:'+bg+'"></td>';
+      h+='<td style="padding:10px 14px;border:1px solid #e5e7eb;background:#f5f3ff;font-weight:700;color:#5b21b6;white-space:nowrap;vertical-align:top;position:sticky;left:0;z-index:1">';
+      h+='🏅 '+esc(label)+'</td>';
+      divList.forEach(function(d){
+        var winners=awDivMap[label+"||"+d]||[];
+        h+='<td style="padding:8px 12px;border:1px solid #e5e7eb;vertical-align:top;background:'+bg+';line-height:1.6">';
+        if(!winners.length){
+          h+='<span style="color:#cbd5e1">-</span>';
+        } else {
+          winners.forEach(function(r,wi){
+            if(wi>0) h+='<div style="border-top:1px dashed #e5e7eb;margin:6px 0"></div>';
+            var sq=iSeq2>=0?String(r[iSeq2]||""):"";
+            var sqEsc=sq?esc(sq).replace(/\\/g,"\\\\").replace(/'/g,"\\'"):"";
+            h+='<div style="cursor:'+(sq?'pointer':'default')+'" onmouseover="this.style.background=\'#eff6ff\'" onmouseout="this.style.background=\'\'"'+(sq?' ondblclick="CTAB=\'apply\';APPLY_Q=\''+sqEsc+'\';mkTabs();draw()" title="더블클릭→참가자 관리"':'')+'>';
+            h+=_cellHtml(r);
+            h+='</div>';
+          });
         }
-      }
+        h+='</td>';
+      });
       h+='</tr>';
     });
     h+='</tbody></table></div>';
