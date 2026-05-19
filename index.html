@@ -3097,19 +3097,10 @@ function dAwards(){
   // 표: 행=상, 열=구분별×인원수 (한사람=한셀)
   h+='<div class="scrollx" style="overflow:auto">';
   h+='<table id="_awTable" style="border-collapse:collapse;font-size:13px;border:1px solid #e5e7eb">';
-  // 헤더 1행: 구분명 (colspan=해당구분 최대인원수)
   h+='<thead><tr>';
-  h+='<th rowspan="2" style="padding:10px 14px;border:1px solid #e5e7eb;text-align:left;white-space:nowrap;min-width:120px;background:#7c3aed;color:#fff;font-size:14px;position:sticky;left:0;z-index:3">상</th>';
+  h+='<th style="padding:10px 14px;border:1px solid #e5e7eb;text-align:left;white-space:nowrap;min-width:120px;background:#7c3aed;color:#fff;font-size:14px;position:sticky;left:0;z-index:3">상</th>';
   divList.forEach(function(d){
-    h+='<th colspan="'+divMax[d]+'" style="padding:8px 10px;border:1px solid #e5e7eb;text-align:center;background:#f5f3ff;color:#5b21b6;font-weight:700;font-size:14px">'+esc(d)+'</th>';
-  });
-  h+='</tr>';
-  // 헤더 2행: 번호 1,2,3...
-  h+='<tr>';
-  divList.forEach(function(d){
-    for(var ci=0;ci<divMax[d];ci++){
-      h+='<th style="padding:4px 8px;border:1px solid #e5e7eb;text-align:center;background:#ede9fe;color:#7c3aed;font-size:11px;min-width:120px;font-weight:400">'+(ci+1)+'</th>';
-    }
+    h+='<th colspan="'+divMax[d]+'" style="padding:10px 14px;border:1px solid #e5e7eb;text-align:center;background:#f5f3ff;color:#5b21b6;font-weight:700;font-size:14px">'+esc(d)+'</th>';
   });
   h+='</tr></thead><tbody>';
   if(!awList.length){
@@ -3195,10 +3186,8 @@ function awardsTableExport(){
     return l.join("\n");
   }
   var aoa=[]; // array of arrays
-  // 헤더1: 상 + 구분명(colspan)
+  // 헤더: 상 + 구분명(colspan)
   var h1=["상"]; divList.forEach(function(d){ for(var i=0;i<divMax[d];i++) h1.push(i===0?d:""); }); aoa.push(h1);
-  // 헤더2: 공백 + 번호
-  var h2=[""]; divList.forEach(function(d){ for(var i=0;i<divMax[d];i++) h2.push(String(i+1)); }); aoa.push(h2);
   // 데이터
   awList.forEach(function(a){
     var label=_awLabel(a);
