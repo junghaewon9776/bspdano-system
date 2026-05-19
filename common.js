@@ -360,6 +360,11 @@ function _dispatch(p) {
         // 첨부파일 ZIP 다운로드
         case "buildGalleryZip": _apiBuildGalleryZip(p).then(resolve); return;
 
+        // 상(수상 종류) 관리
+        case "addAward":    _apiAddAward(p).then(resolve); return;
+        case "renameAward": _apiRenameAward(p).then(resolve); return;
+        case "deleteAward": _apiDeleteAward(p).then(resolve); return;
+
         default:
           console.warn("미구현 action:", action);
           resolve({ok:false, err:"미구현: " + action});
@@ -480,7 +485,7 @@ function _apiRefresh(p) {
           expTypes: (cfg.EXP_TYPES || "").split(",").filter(Boolean),
           gwanTypes: (cfg.GWAN_TYPES || "행사직접비,행사운영비,행사홍보비,인건비,시설비,임차비,기타").split(","),
           incCards: _parseIncCards(cfg.INC_CARDS || ""),
-          awards: (cfg.AWARDS || "").split(",").filter(Boolean),
+          awards: _parseAwards(cfg.AWARDS || ""),
           memGroups: groupData,
           fees: data.Fees || [],
           vendors: _cache.Vendors || [],
@@ -871,6 +876,76 @@ function _apiSetConfig(p) {
       _evtCaches[evtId].Config = cfg;
       return {ok:true};
     });
+  });
+}
+
+// ───────── 상(수상 종류) 관리 ─────────
+// AWARDS 저장 형식: JSON 배열 [{n,giver,sort}]  (구형: 쉼표 문자열 호환)
+function _parseAwards(raw) {
+  if (!raw) return [];
+  // JSON 배열 시도
+  if (raw.charAt(0) === '[') {
+    try { var arr = JSON.parse(raw); return arr.filter(function(a){return !!(a&&a.n)}); } catch(e){}
+  }
+  // 구형 쉼표 문자열
+  return raw.split(",").filter(Boolean).map(function(s,i){return {n:s.trim(),giver:"",sort:i}});
+}
+function _awardsConfigVal(list) {
+  return JSON.stringify(list);
+}
+function _getAwardsList(evtId) {
+  var data = _evtCaches[evtId];
+  if (!data) return [];
+  var cfg = data.Config || [];
+  for (var i = 0; i < cfg.length; i++) {
+    if (cfg[i].k === "AWARDS") return _parseAwards(cfg[i].v || "");
+  }
+  return [];
+}
+function _saveAwardsList(evtId, list) {
+  return _apiSetConfig({evtId:evtId, key:"AWARDS", value:_awardsConfigVal(list)}).then(function() {
+    return {ok:true, awards:list};
+  });
+}
+function _apiAddAward(p) {
+  var evtId = _getEvtId(p);
+  if (!evtId) return Promise.resolve({ok:false, err:"행사 미선택"});
+  return loadEvtData(evtId).then(function() {
+    var list = _getAwardsList(evtId);
+    var maxSort = 0;
+    list.forEach(function(a){ if ((a.sort||0) > maxSort) maxSort = a.sort||0; });
+    list.push({n:p.name, giver:p.giver||"", sort:p.sort!=null?Number(p.sort):(maxSort+1)});
+    return _saveAwardsList(evtId, list);
+  });
+}
+function _apiRenameAward(p) {
+  var evtId = _getEvtId(p);
+  if (!evtId) return Promise.resolve({ok:false, err:"행사 미선택"});
+  return loadEvtData(evtId).then(function() {
+    var list = _getAwardsList(evtId);
+    var found = false;
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].n === p.oldName && (list[i].giver||"") === (p.oldGiver||"")) {
+        list[i].n = p.newName;
+        list[i].giver = p.newGiver || "";
+        if (p.sort != null) list[i].sort = Number(p.sort);
+        found = true;
+        break;
+      }
+    }
+    if (!found) return Promise.resolve({ok:false, err:"해당 상을 찾을 수 없습니다"});
+    return _saveAwardsList(evtId, list);
+  });
+}
+function _apiDeleteAward(p) {
+  var evtId = _getEvtId(p);
+  if (!evtId) return Promise.resolve({ok:false, err:"행사 미선택"});
+  return loadEvtData(evtId).then(function() {
+    var list = _getAwardsList(evtId);
+    list = list.filter(function(a) {
+      return !(a.n === p.name && (a.giver||"") === (p.giver||""));
+    });
+    return _saveAwardsList(evtId, list);
   });
 }
 

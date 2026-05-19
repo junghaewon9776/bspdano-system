@@ -2794,10 +2794,10 @@ function openEncFile(enc){
 // ===== 상(수상 종류) 관리 팝업 =====
 // awards는 이제 [{n, giver}] 형태 (구형: 단순 문자열 배열일 수도 있음 → 정규화)
 function _awardsNorm(){
-  return (awards||[]).map(function(a){
-    if(typeof a==="string")return{n:a,giver:""};
-    return{n:String(a&&a.n||""),giver:String(a&&a.giver||"")};
-  }).filter(function(a){return !!a.n});
+  return (awards||[]).map(function(a,i){
+    if(typeof a==="string")return{n:a,giver:"",sort:i};
+    return{n:String(a&&a.n||""),giver:String(a&&a.giver||""),sort:a&&a.sort!=null?Number(a.sort):i};
+  }).filter(function(a){return !!a.n}).sort(function(x,y){return (x.sort||0)-(y.sort||0)});
 }
 function _awLabel(a){ return a.giver ? (a.n+" — "+a.giver) : a.n; }
 function awardsManage(){
@@ -2810,11 +2810,12 @@ function awardsManage(){
     h+='<div class="mut" style="padding:14px;text-align:center;background:#f8fafc;border-radius:6px;margin-bottom:10px">등록된 상이 없습니다.</div>';
   } else {
     h+='<table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:10px">';
-    h+='<thead><tr style="background:#f1f5f9"><th style="padding:8px;text-align:left">상 이름</th><th style="padding:8px;text-align:left">수여자</th><th style="padding:8px;text-align:right;width:140px">관리</th></tr></thead><tbody>';
+    h+='<thead><tr style="background:#f1f5f9"><th style="padding:8px;text-align:center;width:50px">순서</th><th style="padding:8px;text-align:left">상 이름</th><th style="padding:8px;text-align:left">수여자</th><th style="padding:8px;text-align:right;width:140px">관리</th></tr></thead><tbody>';
     list.forEach(function(a,i){
       var nEsc=esc(a.n).replace(/\\/g,"\\\\").replace(/'/g,"\\'");
       var gEsc=esc(a.giver).replace(/\\/g,"\\\\").replace(/'/g,"\\'");
-      h+='<tr><td style="padding:8px;border-bottom:1px solid #eee">'+esc(a.n)+'</td>';
+      h+='<tr><td style="padding:4px 8px;border-bottom:1px solid #eee;text-align:center"><input type="number" id="_awSort_'+i+'" value="'+(a.sort!=null?a.sort:i)+'" style="width:44px;padding:4px;text-align:center;border:1px solid #ddd;border-radius:4px" onchange="awardSortUpdate(\''+nEsc+'\',\''+gEsc+'\',this.value)"></td>';
+      h+='<td style="padding:8px;border-bottom:1px solid #eee">'+esc(a.n)+'</td>';
       h+='<td style="padding:8px;border-bottom:1px solid #eee;color:'+(a.giver?"#334155":"#94a3b8")+'">'+esc(a.giver||"-")+'</td>';
       h+='<td style="padding:4px;text-align:right">';
       h+='<button class="btn btn-s btn-g" style="margin-right:4px" onclick="awardRename(\''+nEsc+'\',\''+gEsc+'\')">수정</button>';
@@ -2844,12 +2845,12 @@ function awardsManage(){
 function awardsTmpl(){
   if(typeof XLSX==="undefined"){ toast("XLSX 라이브러리 로딩 중", true); return; }
   var rows = [
-    {"상이름":"대상","수여자":"영광군"},
-    {"상이름":"우수상","수여자":"보존회"},
-    {"상이름":"장려상","수여자":""}
+    {"상이름":"대상","수여자":"영광군","순서":1},
+    {"상이름":"우수상","수여자":"보존회","순서":2},
+    {"상이름":"장려상","수여자":"","순서":3}
   ];
   var ws = XLSX.utils.json_to_sheet(rows);
-  ws["!cols"] = [{wch:20},{wch:20}];
+  ws["!cols"] = [{wch:20},{wch:20},{wch:8}];
   var wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "상목록");
   XLSX.writeFile(wb, "상목록_양식.xlsx");
@@ -2861,9 +2862,9 @@ function awardsExport(){
   if(typeof XLSX==="undefined"){ toast("XLSX 라이브러리 로딩 중", true); return; }
   var list = _awardsNorm();
   if(!list.length){ toast("내보낼 상이 없습니다", true); return; }
-  var rows = list.map(function(a){ return {"상이름":a.n, "수여자":a.giver||""}; });
+  var rows = list.map(function(a){ return {"상이름":a.n, "수여자":a.giver||"", "순서":a.sort!=null?a.sort:0}; });
   var ws = XLSX.utils.json_to_sheet(rows);
-  ws["!cols"] = [{wch:20},{wch:20}];
+  ws["!cols"] = [{wch:20},{wch:20},{wch:8}];
   var wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "상목록");
   var fname = "상목록_"+(CUR_EVT&&CUR_EVT.nm?CUR_EVT.nm:"전체")+"_"+today().replace(/-/g,"")+".xlsx";
@@ -2896,11 +2897,12 @@ function awardsImport(){
         rows.forEach(function(r){
           var n = String(r["상이름"]||r["이름"]||r["name"]||r["상"]||"").trim();
           var g = String(r["수여자"]||r["giver"]||r["주체"]||r["주최"]||"").trim();
+          var s = r["순서"]!=null && r["순서"]!=="" ? Number(r["순서"]) : null;
           if(!n) return;
           var key = n+"||"+g;
           if(existingMap[key]){ skipped++; return; }
           existingMap[key] = true;
-          toAdd.push({name:n, giver:g});
+          toAdd.push({name:n, giver:g, sort:s});
         });
         if(!toAdd.length){
           toast(skipped ? skipped+"개 모두 이미 등록됨 (스킵)" : "유효한 데이터 없음", true);
@@ -2919,7 +2921,7 @@ function awardsImport(){
           var item = toAdd[idx++];
           var ld = document.querySelector(".loading .box");
           if(ld) ld.textContent = "추가 중... ("+idx+"/"+toAdd.length+")";
-          api("addAward",{id:CID, name:item.name, giver:item.giver}).then(function(r){
+          api("addAward",{id:CID, name:item.name, giver:item.giver, sort:item.sort}).then(function(r){
             if(r&&r.ok){ ok++; awards = r.awards || awards; }
             else fail++;
             next();
@@ -2971,6 +2973,14 @@ function awardDel(name,giver){
     if(!r||!r.ok){ toast((r&&r.err)||"삭제 실패",true); return; }
     awards = r.awards || awards;
     toast("삭제되었습니다");
+    awardsManage();
+  });
+}
+function awardSortUpdate(name,giver,val){
+  giver = giver || "";
+  api("renameAward",{id:CID,oldName:name,oldGiver:giver,newName:name,newGiver:giver,sort:Number(val)||0}).then(function(r){
+    if(!r||!r.ok){ toast((r&&r.err)||"순서 변경 실패",true); return; }
+    awards = r.awards || awards;
     awardsManage();
   });
 }
