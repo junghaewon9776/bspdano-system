@@ -17254,17 +17254,15 @@ function _renderGroupsModal(){
       var c=cnt[g.n]||0;
       h+='<tr data-gid="'+esc(g.id)+'" style="border-top:1px solid #f1f5f9">';
       h+='<td style="padding:6px 8px"><input type="text" value="'+esc(g.n)+'" data-f="n" style="width:100%;border:1px solid #e5e7eb;border-radius:4px;padding:4px 6px"></td>';
-      h+='<td style="padding:6px 4px"><input type="number" value="'+(Number(g.sort)||0)+'" data-f="sort" style="width:60px;border:1px solid #e5e7eb;border-radius:4px;padding:4px 6px;text-align:center"></td>';
+      var idEsc=esc(g.id).replace(/\\/g,"\\\\").replace(/'/g,"\\'");
+      h+='<td style="padding:6px 4px"><input type="number" value="'+(Number(g.sort)||0)+'" data-f="sort" style="width:60px;border:1px solid #e5e7eb;border-radius:4px;padding:4px 6px;text-align:center" onchange="groupSortUpdate(\''+idEsc+'\',this.value)"></td>';
       h+='<td style="padding:6px 4px;text-align:center;color:#64748b">'+c+'명</td>';
-      h+='<td style="padding:6px 4px;text-align:center"><button class="btn btn-s" style="background:#3b82f6;color:#fff" onclick="saveGroupX(\''+esc(g.id)+'\')">저장</button> <button class="btn btn-s" style="background:#ef4444;color:#fff" onclick="delGroupX(\''+esc(g.id)+'\','+c+')">삭제</button></td>';
+      h+='<td style="padding:6px 4px;text-align:center"><button class="btn btn-s" style="background:#3b82f6;color:#fff" onclick="saveGroupX(\''+idEsc+'\')">저장</button> <button class="btn btn-s" style="background:#ef4444;color:#fff" onclick="delGroupX(\''+idEsc+'\','+c+')">삭제</button></td>';
       h+='</tr>';
     });
     h+='</tbody></table></div>';
   }
-  h+='<div style="margin-top:14px;display:flex;justify-content:space-between">';
-  if(gs.length) h+='<button class="btn" style="background:#7c3aed;color:#fff;font-weight:700" onclick="saveAllGroupsX()">💾 일괄 저장</button>';
-  else h+='<span></span>';
-  h+='<button class="btn" style="background:#94a3b8;color:#fff" onclick="closePopup();draw()">닫기</button></div>';
+  h+='<div style="margin-top:14px;text-align:right"><button class="btn" style="background:#94a3b8;color:#fff" onclick="closePopup();draw()">닫기</button></div>';
   openPopup(h,720);
 }
 async function addGroupX(){
@@ -17308,25 +17306,16 @@ async function delGroupX(id,cnt){
   toast("🗑 삭제 완료");
   await popGroups();
 }
-async function saveAllGroupsX(){
-  var rows=document.querySelectorAll('tr[data-gid]');
-  if(!rows.length) return;
-  showLoading("일괄 저장 중...");
-  var fail=0;
-  for(var i=0;i<rows.length;i++){
-    var row=rows[i];
-    var id=row.getAttribute('data-gid');
-    var n=row.querySelector('input[data-f="n"]').value.trim();
-    var sort=Number(row.querySelector('input[data-f="sort"]').value)||0;
-    if(!n) continue;
-    var r=await api("updateGroup",{id:id,n:n,sort:sort});
-    if(!r||!r.ok) fail++;
-  }
-  hideLoading();
-  if(fail) toast("⚠ "+fail+"건 저장 실패",true);
-  else toast("✅ 일괄 저장 완료");
-  await refreshData(false);
-  await popGroups();
+function groupSortUpdate(id,val){
+  var g=(memGroups||[]).find(function(x){return x.id===id});
+  if(!g) return;
+  api("updateGroup",{id:id,n:g.n,sort:Number(val)||0}).then(function(r){
+    if(!r||!r.ok){ toast((r&&r.err)||"순서 변경 실패",true); return; }
+    // memGroups 즉시 갱신
+    g.sort=Number(val)||0;
+    toast("순서 변경됨");
+    _renderGroupsModal();
+  });
 }
 async function checkSmsCfg(){
   showLoading("설정 확인 중...");
