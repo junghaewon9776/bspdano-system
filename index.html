@@ -3006,46 +3006,54 @@ function dAwards(){
   var iSeq2=H.indexOf("접수순번"), iGrp2=H.indexOf("소속"), iTel2=-1;
   H.forEach(function(hh,ii){ if(iTel2<0 && /연락처|휴대폰|전화번호|핸드폰/.test(hh)) iTel2=ii; });
 
-  // 구분별 목록
-  var divList=[];
-  var divSeen={};
-  if(iDiv2>=0){
-    R.forEach(function(r){
-      var v=String(r[iDiv2]||"").trim();
-      if(v && !divSeen[v]){ divSeen[v]=true; divList.push(v); }
-    });
-  }
+  // 구분(대분류) × 참가구분(중분류) 수집
+  var catList=[]; var catSeen={};
+  if(iCat2>=0){ R.forEach(function(r){ var v=String(r[iCat2]||"").trim(); if(v&&!catSeen[v]){catSeen[v]=true;catList.push(v);} }); }
+  if(!catList.length) catList=["전체"];
+  var divList=[]; var divSeen={};
+  if(iDiv2>=0){ R.forEach(function(r){ var v=String(r[iDiv2]||"").trim(); if(v&&!divSeen[v]){divSeen[v]=true;divList.push(v);} }); }
   if(!divList.length) divList=["전체"];
+  // 열 조합: 구분×참가구분 (실제 데이터에 존재하는 조합만)
+  var colList=[]; // [{cat,div,key}]
+  catList.forEach(function(c){
+    divList.forEach(function(d){
+      var key=c+"||"+d;
+      var exists=R.some(function(r){
+        return (iCat2<0||String(r[iCat2]||"").trim()===c) && (iDiv2<0||String(r[iDiv2]||"").trim()===d);
+      });
+      if(exists) colList.push({cat:c,div:d,key:key});
+    });
+  });
+  if(!colList.length) colList=[{cat:"전체",div:"전체",key:"전체||전체"}];
 
-  // 수상자를 상×구분별로 분류
+  // 수상자를 상×열조합별로 분류
   var awDivMap={};
-  awList.forEach(function(a){ divList.forEach(function(d){ awDivMap[_awLabel(a)+"||"+d]=[]; }); });
+  awList.forEach(function(a){ colList.forEach(function(col){ awDivMap[_awLabel(a)+"||"+col.key]=[]; }); });
   R.forEach(function(r){
     var aw=iAwd2>=0?String(r[iAwd2]||""):"";
     if(!aw) return;
     var gv=iGvr2>=0?String(r[iGvr2]||""):"";
     var label=gv?(aw+" — "+gv):aw;
-    if(!awDivMap[label+"||"+divList[0]]){
-      var found=awList.find(function(a){return a.n===aw;});
-      if(found) label=_awLabel(found);
-    }
+    var found=awList.find(function(a){return a.n===aw;});
+    if(found) label=_awLabel(found);
+    var ct=(iCat2>=0?String(r[iCat2]||"").trim():"")||"전체";
     var dv=(iDiv2>=0?String(r[iDiv2]||"").trim():"")||"전체";
-    var key=label+"||"+dv;
+    var key=label+"||"+ct+"||"+dv;
     if(!awDivMap[key]) awDivMap[key]=[];
     awDivMap[key].push(r);
   });
 
-  // 구분별 최대 인원수 계산 (열 수 결정)
-  var divMax={};
-  divList.forEach(function(d){ divMax[d]=1; }); // 최소 1칸
+  // 열 조합별 최대 인원수 (셀 수 결정)
+  var colMax={};
+  colList.forEach(function(col){ colMax[col.key]=1; });
   awList.forEach(function(a){
-    divList.forEach(function(d){
-      var cnt=(awDivMap[_awLabel(a)+"||"+d]||[]).length;
-      if(cnt+1>divMax[d]) divMax[d]=cnt+1; // +1은 추가 버튼 칸
+    colList.forEach(function(col){
+      var cnt=(awDivMap[_awLabel(a)+"||"+col.key]||[]).length;
+      if(cnt+1>colMax[col.key]) colMax[col.key]=cnt+1;
     });
   });
   var totalCols=0;
-  divList.forEach(function(d){ totalCols+=divMax[d]; });
+  colList.forEach(function(col){ totalCols+=colMax[col.key]; });
 
   var totalWinners=0;
   Object.keys(awDivMap).forEach(function(k){ totalWinners+=awDivMap[k].length; });
@@ -3097,12 +3105,25 @@ function dAwards(){
   // 표: 행=상, 열=구분별×인원수 (한사람=한셀)
   h+='<div class="scrollx" style="overflow:auto">';
   h+='<table id="_awTable" style="border-collapse:collapse;font-size:13px;border:1px solid #e5e7eb">';
-  h+='<thead><tr>';
-  h+='<th style="padding:10px 14px;border:1px solid #e5e7eb;text-align:left;white-space:nowrap;min-width:120px;background:#7c3aed;color:#fff;font-size:14px;position:sticky;left:0;z-index:3">상</th>';
-  divList.forEach(function(d){
-    h+='<th colspan="'+divMax[d]+'" style="padding:10px 14px;border:1px solid #e5e7eb;text-align:center;background:#f5f3ff;color:#5b21b6;font-weight:700;font-size:14px">'+esc(d)+'</th>';
+  // 대분류별 colspan 계산
+  var catColSpan={};
+  catList.forEach(function(c){ catColSpan[c]=0; });
+  colList.forEach(function(col){ catColSpan[col.cat]+=colMax[col.key]; });
+  h+='<thead>';
+  // 1행: 대분류(구분)
+  h+='<tr>';
+  h+='<th rowspan="2" style="padding:10px 14px;border:1px solid #e5e7eb;text-align:left;white-space:nowrap;min-width:120px;background:#7c3aed;color:#fff;font-size:14px;position:sticky;left:0;z-index:3">상</th>';
+  catList.forEach(function(c){
+    if(catColSpan[c]>0) h+='<th colspan="'+catColSpan[c]+'" style="padding:8px 10px;border:1px solid #e5e7eb;text-align:center;background:#5b21b6;color:#fff;font-weight:700;font-size:14px">'+esc(c)+'</th>';
   });
-  h+='</tr></thead><tbody>';
+  h+='</tr>';
+  // 2행: 중분류(참가구분)
+  h+='<tr>';
+  colList.forEach(function(col){
+    h+='<th colspan="'+colMax[col.key]+'" style="padding:6px 8px;border:1px solid #e5e7eb;text-align:center;background:#f5f3ff;color:#5b21b6;font-weight:600;font-size:13px">'+esc(col.div)+'</th>';
+  });
+  h+='</tr>';
+  h+='</thead><tbody>';
   if(!awList.length){
     h+='<tr><td colspan="'+(totalCols+1)+'" style="padding:28px;text-align:center;border:1px solid #e5e7eb;color:#94a3b8">등록된 상이 없습니다. 🏆 상 관리에서 추가하세요.</td></tr>';
   } else {
@@ -3112,11 +3133,12 @@ function dAwards(){
       h+='<tr>';
       h+='<td style="padding:8px 12px;border:1px solid #e5e7eb;background:#f5f3ff;font-weight:700;color:#5b21b6;white-space:nowrap;vertical-align:top;position:sticky;left:0;z-index:1">';
       h+='🏅 '+esc(label)+'</td>';
-      divList.forEach(function(d){
-        var winners=awDivMap[label+"||"+d]||[];
+      colList.forEach(function(col){
+        var winners=awDivMap[label+"||"+col.key]||[];
         var nEsc=esc(a.n).replace(/\\/g,"\\\\").replace(/'/g,"\\'");
         var gEsc=esc(a.giver||"").replace(/\\/g,"\\\\").replace(/'/g,"\\'");
-        var dEsc=esc(d).replace(/\\/g,"\\\\").replace(/'/g,"\\'");
+        var catEsc=esc(col.cat).replace(/\\/g,"\\\\").replace(/'/g,"\\'");
+        var divEsc=esc(col.div).replace(/\\/g,"\\\\").replace(/'/g,"\\'");
         // 수상자 각각 한 셀
         winners.forEach(function(r){
           var sq=iSeq2>=0?String(r[iSeq2]||""):"";
@@ -3130,11 +3152,11 @@ function dAwards(){
           h+='</div></td>';
         });
         // 나머지 빈 셀 (추가 버튼 포함 첫 빈칸만)
-        var remain=divMax[d]-winners.length;
+        var remain=colMax[col.key]-winners.length;
         for(var ei=0;ei<remain;ei++){
           h+='<td style="padding:6px 8px;border:1px solid #e5e7eb;vertical-align:top;background:'+bg+';min-width:120px">';
           if(ei===0){
-            h+='<button onclick="awardAssignPopup(\''+nEsc+'\',\''+gEsc+'\',\''+dEsc+'\')" style="border:1px dashed #c4b5fd;background:#faf5ff;color:#7c3aed;cursor:pointer;border-radius:4px;padding:3px 8px;font-size:11px;width:100%" title="수상자 추가">+</button>';
+            h+='<button onclick="awardAssignPopup(\''+nEsc+'\',\''+gEsc+'\',\''+catEsc+'\',\''+divEsc+'\')" style="border:1px dashed #c4b5fd;background:#faf5ff;color:#7c3aed;cursor:pointer;border-radius:4px;padding:3px 8px;font-size:11px;width:100%" title="수상자 추가">+</button>';
           }
           h+='</td>';
         }
@@ -3159,22 +3181,40 @@ function awardsTableExport(){
   var iCat2=H.indexOf("구분"), iDiv2=H.indexOf("참가구분"), iReg2=H.indexOf("시도별");
   var iSeq2=H.indexOf("접수순번"), iGrp2=H.indexOf("소속"), iTel2=-1;
   H.forEach(function(hh,ii){ if(iTel2<0 && /연락처|휴대폰|전화번호|핸드폰/.test(hh)) iTel2=ii; });
+  // 구분(대분류) × 참가구분(중분류) 수집
+  var catList=[]; var catSeen={};
+  if(iCat2>=0){ R.forEach(function(r){ var v=String(r[iCat2]||"").trim(); if(v&&!catSeen[v]){catSeen[v]=true;catList.push(v);} }); }
+  if(!catList.length) catList=["전체"];
   var divList=[]; var divSeen={};
   if(iDiv2>=0) R.forEach(function(r){ var v=String(r[iDiv2]||"").trim(); if(v&&!divSeen[v]){divSeen[v]=true;divList.push(v);} });
   if(!divList.length) divList=["전체"];
+  var colList=[];
+  catList.forEach(function(c){
+    divList.forEach(function(d){
+      var key=c+"||"+d;
+      var exists=R.some(function(r){
+        return (iCat2<0||String(r[iCat2]||"").trim()===c) && (iDiv2<0||String(r[iDiv2]||"").trim()===d);
+      });
+      if(exists) colList.push({cat:c,div:d,key:key});
+    });
+  });
+  if(!colList.length) colList=[{cat:"전체",div:"전체",key:"전체||전체"}];
   var awDivMap={};
-  awList.forEach(function(a){ divList.forEach(function(d){ awDivMap[_awLabel(a)+"||"+d]=[]; }); });
+  awList.forEach(function(a){ colList.forEach(function(col){ awDivMap[_awLabel(a)+"||"+col.key]=[]; }); });
   R.forEach(function(r){
     var aw=iAwd2>=0?String(r[iAwd2]||""):""; if(!aw) return;
     var gv=iGvr2>=0?String(r[iGvr2]||""):"";
     var label=gv?(aw+" — "+gv):aw;
-    if(!awDivMap[label+"||"+divList[0]]){ var found=awList.find(function(a){return a.n===aw;}); if(found) label=_awLabel(found); }
+    var found=awList.find(function(a){return a.n===aw;});
+    if(found) label=_awLabel(found);
+    var ct=(iCat2>=0?String(r[iCat2]||"").trim():"")||"전체";
     var dv=(iDiv2>=0?String(r[iDiv2]||"").trim():"")||"전체";
-    if(!awDivMap[label+"||"+dv]) awDivMap[label+"||"+dv]=[];
-    awDivMap[label+"||"+dv].push(r);
+    var key=label+"||"+ct+"||"+dv;
+    if(!awDivMap[key]) awDivMap[key]=[];
+    awDivMap[key].push(r);
   });
-  var divMax={}; divList.forEach(function(d){divMax[d]=1;});
-  awList.forEach(function(a){ divList.forEach(function(d){ var c=(awDivMap[_awLabel(a)+"||"+d]||[]).length; if(c>divMax[d])divMax[d]=c; }); });
+  var colMax={}; colList.forEach(function(col){colMax[col.key]=1;});
+  awList.forEach(function(a){ colList.forEach(function(col){ var c=(awDivMap[_awLabel(a)+"||"+col.key]||[]).length; if(c>colMax[col.key])colMax[col.key]=c; }); });
   function _ct(r){
     var l=[];
     if(AC2.name){var nm=iName2>=0?String(r[iName2]||""):"";if(!nm&&iRep2>=0)nm=String(r[iRep2]||"");if(nm)l.push(nm);}
@@ -3186,15 +3226,19 @@ function awardsTableExport(){
     return l.join("\n");
   }
   var aoa=[]; // array of arrays
-  // 헤더: 상 + 구분명(colspan)
-  var h1=["상"]; divList.forEach(function(d){ for(var i=0;i<divMax[d];i++) h1.push(i===0?d:""); }); aoa.push(h1);
+  // 2행 헤더: 1행=대분류(구분), 2행=중분류(참가구분)
+  var catColSpan={};
+  catList.forEach(function(c){ catColSpan[c]=0; });
+  colList.forEach(function(col){ catColSpan[col.cat]+=colMax[col.key]; });
+  var h1=["상"]; catList.forEach(function(c){ if(catColSpan[c]>0){ h1.push(c); for(var i=1;i<catColSpan[c];i++) h1.push(""); } }); aoa.push(h1);
+  var h2=[""]; colList.forEach(function(col){ h2.push(col.div); for(var i=1;i<colMax[col.key];i++) h2.push(""); }); aoa.push(h2);
   // 데이터
   awList.forEach(function(a){
     var label=_awLabel(a);
     var row=[label];
-    divList.forEach(function(d){
-      var winners=awDivMap[label+"||"+d]||[];
-      for(var i=0;i<divMax[d];i++){
+    colList.forEach(function(col){
+      var winners=awDivMap[label+"||"+col.key]||[];
+      for(var i=0;i<colMax[col.key];i++){
         row.push(i<winners.length?_ct(winners[i]):"");
       }
     });
@@ -3212,12 +3256,21 @@ function awardsTableExport(){
       }
     }
   }
-  // 머지: 헤더1의 구분명
+  // 머지: 1행 대분류(구분), 2행 중분류(참가구분), "상" 셀 rowspan
   var merges=[];
+  // "상" 셀 머지 (A1:A2)
+  merges.push({s:{r:0,c:0},e:{r:1,c:0}});
+  // 1행: 대분류 머지
   var ci=1;
-  divList.forEach(function(d){
-    if(divMax[d]>1) merges.push({s:{r:0,c:ci},e:{r:0,c:ci+divMax[d]-1}});
-    ci+=divMax[d];
+  catList.forEach(function(c){
+    if(catColSpan[c]>1) merges.push({s:{r:0,c:ci},e:{r:0,c:ci+catColSpan[c]-1}});
+    ci+=catColSpan[c];
+  });
+  // 2행: 중분류 머지
+  ci=1;
+  colList.forEach(function(col){
+    if(colMax[col.key]>1) merges.push({s:{r:1,c:ci},e:{r:1,c:ci+colMax[col.key]-1}});
+    ci+=colMax[col.key];
   });
   ws['!merges']=merges;
   var wb=XLSX.utils.book_new();
@@ -3228,17 +3281,19 @@ function awardsTableExport(){
 }
 
 // 수상자 배정 팝업 — 해당 구분의 미수상 참가자 목록에서 선택
-function awardAssignPopup(awdName, awdGiver, divFilter){
+function awardAssignPopup(awdName, awdGiver, catFilter, divFilter){
   if(!APPLY || !APPLY.headers) return;
   var H=APPLY.headers, R=APPLY.rows||[];
-  var iDiv=H.indexOf("참가구분"), iSeq=H.indexOf("접수순번");
+  var iCat=H.indexOf("구분"), iDiv=H.indexOf("참가구분"), iSeq=H.indexOf("접수순번");
   var iName=H.indexOf("성명"); if(iName<0) iName=H.indexOf("이름");
   var iRep=H.indexOf("대표자"), iTeam=H.indexOf("팀명");
   var iAwd=H.indexOf("수상"), iGrp=H.indexOf("소속");
-  // 해당 구분 + 미수상 참가자만 필터
+  // 해당 구분×참가구분 + 미수상 참가자만 필터
   var cands=[];
   R.forEach(function(r){
+    var ct=iCat>=0?String(r[iCat]||"").trim():"전체";
     var dv=iDiv>=0?String(r[iDiv]||"").trim():"전체";
+    if(catFilter!=="전체" && ct!==catFilter) return;
     if(divFilter!=="전체" && dv!==divFilter) return;
     var aw=iAwd>=0?String(r[iAwd]||""):"";
     if(aw) return; // 이미 수상자
@@ -3247,11 +3302,12 @@ function awardAssignPopup(awdName, awdGiver, divFilter){
     if(!nm && iRep>=0) nm=String(r[iRep]||"");
     var tm=iTeam>=0?String(r[iTeam]||""):"";
     var grp=iGrp>=0?String(r[iGrp]||""):"";
-    cands.push({seq:seq, nm:nm, team:tm, grp:grp, div:dv});
+    cands.push({seq:seq, nm:nm, team:tm, grp:grp, cat:ct, div:dv});
   });
   var awLabel=awdGiver?(awdName+" — "+awdGiver):awdName;
+  var filterLabel=catFilter+(divFilter!==catFilter?" / "+divFilter:"");
   var h='<div style="padding:4px 0">';
-  h+='<h3 style="margin:0 0 8px">🏅 '+esc(awLabel)+' <span style="color:#7c3aed;font-size:14px">('+esc(divFilter)+')</span></h3>';
+  h+='<h3 style="margin:0 0 8px">🏅 '+esc(awLabel)+' <span style="color:#7c3aed;font-size:14px">('+esc(filterLabel)+')</span></h3>';
   h+='<div class="mut" style="margin-bottom:8px;font-size:12px">미수상 참가자 중에서 선택하세요. 검색으로 빠르게 찾을 수 있습니다.</div>';
   h+='<input id="_awAssignQ" class="in" placeholder="🔍 이름/팀/소속 검색" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;margin-bottom:8px;box-sizing:border-box" oninput="_awAssignFilter()">';
   h+='<div id="_awAssignList" style="max-height:400px;overflow:auto;border:1px solid #e5e7eb;border-radius:6px">';
