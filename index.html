@@ -1707,7 +1707,7 @@ function dApply(){
     var iName2=H.indexOf("성명"); if(iName2<0) iName2=H.indexOf("이름");
     var iTeam2=H.indexOf("팀명"), iRep2=H.indexOf("대표자");
     var iCat2=H.indexOf("구분"), iDiv2=H.indexOf("참가구분"), iReg2=H.indexOf("시도별");
-    var iSeq2=H.indexOf("접수순번"), iTel2=-1;
+    var iSeq2=H.indexOf("접수순번"), iGrp2=H.indexOf("소속"), iTel2=-1;
     H.forEach(function(hh,ii){ if(iTel2<0 && /연락처|휴대폰|전화번호|핸드폰/.test(hh)) iTel2=ii; });
     // 수상자 맵: {상라벨 → [행들]}
     var awMap={};
@@ -1744,38 +1744,17 @@ function dApply(){
         if(!winners.length){
           h+='<div class="mut" style="padding:14px;text-align:center;color:#94a3b8;font-size:13px">수상자 없음</div>';
         } else {
-          h+='<div class="scrollx" style="overflow:auto">';
-          h+='<table style="width:100%;border-collapse:collapse;font-size:13px">';
-          h+='<thead><tr style="background:#f8fafc">';
-          h+='<th style="padding:8px;text-align:center;border-bottom:2px solid #e5e7eb;width:40px">#</th>';
-          if(iSeq2>=0) h+='<th style="padding:8px;text-align:left;border-bottom:2px solid #e5e7eb">접수순번</th>';
-          if(iCat2>=0) h+='<th style="padding:8px;text-align:left;border-bottom:2px solid #e5e7eb">구분</th>';
-          if(iDiv2>=0) h+='<th style="padding:8px;text-align:left;border-bottom:2px solid #e5e7eb">참가구분</th>';
-          h+='<th style="padding:8px;text-align:left;border-bottom:2px solid #e5e7eb">이름</th>';
-          if(iTeam2>=0) h+='<th style="padding:8px;text-align:left;border-bottom:2px solid #e5e7eb">팀명</th>';
-          if(iReg2>=0) h+='<th style="padding:8px;text-align:left;border-bottom:2px solid #e5e7eb">시도별</th>';
-          if(iTel2>=0) h+='<th style="padding:8px;text-align:left;border-bottom:2px solid #e5e7eb">연락처</th>';
-          h+='<th style="padding:8px;text-align:center;border-bottom:2px solid #e5e7eb">상세</th>';
-          h+='</tr></thead><tbody>';
+          h+='<div style="padding:10px 14px;font-size:14px;display:flex;flex-wrap:wrap;gap:4px;align-items:center">';
           winners.forEach(function(r,wi){
             var nm=iName2>=0?String(r[iName2]||""):"";
             if(!nm && iRep2>=0) nm=String(r[iRep2]||"");
             var sq=iSeq2>=0?String(r[iSeq2]||""):"";
             var sqEsc=sq?esc(sq).replace(/\\/g,"\\\\").replace(/'/g,"\\'"):"";
-            h+='<tr style="border-bottom:1px solid #f1f5f9" onmouseover="this.style.background=\'#eff6ff\'" onmouseout="this.style.background=\'\'">';
-            h+='<td style="padding:8px;text-align:center;font-weight:700;color:#7c3aed">'+(wi+1)+'</td>';
-            if(iSeq2>=0) h+='<td style="padding:8px;color:#4338ca;font-weight:600">'+esc(sq)+'</td>';
-            if(iCat2>=0) h+='<td style="padding:8px">'+esc(String(r[iCat2]||""))+'</td>';
-            if(iDiv2>=0) h+='<td style="padding:8px">'+esc(String(r[iDiv2]||""))+'</td>';
-            h+='<td style="padding:8px;font-weight:700">'+esc(nm)+'</td>';
-            if(iTeam2>=0) h+='<td style="padding:8px">'+esc(String(r[iTeam2]||""))+'</td>';
-            if(iReg2>=0) h+='<td style="padding:8px">'+esc(String(r[iReg2]||""))+'</td>';
-            if(iTel2>=0) h+='<td style="padding:8px">'+telLink(String(r[iTel2]||""))+'</td>';
-            h+='<td style="padding:8px;text-align:center">';
-            if(sq) h+='<button class="btn btn-b btn-s" onclick="applyDetail(\''+sqEsc+'\')">상세</button>';
-            h+='</td></tr>';
+            var grp2=iGrp2>=0?String(r[iGrp2]||""):"";
+            if(wi>0) h+='<span style="color:#cbd5e1;margin:0 2px">·</span>';
+            h+='<span style="cursor:'+(sq?'pointer':'default')+';font-weight:600;color:#334155'+(sq?';text-decoration:underline;text-underline-offset:2px':'')+'" '+(sq?'onclick="applyDetail(\''+sqEsc+'\')" title="클릭하면 상세"':'')+'>'+esc(nm)+(grp2?' <span style="font-weight:400;color:#6b7280;font-size:12px">('+esc(grp2)+')</span>':'')+'</span>';
           });
-          h+='</tbody></table></div>';
+          h+='</div>';
         }
         h+='</div>';
       });
