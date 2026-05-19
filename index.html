@@ -3131,8 +3131,12 @@ function dAwards(){
       var label=_awLabel(a);
       var bg=ai%2?'#faf5ff':'#fff';
       h+='<tr>';
+      var nEscL=esc(a.n).replace(/\\/g,"\\\\").replace(/'/g,"\\'");
+      var gEscL=esc(a.giver||"").replace(/\\/g,"\\\\").replace(/'/g,"\\'");
       h+='<td style="padding:8px 12px;border:1px solid #e5e7eb;background:#f5f3ff;font-weight:700;color:#5b21b6;white-space:nowrap;vertical-align:top;position:sticky;left:0;z-index:1">';
-      h+='🏅 '+esc(label)+'</td>';
+      h+='<div style="display:flex;align-items:center;gap:6px">🏅 '+esc(label);
+      h+=' <button onclick="awardAssignPopup(\''+nEscL+'\',\''+gEscL+'\',\'전체\',\'전체\')" title="구분 무관 수상자 추가" style="border:1px dashed #c4b5fd;background:#faf5ff;color:#7c3aed;cursor:pointer;border-radius:4px;padding:1px 6px;font-size:11px;flex-shrink:0">+전체</button>';
+      h+='</div></td>';
       colList.forEach(function(col){
         var winners=awDivMap[label+"||"+col.key]||[];
         var nEsc=esc(a.n).replace(/\\/g,"\\\\").replace(/'/g,"\\'");
