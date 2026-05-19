@@ -919,10 +919,8 @@ async function doLogin(id,pw,keep,silent){
   // ⚡ lazy 모드: 무거운 데이터는 빈 배열로 초기화 (apiRefresh 에서 채움)
   acts=[];purs=[];exps=[];mems=[];notices=[];pays=[];dpst=[];inc=[];incTypes=[];expBG=[];txn=[];expTypes=[];gwanTypes=[];incCards=[];awards=[];memGroups=[];
 
-  // 행사 1개 → 자동 선택 + 자동 로드
-  // 행사 여러개 → CUR_EVT 미지정 (사용자가 드롭다운에서 선택해야 로드됨)
-  var single = (EVENTS.length === 1);
-  CUR_EVT = single ? EVENTS[0] : null;
+  // 행사 1개 이상이면 첫 번째 행사 자동 선택
+  CUR_EVT = EVENTS.length ? EVENTS[0] : null;
 
   if (IS_APPLY_MODE) return false; // 신청폼 모드면 시스템 진입 차단
   document.getElementById("loginPage").style.display="none";
