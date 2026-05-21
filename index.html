@@ -3060,14 +3060,34 @@ function awardAdd(){
 }
 function awardRename(oldName,oldGiver){
   oldGiver = oldGiver || "";
-  var newName = prompt("새 이름:", oldName);
-  if(newName==null) return;
-  newName = String(newName).trim();
-  var newGiver = prompt("새 수여자 (비워도 됨):", oldGiver);
-  if(newGiver==null) return;
-  newGiver = String(newGiver).trim();
-  if(!newName || (newName===oldName && newGiver===oldGiver)) return;
-  api("renameAward",{id:CID,oldName:oldName,oldGiver:oldGiver,newName:newName,newGiver:newGiver}).then(function(r){
+  window._awRenameOld = {n:oldName, g:oldGiver};
+  var h='<div style="padding:4px 0">';
+  h+='<h3 style="margin:0 0 12px">✏️ 상 수정</h3>';
+  h+='<div style="display:flex;flex-direction:column;gap:12px">';
+  h+='<div><label style="font-weight:600;font-size:13px;color:#1a3764;display:block;margin-bottom:4px">상이름</label>';
+  h+='<input id="_awRnName" class="in" value="'+esc(oldName)+'" style="width:100%;padding:8px 10px;border:1px solid #bfcfdf;border-radius:6px;font-size:14px;box-sizing:border-box"></div>';
+  h+='<div><label style="font-weight:600;font-size:13px;color:#1a3764;display:block;margin-bottom:4px">훈격</label>';
+  h+='<input id="_awRnGiver" class="in" value="'+esc(oldGiver)+'" placeholder="(없으면 비워두세요)" style="width:100%;padding:8px 10px;border:1px solid #bfcfdf;border-radius:6px;font-size:14px;box-sizing:border-box"></div>';
+  h+='</div>';
+  h+='<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">';
+  h+='<button class="btn btn-out" onclick="closePopup();awardsManage()">취소</button>';
+  h+='<button class="btn" style="background:#4472c4;color:#fff;font-weight:700;padding:8px 20px" onclick="_awRenameSave()">저장</button>';
+  h+='</div></div>';
+  openPopup(h, 400);
+  setTimeout(function(){ var el=document.getElementById("_awRnName"); if(el){el.focus();el.select();} },50);
+}
+function _awRenameSave(){
+  var old=window._awRenameOld;
+  if(!old) return;
+  var newName=(document.getElementById("_awRnName")||{}).value||"";
+  var newGiver=(document.getElementById("_awRnGiver")||{}).value||"";
+  newName=newName.trim(); newGiver=newGiver.trim();
+  if(!newName){ toast("상이름을 입력하세요",true); return; }
+  if(newName===old.n && newGiver===old.g){ closePopup(); awardsManage(); return; }
+  closePopup();
+  showLoading("수정 중...");
+  api("renameAward",{id:CID,oldName:old.n,oldGiver:old.g,newName:newName,newGiver:newGiver}).then(function(r){
+    hideLoading();
     if(!r||!r.ok){ toast((r&&r.err)||"수정 실패",true); return; }
     awards = r.awards || awards;
     toast("수정되었습니다");
