@@ -1461,6 +1461,7 @@ function dApply(){
   var q=(APPLY_Q||"").trim().toLowerCase();
   var iCat=H.indexOf("구분"), iDiv=H.indexOf("참가구분"), iReg=H.indexOf("시도별"), iSeq=H.indexOf("접수순번");
   var iPreH=H.indexOf("예선합격"), iFinH=H.indexOf("최종합격"), iAwdH=H.indexOf("수상"), iAbsH=H.indexOf("불참");
+  var iGvrH=H.indexOf("수여자");
   var AC=_attachCols(H);
   var isYes=function(v){ v=String(v==null?"":v); return v==="O"||v==="Y"||v==="true"||v==="1"; };
 
@@ -1499,12 +1500,7 @@ function dApply(){
       if(APPLY_F.abs==="불참" && !ya) return false;
       if(APPLY_F.abs==="참석" && ya) return false;
     }
-    if(APPLY_F.awd && iAwdH>=0){
-      var aw = String(r[iAwdH]||"").trim();
-      if(APPLY_F.awd==="__any__"){ if(!aw) return false; }
-      else if(APPLY_F.awd==="__none__"){ if(aw) return false; }
-      else { if(aw !== APPLY_F.awd) return false; }
-    }
+    if(APPLY_F.awd && !_awFilterMatch(r,H)) return false;
     if(APPLY_F.att && !_matchAttachFilter(r, AC, APPLY_F.att)) return false;
     if(APPLY_F.color){var _cSeq=iSeq>=0?String(r[iSeq]||""):"";var _cC=_applyGetColor(_cSeq);if(APPLY_F.color==="__any__"){if(!_cC)return false;}else if(APPLY_F.color==="__none__"){if(_cC)return false;}else{if(!_cC||_cC.bd!==APPLY_F.color)return false;}}
     if(q){ return r.some(function(v){return jamoMatch(v, q);}); }
@@ -1623,14 +1619,21 @@ function dApply(){
   if(iPreH>=0) h+='<select class="in" style="flex:1;min-width:140px;padding:8px;border:1px solid #16a34a;border-radius:6px;background:#f0fdf4;font-weight:600" onchange="applyF(\'pre\',this.value)"><option value="">예선 전체</option><option value="합격"'+(APPLY_F.pre==="합격"?" selected":"")+'>✅ 예선합격</option><option value="불합격"'+(APPLY_F.pre==="불합격"?" selected":"")+'>❌ 예선불합격</option></select>';
   if(iFinH>=0) h+='<select class="in" style="flex:1;min-width:140px;padding:8px;border:1px solid #dc2626;border-radius:6px;background:#fef2f2;font-weight:600" onchange="applyF(\'fin\',this.value)"><option value="">본선 전체</option><option value="합격"'+(APPLY_F.fin==="합격"?" selected":"")+'>🎯 본선합격</option><option value="불합격"'+(APPLY_F.fin==="불합격"?" selected":"")+'>❌ 본선불합격</option></select>';
   if(iAwdH>=0){
-    var awUniq={}; R.forEach(function(rr){var v=String(rr[iAwdH]||"").trim(); if(v) awUniq[v]=1;});
-    var awList=Object.keys(awUniq).sort();
+    // 상+훈격 조합으로 유니크 목록 생성
+    var awUniq={}; R.forEach(function(rr){
+      var v=String(rr[iAwdH]||"").trim(); if(!v) return;
+      var g=iGvrH>=0?String(rr[iGvrH]||"").trim():"";
+      var key=g?(v+"||"+g):v;
+      var disp=g?(v+" — "+g):v;
+      awUniq[key]=disp;
+    });
+    var awKeys=Object.keys(awUniq).sort(function(a,b){ return (awUniq[a]||"").localeCompare(awUniq[b]||""); });
     var awSel=APPLY_F.awd||"";
     h+='<select class="in" style="flex:1;min-width:140px;padding:8px;border:1px solid #7c3aed;border-radius:6px;background:#faf5ff;font-weight:600" onchange="applyF(\'awd\',this.value)">';
     h+='<option value="">🏆 수상 전체</option>';
     h+='<option value="__any__"'+(awSel==="__any__"?" selected":"")+'>🏆 수상자만</option>';
     h+='<option value="__none__"'+(awSel==="__none__"?" selected":"")+'>○ 미수상</option>';
-    awList.forEach(function(a){ h+='<option value="'+esc(a)+'"'+(a===awSel?" selected":"")+'>🏅 '+esc(a)+'</option>'; });
+    awKeys.forEach(function(k){ h+='<option value="'+esc(k)+'"'+(k===awSel?" selected":"")+'>🏅 '+esc(awUniq[k])+'</option>'; });
     h+='</select>';
   }
   if(iAbsH>=0) h+='<select class="in" style="flex:1;min-width:140px;padding:8px;border:1px solid #6b7280;border-radius:6px;background:#f9fafb;font-weight:600" onchange="applyF(\'abs\',this.value)"><option value="">출석 전체</option><option value="참석"'+(APPLY_F.abs==="참석"?" selected":"")+'>✅ 참석</option><option value="불참"'+(APPLY_F.abs==="불참"?" selected":"")+'>🚫 불참</option></select>';
@@ -1752,7 +1755,8 @@ function dApply(){
       var gv=iGvr2>=0?String(r[iGvr2]||""):"";
       var label=gv?(aw+" — "+gv):aw;
       if(!awMap[label]){
-        var found=awList.find(function(a){return a.n===aw;});
+        var found=awList.find(function(a){return a.n===aw && (a.giver||"")===(gv||"");});
+        if(!found) found=awList.find(function(a){return a.n===aw;});
         if(found) label=_awLabel(found);
         else{ awMap[label]=[]; }
       }
@@ -2842,6 +2846,22 @@ function _awardsNorm(){
   }).filter(function(a){return !!a.n}).sort(function(x,y){return (x.sort||0)-(y.sort||0)});
 }
 function _awLabel(a){ return a.giver ? (a.n+" — "+a.giver) : a.n; }
+// 행(row)에서 상+훈격 조합키 생성 (필터용)
+function _awRowKey(r,H){
+  var iA=H.indexOf("수상"), iG=H.indexOf("수여자");
+  var a=iA>=0?String(r[iA]||"").trim():"";
+  var g=iG>=0?String(r[iG]||"").trim():"";
+  return g?(a+"||"+g):a;
+}
+// 필터 매칭: APPLY_F.awd 값과 행 비교
+function _awFilterMatch(r,H){
+  if(!APPLY_F.awd) return true;
+  var iA=H.indexOf("수상");
+  var aw=iA>=0?String(r[iA]||"").trim():"";
+  if(APPLY_F.awd==="__any__") return !!aw;
+  if(APPLY_F.awd==="__none__") return !aw;
+  return _awRowKey(r,H)===APPLY_F.awd;
+}
 function awardsManage(){
   if(!isA()){ toast("관리자 전용",true); return; }
   var list=_awardsNorm();
@@ -3205,7 +3225,9 @@ function dAwards(){
     if(!aw) return;
     var gv=iGvr2>=0?String(r[iGvr2]||""):"";
     var label=gv?(aw+" — "+gv):aw;
-    var found=awList.find(function(a){return a.n===aw;});
+    // 이름+훈격 모두 일치 우선, 없으면 이름만 일치
+    var found=awList.find(function(a){return a.n===aw && (a.giver||"")===(gv||"");});
+    if(!found) found=awList.find(function(a){return a.n===aw;});
     if(found) label=_awLabel(found);
     var ct=(iCat2>=0?String(r[iCat2]||"").trim():"")||"전체";
     var dv=(iDiv2>=0?String(r[iDiv2]||"").trim():"")||"전체";
@@ -3615,7 +3637,8 @@ function awardsTableExport(){
     var aw=iAwd2>=0?String(r[iAwd2]||""):""; if(!aw) return;
     var gv=iGvr2>=0?String(r[iGvr2]||""):"";
     var label=gv?(aw+" — "+gv):aw;
-    var found=awList.find(function(a){return a.n===aw;});
+    var found=awList.find(function(a){return a.n===aw && (a.giver||"")===(gv||"");});
+    if(!found) found=awList.find(function(a){return a.n===aw;});
     if(found) label=_awLabel(found);
     var ct=(iCat2>=0?String(r[iCat2]||"").trim():"")||"전체";
     var dv=(iDiv2>=0?String(r[iDiv2]||"").trim():"")||"전체";
@@ -4083,7 +4106,7 @@ function _applyRenderListBody(){
     if(APPLY_F.pre && iPreH>=0){ var y=isYes(r[iPreH]); if(APPLY_F.pre==="합격"&&!y) return false; if(APPLY_F.pre==="불합격"&&y) return false; }
     if(APPLY_F.fin && iFinH>=0){ var y2=isYes(r[iFinH]); if(APPLY_F.fin==="합격"&&!y2) return false; if(APPLY_F.fin==="불합격"&&y2) return false; }
     if(APPLY_F.abs && iAbsH>=0){ var ya=isYes(r[iAbsH]); if(APPLY_F.abs==="불참"&&!ya) return false; if(APPLY_F.abs==="참석"&&ya) return false; }
-    if(APPLY_F.awd && iAwdH>=0){ var aw=String(r[iAwdH]||"").trim(); if(APPLY_F.awd==="__any__"){ if(!aw) return false; } else if(APPLY_F.awd==="__none__"){ if(aw) return false; } else { if(aw!==APPLY_F.awd) return false; } }
+    if(APPLY_F.awd && !_awFilterMatch(r,H)) return false;
     if(APPLY_F.att && !_matchAttachFilter(r, AC, APPLY_F.att)) return false;
     if(APPLY_F.color){var _cSeq=iSeq>=0?String(r[iSeq]||""):"";var _cC=_applyGetColor(_cSeq);if(APPLY_F.color==="__any__"){if(!_cC)return false;}else if(APPLY_F.color==="__none__"){if(_cC)return false;}else{if(!_cC||_cC.bd!==APPLY_F.color)return false;}}
     if(q){ return r.some(function(v){return jamoMatch(v, q);}); }
@@ -4398,7 +4421,7 @@ function _applySmsFilteredRows(){
     if(APPLY_F.pre && iPreH>=0){ var y=isYes(r[iPreH]); if(APPLY_F.pre==="합격"&&!y)return false; if(APPLY_F.pre==="불합격"&&y)return false; }
     if(APPLY_F.fin && iFinH>=0){ var y2=isYes(r[iFinH]); if(APPLY_F.fin==="합격"&&!y2)return false; if(APPLY_F.fin==="불합격"&&y2)return false; }
     if(APPLY_F.abs && iAbsH>=0){ var ya=isYes(r[iAbsH]); if(APPLY_F.abs==="불참"&&!ya)return false; if(APPLY_F.abs==="참석"&&ya)return false; }
-    if(APPLY_F.awd && iAwdH>=0){ var aw=String(r[iAwdH]||"").trim(); if(APPLY_F.awd==="__any__"){if(!aw)return false;} else if(APPLY_F.awd==="__none__"){if(aw)return false;} else {if(aw!==APPLY_F.awd)return false;} }
+    if(APPLY_F.awd && !_awFilterMatch(r,H)) return false;
     if(APPLY_F.att && !_matchAttachFilter(r, AC, APPLY_F.att)) return false;
     if(APPLY_F.color){var _cSeq=iSeq>=0?String(r[iSeq]||""):"";var _cC=_applyGetColor(_cSeq);if(APPLY_F.color==="__any__"){if(!_cC)return false;}else if(APPLY_F.color==="__none__"){if(_cC)return false;}else{if(!_cC||_cC.bd!==APPLY_F.color)return false;}}
     if(q){ return r.some(function(v){return jamoMatch(v, q);}); }
@@ -4869,7 +4892,7 @@ function applyDownloadAllFiles(){
     if(APPLY_F.region&&iReg>=0&&String(r[iReg]||"")!==APPLY_F.region)return false;
     if(APPLY_F.pre&&iPreH>=0){var y=isYes(r[iPreH]);if(APPLY_F.pre==="합격"&&!y)return false;if(APPLY_F.pre==="불합격"&&y)return false;}
     if(APPLY_F.fin&&iFinH>=0){var y2=isYes(r[iFinH]);if(APPLY_F.fin==="합격"&&!y2)return false;if(APPLY_F.fin==="불합격"&&y2)return false;}
-    if(APPLY_F.awd&&iAwdH>=0){var aw=String(r[iAwdH]||"").trim();if(APPLY_F.awd==="__any__"){if(!aw)return false;}else if(APPLY_F.awd==="__none__"){if(aw)return false;}else{if(aw!==APPLY_F.awd)return false;}}
+    if(APPLY_F.awd && !_awFilterMatch(r,H)) return false;
     if(APPLY_F.att && !_matchAttachFilter(r, AC, APPLY_F.att)) return false;
     if(q){return r.some(function(v){return jamoMatch(v,q);});}
     return true;
@@ -4946,7 +4969,7 @@ function applyDownloadByType(type){
     if(APPLY_F.pre&&iPreH>=0){var y=isYes(r[iPreH]);if(APPLY_F.pre==="합격"&&!y)return false;if(APPLY_F.pre==="불합격"&&y)return false;}
     if(APPLY_F.fin&&iFinH>=0){var y2=isYes(r[iFinH]);if(APPLY_F.fin==="합격"&&!y2)return false;if(APPLY_F.fin==="불합격"&&y2)return false;}
     if(APPLY_F.abs&&iAbsH>=0){var ya=isYes(r[iAbsH]);if(APPLY_F.abs==="불참"&&!ya)return false;if(APPLY_F.abs==="참석"&&ya)return false;}
-    if(APPLY_F.awd&&iAwdH>=0){var aw=String(r[iAwdH]||"").trim();if(APPLY_F.awd==="__any__"){if(!aw)return false;}else if(APPLY_F.awd==="__none__"){if(aw)return false;}else{if(aw!==APPLY_F.awd)return false;}}
+    if(APPLY_F.awd && !_awFilterMatch(r,H)) return false;
     if(APPLY_F.att && !_matchAttachFilter(r, AC, APPLY_F.att)) return false;
     if(q){return r.some(function(v){return jamoMatch(v,q);});}
     return true;
@@ -5063,7 +5086,7 @@ function _runDirectDL(){
     if(APPLY_F.pre&&iPreH>=0){var y=isYes(r[iPreH]);if(APPLY_F.pre==="합격"&&!y)return false;if(APPLY_F.pre==="불합격"&&y)return false;}
     if(APPLY_F.fin&&iFinH>=0){var y2=isYes(r[iFinH]);if(APPLY_F.fin==="합격"&&!y2)return false;if(APPLY_F.fin==="불합격"&&y2)return false;}
     if(APPLY_F.abs&&iAbsH>=0){var ya=isYes(r[iAbsH]);if(APPLY_F.abs==="불참"&&!ya)return false;if(APPLY_F.abs==="참석"&&ya)return false;}
-    if(APPLY_F.awd&&iAwdH>=0){var aw=String(r[iAwdH]||"").trim();if(APPLY_F.awd==="__any__"){if(!aw)return false;}else if(APPLY_F.awd==="__none__"){if(aw)return false;}else{if(aw!==APPLY_F.awd)return false;}}
+    if(APPLY_F.awd && !_awFilterMatch(r,H)) return false;
     if(APPLY_F.att && !_matchAttachFilter(r, AC, APPLY_F.att)) return false;
     if(q){return r.some(function(v){return jamoMatch(v,q);});}
     return true;
@@ -5233,7 +5256,7 @@ function applyXLSX(){
     if(APPLY_F.region && iReg>=0 && String(r[iReg]||"")    !== APPLY_F.region) return false;
     if(APPLY_F.pre && iPreH>=0){ var y=isYes(r[iPreH]); if(APPLY_F.pre==="합격"&&!y) return false; if(APPLY_F.pre==="불합격"&&y) return false; }
     if(APPLY_F.fin && iFinH>=0){ var y2=isYes(r[iFinH]); if(APPLY_F.fin==="합격"&&!y2) return false; if(APPLY_F.fin==="불합격"&&y2) return false; }
-    if(APPLY_F.awd && iAwdH>=0){ var aw=String(r[iAwdH]||"").trim(); if(APPLY_F.awd==="__any__"){ if(!aw) return false; } else if(APPLY_F.awd==="__none__"){ if(aw) return false; } else { if(aw!==APPLY_F.awd) return false; } }
+    if(APPLY_F.awd && !_awFilterMatch(r,H)) return false;
     if(APPLY_F.att && !_matchAttachFilter(r, AC, APPLY_F.att)) return false;
     if(APPLY_F.color){var _cSeq=iSeq>=0?String(r[iSeq]||""):"";var _cC=_applyGetColor(_cSeq);if(APPLY_F.color==="__any__"){if(!_cC)return false;}else if(APPLY_F.color==="__none__"){if(_cC)return false;}else{if(!_cC||_cC.bd!==APPLY_F.color)return false;}}
     if(q){ return r.some(function(v){return jamoMatch(v, q);}); }
