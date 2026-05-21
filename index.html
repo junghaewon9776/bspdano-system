@@ -3456,17 +3456,22 @@ function dAwards(){
         h+='<button onclick="awardAssignPopup(\''+_nEsc(a)+'\',\''+_gEsc(a)+'\',\'전체\',\'전체\')" style="border:1px dashed #c4b5fd;background:#faf5ff;color:#7c3aed;cursor:pointer;border-radius:4px;padding:3px 10px;font-size:11px">+추가</button>';
         h+='</div>';
         if(allW.length){
-          h+='<table style="width:100%;border-collapse:collapse;font-size:13px"><tbody>';
+          h+='<table style="width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed">';
+          h+='<colgroup><col style="width:36px">';
+          if(iCat2>=0) h+='<col style="width:90px">';
+          if(iDiv2>=0) h+='<col style="width:90px">';
+          h+='<col style="width:auto"><col style="width:32px"></colgroup>';
+          h+='<tbody>';
           allW.forEach(function(w,wi){
             var r=w.r;
             var sq=iSeq2>=0?String(r[iSeq2]||""):"";
             var sqEsc=sq?esc(sq).replace(/\\/g,"\\\\").replace(/'/g,"\\'"):"";
             h+='<tr style="background:'+(wi%2?'#faf5ff':'#fff')+'">';
-            h+='<td style="padding:6px 14px;border-bottom:1px solid #f1f5f9;width:30px;text-align:center;color:#94a3b8;font-size:11px">'+(wi+1)+'</td>';
-            if(iCat2>=0) h+='<td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;color:#6b7280;font-size:12px;white-space:nowrap">'+esc(String(r[iCat2]||""))+'</td>';
-            if(iDiv2>=0) h+='<td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;color:#6b7280;font-size:12px;white-space:nowrap">'+esc(String(r[iDiv2]||""))+'</td>';
-            h+='<td style="padding:6px 14px;border-bottom:1px solid #f1f5f9;line-height:1.5">'+_cellHtml(r)+'</td>';
-            h+='<td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;width:28px;text-align:center">';
+            h+='<td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;text-align:center;color:#94a3b8;font-size:11px;overflow:hidden">'+(wi+1)+'</td>';
+            if(iCat2>=0) h+='<td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;color:#6b7280;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(String(r[iCat2]||""))+'</td>';
+            if(iDiv2>=0) h+='<td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;color:#6b7280;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(String(r[iDiv2]||""))+'</td>';
+            h+='<td style="padding:6px 14px;border-bottom:1px solid #f1f5f9;line-height:1.5;overflow:hidden">'+_cellHtml(r)+'</td>';
+            h+='<td style="padding:6px 4px;border-bottom:1px solid #f1f5f9;text-align:center">';
             if(sq) h+='<button onclick="awardUnassign(\''+sqEsc+'\')" title="수상 취소" style="border:none;background:none;color:#dc2626;cursor:pointer;font-size:12px">✕</button>';
             h+='</td></tr>';
           });
