@@ -145,6 +145,7 @@ label{display:block;font-size:10px;color:#999;margin-bottom:3px}
 #loading.on{display:flex}
 .sp{width:40px;height:40px;border:4px solid #e2e8f0;border-top-color:#2563eb;border-radius:50%;animation:sp 1s linear infinite}
 @keyframes sp{to{transform:rotate(360deg)}}
+@keyframes blinker{50%{opacity:0.4}}
 #loading .msg{color:#333;font-size:13px;font-weight:600}
 
 /* 반응형 - 태블릿 */
@@ -579,7 +580,7 @@ var rptPeriod="month", rptFrom="", rptTo="", rptAr="all";
 // 참가자 관리 (v2 신청폼 연동)
 var APPLY=null;                              // {headers:[], rows:[[]], sheetUrl:""}
 var APPLY_Q="";                              // 검색어
-var APPLY_F={cat:"",div:"",region:"",pre:"",fin:"",awd:"",att:"",abs:""};  // 필터: 구분/참가구분/시도별/예선합격/최종합격/수상/첨부파일유무/불참
+var APPLY_F={cat:"",div:"",region:"",pre:"",fin:"",awd:"",att:"",abs:"",color:""};  // 필터: 구분/참가구분/시도별/예선합격/최종합격/수상/첨부파일유무/불참/색상
 var APPLY_SORT={col:-1,asc:true};            // 정렬 (기본: 접수순번 오름차순 — loadApply_ 에서 세팅)
 var APPLY_CATS=null;                         // 동적 카테고리 (null이면 기본값 사용)
 var APPLY_CATS_DEFAULT=["기악","판소리","무용","고법"];
@@ -589,6 +590,9 @@ var DRIVE_UPLOAD_URL="";                     // Drive 업로드 Apps Script URL
 var APPLY_VIEW="compact";                    // "compact" | "full"
 // 컴팩트 모드에서 표시할 컬럼 (헤더 이름 기준, 해당 컬럼이 있을 때만 표시)
 var APPLY_KEYCOLS=["접수순번","접수일시","구분","참가구분","팀명","대표자","이름","연락처","시도별","지역","예선합격","최종합격","수상","불참","다회참가자"];
+// 색상 마킹 (테두리+채우기)
+var APPLY_COLORS={};   // { "seq": {bg:"#색상", bd:"#색상"} }
+var APPLY_COLOR_MODE=null; // null=비활성, {bg,bd}=활성 — 클릭하면 적용
 
 // ===== 한글 자모(초성/중성/종성) 검색 유틸 =====
 // "홍길동" 을 "ㅎㄱㄷ" / "홍ㄱ" / "ㅎㅗㅇ" 등 자모 조각으로 검색 가능하게 함
@@ -1502,6 +1506,7 @@ function dApply(){
       else { if(aw !== APPLY_F.awd) return false; }
     }
     if(APPLY_F.att && !_matchAttachFilter(r, AC, APPLY_F.att)) return false;
+    if(APPLY_F.color){var _cSeq=iSeq>=0?String(r[iSeq]||""):"";var _cC=_applyGetColor(_cSeq);if(APPLY_F.color==="__any__"){if(!_cC)return false;}else if(APPLY_F.color==="__none__"){if(_cC)return false;}else{if(!_cC||_cC.bd!==APPLY_F.color)return false;}}
     if(q){ return r.some(function(v){return jamoMatch(v, q);}); }
     return true;
   });
@@ -1595,6 +1600,18 @@ function dApply(){
   h+='<span style="flex:1"></span>';
   h+='<button class="btn" style="background:#0ea5e9;color:#fff;font-weight:700" onclick="applyReload()" title="참가자 데이터 새로고침">🔄 새로고침</button>';
   h+='</div>';
+  // 색상 마킹 툴바
+  var _cc=_applyColorCount();
+  h+='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;align-items:center;padding:8px 12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px">';
+  h+='<span style="font-weight:700;font-size:13px;color:#475569">🎨 색상</span>';
+  _APPLY_PRESETS.forEach(function(p,i){
+    var isActive=APPLY_COLOR_MODE&&APPLY_COLOR_MODE.bg===p.bg&&APPLY_COLOR_MODE.bd===p.bd;
+    h+='<div class="_acBtn" data-idx="'+i+'" onclick="applyColorPick('+i+')" style="width:28px;height:28px;background:'+p.bg+';border:2.5px solid '+p.bd+';border-radius:5px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;font-size:11px;'+(isActive?'outline:3px solid #1d4ed8;outline-offset:1px;':'')+'" title="'+p.label+'"></div>';
+  });
+  h+='<div onclick="applyColorPick(-1)" style="width:28px;height:28px;background:#fff;border:2px dashed #cbd5e1;border-radius:5px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;font-size:14px;color:#94a3b8" title="색칠 모드 해제">✕</div>';
+  h+='<span id="applyColorTip" style="display:'+(APPLY_COLOR_MODE?'inline':'none')+';font-size:12px;color:#2563eb;font-weight:600;animation:blinker 1.2s linear infinite">← 행을 클릭하면 색상 적용 (같은 색 다시 클릭 → 제거)</span>';
+  if(_cc) h+='<span style="flex:1"></span><span class="mut" style="font-size:12px">마킹 '+_cc+'건</span><button class="btn btn-s" style="background:#ef4444;color:#fff" onclick="applyColorClearAll()">전체 해제</button>';
+  h+='</div>';
   // 1행: 구분 / 참가구분 / 시도별
   h+='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">';
   if(iCat>=0) h+='<select class="in" style="flex:1;min-width:140px;padding:8px;border:1px solid #ddd;border-radius:6px" onchange="applyF(\'cat\',this.value)">'+opts(uniq(iCat),APPLY_F.cat,'구분')+'</select>';
@@ -1644,6 +1661,19 @@ function dApply(){
     h+='</select>';
     h+='</div>';
   }
+  // 색상 마킹 필터
+  if(_applyColorCount()>0){
+    var clrSel=APPLY_F.color||"";
+    h+='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">';
+    h+='<select class="in" style="flex:1;min-width:200px;padding:8px;border:1px solid #8b5cf6;border-radius:6px;background:#faf5ff;font-weight:600" onchange="applyF(\'color\',this.value)">';
+    h+='<option value="">🎨 색상 전체</option>';
+    h+='<option value="__any__"'+(clrSel==="__any__"?" selected":"")+'>🎨 색상 있음</option>';
+    h+='<option value="__none__"'+(clrSel==="__none__"?" selected":"")+'>○ 색상 없음</option>';
+    _APPLY_PRESETS.forEach(function(p,i){
+      h+='<option value="'+p.bd+'"'+(clrSel===p.bd?" selected":"")+' style="background:'+p.bg+'">● '+p.label+'</option>';
+    });
+    h+='</select></div>';
+  }
 
   // 📱 심사 모드 — 핸드폰 최적화 (이름 + 큰 체크박스 3개)
   if(APPLY_VIEW==="judge"){
@@ -1674,8 +1704,10 @@ function dApply(){
         var sub = [cat,div].filter(Boolean).join(" · ");
         var dupJ = _isDup(r);
         var rowBg = isAbsentJ ? "#f3f4f6" : (dupJ ? "#fef9c3" : (ri%2?"#fafafa":"#fff"));
+        var _rcJ=_applyGetColor(seq); if(_rcJ&&_rcJ.bg) rowBg=_rcJ.bg;
+        var _rcSJ=_applyRowColorStyle(seq);
         var absStyle = isAbsentJ?'color:#9ca3af;text-decoration:line-through;':(dupJ?'font-weight:700;':'');
-        h+='<div style="display:flex;gap:8px;align-items:center;padding:12px;border-bottom:1px solid #e5e7eb;background:'+rowBg+';'+absStyle+'" ondblclick="applyEdit(\''+sqEsc+'\')">';
+        h+='<div style="display:flex;gap:8px;align-items:center;padding:12px;border-bottom:1px solid #e5e7eb;background:'+rowBg+';'+absStyle+_rcSJ+'" onclick="if(applyColorRow(\''+sqEsc+'\'))return" ondblclick="applyEdit(\''+sqEsc+'\')" oncontextmenu="if(\''+sqEsc+'\')applyColorCtx(event,\''+sqEsc+'\')">';
         h+='<div style="flex:1;min-width:0">';
         h+='<div style="font-weight:700;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(label)+'</div>';
         if(sub) h+='<div style="font-size:11px;color:#64748b;margin-top:2px">'+esc(sub)+(seq?' · #'+esc(seq):'')+'</div>';
@@ -1814,8 +1846,11 @@ function dApply(){
       var seq = iSeq>=0 ? String(r[iSeq]||"") : "";
       var sqEsc = seq ? esc(seq).replace(/\\/g,"\\\\").replace(/'/g,"\\'") : "";
       var rowFw = dupR && !isAbsent ? 'font-weight:700;' : '';
-      var dbl = seq ? ' ondblclick="applyEdit(\''+sqEsc+'\')" style="cursor:pointer;background:'+bg+';'+rowFw+'" title="더블클릭하면 수정"' : ' style="background:'+bg+';'+rowFw+'"';
-      h+='<tr'+dbl+' onmouseover="this.style.background=\'#eff6ff\'" onmouseout="this.style.background=\''+bg+'\'"'+(isAbsent?' class="apply-absent"':'')+'>';
+      var _rc=_applyRowColorStyle(seq);
+      var _rcBg=_applyGetColor(seq);
+      var _rowBg=(_rcBg&&_rcBg.bg)?_rcBg.bg:bg;
+      var dbl = seq ? ' onclick="if(applyColorRow(\''+sqEsc+'\'))return" ondblclick="applyEdit(\''+sqEsc+'\')" oncontextmenu="if(\''+sqEsc+'\')applyColorCtx(event,\''+sqEsc+'\')" style="cursor:pointer;background:'+_rowBg+';'+rowFw+_rc+'" title="더블클릭=수정 · 우클릭=색상"' : ' style="background:'+bg+';'+rowFw+'"';
+      h+='<tr'+dbl+' onmouseover="if(!APPLY_COLOR_MODE)this.style.background=\'#eff6ff\'" onmouseout="this.style.background=\''+_rowBg+'\'"'+(isAbsent?' class="apply-absent"':'')+'>';
       h+='<td style="padding:8px 6px;border-bottom:1px solid #f1f5f9;text-align:center;font-weight:700;color:#4338ca;background:#eef2ff">'+(ri+1)+'</td>';
       showCols.forEach(function(ci){
         var s=String(r[ci]==null?"":r[ci]);
@@ -3816,6 +3851,7 @@ function loadApply_(silent){
     if(cfg && cfg.cats && cfg.cats.length) APPLY_CATS=cfg.cats;
     if(cfg){ APPLY_FORM_URL=cfg.formUrl||""; APPLY_FORM_URL_PDF=cfg.formUrlPdf||""; DRIVE_UPLOAD_URL=cfg.driveUploadUrl||""; }
     if(!APPLY_CATS) APPLY_CATS=APPLY_CATS_DEFAULT;
+    _loadApplyColors();
     if(APPLY_SORT.col<0 && APPLY && APPLY.headers){
       var si=APPLY.headers.indexOf("접수순번");
       if(si>=0) APPLY_SORT={col:si, asc:true};
@@ -4049,6 +4085,7 @@ function _applyRenderListBody(){
     if(APPLY_F.abs && iAbsH>=0){ var ya=isYes(r[iAbsH]); if(APPLY_F.abs==="불참"&&!ya) return false; if(APPLY_F.abs==="참석"&&ya) return false; }
     if(APPLY_F.awd && iAwdH>=0){ var aw=String(r[iAwdH]||"").trim(); if(APPLY_F.awd==="__any__"){ if(!aw) return false; } else if(APPLY_F.awd==="__none__"){ if(aw) return false; } else { if(aw!==APPLY_F.awd) return false; } }
     if(APPLY_F.att && !_matchAttachFilter(r, AC, APPLY_F.att)) return false;
+    if(APPLY_F.color){var _cSeq=iSeq>=0?String(r[iSeq]||""):"";var _cC=_applyGetColor(_cSeq);if(APPLY_F.color==="__any__"){if(!_cC)return false;}else if(APPLY_F.color==="__none__"){if(_cC)return false;}else{if(!_cC||_cC.bd!==APPLY_F.color)return false;}}
     if(q){ return r.some(function(v){return jamoMatch(v, q);}); }
     return true;
   });
@@ -4083,8 +4120,10 @@ function _applyRenderListBody(){
       if(isAbsent2) bg="#f3f4f6";
       var seq=iSeq>=0?String(r[iSeq]||""):"";
       var sqEsc=seq?esc(seq).replace(/\\/g,"\\\\").replace(/'/g,"\\'"):"";
-      var dbl=seq?' ondblclick="applyEdit(\''+sqEsc+'\')" style="cursor:pointer;background:'+bg+'" title="더블클릭하면 수정"':' style="background:'+bg+'"';
-      bh+='<tr'+dbl+' onmouseover="this.style.background=\'#eff6ff\'" onmouseout="this.style.background=\''+bg+'\'"'+(isAbsent2?' class="apply-absent"':'')+'>';
+      var _rc2=_applyGetColor(seq); if(_rc2&&_rc2.bg) bg=_rc2.bg;
+      var _rcS2=_applyRowColorStyle(seq);
+      var dbl=seq?' onclick="if(applyColorRow(\''+sqEsc+'\'))return" ondblclick="applyEdit(\''+sqEsc+'\')" oncontextmenu="if(\''+sqEsc+'\')applyColorCtx(event,\''+sqEsc+'\')" style="cursor:pointer;background:'+bg+';'+_rcS2+'" title="더블클릭=수정 · 우클릭=색상"':' style="background:'+bg+'"';
+      bh+='<tr'+dbl+' onmouseover="if(!APPLY_COLOR_MODE)this.style.background=\'#eff6ff\'" onmouseout="this.style.background=\''+bg+'\'"'+(isAbsent2?' class="apply-absent"':'')+'>';
       bh+='<td style="padding:8px 6px;border-bottom:1px solid #f1f5f9;text-align:center;font-weight:700;color:#4338ca;background:#eef2ff">'+(ri+1)+'</td>';
       showCols.forEach(function(ci){
         var s=String(r[ci]==null?"":r[ci]);
@@ -4209,6 +4248,111 @@ function applyChkSave(){
     });
   });
 }
+// ===== 색상 마킹 (테두리+채우기) =====
+var _APPLY_PRESETS=[
+  {label:"빨강",   bg:"#fee2e2",bd:"#ef4444"},
+  {label:"주황",   bg:"#ffedd5",bd:"#f97316"},
+  {label:"노랑",   bg:"#fef9c3",bd:"#eab308"},
+  {label:"초록",   bg:"#dcfce7",bd:"#22c55e"},
+  {label:"파랑",   bg:"#dbeafe",bd:"#3b82f6"},
+  {label:"보라",   bg:"#ede9fe",bd:"#8b5cf6"},
+  {label:"분홍",   bg:"#fce7f3",bd:"#ec4899"},
+  {label:"회색",   bg:"#f3f4f6",bd:"#6b7280"}
+];
+function _loadApplyColors(){
+  if(!CID) return;
+  var cfg=_evtCaches[CID]&&_evtCaches[CID].Config||[];
+  for(var i=0;i<cfg.length;i++){
+    if(cfg[i].k==="APPLY_COLORS"){
+      try{ APPLY_COLORS=JSON.parse(cfg[i].v)||{}; }catch(e){ APPLY_COLORS={}; }
+      return;
+    }
+  }
+  APPLY_COLORS={};
+}
+function _saveApplyColors(){
+  api("setConfigValue",{id:CID, key:"APPLY_COLORS", value:JSON.stringify(APPLY_COLORS)});
+}
+function _applyGetColor(seq){
+  return APPLY_COLORS[String(seq)]||null;
+}
+function _applyRowColorStyle(seq){
+  var c=_applyGetColor(seq);
+  if(!c) return "";
+  var s="";
+  if(c.bg) s+="background:"+c.bg+" !important;";
+  if(c.bd) s+="outline:2.5px solid "+c.bd+";outline-offset:-2px;";
+  return s;
+}
+// 색상 팔레트 토글
+function applyColorToggle(){
+  var el=document.getElementById("applyColorPalette");
+  if(el){ el.style.display=el.style.display==="none"?"block":"none"; return; }
+}
+// 프리셋 색상 선택 → 색칠 모드 진입
+function applyColorPick(idx){
+  if(idx<0){ APPLY_COLOR_MODE=null; }
+  else { APPLY_COLOR_MODE={bg:_APPLY_PRESETS[idx].bg, bd:_APPLY_PRESETS[idx].bd}; }
+  // 버튼 활성 상태 표시
+  var btns=document.querySelectorAll("._acBtn");
+  for(var i=0;i<btns.length;i++){
+    btns[i].style.outline = (APPLY_COLOR_MODE && parseInt(btns[i].dataset.idx)===idx) ? "3px solid #1d4ed8" : "none";
+  }
+  var tip=document.getElementById("applyColorTip");
+  if(tip) tip.style.display=APPLY_COLOR_MODE?"inline":"none";
+}
+// 행 클릭 시 색상 적용 (색칠 모드일 때)
+function applyColorRow(seq){
+  if(!APPLY_COLOR_MODE) return false; // 색칠 모드 아님 → 무시
+  var key=String(seq);
+  var cur=APPLY_COLORS[key];
+  // 같은 색이면 토글(제거)
+  if(cur && cur.bg===APPLY_COLOR_MODE.bg && cur.bd===APPLY_COLOR_MODE.bd){
+    delete APPLY_COLORS[key];
+  } else {
+    APPLY_COLORS[key]={bg:APPLY_COLOR_MODE.bg, bd:APPLY_COLOR_MODE.bd};
+  }
+  _saveApplyColors();
+  draw();
+  return true; // 이벤트 소비됨
+}
+// 개별 행 우클릭 색상 메뉴
+function applyColorCtx(evt, seq){
+  evt.preventDefault();
+  var cur=_applyGetColor(seq);
+  var h='<div style="padding:8px 0">';
+  h+='<div style="font-weight:700;margin-bottom:8px;padding:0 14px">🎨 색상 지정 — 접수순번 '+esc(seq)+'</div>';
+  h+='<div style="display:flex;gap:6px;flex-wrap:wrap;padding:0 14px">';
+  _APPLY_PRESETS.forEach(function(p,i){
+    var sel=cur&&cur.bg===p.bg&&cur.bd===p.bd;
+    h+='<div onclick="applyColorSet(\''+esc(seq)+'\','+i+')" style="width:36px;height:36px;background:'+p.bg+';border:3px solid '+p.bd+';border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;'+(sel?'outline:3px solid #1d4ed8;outline-offset:1px;':'')+'" title="'+p.label+'">'+(sel?'✓':'')+'</div>';
+  });
+  h+='</div>';
+  h+='<div style="margin-top:10px;padding:0 14px;display:flex;gap:6px">';
+  h+='<button class="btn" style="background:#ef4444;color:#fff" onclick="applyColorSet(\''+esc(seq)+'\',-1)">🚫 색상 제거</button>';
+  h+='<button class="btn" onclick="closePopup()">닫기</button>';
+  h+='</div></div>';
+  openPopup(h, 340);
+}
+// 색상 설정 (우클릭 메뉴에서)
+function applyColorSet(seq, presetIdx){
+  var key=String(seq);
+  if(presetIdx<0){ delete APPLY_COLORS[key]; }
+  else { APPLY_COLORS[key]={bg:_APPLY_PRESETS[presetIdx].bg, bd:_APPLY_PRESETS[presetIdx].bd}; }
+  _saveApplyColors();
+  closePopup();
+  draw();
+}
+// 색상 전체 지우기
+function applyColorClearAll(){
+  if(!confirm("모든 참가자의 색상 마킹을 지우시겠습니까?")) return;
+  APPLY_COLORS={};
+  _saveApplyColors();
+  draw();
+}
+// 색상 마킹 수 카운트
+function _applyColorCount(){ var n=0; for(var k in APPLY_COLORS) n++; return n; }
+
 function applyView(v){ APPLY_VIEW=v; draw(); }
 function applySort(i){
   if(APPLY_SORT.col===i) APPLY_SORT.asc=!APPLY_SORT.asc;
@@ -4256,6 +4400,7 @@ function _applySmsFilteredRows(){
     if(APPLY_F.abs && iAbsH>=0){ var ya=isYes(r[iAbsH]); if(APPLY_F.abs==="불참"&&!ya)return false; if(APPLY_F.abs==="참석"&&ya)return false; }
     if(APPLY_F.awd && iAwdH>=0){ var aw=String(r[iAwdH]||"").trim(); if(APPLY_F.awd==="__any__"){if(!aw)return false;} else if(APPLY_F.awd==="__none__"){if(aw)return false;} else {if(aw!==APPLY_F.awd)return false;} }
     if(APPLY_F.att && !_matchAttachFilter(r, AC, APPLY_F.att)) return false;
+    if(APPLY_F.color){var _cSeq=iSeq>=0?String(r[iSeq]||""):"";var _cC=_applyGetColor(_cSeq);if(APPLY_F.color==="__any__"){if(!_cC)return false;}else if(APPLY_F.color==="__none__"){if(_cC)return false;}else{if(!_cC||_cC.bd!==APPLY_F.color)return false;}}
     if(q){ return r.some(function(v){return jamoMatch(v, q);}); }
     return true;
   });
@@ -5090,6 +5235,7 @@ function applyXLSX(){
     if(APPLY_F.fin && iFinH>=0){ var y2=isYes(r[iFinH]); if(APPLY_F.fin==="합격"&&!y2) return false; if(APPLY_F.fin==="불합격"&&y2) return false; }
     if(APPLY_F.awd && iAwdH>=0){ var aw=String(r[iAwdH]||"").trim(); if(APPLY_F.awd==="__any__"){ if(!aw) return false; } else if(APPLY_F.awd==="__none__"){ if(aw) return false; } else { if(aw!==APPLY_F.awd) return false; } }
     if(APPLY_F.att && !_matchAttachFilter(r, AC, APPLY_F.att)) return false;
+    if(APPLY_F.color){var _cSeq=iSeq>=0?String(r[iSeq]||""):"";var _cC=_applyGetColor(_cSeq);if(APPLY_F.color==="__any__"){if(!_cC)return false;}else if(APPLY_F.color==="__none__"){if(_cC)return false;}else{if(!_cC||_cC.bd!==APPLY_F.color)return false;}}
     if(q){ return r.some(function(v){return jamoMatch(v, q);}); }
     return true;
   });
