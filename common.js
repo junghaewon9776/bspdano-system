@@ -302,9 +302,9 @@ function _dispatch(p) {
         case "updateApply":  _apiUpdateApplyBySeq(p).then(resolve); return;
         case "deleteApply":  _apiDeleteApplyBySeq(p).then(resolve); return;
 
-        // 사진 업로드 (Drive GAS 프록시 — 추후 연동)
-        case "uploadPhoto":    resolve({ok:false, err:"사진 업로드는 Drive 설정 후 사용 가능합니다"}); return;
-        case "deletePhoto":    resolve({ok:false, err:"사진 삭제는 Drive 설정 후 사용 가능합니다"}); return;
+        // 사진 업로드 (Firebase Storage)
+        case "uploadPhoto":    _apiUploadPhoto(p).then(resolve); return;
+        case "deletePhoto":    _apiDeletePhoto(p).then(resolve); return;
 
         // 대여자산
         case "listAssets":     _apiListMainNode(p, "Assets").then(resolve); return;
@@ -665,6 +665,54 @@ function _apiDeleteIncCard(p) {
   return _incCardHelper(evtId).then(function(h){
     h.cards = h.cards.filter(function(c){return c.name!==p.name;});
     return _saveIncCards(evtId, h.data, h.cards);
+  });
+}
+
+// ───────── 사진 업로드 (Firebase Storage) ─────────
+var fbStorage = (typeof firebase !== 'undefined' && firebase.storage) ? firebase.storage() : null;
+
+function _apiUploadPhoto(p) {
+  if (!fbStorage) return Promise.resolve({ok:false, err:"Firebase Storage 미초기화"});
+  var dataUrl = p.dataUrl;
+  if (!dataUrl) return Promise.resolve({ok:false, err:"사진 데이터 없음"});
+  // dataUrl → Blob 변환
+  var parts = dataUrl.split(",");
+  var mime = (parts[0].match(/:(.*?);/)||[])[1] || "image/jpeg";
+  var raw = atob(parts[1]);
+  var arr = new Uint8Array(raw.length);
+  for (var i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
+  var blob = new Blob([arr], {type: mime});
+  // 경로: photos/{evtId}/{type}/{timestamp}_{name}
+  var evtId = _getEvtId(p) || "general";
+  var type = p.type || "photo";
+  var name = p.name || ("img_" + Date.now());
+  var ext = name.lastIndexOf(".") >= 0 ? name.substring(name.lastIndexOf(".")) : ".jpg";
+  var path = "photos/" + evtId + "/" + type + "/" + Date.now() + "_" + Math.random().toString(36).slice(2,6) + ext;
+  var ref = fbStorage.ref(path);
+  return ref.put(blob, {contentType: mime}).then(function(snap) {
+    return snap.ref.getDownloadURL();
+  }).then(function(url) {
+    return {ok:true, url:url, path:path};
+  }).catch(function(err) {
+    return {ok:false, err:"업로드 실패: " + err.message};
+  });
+}
+
+function _apiDeletePhoto(p) {
+  if (!fbStorage) return Promise.resolve({ok:false, err:"Firebase Storage 미초기화"});
+  if (!p.path && p.url) {
+    // URL에서 path 추출 시도
+    try {
+      var decoded = decodeURIComponent(p.url);
+      var match = decoded.match(/\/o\/(.+?)\?/);
+      if (match) p.path = match[1];
+    } catch(e){}
+  }
+  if (!p.path) return Promise.resolve({ok:false, err:"삭제할 사진 경로 없음"});
+  return fbStorage.ref(p.path).delete().then(function() {
+    return {ok:true};
+  }).catch(function(err) {
+    return {ok:false, err:"삭제 실패: " + err.message};
   });
 }
 
