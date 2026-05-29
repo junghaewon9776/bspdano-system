@@ -434,7 +434,7 @@ label{display:block;font-size:10px;color:#999;margin-bottom:3px}
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <!-- firebase-storage 불필요 (Drive 업로드 사용) -->
 <script src="firebase-config.js"></script>
-<script src="common.js"></script>
+<script src="common.js?v=20260529"></script>
 
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" onerror="console.warn('XLSX CDN load failed')"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js" onerror="console.warn('xlsx-js-style CDN load failed')"></script>
@@ -3287,7 +3287,7 @@ function dAwards(){
   h+='<span style="flex:1"></span>';
   h+='<button class="btn" style="background:#ea580c;color:#fff;font-weight:700" onclick="openSheet(\'Awards\')">🏆 상 관리(시트)</button>';
   h+='<button class="btn" style="background:#7c3aed;color:#fff;font-weight:600" onclick="awardsManage()">🏆 상 관리</button>';
-  h+='<button class="btn btn-b" onclick="awardsTableExport()">⬇ 엑셀</button>';
+  h+='<button class="btn btn-b" onclick="awardsTableExport(window._awStyle)">⬇ 엑셀</button>';
   h+='<button class="btn" style="background:#2563eb;color:#fff;font-weight:700" onclick="awardsMergeExport()">📄 메일머지</button>';
   h+='<button class="btn" style="background:#0ea5e9;color:#fff;font-weight:700" onclick="APPLY=null;draw()">🔄 새로고침</button>';
   h+='</div>';
@@ -3612,9 +3612,10 @@ function dAwards(){
   return h;
 }
 // 상장현황 엑셀 내보내기
-function awardsTableExport(){
+function awardsTableExport(style){
   if(typeof XLSX==="undefined"){ toast("XLSX 로딩 중",true); return; }
   if(!APPLY||!APPLY.headers) return;
+  style=style||"table";
   var H=APPLY.headers, R=APPLY.rows||[];
   var AC2=window._awCols||{name:true,group:true,tel:true};
   var awList=_awardsNorm();
@@ -3677,6 +3678,77 @@ function awardsTableExport(){
     if(AC2.region&&iReg2>=0){var v=String(r[iReg2]||"");if(v)l.push(v);}
     return l.join("\n");
   }
+  // 셀 개별 텍스트 (리스트용)
+  function _ctCols(r){
+    var o={};
+    if(iSeq2>=0) o["순번"]=String(r[iSeq2]||"");
+    if(iCat2>=0) o["구분"]=String(r[iCat2]||"");
+    if(iDiv2>=0) o["참가구분"]=String(r[iDiv2]||"");
+    var nm=iName2>=0?String(r[iName2]||""):""; if(!nm&&iRep2>=0) nm=String(r[iRep2]||"");
+    o["이름"]=nm;
+    if(iTeam2>=0) o["팀명"]=String(r[iTeam2]||"");
+    if(iGrp2>=0) o["소속"]=String(r[iGrp2]||"");
+    if(iReg2>=0) o["시도별"]=String(r[iReg2]||"");
+    if(iTel2>=0) o["연락처"]=String(r[iTel2]||"");
+    return o;
+  }
+
+  if(style==="list"||style==="card"){
+    // ═══ 리스트/카드형 엑셀: 상별로 그룹핑 ═══
+    var aoa=[];
+    var listHeaders=["No","상이름","훈격"];
+    if(iCat2>=0) listHeaders.push("구분");
+    if(iDiv2>=0) listHeaders.push("참가구분");
+    listHeaders.push("이름");
+    if(iTeam2>=0) listHeaders.push("팀명");
+    if(iGrp2>=0) listHeaders.push("소속");
+    if(iReg2>=0) listHeaders.push("시도별");
+    if(iTel2>=0) listHeaders.push("연락처");
+    if(iSeq2>=0) listHeaders.push("접수순번");
+    aoa.push(listHeaders);
+    var no=1;
+    awList.forEach(function(a){
+      var label=_awLabel(a);
+      var allW=[];
+      colList.forEach(function(col){ (awDivMap[label+"||"+col.key]||[]).forEach(function(r){allW.push(r);}); });
+      if(!allW.length){
+        // 수상자 없어도 상 행은 출력
+        var emptyRow=[no++, a.n, a.giver||""];
+        if(iCat2>=0) emptyRow.push("");
+        if(iDiv2>=0) emptyRow.push("");
+        emptyRow.push("(없음)");
+        if(iTeam2>=0) emptyRow.push("");
+        if(iGrp2>=0) emptyRow.push("");
+        if(iReg2>=0) emptyRow.push("");
+        if(iTel2>=0) emptyRow.push("");
+        if(iSeq2>=0) emptyRow.push("");
+        aoa.push(emptyRow);
+      } else {
+        allW.forEach(function(r){
+          var c=_ctCols(r);
+          var row=[no++, a.n, a.giver||""];
+          if(iCat2>=0) row.push(c["구분"]||"");
+          if(iDiv2>=0) row.push(c["참가구분"]||"");
+          row.push(c["이름"]||"");
+          if(iTeam2>=0) row.push(c["팀명"]||"");
+          if(iGrp2>=0) row.push(c["소속"]||"");
+          if(iReg2>=0) row.push(c["시도별"]||"");
+          if(iTel2>=0) row.push(c["연락처"]||"");
+          if(iSeq2>=0) row.push(c["순번"]||"");
+          aoa.push(row);
+        });
+      }
+    });
+    var ws=XLSX.utils.aoa_to_sheet(aoa);
+    var wb=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb,ws,"상장현황");
+    var fname="상장현황_리스트_"+(CUR_EVT&&CUR_EVT.nm?CUR_EVT.nm:"")+"_"+today().replace(/-/g,"")+".xlsx";
+    XLSX.writeFile(wb,fname);
+    toast("엑셀 내보내기 완료 (리스트)");
+    return;
+  }
+
+  // ═══ 기본 표/한글/엑셀 스타일: 기존 테이블형 ═══
   var aoa=[]; // array of arrays
   // 2행 헤더: 1행=대분류(구분), 2행=중분류(참가구분)
   var catColSpan={};
