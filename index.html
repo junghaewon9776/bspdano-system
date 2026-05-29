@@ -8699,7 +8699,7 @@ function expAddSave(){
     if(!r||!r.ok){ toast((r&&r.err)||"실패", true); return; }
     closePopup();
     toast("세출 항목 추가됨");
-    refreshData(false);
+    refreshData(false).then(function(){ draw(); });
   });
 }
 function expEdit(rowId){
@@ -8740,7 +8740,7 @@ function expEditSave(rowId){
     if(!r||!r.ok){ toast((r&&r.err)||"실패", true); return; }
     closePopup();
     toast("수정됨");
-    refreshData(false);
+    refreshData(false).then(function(){ draw(); });
   });
 }
 function expDel(rowId){
