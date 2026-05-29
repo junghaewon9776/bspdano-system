@@ -444,9 +444,9 @@ label{display:block;font-size:10px;color:#999;margin-bottom:3px}
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+<!-- firebase-storage 제거: 구글 드라이브 프록시로 대체 -->
 <script src="firebase-config.js"></script>
-<script src="common.js?v=20260529g"></script>
+<script src="common.js?v=20260529j"></script>
 
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" onerror="console.warn('XLSX CDN load failed')"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js" onerror="console.warn('xlsx-js-style CDN load failed')"></script>
@@ -16871,13 +16871,49 @@ function _evtMgrHtml(){
     +(fmOn?'✅ ON':'❌ OFF')+'</button>'
     +'</div></div>';
 
-  return css + linkToggle + fieldToggle + evTable + matrix;
+  // 드라이브 프록시 URL 설정
+  var dpUrl = (typeof DRIVE_PROXY_URL!=='undefined'&&DRIVE_PROXY_URL)||(_cache&&_cache.DriveProxyUrl)||"";
+  var driveCard = '<div class="card" style="padding:20px">'
+    +'<h3 style="margin:0 0 8px;font-size:18px">📁 구글 드라이브 연동</h3>'
+    +'<div class="mut" style="margin-bottom:10px">자료실 · 구매사진 · 활동사진을 구글 드라이브에 저장합니다.<br>GAS 웹앱 배포 후 URL을 입력하세요.</div>'
+    +'<div style="display:flex;gap:8px;align-items:center">'
+    +'<input id="driveProxyUrl" value="'+esc(dpUrl)+'" placeholder="https://script.google.com/macros/s/.../exec" style="flex:1;padding:8px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:12px;font-family:monospace">'
+    +'<button class="btn btn-b" onclick="saveDriveProxy()">저장</button>'
+    +'<button class="btn" onclick="testDriveProxy()">테스트</button>'
+    +'</div>'
+    +'<div id="driveTestResult" class="mut" style="margin-top:8px;font-size:12px"></div>'
+    +'</div>';
+
+  return css + linkToggle + fieldToggle + driveCard + evTable + matrix;
 }
 
 // 전역: 행사에서 활성화 가능한 모든 모듈 — 새 모듈 추가 시 여기만 수정
 var ALL_MODS = ["apply","budget","purchase","act","mem","fee","rental","files","groups","vehicle"];
 
 // 행사 추가/수정 팝업
+function saveDriveProxy(){
+  var url=(document.getElementById("driveProxyUrl").value||"").trim();
+  if(!url){toast("URL을 입력하세요",true);return;}
+  showLoading("저장 중...");
+  fbDb.ref('/main/DriveProxyUrl').set(url).then(function(){
+    DRIVE_PROXY_URL=url;
+    hideLoading();toast("✅ 드라이브 프록시 URL 저장됨");
+  });
+}
+function testDriveProxy(){
+  var url=(document.getElementById("driveProxyUrl").value||"").trim();
+  if(!url){toast("URL을 입력하세요",true);return;}
+  var el=document.getElementById("driveTestResult");
+  el.textContent="⏳ 테스트 중...";
+  el.style.color="#6366f1";
+  fetch(url,{method:"POST",headers:{"Content-Type":"text/plain"},body:JSON.stringify({action:"ping"}),redirect:"follow"})
+    .then(function(r){return r.json()})
+    .then(function(r){
+      if(r.ok){el.style.color="#16a34a";el.textContent="✅ 연결 성공! 루트폴더: "+r.rootId;}
+      else{el.style.color="#dc2626";el.textContent="❌ 실패: "+(r.err||"알 수 없는 오류");}
+    })
+    .catch(function(e){el.style.color="#dc2626";el.textContent="❌ 통신 실패: "+e.message;});
+}
 function toggleFieldMenu(){
   var next = FIELD_MENU==="on" ? "off" : "on";
   api("setConfigValue",{id:CID,key:"FIELD_MENU",value:next}).then(function(r){

@@ -671,52 +671,54 @@ function _apiDeleteIncCard(p) {
   });
 }
 
-// ───────── 사진 업로드 (Firebase Storage) ─────────
-var fbStorage = (typeof firebase !== 'undefined' && firebase.storage) ? firebase.storage() : null;
+// ───────── 파일 업로드 (Google Drive via GAS Proxy) ─────────
+var DRIVE_PROXY_URL = "";
+
+function _driveProxy(payload) {
+  if (!DRIVE_PROXY_URL) {
+    var cfg = (_evtCaches && _evtCaches[_getEvtId({})||""] && _evtCaches[_getEvtId({})||""].Config) || [];
+    for (var i = 0; i < cfg.length; i++) {
+      if (cfg[i] && cfg[i].k === "DRIVE_PROXY_URL") { DRIVE_PROXY_URL = cfg[i].v || ""; break; }
+    }
+    if (!DRIVE_PROXY_URL && _cache && _cache.DriveProxyUrl) DRIVE_PROXY_URL = _cache.DriveProxyUrl;
+  }
+  if (!DRIVE_PROXY_URL) return Promise.resolve({ok:false, err:"드라이브 프록시 URL 미설정. 행사관리에서 설정하세요."});
+  return fetch(DRIVE_PROXY_URL, {
+    method: "POST",
+    headers: {"Content-Type": "text/plain"},
+    body: JSON.stringify(payload),
+    redirect: "follow"
+  }).then(function(r) { return r.json(); })
+    .catch(function(err) { return {ok:false, err:"프록시 통신 실패: " + err.message}; });
+}
 
 function _apiUploadPhoto(p) {
-  if (!fbStorage) return Promise.resolve({ok:false, err:"Firebase Storage 미초기화"});
   var dataUrl = p.dataUrl;
   if (!dataUrl) return Promise.resolve({ok:false, err:"사진 데이터 없음"});
-  // dataUrl → Blob 변환
   var parts = dataUrl.split(",");
   var mime = (parts[0].match(/:(.*?);/)||[])[1] || "image/jpeg";
-  var raw = atob(parts[1]);
-  var arr = new Uint8Array(raw.length);
-  for (var i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
-  var blob = new Blob([arr], {type: mime});
-  // 경로: photos/{evtId}/{type}/{timestamp}_{name}
+  var base64 = parts[1];
   var evtId = _getEvtId(p) || "general";
-  var type = p.type || "photo";
-  var name = p.name || ("img_" + Date.now());
-  var ext = name.lastIndexOf(".") >= 0 ? name.substring(name.lastIndexOf(".")) : ".jpg";
-  var path = "photos/" + evtId + "/" + type + "/" + Date.now() + "_" + Math.random().toString(36).slice(2,6) + ext;
-  var ref = fbStorage.ref(path);
-  return ref.put(blob, {contentType: mime}).then(function(snap) {
-    return snap.ref.getDownloadURL();
-  }).then(function(url) {
-    return {ok:true, url:url, path:path};
-  }).catch(function(err) {
-    return {ok:false, err:"업로드 실패: " + err.message};
+  var category = p.type === "purchase" ? "구매사진" : "활동사진";
+  return _driveProxy({
+    action: "upload",
+    base64: base64,
+    mime: mime,
+    filename: p.name || ("photo_" + Date.now() + ".jpg"),
+    category: category,
+    evtId: evtId
   });
 }
 
 function _apiDeletePhoto(p) {
-  if (!fbStorage) return Promise.resolve({ok:false, err:"Firebase Storage 미초기화"});
-  if (!p.path && p.url) {
-    // URL에서 path 추출 시도
-    try {
-      var decoded = decodeURIComponent(p.url);
-      var match = decoded.match(/\/o\/(.+?)\?/);
-      if (match) p.path = match[1];
-    } catch(e){}
+  var fileId = null;
+  if (p.url) {
+    var m = String(p.url).match(/id=([^&]+)/);
+    if (m) fileId = m[1];
   }
-  if (!p.path) return Promise.resolve({ok:false, err:"삭제할 사진 경로 없음"});
-  return fbStorage.ref(p.path).delete().then(function() {
-    return {ok:true};
-  }).catch(function(err) {
-    return {ok:false, err:"삭제 실패: " + err.message};
-  });
+  if (p.id) fileId = p.id;
+  if (!fileId) return Promise.resolve({ok:false, err:"삭제할 파일 ID 없음"});
+  return _driveProxy({action: "delete", fileId: fileId});
 }
 
 // ───────── 범용 CRUD (행사별 데이터) ─────────
@@ -1711,154 +1713,32 @@ function _apiBulkReplaceAccounts(p) {
   });
 }
 
-// ───────── 자료실 (Firebase RTDB 저장) ─────────
-function _filesRef(evtId) {
-  return fbDb.ref('/evtData/' + evtId + '/Files');
-}
-
+// (기존 Firebase RTDB 자료실 제거됨 — Google Drive 프록시로 대체)
 function _apiListFileFolders(p) {
-  var evtId = _getEvtId(p);
-  if (!evtId) return Promise.resolve({ok:true, folders:[]});
-  return new Promise(function(resolve) {
-    _filesRef(evtId).child('folders').once('value', function(snap) {
-      var raw = snap.val();
-      var arr = [];
-      if (raw) {
-        if (Array.isArray(raw)) arr = raw.filter(function(r){return r!=null;});
-        else Object.keys(raw).forEach(function(k){if(raw[k])arr.push(raw[k]);});
-      }
-      // 각 폴더에 파일 개수 추가
-      _filesRef(evtId).child('items').once('value', function(snap2) {
-        var items = snap2.val();
-        var allFiles = [];
-        if (items) {
-          if (Array.isArray(items)) allFiles = items.filter(function(r){return r!=null;});
-          else Object.keys(items).forEach(function(k){if(items[k])allFiles.push(items[k]);});
-        }
-        arr.forEach(function(f) {
-          f.fileCnt = allFiles.filter(function(it){return it.folderId===f.id;}).length;
-        });
-        resolve({ok:true, folders:arr});
-      });
-    });
-  });
+  return _driveProxy({action: "listFolders", evtId: _getEvtId(p) || "general"});
 }
-
 function _apiAddFileFolder(p) {
-  var evtId = _getEvtId(p);
-  if (!evtId) return Promise.resolve({ok:false, err:"행사 미선택"});
-  return new Promise(function(resolve) {
-    _filesRef(evtId).child('folders').once('value', function(snap) {
-      var raw = snap.val();
-      var arr = [];
-      if (raw) {
-        if (Array.isArray(raw)) arr = raw.filter(function(r){return r!=null;});
-        else Object.keys(raw).forEach(function(k){if(raw[k])arr.push(raw[k]);});
-      }
-      arr.push({id:uid(), name:p.name, createdAt:now_()});
-      _filesRef(evtId).child('folders').set(arr).then(function() {
-        resolve({ok:true});
-      });
-    });
-  });
+  return _driveProxy({action: "addFolder", evtId: _getEvtId(p) || "general", name: p.name || "새 폴더"});
 }
-
 function _apiDeleteFileFolder(p) {
-  var evtId = _getEvtId(p);
-  if (!evtId) return Promise.resolve({ok:false, err:"행사 미선택"});
-  return new Promise(function(resolve) {
-    var ref = _filesRef(evtId);
-    Promise.all([
-      ref.child('folders').once('value'),
-      ref.child('items').once('value')
-    ]).then(function(snaps) {
-      var rawF = snaps[0].val();
-      var rawI = snaps[1].val();
-      var folders = [];
-      if (rawF) {
-        if (Array.isArray(rawF)) folders = rawF.filter(function(r){return r!=null;});
-        else Object.keys(rawF).forEach(function(k){if(rawF[k])folders.push(rawF[k]);});
-      }
-      var items = [];
-      if (rawI) {
-        if (Array.isArray(rawI)) items = rawI.filter(function(r){return r!=null;});
-        else Object.keys(rawI).forEach(function(k){if(rawI[k])items.push(rawI[k]);});
-      }
-      folders = folders.filter(function(f){return f.id!==p.fid;});
-      items = items.filter(function(f){return f.folderId!==p.fid;});
-      Promise.all([
-        ref.child('folders').set(folders),
-        ref.child('items').set(items)
-      ]).then(function() { resolve({ok:true}); });
-    });
-  });
+  return _driveProxy({action: "deleteFolder", fid: p.fid});
 }
-
 function _apiListFiles(p) {
-  var evtId = _getEvtId(p);
-  if (!evtId) return Promise.resolve({ok:true, files:[]});
-  return new Promise(function(resolve) {
-    _filesRef(evtId).child('items').once('value', function(snap) {
-      var raw = snap.val();
-      var arr = [];
-      if (raw) {
-        if (Array.isArray(raw)) arr = raw.filter(function(r){return r!=null;});
-        else Object.keys(raw).forEach(function(k){if(raw[k])arr.push(raw[k]);});
-      }
-      var filtered = arr.filter(function(f){return f.folderId===p.folderId;});
-      // base64 데이터는 목록에서 제외 (용량 절약)
-      var files = filtered.map(function(f) {
-        return {id:f.id, folderId:f.folderId, filename:f.filename, mime:f.mime, size:f.size, uploadedAt:f.uploadedAt, url:f.url||""};
-      });
-      resolve({ok:true, files:files});
-    });
-  });
+  return _driveProxy({action: "listFiles", folderId: p.folderId});
 }
-
 function _apiUploadFile(p) {
-  var evtId = _getEvtId(p);
-  if (!evtId) return Promise.resolve({ok:false, err:"행사 미선택"});
-  return new Promise(function(resolve) {
-    _filesRef(evtId).child('items').once('value', function(snap) {
-      var raw = snap.val();
-      var arr = [];
-      if (raw) {
-        if (Array.isArray(raw)) arr = raw.filter(function(r){return r!=null;});
-        else Object.keys(raw).forEach(function(k){if(raw[k])arr.push(raw[k]);});
-      }
-      var fileId = uid();
-      var dataUrl = "data:" + (p.mime||"application/octet-stream") + ";base64," + p.base64;
-      arr.push({
-        id:fileId, folderId:p.folderId, filename:p.filename,
-        mime:p.mime||"application/octet-stream", size:p.size||0,
-        uploadedAt:now_(), url:dataUrl
-      });
-      _filesRef(evtId).child('items').set(arr).then(function() {
-        resolve({ok:true, id:fileId});
-      }).catch(function(err) {
-        resolve({ok:false, err:"업로드 실패: " + err.message});
-      });
-    });
+  return _driveProxy({
+    action: "upload",
+    base64: p.base64,
+    mime: p.mime || "application/octet-stream",
+    filename: p.filename || "file",
+    category: "자료실",
+    evtId: _getEvtId(p) || "general",
+    folderId: p.folderId
   });
 }
-
 function _apiDeleteFile(p) {
-  var evtId = _getEvtId(p);
-  if (!evtId) return Promise.resolve({ok:false, err:"행사 미선택"});
-  return new Promise(function(resolve) {
-    _filesRef(evtId).child('items').once('value', function(snap) {
-      var raw = snap.val();
-      var arr = [];
-      if (raw) {
-        if (Array.isArray(raw)) arr = raw.filter(function(r){return r!=null;});
-        else Object.keys(raw).forEach(function(k){if(raw[k])arr.push(raw[k]);});
-      }
-      arr = arr.filter(function(f){return f.id!==p.fid;});
-      _filesRef(evtId).child('items').set(arr).then(function() {
-        resolve({ok:true});
-      });
-    });
-  });
+  return _driveProxy({action: "delete", fileId: p.fid, url: p.url});
 }
 
 // ───────── 첨부파일 ZIP 다운로드 (클라이언트 JSZip) ─────────
