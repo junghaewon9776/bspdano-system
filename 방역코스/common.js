@@ -578,6 +578,35 @@ function getCurrentMember() {
   return getMemberByUid(loadData(), u.uid);
 }
 
+// ───────── 회원/관리자 구분 + 접근 제어 ─────────
+function isMemberUser() {
+  const u = fbAuth.currentUser;
+  if (!u || !u.email) return false;
+  return /@bsp\.local$/i.test(u.email);
+}
+
+const MEMBER_ALLOWED_PAGES = ['index.html', 'today.html', 'monitor.html', 'monitor-public.html', 'stats.html', 'print.html'];
+
+function applyMemberNav() {
+  if (!isMemberUser()) return;
+  document.querySelectorAll('nav a').forEach(a => {
+    const href = (a.getAttribute('href') || '').split('?')[0];
+    if (['admin.html', 'members.html', 'accounts.html'].includes(href)) {
+      a.style.display = 'none';
+    }
+  });
+}
+
+function blockMemberAccess() {
+  const page = location.pathname.split('/').pop() || 'index.html';
+  if (isMemberUser() && !MEMBER_ALLOWED_PAGES.includes(page)) {
+    alert('관리자만 접근 가능한 페이지입니다.');
+    location.href = 'index.html';
+    return true;
+  }
+  return false;
+}
+
 function checkAdminAuth() {
   return new Promise((resolve) => {
     let resolved = false;
@@ -601,6 +630,11 @@ function checkAdminAuth() {
             });
           });
         }
+        // 회원 접근 제어
+        onDataReady(() => {
+          if (blockMemberAccess()) return;
+          applyMemberNav();
+        });
         resolve(true);
       } else {
         resolved = true;
@@ -721,6 +755,10 @@ async function doLogin() {
     localStorage.setItem('lastAdminId', id);
     document.getElementById('loginGate').remove();
     initFirebaseSync();
+    onDataReady(() => {
+      if (blockMemberAccess()) return;
+      applyMemberNav();
+    });
     if (window.onAuthSuccess) window.onAuthSuccess();
     onDataReady(() => {
       const u = (loadData().users || {})[fbAuth.currentUser?.uid] || {};
