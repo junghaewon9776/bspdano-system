@@ -446,7 +446,7 @@ label{display:block;font-size:10px;color:#999;margin-bottom:3px}
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 <script src="firebase-config.js"></script>
-<script src="common.js?v=20260529e"></script>
+<script src="common.js?v=20260529f"></script>
 
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" onerror="console.warn('XLSX CDN load failed')"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js" onerror="console.warn('xlsx-js-style CDN load failed')"></script>
@@ -936,8 +936,16 @@ async function doLogin(id,pw,keep,silent){
   // ⚡ lazy 모드: 무거운 데이터는 빈 배열로 초기화 (apiRefresh 에서 채움)
   acts=[];purs=[];exps=[];mems=[];notices=[];pays=[];dpst=[];inc=[];incTypes=[];expBG=[];txn=[];expTypes=[];gwanTypes=[];incCards=[];awards=[];memGroups=[];
 
-  // 행사 1개 이상이면 첫 번째 행사 자동 선택
-  CUR_EVT = EVENTS.length ? EVENTS[0] : null;
+  // 행사 선택: 이전에 저장된 행사 ID가 있으면 복원, 없으면 첫 번째 행사
+  var _savedEvtId = null;
+  try { _savedEvtId = localStorage.getItem("lastEvtId"); } catch(e){}
+  CUR_EVT = null;
+  if(_savedEvtId && EVENTS.length){
+    for(var _ei=0;_ei<EVENTS.length;_ei++){
+      if(EVENTS[_ei].evtId===_savedEvtId){CUR_EVT=EVENTS[_ei];break;}
+    }
+  }
+  if(!CUR_EVT) CUR_EVT = EVENTS.length ? EVENTS[0] : null;
 
   if (IS_APPLY_MODE) return false; // 신청폼 모드면 시스템 진입 차단
   document.getElementById("loginPage").style.display="none";
@@ -1044,6 +1052,8 @@ async function switchEvent(evtId){
   if(!r||!r.ok){ hideLoading(); toast((r&&r.err)||"행사 전환 실패", true); return; }
   if(r.evts) EVENTS=r.evts;
   CUR_EVT = r.curEvt || (EVENTS.filter(function(e){return e.evtId===evtId;})[0]) || CUR_EVT;
+  // 선택 행사 저장 — 새로고침 시 복원용
+  try { localStorage.setItem("lastEvtId", evtId); } catch(e){}
   AR=r.AR||AR;BG=r.BG||BG;US=r.US||US;
   if(r.LBL){LBL.leader=r.LBL.leader||"단장";LBL.member=r.LBL.member||"단원";}
   acts=r.acts||[];purs=r.purs||[];exps=r.exps||[];mems=r.mems||[];notices=r.notices||[];pays=r.pays||[];dpst=r.dpst||[];inc=r.inc||[];incTypes=r.incTypes||[];expBG=r.expBG||[];txn=r.txn||[];expTypes=r.expTypes||[];gwanTypes=r.gwanTypes||[];incCards=r.incCards||[];awards=r.awards||[];memGroups=r.memGroups||r.groups||[];vendors=r.vendors||vendors||[];fees=r.fees||[];assets=r.assets||[];rentals=r.rentals||[];assetCats=r.assetCats||[];assetLocs=r.assetLocs||[];
@@ -1143,6 +1153,7 @@ function logout(msg){
 }
 function _doLogoutReload_(msg){
   clearAuth();
+  try { localStorage.removeItem("lastEvtId"); } catch(e){}
   stopIdleWatch();
   closeIdleModal();
   ME=null;CID=null;
