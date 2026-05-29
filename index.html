@@ -6010,7 +6010,7 @@ function dDashIncExp(){
   var incPlan = 0;
   inc.forEach(function(r){ incPlan += Number(r.am)||0; });
   var incActual = 0;
-  txn.forEach(function(t){ incActual += Number(t.inAm)||0; });
+  (dpst||[]).forEach(function(d){ incActual += Number(d.am)||0; });
 
   // 세출 계획 총액 / 실제 지출 총액 (대분류만 합산 — 중분류는 대분류 내부 세부라 중복 방지)
   var expPlan = 0;
@@ -6025,10 +6025,10 @@ function dDashIncExp(){
     if (!incByTp[r.tp]) incByTp[r.tp] = {plan:0, actual:0};
     incByTp[r.tp].plan += Number(r.am)||0;
   });
-  txn.forEach(function(t){
-    if (!t.incTp || !t.inAm) return;
-    if (!incByTp[t.incTp]) incByTp[t.incTp] = {plan:0, actual:0};
-    incByTp[t.incTp].actual += Number(t.inAm)||0;
+  (dpst||[]).forEach(function(d){
+    if (!d.incTp || !d.am) return;
+    if (!incByTp[d.incTp]) incByTp[d.incTp] = {plan:0, actual:0};
+    incByTp[d.incTp].actual += Number(d.am)||0;
   });
 
   // 세출종류별 (계획 vs 사용) — 대분류만
@@ -9761,17 +9761,19 @@ async function delPay(id){
 function popDpst(){
   if(!pays.length){alert("먼저 결제수단을 추가하세요");return}
   var po='';for(var i=0;i<pays.length;i++)po+='<option value="'+pays[i].id+'">'+esc(pays[i].nm)+(pays[i].no4?" ("+esc(pays[i].no4)+")":"")+'</option>';
+  var io='<option value="">— 선택 —</option>';(incTypes||[]).forEach(function(t){io+='<option value="'+esc(t)+'">'+esc(t)+'</option>';});
   openPopup('<h3>입금 등록 <button class="close-x" onclick="closePopup()">&times;</button></h3>'+
     '<div class="frow fr2"><div><label>날짜 *</label><input type="date" id="dpD" value="'+today()+'"></div>'+
     '<div><label>결제수단 *</label><select id="dpP">'+po+'</select></div></div>'+
     '<div class="frow fr2"><div><label>금액(원) *</label><input type="number" id="dpA"></div>'+
-    '<div><label>적요</label><input type="text" id="dpDs" placeholder="예: 보조금 입금"></div></div>'+
+    '<div><label>세입종류</label><select id="dpIncTp">'+io+'</select></div></div>'+
+    '<div class="frow"><div><label>적요</label><input type="text" id="dpDs" placeholder="예: 보조금 입금" style="width:100%"></div></div>'+
     '<div style="text-align:right;margin-top:14px"><button class="btn btn-b" onclick="addDpst()">등록</button></div>');
 }
 async function addDpst(){
   var d=document.getElementById("dpD").value,a=document.getElementById("dpA").value;
   if(!d||!a){alert("날짜/금액 필수");return}
-  var p={dt:d,payM:document.getElementById("dpP").value,am:a,ds:document.getElementById("dpDs").value,by:CID};
+  var p={dt:d,payM:document.getElementById("dpP").value,am:a,incTp:document.getElementById("dpIncTp").value,ds:document.getElementById("dpDs").value,by:CID};
   showLoading("저장 중...");
   var r=await api("addDpst",p);
   hideLoading();
@@ -9783,15 +9785,17 @@ function edDpst(id){
   var d;for(var i=0;i<dpst.length;i++)if(dpst[i].id==id){d=dpst[i];break}
   if(!d)return;
   var po='';for(var i=0;i<pays.length;i++)po+='<option value="'+pays[i].id+'"'+(pays[i].id==d.payM?' selected':'')+'>'+esc(pays[i].nm)+(pays[i].no4?" ("+esc(pays[i].no4)+")":"")+'</option>';
+  var io='<option value="">— 선택 —</option>';(incTypes||[]).forEach(function(t){io+='<option value="'+esc(t)+'"'+(d.incTp===t?' selected':'')+'>'+esc(t)+'</option>';});
   openPopup('<h3>입금 수정 <button class="close-x" onclick="closePopup()">&times;</button></h3>'+
     '<div class="frow fr2"><div><label>날짜</label><input type="date" id="edpD" value="'+esc(d.dt)+'"></div>'+
     '<div><label>결제수단</label><select id="edpP">'+po+'</select></div></div>'+
     '<div class="frow fr2"><div><label>금액(원)</label><input type="number" id="edpA" value="'+esc(d.am)+'"></div>'+
-    '<div><label>적요</label><input type="text" id="edpDs" value="'+esc(d.ds||"")+'"></div></div>'+
+    '<div><label>세입종류</label><select id="edpIncTp">'+io+'</select></div></div>'+
+    '<div class="frow"><div><label>적요</label><input type="text" id="edpDs" value="'+esc(d.ds||"")+'" style="width:100%"></div></div>'+
     '<div style="text-align:right;margin-top:14px"><button class="btn btn-b" onclick="saveDpst(\''+id+'\')">저장</button></div>');
 }
 async function saveDpst(id){
-  var p={id:id,dt:document.getElementById("edpD").value,payM:document.getElementById("edpP").value,am:document.getElementById("edpA").value,ds:document.getElementById("edpDs").value};
+  var p={id:id,dt:document.getElementById("edpD").value,payM:document.getElementById("edpP").value,am:document.getElementById("edpA").value,incTp:document.getElementById("edpIncTp").value,ds:document.getElementById("edpDs").value};
   showLoading("저장 중...");
   var r=await api("updateDpst",p);
   hideLoading();
