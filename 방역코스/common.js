@@ -501,9 +501,35 @@ function getSecondaryAuth() {
 
 async function createMemberAccount(memberId, phone, pin) {
   const secAuth = getSecondaryAuth();
-  const cred = await secAuth.createUserWithEmailAndPassword(memberEmail(phone), pinToPassword(pin));
-  const uid = cred.user.uid;
-  await secAuth.signOut();
+  const email = memberEmail(phone);
+  const pw = pinToPassword(pin);
+  let uid;
+  try {
+    const cred = await secAuth.createUserWithEmailAndPassword(email, pw);
+    uid = cred.user.uid;
+    await secAuth.signOut();
+  } catch (e) {
+    if (e.code === 'auth/email-already-in-use') {
+      // 이미 계정 있으면 로그인해서 uid 가져오고 비번 초기화
+      try {
+        const cred = await secAuth.signInWithEmailAndPassword(email, pw);
+        uid = cred.user.uid;
+        await secAuth.signOut();
+      } catch (e2) {
+        // 비번이 다르면 기본 PIN으로 재시도
+        try {
+          const cred2 = await secAuth.signInWithEmailAndPassword(email, pinToPassword(DEFAULT_PIN));
+          uid = cred2.user.uid;
+          await cred2.user.updatePassword(pw);
+          await secAuth.signOut();
+        } catch (e3) {
+          throw new Error('이미 계정이 있고 비번이 다릅니다 (' + phone + '). Firebase 콘솔에서 삭제 후 재시도하세요.');
+        }
+      }
+    } else {
+      throw e;
+    }
+  }
 
   // memberId ↔ uid 매핑 저장
   const data = loadData();
