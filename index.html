@@ -446,7 +446,7 @@ label{display:block;font-size:10px;color:#999;margin-bottom:3px}
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <!-- firebase-storage 제거: 구글 드라이브 프록시로 대체 -->
 <script src="firebase-config.js"></script>
-<script src="common.js?v=20260529j"></script>
+<script src="common.js?v=20260529l"></script>
 
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" onerror="console.warn('XLSX CDN load failed')"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js" onerror="console.warn('xlsx-js-style CDN load failed')"></script>
@@ -1287,7 +1287,20 @@ function mkTabs(){
   if(!isA()) c5.push({k:"myinfo",l:"내 정보"});
   if(_isEvtAdmin()) c5.push({k:"evtMgr",l:"행사관리"});
   if(ME && (ME.r==="super" || ME.r==="admin")) c5.push({k:"forms",l:"폼 관리"});
+  if(_isSuperAdmin()) c5.push({k:"linkTabs",l:"🔗 연동 탭"});
   cats.push({id:"sys",label:"⚙️ 시스템",items:c5});
+
+  // ── 연동 탭 (CustomTabs) ──
+  if(LINK_TABS==="on"){
+    var _ctabs = _getCustomTabs();
+    _ctabs.forEach(function(cat,ci){
+      if(cat.hidden) return;
+      var ctItems=(cat.items||[]).map(function(it,ii){
+        return {k:"ct_"+cat.id+"_"+ii, l:(it.icon?it.icon+" ":"")+it.label};
+      });
+      if(ctItems.length) cats.push({id:"ct_"+cat.id, label:(cat.icon||"🔗")+" "+cat.label, items:ctItems});
+    });
+  }
 
   // ── 현장 ──
   if(FIELD_MENU==="on"){
@@ -5744,6 +5757,7 @@ function draw(){
   else if(CTAB=="notice")el.innerHTML=dNotice();
   else if(CTAB=="stat")el.innerHTML=dStat();
   else if(CTAB=="evtMgr"){ dEvtMgr(); }   // 행사관리 (super admin 전용, 비동기 렌더)
+  else if(CTAB=="linkTabs"){ el.innerHTML=dLinkTabs(); }
   else {
     // frame 탭 처리
     var frameUrl=_getFrameUrl(CTAB);
@@ -5756,11 +5770,25 @@ function draw(){
 }
 
 function _getFrameUrl(tabKey){
-  if(FIELD_MENU!=="on")return null;
   var map={field_layout:"방역코스/layout.html",field_monitor:"방역코스/monitor.html",field_admin:"방역코스/admin.html",field_vehicle:"방역코스/vehicle.html",field_today:"방역코스/today.html"};
-  var url=map[tabKey]||null;
-  if(url && CUR_EVT && CUR_EVT.evtId) url += (url.indexOf('?')>=0?'&':'?')+'evtId='+encodeURIComponent(CUR_EVT.evtId);
-  return url;
+  if(FIELD_MENU==="on"){
+    var url=map[tabKey]||null;
+    if(url){
+      if(CUR_EVT && CUR_EVT.evtId) url += (url.indexOf('?')>=0?'&':'?')+'evtId='+encodeURIComponent(CUR_EVT.evtId);
+      return url;
+    }
+  }
+  // 연동 탭 (CustomTabs) — ct_{catId}_{itemIdx}
+  if(tabKey.indexOf("ct_")===0){
+    var parts=tabKey.split("_"), catId=parts[1], ii=parseInt(parts[2]||"0");
+    var ctabs=_getCustomTabs();
+    for(var c=0;c<ctabs.length;c++){
+      if(ctabs[c].id===catId && ctabs[c].items && ctabs[c].items[ii]){
+        return ctabs[c].items[ii].url||null;
+      }
+    }
+  }
+  return null;
 }
 
 // ===== 바 =====
@@ -16933,6 +16961,182 @@ function toggleLinkTabs(){
     draw();
     toast("연동 탭 "+(next==="on"?"켜짐":"꺼짐"));
   });
+}
+
+// ===== 연동 탭 관리 (CustomTabs) =====
+function _getCustomTabs(){ return (_cache && _cache.CustomTabs) || []; }
+function _saveCustomTabs(tabs){ return fbDb.ref('/main/CustomTabs').set(tabs); }
+function _ctUid(){ return 'c'+Date.now().toString(36)+Math.random().toString(36).slice(2,5); }
+
+function dLinkTabs(){
+  var tabs=_getCustomTabs();
+  var h='<div class="card"><h3 style="margin-bottom:12px">🔗 연동 탭 관리</h3>';
+  h+='<p style="color:#64748b;font-size:13px;margin-bottom:16px">외부 사이트를 iframe으로 연동하는 탭을 추가/편집할 수 있습니다.<br>카테고리 = 상단 탭 그룹, 항목 = 서브 탭 (각각 URL 지정)</p>';
+  h+='<button class="btn btn-b" onclick="popLinkCat(-1)" style="margin-bottom:16px">➕ 카테고리 추가</button>';
+  if(!tabs.length){
+    h+='<div class="empty2" style="padding:40px">등록된 연동 탭이 없습니다</div>';
+  } else {
+    tabs.forEach(function(cat,ci){
+      h+='<div style="border:1.5px solid #e2e8f0;border-radius:10px;padding:14px;margin-bottom:12px;background:#f8fafc">';
+      h+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">';
+      h+='<div style="display:flex;align-items:center;gap:10px"><span style="font-size:16px;font-weight:700">'+(cat.icon||"🔗")+' '+esc(cat.label||"")+'</span>';
+      h+='<button onclick="toggleLinkCat('+ci+')" style="padding:4px 12px;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;'+(cat.hidden?'background:#fecaca;color:#dc2626':'background:#bbf7d0;color:#16a34a')+'">'+(cat.hidden?'❌ OFF':'✅ ON')+'</button></div>';
+      h+='<div style="display:flex;gap:6px">';
+      h+='<button class="btn btn-s" onclick="popLinkCat('+ci+')" style="font-size:11px">✏️ 수정</button>';
+      h+='<button class="btn btn-s" onclick="delLinkCat('+ci+')" style="font-size:11px;color:#dc2626">🗑 삭제</button>';
+      h+='</div></div>';
+      var items=cat.items||[];
+      if(items.length){
+        h+='<table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#e2e8f0"><th style="padding:6px 8px;text-align:left;width:30px">#</th><th style="padding:6px 8px;text-align:left">이름</th><th style="padding:6px 8px;text-align:left">URL</th><th style="padding:6px 8px;width:90px"></th></tr></thead><tbody>';
+        items.forEach(function(it,ii){
+          h+='<tr style="border-bottom:1px solid #e5e7eb">';
+          h+='<td style="padding:6px 8px;color:#94a3b8">'+(ii+1)+'</td>';
+          h+='<td style="padding:6px 8px;font-weight:600">'+(it.icon?it.icon+' ':'')+esc(it.label||"")+'</td>';
+          h+='<td style="padding:6px 8px;max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#2563eb;font-size:11px">'+esc(it.url||"")+'</td>';
+          h+='<td style="padding:6px 8px;text-align:right">';
+          h+='<button class="btn btn-s" onclick="popLinkItem('+ci+','+ii+')" style="font-size:11px">✏️</button> ';
+          h+='<button class="btn btn-s" onclick="delLinkItem('+ci+','+ii+')" style="font-size:11px;color:#dc2626">🗑</button>';
+          if(ii>0) h+=' <button class="btn btn-s" onclick="moveLinkItem('+ci+','+ii+',-1)" style="font-size:11px">▲</button>';
+          if(ii<items.length-1) h+=' <button class="btn btn-s" onclick="moveLinkItem('+ci+','+ii+',1)" style="font-size:11px">▼</button>';
+          h+='</td></tr>';
+        });
+        h+='</tbody></table>';
+      } else {
+        h+='<div style="color:#94a3b8;font-size:12px;padding:8px">항목 없음</div>';
+      }
+      h+='<button class="btn btn-s" onclick="popLinkItem('+ci+',-1)" style="margin-top:8px;font-size:12px;color:#2563eb">➕ 항목 추가</button>';
+      h+='</div>';
+    });
+  }
+  h+='</div>';
+  return h;
+}
+
+var EMOJI_LIST=["🔗","🦠","📋","🗺️","📊","📦","🚗","🏠","📷","💰","📝","🎪","👥","⚙️","📁","🔔","📌","🎯","🛒","💳","🏷️","📞","🌐","🔧","📅","🎵","🎬","🏆","🍽️","☀️","🌙","⭐","❤️","🔥","💡","🚀","✈️"];
+function _emojiSelect(id, cur){
+  var h='<select id="'+id+'" style="font-size:22px;padding:6px 10px;border-radius:8px;border:1px solid #d1d5db;cursor:pointer;min-width:70px">';
+  var found=false;
+  EMOJI_LIST.forEach(function(e){
+    var sel=(e===cur);if(sel)found=true;
+    h+='<option value="'+e+'"'+(sel?' selected':'')+' style="font-size:20px">'+e+'</option>';
+  });
+  if(cur&&!found) h='<select id="'+id+'" style="font-size:22px;padding:6px 10px;border-radius:8px;border:1px solid #d1d5db;cursor:pointer;min-width:70px"><option value="'+esc(cur)+'" selected style="font-size:20px">'+cur+'</option>'+h.split('>').slice(1).join('>');
+  h+='</select>';
+  return h;
+}
+
+function popLinkCat(idx){
+  var tabs=_getCustomTabs();
+  var isNew=idx<0;
+  var cat=isNew?{id:"",label:"",icon:"🔗"}:tabs[idx]||{};
+  var h='<div class="pop-head"><h3>'+(isNew?"➕ 카테고리 추가":"✏️ 카테고리 수정")+'</h3></div>';
+  h+='<div style="padding:14px">';
+  h+='<div class="fr"><label>아이콘</label>'+_emojiSelect("lc_icon",cat.icon||"🔗")+'</div>';
+  h+='<div class="fr"><label>이름</label><input id="lc_label" value="'+esc(cat.label||"")+'" placeholder="예: 방역"></div>';
+  h+='<div style="text-align:right;margin-top:12px"><button class="btn" onclick="closePopup()">취소</button> <button class="btn btn-b" onclick="saveLinkCat('+idx+')">저장</button></div>';
+  h+='</div>';
+  openPopup(h,400);
+}
+
+function saveLinkCat(idx){
+  var icon=(document.getElementById("lc_icon").value||"🔗").trim();
+  var label=(document.getElementById("lc_label").value||"").trim();
+  if(!label) return toast("이름을 입력하세요",true);
+  var tabs=JSON.parse(JSON.stringify(_getCustomTabs()));
+  if(idx<0){
+    tabs.push({id:_ctUid(), label:label, icon:icon, items:[]});
+  } else {
+    tabs[idx].label=label;
+    tabs[idx].icon=icon;
+  }
+  showLoading("저장 중...");
+  _saveCustomTabs(tabs).then(function(){
+    hideLoading(); closePopup(); toast(idx<0?"카테고리 추가됨":"카테고리 수정됨");
+    setTimeout(function(){ draw(); },300);
+  });
+}
+
+function toggleLinkCat(idx){
+  var tabs=JSON.parse(JSON.stringify(_getCustomTabs()));
+  if(!tabs[idx]) return;
+  tabs[idx].hidden = !tabs[idx].hidden;
+  showLoading("저장 중...");
+  _saveCustomTabs(tabs).then(function(){
+    hideLoading(); toast(tabs[idx].label+" "+(tabs[idx].hidden?"OFF":"ON"));
+    setTimeout(function(){ draw(); },300);
+  });
+}
+
+function delLinkCat(idx){
+  var tabs=_getCustomTabs();
+  if(!tabs[idx]) return;
+  if(!confirm("'"+tabs[idx].label+"' 카테고리와 하위 항목을 모두 삭제할까요?")) return;
+  var copy=JSON.parse(JSON.stringify(tabs));
+  copy.splice(idx,1);
+  showLoading("삭제 중...");
+  _saveCustomTabs(copy).then(function(){
+    hideLoading(); toast("카테고리 삭제됨");
+    setTimeout(function(){ draw(); },300);
+  });
+}
+
+function popLinkItem(catIdx, itemIdx){
+  var tabs=_getCustomTabs();
+  var cat=tabs[catIdx]; if(!cat) return;
+  var isNew=itemIdx<0;
+  var it=isNew?{label:"",icon:"",url:""}:(cat.items||[])[itemIdx]||{};
+  var h='<div class="pop-head"><h3>'+(isNew?"➕ 항목 추가":"✏️ 항목 수정")+' — '+esc(cat.label)+'</h3></div>';
+  h+='<div style="padding:14px">';
+  h+='<div class="fr"><label>아이콘</label>'+_emojiSelect("li_icon",it.icon||"🔗")+'</div>';
+  h+='<div class="fr"><label>이름</label><input id="li_label" value="'+esc(it.label||"")+'" placeholder="예: 오늘의 운영"></div>';
+  h+='<div class="fr"><label>URL</label><input id="li_url" value="'+esc(it.url||"")+'" placeholder="https://example.com/page.html" style="font-size:12px"></div>';
+  h+='<div class="mut" style="font-size:11px;margin-top:-6px;color:#6366f1">💡 구글 드라이브 폴더/사이트/외부 시스템 URL을 입력하세요</div>';
+  h+='<div style="text-align:right;margin-top:12px"><button class="btn" onclick="closePopup()">취소</button> <button class="btn btn-b" onclick="saveLinkItem('+catIdx+','+itemIdx+')">저장</button></div>';
+  h+='</div>';
+  openPopup(h,460);
+}
+
+function saveLinkItem(catIdx, itemIdx){
+  var icon=(document.getElementById("li_icon").value||"🔗").trim();
+  var label=(document.getElementById("li_label").value||"").trim();
+  var url=(document.getElementById("li_url").value||"").trim();
+  if(!label) return toast("이름을 입력하세요",true);
+  if(!url) return toast("URL을 입력하세요",true);
+  var tabs=JSON.parse(JSON.stringify(_getCustomTabs()));
+  if(!tabs[catIdx].items) tabs[catIdx].items=[];
+  if(itemIdx<0){
+    tabs[catIdx].items.push({icon:icon, label:label, url:url});
+  } else {
+    tabs[catIdx].items[itemIdx]={icon:icon, label:label, url:url};
+  }
+  showLoading("저장 중...");
+  _saveCustomTabs(tabs).then(function(){
+    hideLoading(); closePopup(); toast(itemIdx<0?"항목 추가됨":"항목 수정됨");
+    setTimeout(function(){ draw(); },300);
+  });
+}
+
+function delLinkItem(catIdx, itemIdx){
+  var tabs=_getCustomTabs();
+  var cat=tabs[catIdx]; if(!cat) return;
+  var it=(cat.items||[])[itemIdx]; if(!it) return;
+  if(!confirm("'"+it.label+"' 항목을 삭제할까요?")) return;
+  var copy=JSON.parse(JSON.stringify(tabs));
+  copy[catIdx].items.splice(itemIdx,1);
+  showLoading("삭제 중...");
+  _saveCustomTabs(copy).then(function(){
+    hideLoading(); toast("항목 삭제됨");
+    setTimeout(function(){ draw(); },300);
+  });
+}
+
+function moveLinkItem(catIdx, itemIdx, dir){
+  var tabs=JSON.parse(JSON.stringify(_getCustomTabs()));
+  var items=tabs[catIdx].items;
+  var newIdx=itemIdx+dir;
+  if(newIdx<0||newIdx>=items.length) return;
+  var tmp=items[itemIdx]; items[itemIdx]=items[newIdx]; items[newIdx]=tmp;
+  _saveCustomTabs(tabs).then(function(){ draw(); });
 }
 
 function popEvtEdit(evtId){
