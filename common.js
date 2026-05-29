@@ -365,6 +365,11 @@ function _dispatch(p) {
         case "updateIncCard": _apiUpdateIncCard(p).then(resolve); return;
         case "deleteIncCard": _apiDeleteIncCard(p).then(resolve); return;
 
+        // 세출 대분류 관리
+        case "addExpType":    _apiAddExpType(p).then(resolve); return;
+        case "renameExpType": _apiRenameExpType(p).then(resolve); return;
+        case "deleteExpType": _apiDeleteExpType(p).then(resolve); return;
+
         // 상(수상 종류) 관리
         case "addAward":    _apiAddAward(p).then(resolve); return;
         case "renameAward": _apiRenameAward(p).then(resolve); return;
@@ -552,6 +557,60 @@ function _serializeIncCards(cards) {
   return (cards||[]).map(function(c){
     return c.name+"|"+(c.pays||[]).join(",");
   }).join(";");
+}
+
+// ───────── 세출 대분류(EXP_TYPES) CRUD ─────────
+function _cfgHelper(evtId) {
+  return loadEvtData(evtId).then(function(data) {
+    var cfg = {};
+    (data.Config || []).forEach(function(c) { if(c && c.k) cfg[c.k] = c.v; });
+    return {data:data, cfg:cfg, configArr: data.Config || []};
+  });
+}
+function _saveCfgKey(evtId, configArr, key, val) {
+  var found = false;
+  for(var i=0;i<configArr.length;i++){
+    if(configArr[i] && configArr[i].k === key){ configArr[i].v = val; found=true; break; }
+  }
+  if(!found) configArr.push({k:key, v:val});
+  return saveEvtNode(evtId, "Config", configArr).then(function(){
+    _evtCaches[evtId].Config = configArr;
+  });
+}
+function _apiAddExpType(p) {
+  var evtId = _getEvtId(p);
+  if(!evtId) return Promise.resolve({ok:false, err:"행사 미선택"});
+  return _cfgHelper(evtId).then(function(h){
+    var types = (h.cfg.EXP_TYPES||"").split(",").filter(Boolean);
+    if(types.indexOf(p.name)>=0) return {ok:false, err:"이미 존재합니다"};
+    types.push(p.name);
+    return _saveCfgKey(evtId, h.configArr, "EXP_TYPES", types.join(",")).then(function(){
+      return {ok:true, types:types};
+    });
+  });
+}
+function _apiRenameExpType(p) {
+  var evtId = _getEvtId(p);
+  if(!evtId) return Promise.resolve({ok:false, err:"행사 미선택"});
+  return _cfgHelper(evtId).then(function(h){
+    var types = (h.cfg.EXP_TYPES||"").split(",").filter(Boolean);
+    var idx = types.indexOf(p.oldName);
+    if(idx<0) return {ok:false, err:"대분류를 찾을 수 없습니다"};
+    types[idx] = p.newName;
+    return _saveCfgKey(evtId, h.configArr, "EXP_TYPES", types.join(",")).then(function(){
+      return {ok:true, types:types};
+    });
+  });
+}
+function _apiDeleteExpType(p) {
+  var evtId = _getEvtId(p);
+  if(!evtId) return Promise.resolve({ok:false, err:"행사 미선택"});
+  return _cfgHelper(evtId).then(function(h){
+    var types = (h.cfg.EXP_TYPES||"").split(",").filter(function(t){ return t && t!==p.name; });
+    return _saveCfgKey(evtId, h.configArr, "EXP_TYPES", types.join(",")).then(function(){
+      return {ok:true, types:types};
+    });
+  });
 }
 
 // ───────── 카드/계좌 CRUD ─────────
