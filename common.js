@@ -360,6 +360,11 @@ function _dispatch(p) {
         // 첨부파일 ZIP 다운로드
         case "buildGalleryZip": _apiBuildGalleryZip(p).then(resolve); return;
 
+        // 카드/계좌 관리
+        case "addIncCard":    _apiAddIncCard(p).then(resolve); return;
+        case "updateIncCard": _apiUpdateIncCard(p).then(resolve); return;
+        case "deleteIncCard": _apiDeleteIncCard(p).then(resolve); return;
+
         // 상(수상 종류) 관리
         case "addAward":    _apiAddAward(p).then(resolve); return;
         case "renameAward": _apiRenameAward(p).then(resolve); return;
@@ -538,8 +543,67 @@ function _parseIncCards(s) {
   if (!s) return [];
   return s.split(";").map(function(chunk) {
     var parts = chunk.split("|");
-    return {name: (parts[0]||"").trim(), methods: (parts[1]||"").trim()};
+    var name = (parts[0]||"").trim();
+    var pays = (parts[1]||"").trim().split(",").map(function(x){return x.trim();}).filter(Boolean);
+    return {name: name, pays: pays};
   }).filter(function(c) { return c.name; });
+}
+function _serializeIncCards(cards) {
+  return (cards||[]).map(function(c){
+    return c.name+"|"+(c.pays||[]).join(",");
+  }).join(";");
+}
+
+// ───────── 카드/계좌 CRUD ─────────
+function _incCardHelper(evtId) {
+  return loadEvtData(evtId).then(function(data) {
+    var cfg = {};
+    (data.Config || []).forEach(function(c) { if(c && c.k) cfg[c.k] = c.v; });
+    return {data:data, cfg:cfg, cards: _parseIncCards(cfg.INC_CARDS || "")};
+  });
+}
+function _saveIncCards(evtId, data, cards) {
+  var configArr = data.Config || [];
+  var found = false;
+  var serialized = _serializeIncCards(cards);
+  for(var i=0;i<configArr.length;i++){
+    if(configArr[i] && configArr[i].k === "INC_CARDS"){ configArr[i].v = serialized; found=true; break; }
+  }
+  if(!found) configArr.push({k:"INC_CARDS", v:serialized});
+  return saveEvtNode(evtId, "Config", configArr).then(function(){
+    _evtCaches[evtId].Config = configArr;
+    return {ok:true, cards:cards};
+  });
+}
+function _apiAddIncCard(p) {
+  var evtId = _getEvtId(p);
+  if(!evtId) return Promise.resolve({ok:false, err:"행사 미선택"});
+  return _incCardHelper(evtId).then(function(h){
+    if(h.cards.some(function(c){return c.name===p.name;}))
+      return {ok:false, err:"이미 존재하는 이름입니다"};
+    h.cards.push({name:p.name, pays:p.pays||[]});
+    return _saveIncCards(evtId, h.data, h.cards);
+  });
+}
+function _apiUpdateIncCard(p) {
+  var evtId = _getEvtId(p);
+  if(!evtId) return Promise.resolve({ok:false, err:"행사 미선택"});
+  return _incCardHelper(evtId).then(function(h){
+    var idx=-1;
+    for(var i=0;i<h.cards.length;i++){ if(h.cards[i].name===p.oldName){idx=i;break;} }
+    if(idx<0) return {ok:false, err:"카드/계좌를 찾을 수 없습니다"};
+    h.cards[idx].name = p.newName || p.oldName;
+    h.cards[idx].pays = p.pays || h.cards[idx].pays;
+    return _saveIncCards(evtId, h.data, h.cards);
+  });
+}
+function _apiDeleteIncCard(p) {
+  var evtId = _getEvtId(p);
+  if(!evtId) return Promise.resolve({ok:false, err:"행사 미선택"});
+  return _incCardHelper(evtId).then(function(h){
+    h.cards = h.cards.filter(function(c){return c.name!==p.name;});
+    return _saveIncCards(evtId, h.data, h.cards);
+  });
 }
 
 // ───────── 범용 CRUD (행사별 데이터) ─────────
