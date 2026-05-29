@@ -8197,9 +8197,38 @@ function dInc(){
 
   h += '</div>';
 
-  // ===== 결제수단·입금 관리 (계좌관리 통합) =====
-  h += dPay();
+  // ===== 입금 내역 =====
+  h += _dDpstSection();
 
+  return h;
+}
+
+// ===== 입금 내역 섹션 (세입관리 하단) =====
+function _dDpstSection(){
+  var un=unitNm();
+  var dp=dpst.slice();
+  var dpTot=0;for(var i=0;i<dp.length;i++)dpTot+=pn(dp[i].am);
+  dp.sort(function(a,b){return(a.dt||"").localeCompare(b.dt||"");});
+  var h='<div class="card" style="margin-top:14px">';
+  h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">';
+  h+='<h3 style="margin:0">💵 입금 내역 ('+dp.length+'건, '+fmu(dpTot)+un+')</h3>';
+  h+='<button class="btn btn-g btn-s" onclick="popDpst()">+ 입금 등록</button>';
+  h+='</div>';
+  if(!dp.length){
+    h+='<div class="empty2">입금 내역이 없습니다. 이월액·보조금·후원금 등 입금이 있을 때 등록하세요.</div>';
+  }else{
+    h+='<div class="scrollx"><table><tr><th>날짜</th><th>내용</th>'+(incCards&&incCards.length?'<th>카드/계좌</th>':'')+'<th>세입종류</th><th style="text-align:right">금액</th><th></th></tr>';
+    dp.forEach(function(d){
+      h+='<tr><td>'+esc(d.dt||"")+'</td><td>'+esc(d.ds||"")+'</td>';
+      if(incCards&&incCards.length) h+='<td>'+esc(d.payM||"-")+'</td>';
+      h+='<td>'+esc(d.incTp||"-")+'</td>';
+      h+='<td style="text-align:right;font-weight:600;color:#16a34a">'+fmu(pn(d.am))+'</td>';
+      h+='<td style="white-space:nowrap"><button class="btn btn-b btn-s" onclick="edDpst(\''+d.id+'\')">수정</button> <button class="btn btn-r btn-s" onclick="delDpst(\''+d.id+'\')" style="color:#fff">삭제</button></td></tr>';
+    });
+    h+='<tr style="background:#f0fdf4;font-weight:700"><td colspan="'+(incCards&&incCards.length?'4':'3')+'" style="text-align:right">합계</td><td style="text-align:right;color:#16a34a">'+fmu(dpTot)+'</td><td></td></tr>';
+    h+='</table></div>';
+  }
+  h+='</div>';
   return h;
 }
 
@@ -9764,15 +9793,15 @@ async function delPay(id){
 }
 function popDpst(){
   var cards=incCards||[];
-  if(!cards.length){alert("등록된 카드/계좌가 없습니다.\n세입관리 탭의 💳 카드/계좌 버튼으로 먼저 등록해주세요.");return}
   var po='<option value="">— 선택 —</option>';cards.forEach(function(c){po+='<option value="'+esc(c.name)+'">'+esc(c.name)+'</option>';});
   var io='<option value="">— 선택 —</option>';(incTypes||[]).forEach(function(t){io+='<option value="'+esc(t)+'">'+esc(t)+'</option>';});
   openPopup('<h3>입금 등록 <button class="close-x" onclick="closePopup()">&times;</button></h3>'+
     '<div class="frow fr2"><div><label>날짜 *</label><input type="date" id="dpD" value="'+today()+'"></div>'+
-    '<div><label>카드/계좌 *</label><select id="dpP">'+po+'</select></div></div>'+
-    '<div class="frow fr2"><div><label>금액(원) *</label><input type="number" id="dpA"></div>'+
+    '<div><label>금액(원) *</label><input type="number" id="dpA"></div></div>'+
+    '<div class="frow fr2">'+(cards.length?'<div><label>카드/계좌</label><select id="dpP">'+po+'</select></div>':'')+
     '<div><label>세입종류</label><select id="dpIncTp">'+io+'</select></div></div>'+
-    '<div class="frow"><div><label>적요</label><input type="text" id="dpDs" placeholder="예: 보조금 입금" style="width:100%"></div></div>'+
+    '<div class="frow"><div><label>내용</label><input type="text" id="dpDs" placeholder="예: 이월액, 보조금 입금, 후원금" style="width:100%"></div></div>'+
+    (cards.length?'':'<input type="hidden" id="dpP" value="">')+
     '<div style="text-align:right;margin-top:14px"><button class="btn btn-b" onclick="addDpst()">등록</button></div>');
 }
 async function addDpst(){
@@ -9794,10 +9823,11 @@ function edDpst(id){
   var io='<option value="">— 선택 —</option>';(incTypes||[]).forEach(function(t){io+='<option value="'+esc(t)+'"'+(d.incTp===t?' selected':'')+'>'+esc(t)+'</option>';});
   openPopup('<h3>입금 수정 <button class="close-x" onclick="closePopup()">&times;</button></h3>'+
     '<div class="frow fr2"><div><label>날짜</label><input type="date" id="edpD" value="'+esc(d.dt)+'"></div>'+
-    '<div><label>카드/계좌</label><select id="edpP">'+po+'</select></div></div>'+
-    '<div class="frow fr2"><div><label>금액(원)</label><input type="number" id="edpA" value="'+esc(d.am)+'"></div>'+
+    '<div><label>금액(원)</label><input type="number" id="edpA" value="'+esc(d.am)+'"></div></div>'+
+    '<div class="frow fr2">'+(cards.length?'<div><label>카드/계좌</label><select id="edpP">'+po+'</select></div>':'')+
     '<div><label>세입종류</label><select id="edpIncTp">'+io+'</select></div></div>'+
-    '<div class="frow"><div><label>적요</label><input type="text" id="edpDs" value="'+esc(d.ds||"")+'" style="width:100%"></div></div>'+
+    '<div class="frow"><div><label>내용</label><input type="text" id="edpDs" value="'+esc(d.ds||"")+'" style="width:100%"></div></div>'+
+    (cards.length?'':'<input type="hidden" id="edpP" value="'+(d.payM||"")+'">')+
     '<div style="text-align:right;margin-top:14px"><button class="btn btn-b" onclick="saveDpst(\''+id+'\')">저장</button></div>');
 }
 async function saveDpst(id){
