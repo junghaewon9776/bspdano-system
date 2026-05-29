@@ -17021,13 +17021,13 @@ function dLinkTabs(){
   return h;
 }
 
-var EMOJI_LIST=["🔗","🦠","📋","🗺️","📊","📦","🚗","🏠","📷","💰","📝","🎪","👥","⚙️","📁","🔔","📌","🎯","🛒","💳","🏷️","📞","🌐","🔧","📅","🎵","🎬","🏆","🍽️","☀️","🌙","⭐","❤️","🔥","💡","🚀","✈️"];
+var EMOJI_LIST=["","🔗","🦠","📋","🗺️","📊","📦","🚗","🏠","📷","💰","📝","🎪","👥","⚙️","📁","🔔","📌","🎯","🛒","💳","🏷️","📞","🌐","🔧","📅","🎵","🎬","🏆","🍽️","☀️","🌙","⭐","❤️","🔥","💡","🚀","✈️"];
 function _emojiSelect(id, cur){
   var h='<select id="'+id+'" style="font-size:22px;padding:6px 10px;border-radius:8px;border:1px solid #d1d5db;cursor:pointer;min-width:70px">';
   var found=false;
   EMOJI_LIST.forEach(function(e){
     var sel=(e===cur);if(sel)found=true;
-    h+='<option value="'+e+'"'+(sel?' selected':'')+' style="font-size:20px">'+e+'</option>';
+    h+='<option value="'+e+'"'+(sel?' selected':'')+' style="font-size:20px">'+(e||'없음')+'</option>';
   });
   if(cur&&!found) h='<select id="'+id+'" style="font-size:22px;padding:6px 10px;border-radius:8px;border:1px solid #d1d5db;cursor:pointer;min-width:70px"><option value="'+esc(cur)+'" selected style="font-size:20px">'+cur+'</option>'+h.split('>').slice(1).join('>');
   h+='</select>';
