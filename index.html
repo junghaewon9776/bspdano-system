@@ -8594,7 +8594,7 @@ function dExp(){
   var bigTot=0, midTot=0;
   Object.keys(bigAmt).forEach(function(k){ bigTot += bigAmt[k]||0; });
   Object.keys(midAmt).forEach(function(k){ midTot += midAmt[k]||0; });
-  var unallocTot = (bigTot>0) ? (bigTot - midTot) : 0;
+  var unallocTot = bigTot - midTot;
   h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin:10px 0">';
   h += '<div style="background:#fff;border:1px solid #93c5fd;border-radius:6px;padding:10px;text-align:center"><div style="color:#2563eb;font-weight:600;font-size:12px">대분류 예산</div><div style="font-size:18px;font-weight:800;color:#1e40af">'+fmtKRW(bigTot)+'</div></div>';
   h += '<div style="background:#fff;border:1px solid #a78bfa;border-radius:6px;padding:10px;text-align:center"><div style="color:#7c3aed;font-weight:600;font-size:12px">중분류 배정 합</div><div style="font-size:18px;font-weight:800;color:#6d28d9">'+fmtKRW(midTot)+'</div></div>';
@@ -8625,6 +8625,9 @@ function dExp(){
   }
 
   // 대분류별 그룹핑
+  // 원본 인덱스 스탬프
+  expBG.forEach(function(r,i){ r._idx = i; });
+
   var order = types.slice();
   var groups = {}; order.forEach(function(t){ groups[t]=[]; });
   expBG.forEach(function(r){
@@ -8653,7 +8656,7 @@ function dExp(){
     // 대분류 예산이 0이면 중분류 합으로 대체
     var effectiveBudget = (bigBudget>0) ? bigBudget : midPlanSum;
     // 대분류 미배정 잔여 = 대분류 예산 - 중분류 배정 합 (대분류 0이면 0)
-    var unallocated = (bigBudget>0) ? (bigBudget - midPlanSum) : 0;
+    var unallocated = bigBudget - midPlanSum;
     // 대분류 전체 남은 = effective 예산 - 실제 집행
     var bigRem = effectiveBudget - useSum;
 
@@ -8697,8 +8700,8 @@ function dExp(){
           +  (over?'⚠ 예산초과 ':'')+fmtKRW(rem)+'</td>';
         h += '<td style="padding:8px;color:#718096;font-size:12px">'+esc(r.note||'')+'</td>';
         h += '<td style="padding:8px;text-align:right;white-space:nowrap">';
-        h += '<button class="btn btn-s" style="background:#2563eb;color:#fff;font-weight:700" onclick="expEdit(\''+esc(r.id)+'\')">수정</button> ';
-        h += '<button class="btn btn-s" style="background:#c53030;color:#fff" onclick="expDel(\''+esc(r.id)+'\')">삭제</button>';
+        h += '<button class="btn btn-s" style="background:#2563eb;color:#fff;font-weight:700" onclick="expEdit('+r._idx+')">수정</button> ';
+        h += '<button class="btn btn-s" style="background:#c53030;color:#fff" onclick="expDel('+r._idx+')">삭제</button>';
         h += '</td></tr>';
       });
       h += '</tbody></table>';
@@ -8781,8 +8784,8 @@ function expAddSave(){
     refreshData(false).then(function(){ draw(); });
   });
 }
-function expEdit(rowId){
-  var r = expBG.filter(function(x){return x.id===rowId;})[0];
+function expEdit(idx){
+  var r = expBG[idx];
   if(!r){ toast("항목을 찾을 수 없습니다", true); return; }
   var types = (expTypes||[]).slice();
   expBG.forEach(function(x){ if(x.tp && types.indexOf(x.tp)<0) types.push(x.tp); });
@@ -8802,36 +8805,33 @@ function expEdit(rowId){
   h += '<textarea id="expE_note" rows="2" style="width:100%;padding:8px;border:1px solid #cbd5e0;border-radius:5px">'+esc(r.note||"")+'</textarea>';
   h += '<div style="text-align:right;margin-top:15px">';
   h += '<button class="btn btn-out" onclick="closePopup()">취소</button> ';
-  h += '<button class="btn btn-b" onclick="expEditSave(\''+esc(rowId)+'\')">저장</button>';
+  h += '<button class="btn btn-b" onclick="expEditSave('+idx+')">저장</button>';
   h += '</div></div>';
   openPopup(h, 460);
 }
-function expEditSave(rowId){
+function expEditSave(idx){
+  var row = expBG[idx];
+  if(!row){ toast("항목을 찾을 수 없습니다", true); return; }
   var tp = document.getElementById("expE_tp").value;
   var mid = document.getElementById("expE_mid").value.trim();
   var sub = document.getElementById("expE_sub").value.trim();
   var am = Number(document.getElementById("expE_am").value.replace(/,/g,""))||0;
   var note = document.getElementById("expE_note").value;
   if (!tp||!mid){ toast("대분류/중분류는 필수입니다", true); return; }
+  row.tp = tp; row.mid = mid; row.sub = sub; row.planAm = am; row.note = note;
   showLoading("저장 중...");
-  api("updateExpBG",{id:CID, rowId:rowId, tp:tp, mid:mid, sub:sub, planAm:am, note:note}).then(function(r){
-    hideLoading();
-    if(!r||!r.ok){ toast((r&&r.err)||"실패", true); return; }
-    closePopup();
-    toast("수정됨");
-    refreshData(false).then(function(){ draw(); });
+  fbDb.ref('/evtData/'+CUR_EVT.evtId+'/ExpBG').set(expBG).then(function(){
+    hideLoading(); closePopup(); draw(); toast("수정됨");
   });
 }
-function expDel(rowId){
+function expDel(idx){
+  var r = expBG[idx];
+  if(!r) return;
   if(!confirm("이 세출 항목을 삭제하시겠습니까?")) return;
+  expBG.splice(idx, 1);
   showLoading("삭제 중...");
-  api("deleteExpBG",{id:CID, rowId:rowId}).then(function(r){
-    hideLoading();
-    if(!r||!r.ok){ toast((r&&r.err)||"실패", true); return; }
-    expBG = expBG.filter(function(it){ return it.id !== rowId; });
-    draw();
-    toast("삭제됨");
-    refreshData(false);
+  fbDb.ref('/evtData/'+CUR_EVT.evtId+'/ExpBG').set(expBG).then(function(){
+    hideLoading(); draw(); toast("삭제됨");
   });
 }
 function expManageTypes(){
