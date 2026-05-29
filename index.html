@@ -446,7 +446,7 @@ label{display:block;font-size:10px;color:#999;margin-bottom:3px}
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <!-- firebase-storage 제거: 구글 드라이브 프록시로 대체 -->
 <script src="firebase-config.js"></script>
-<script src="common.js?v=20260529l"></script>
+<script src="common.js?v=20260529m"></script>
 
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" onerror="console.warn('XLSX CDN load failed')"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js" onerror="console.warn('xlsx-js-style CDN load failed')"></script>
@@ -8072,6 +8072,15 @@ function dBud(){
 function fmtKRW(n){ return Number(n||0).toLocaleString("ko-KR"); }
 function dInc(){
   if(!isA())return'<div class="card"><div class="empty2">관리자 전용 화면입니다</div></div>';
+
+  // ID 없는 행에 자동 ID 부여 (Firebase 배열 변환 시 id 누락 방지)
+  var _incNeedSave = false;
+  inc.forEach(function(r){
+    if(!r.id){ r.id = 'inc_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,6); _incNeedSave=true; }
+  });
+  if(_incNeedSave && CUR_EVT && CUR_EVT.evtId){
+    fbDb.ref('/evtData/'+CUR_EVT.evtId+'/Inc').set(inc);
+  }
 
   // 필터 적용
   var rows = inc.slice();
