@@ -446,7 +446,7 @@ label{display:block;font-size:10px;color:#999;margin-bottom:3px}
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <!-- firebase-storage 제거: 구글 드라이브 프록시로 대체 -->
 <script src="firebase-config.js"></script>
-<script src="common.js?v=20260529m"></script>
+<script src="common.js?v=20260529n"></script>
 
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" onerror="console.warn('XLSX CDN load failed')"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js" onerror="console.warn('xlsx-js-style CDN load failed')"></script>
@@ -8159,7 +8159,7 @@ function dInc(){
         h += '<th style="padding:8px 10px;text-align:left;border-bottom:1px solid #e5e7eb">비고</th>';
         h += '<th style="padding:8px 10px;border-bottom:1px solid #e5e7eb;width:90px"></th></tr></thead><tbody>';
         gRows.forEach(function(r){
-          var rid = String(r.id).replace(/'/g,"\\'");
+          var incIdx = inc.indexOf(r);
           h += '<tr style="border-bottom:1px solid #f1f5f9">';
           h += '<td style="padding:7px 10px">'+esc(r.sub||"")+'</td>';
           h += '<td style="padding:7px 10px">'+esc(r.card||"")+'</td>';
@@ -8170,8 +8170,8 @@ function dInc(){
           h += '<td style="padding:7px 10px;text-align:right;font-weight:600">'+fmtKRW(r.am)+'</td>';
           h += '<td style="padding:7px 10px;color:#64748b;font-size:12px">'+esc(r.note||"")+'</td>';
           h += '<td style="padding:4px 6px;text-align:right;white-space:nowrap">';
-          h += '<button class="btn btn-s" style="background:#2563eb;color:#fff;font-weight:700" onclick="incEdit(\''+rid+'\')">수정</button> ';
-          h += '<button class="btn btn-s btn-r" onclick="incDel(\''+rid+'\')" style="color:#fff">×</button>';
+          h += '<button class="btn btn-s" style="background:#2563eb;color:#fff;font-weight:700" onclick="incEdit('+incIdx+')">수정</button> ';
+          h += '<button class="btn btn-s btn-r" onclick="incDel('+incIdx+')" style="color:#fff">×</button>';
           h += '</td></tr>';
         });
         h += '</tbody></table>';
@@ -8277,9 +8277,10 @@ function incAddSave(){
 }
 
 // 세입 수정
-function incEdit(rowId){
+// 세입 수정 (배열 인덱스 기반)
+function incEdit(idx){
   try{
-    var r = inc.filter(function(x){ return String(x.id)===String(rowId); })[0];
+    var r = inc[idx];
     if(!r){ toast("항목을 찾을 수 없습니다",true); return; }
     var types = (incTypes||[]).slice();
     var h = '';
@@ -8299,12 +8300,14 @@ function incEdit(rowId){
     h += '<textarea id="incNote" rows="2" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-family:inherit">'+esc(r.note||"")+'</textarea>';
     h += '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">';
     h += '<button class="btn btn-out" onclick="closePopup()">취소</button>';
-    h += '<button class="btn btn-b" onclick="incEditSave(\''+String(rowId).replace(/'/g,"\\'")+'\')">저장</button>';
+    h += '<button class="btn btn-b" onclick="incEditSave('+idx+')">저장</button>';
     h += '</div>';
     openPopup(h, 480);
   }catch(e){ alert("오류: "+(e&&e.message||e)); }
 }
-function incEditSave(rowId){
+function incEditSave(idx){
+  var row = inc[idx];
+  if(!row){ toast("항목을 찾을 수 없습니다",true); return; }
   var tp   = document.getElementById("incTp").value;
   var sub  = document.getElementById("incSub").value.trim();
   var am   = document.getElementById("incAm").value.replace(/,/g,"");
@@ -8312,29 +8315,26 @@ function incEditSave(rowId){
   var note = document.getElementById("incNote").value;
   if(!tp || !sub){ alert("대분류/중분류를 입력해주세요"); return; }
   if(!card){ alert("카드/계좌를 선택해주세요"); return; }
+  row.tp = tp; row.sub = sub; row.am = am; row.card = card; row.note = note;
   showLoading("저장 중...");
-  api("updateInc",{id:CID,rowId:rowId,tp:tp,sub:sub,am:am,card:card,note:note}).then(function(r){
+  fbDb.ref('/evtData/'+CUR_EVT.evtId+'/Inc').set(inc).then(function(){
     hideLoading();
-    if(!r||!r.ok){ toast((r&&r.err)||"저장 실패",true); return; }
     closePopup();
-    refreshData(false);
+    draw();
     toast("수정되었습니다");
   });
 }
 
-function incDel(rowId){
-  var r = inc.filter(function(x){ return String(x.id)===String(rowId); })[0];
+function incDel(idx){
+  var r = inc[idx];
   if(!r) return;
   if(!confirm(r.tp+" - "+r.sub+" ("+fmtKRW(r.am)+"원) 항목을 삭제하시겠습니까?")) return;
+  inc.splice(idx, 1);
   showLoading("삭제 중...");
-  api("deleteInc",{id:CID,rowId:rowId}).then(function(x){
+  fbDb.ref('/evtData/'+CUR_EVT.evtId+'/Inc').set(inc).then(function(){
     hideLoading();
-    if(!x||!x.ok){ toast((x&&x.err)||"삭제 실패",true); return; }
-    // 즉시 로컬 반영 → UI 바로 업데이트
-    inc = inc.filter(function(it){ return it.id !== rowId; });
     draw();
     toast("삭제되었습니다");
-    refreshData(false); // 백그라운드 재동기화
   });
 }
 
