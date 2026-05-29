@@ -483,7 +483,7 @@ function memberEmail(phone) {
 function pinToPassword(pin) {
   return String(pin).padStart(4, '0') + 'bsp';
 }
-const DEFAULT_PIN = '123456';
+const DEFAULT_PIN = '1234';
 
 async function memberLogin(phone, pin) {
   return fbAuth.signInWithEmailAndPassword(memberEmail(phone), pinToPassword(pin));
