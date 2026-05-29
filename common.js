@@ -807,11 +807,14 @@ function _apiDeleteMainRow(p, nodeName) {
 
 // ───────── 행사 관리 ─────────
 function _apiListEvents(p) {
-  return Promise.resolve({ok:true, events: _cache.Events || [], acctEvt: _cache.AcctEvt || []});
+  // deep-copy로 반환 — EVTMGR.events가 _cache 참조를 공유하면 모듈 편집 시 꼬임
+  var evts = JSON.parse(JSON.stringify(_cache.Events || []));
+  var acct = JSON.parse(JSON.stringify(_cache.AcctEvt || []));
+  return Promise.resolve({ok:true, events: evts, acctEvt: acct});
 }
 
 function _apiAddEvent(p) {
-  var events = (_cache.Events || []).slice();
+  var events = JSON.parse(JSON.stringify(_cache.Events || []));
   var ev = {
     evtId: p.evtId || uid(),
     nm: p.nm || "",
@@ -836,7 +839,8 @@ function _apiAddEvent(p) {
 }
 
 function _apiUpdateEvent(p) {
-  var events = (_cache.Events || []).slice();
+  // deep-copy 전체 배열 — shallow .slice()는 객체 공유 참조 버그 유발
+  var events = JSON.parse(JSON.stringify(_cache.Events || []));
   var idx = -1;
   for (var i = 0; i < events.length; i++) {
     if (events[i].evtId === p.evtId) { idx = i; break; }
