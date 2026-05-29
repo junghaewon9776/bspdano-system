@@ -485,6 +485,8 @@ function _apiRefresh(p) {
       function buildResult(memData, groupData) {
         resolve({
           ok: true,
+          curEvt: curEvt,
+          evtId: p.evtId,
           acts: data.Acts || [],
           purs: data.Purs || [],
           exps: data.Exps || [],
