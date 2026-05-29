@@ -588,13 +588,30 @@ function isMemberUser() {
 const MEMBER_ALLOWED_PAGES = ['index.html', 'today.html', 'monitor.html', 'monitor-public.html', 'stats.html', 'print.html'];
 
 function applyMemberNav() {
-  if (!isMemberUser()) return;
+  const u = fbAuth.currentUser;
+  const isMember = isMemberUser();
+  const data = loadData();
+  const myRole = (data.users || {})[u?.uid]?.role || '';
+
   document.querySelectorAll('nav a').forEach(a => {
     const href = (a.getAttribute('href') || '').split('?')[0];
-    if (['admin.html', 'members.html', 'accounts.html'].includes(href)) {
+    if (isMember && ['admin.html', 'members.html', 'accounts.html'].includes(href)) {
+      a.style.display = 'none';
+    }
+    if (!isMember && href === 'accounts.html' && myRole !== 'super') {
       a.style.display = 'none';
     }
   });
+
+  const nav = document.querySelector('nav');
+  if (nav && !nav.querySelector('a[href="print.html"]')) {
+    const logoutLink = nav.querySelector('a[onclick*="Logout"]');
+    const printLink = document.createElement('a');
+    printLink.href = 'print.html';
+    printLink.textContent = '인쇄';
+    if (logoutLink) nav.insertBefore(printLink, logoutLink);
+    else nav.appendChild(printLink);
+  }
 }
 
 function blockMemberAccess() {
@@ -603,6 +620,16 @@ function blockMemberAccess() {
     alert('관리자만 접근 가능한 페이지입니다.');
     location.href = 'index.html';
     return true;
+  }
+  if (page === 'accounts.html' && !isMemberUser()) {
+    const data = loadData();
+    const u = fbAuth.currentUser;
+    const myRole = (data.users || {})[u?.uid]?.role || '';
+    if (myRole !== 'super') {
+      alert('계정관리는 super 권한만 접근 가능합니다.');
+      location.href = 'index.html';
+      return true;
+    }
   }
   return false;
 }
