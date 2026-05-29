@@ -509,22 +509,33 @@ async function createMemberAccount(memberId, phone, pin) {
     uid = cred.user.uid;
     await secAuth.signOut();
   } catch (e) {
-    if (e.code === 'auth/email-already-in-use') {
-      // 이미 계정 있으면 로그인해서 uid 가져오고 비번 초기화
-      try {
-        const cred = await secAuth.signInWithEmailAndPassword(email, pw);
-        uid = cred.user.uid;
-        await secAuth.signOut();
-      } catch (e2) {
-        // 비번이 다르면 기본 PIN으로 재시도
+    if (e.code === 'auth/email-already-in-use' || (e.message && e.message.indexOf('already-in-use') !== -1)) {
+      // 이미 계정 있으면 로그인해서 uid 가져오기 (여러 비번 후보 시도)
+      const candidates = [pw];
+      // 현재 PIN의 비번이 아닌 후보들 추가
+      if (pinToPassword(DEFAULT_PIN) !== pw) candidates.push(pinToPassword(DEFAULT_PIN));
+      // 이전 기본 PIN(123456)으로 만든 계정도 시도
+      if (pinToPassword('123456') !== pw && pinToPassword('123456') !== pinToPassword(DEFAULT_PIN)) {
+        candidates.push(pinToPassword('123456'));
+      }
+      // 이전 기본 PIN(1234)도 확인
+      if (pinToPassword('1234') !== pw && pinToPassword('1234') !== pinToPassword(DEFAULT_PIN)) {
+        candidates.push(pinToPassword('1234'));
+      }
+      let loggedIn = false;
+      for (const tryPw of candidates) {
         try {
-          const cred2 = await secAuth.signInWithEmailAndPassword(email, pinToPassword(DEFAULT_PIN));
-          uid = cred2.user.uid;
-          await cred2.user.updatePassword(pw);
+          const cred = await secAuth.signInWithEmailAndPassword(email, tryPw);
+          uid = cred.user.uid;
+          // 원래 비번과 다르면 업데이트
+          if (tryPw !== pw) await cred.user.updatePassword(pw);
           await secAuth.signOut();
-        } catch (e3) {
-          throw new Error('이미 계정이 있고 비번이 다릅니다 (' + phone + '). Firebase 콘솔에서 삭제 후 재시도하세요.');
-        }
+          loggedIn = true;
+          break;
+        } catch (ex) { /* 다음 후보 시도 */ }
+      }
+      if (!loggedIn) {
+        throw new Error('이미 계정이 있고 비번이 다릅니다 (' + phone + '). Firebase 콘솔에서 삭제 후 재시도하세요.');
       }
     } else {
       throw e;
