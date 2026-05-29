@@ -15914,7 +15914,7 @@ function expPur(){
   var af=isA()?(FILT=="전체"?null:FILT):myar();
   var fp=af?purs.filter(function(p){return p.ar==af}):purs;
   var wb=XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(fp.map(function(p,i){return{No:i+1,구매일:p.dt,부서:p.ar,물품명:p.it,수량:p.qt,"단가(원)":p.un,"합계(원)":p.tot,비목:bn(p.bi),결제수단:payN(p.payM)||"",등록자:p.by||"",명세서ID:p.inv||p.id,결의서발행일:p.prtD||"",결의서상태:p.signU?"서명완료":(p.prtD?"발행":"미발행"),서명본URL:p.signU||""}})),"물품구매");
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(fp.map(function(p,i){return{No:i+1,구매일:p.dt,부서:p.ar,물품명:p.it,수량:p.qt,"단가(원)":p.un,"합계(원)":p.tot,세출대분류:p.expTp||"",세출중분류:p.expMid||"","카드/계좌":p.card||"",결제방법:p.payM||"",거래처:p.vendor||"",비목:bn(p.bi),결제수단:payN(p.payM)||"",등록자:p.by||"",명세서ID:p.inv||p.id,결의서발행일:p.prtD||"",결의서상태:p.signU?"서명완료":(p.prtD?"발행":"미발행"),서명본URL:p.signU||""}})),"물품구매");
   XLSX.writeFile(wb,"물품구매_"+today().replace(/-/g,"")+".xlsx");toast("물품구매 다운로드");
 }
 function expBud(){
@@ -16140,12 +16140,13 @@ function tmplPur(){
   var wb=XLSX.utils.book_new();
   var bn0=BG[0]?BG[0].n:"소모품비";
   var pn0=pays[0]?pays[0].nm:"";
+  var et0=expTypes[0]||""; var cn0=(incCards[0]||{}).name||"";
   tmplSheet(wb,"물품구매",
-    ["No","구매일","부서","물품명","수량","단가(원)","합계(원)","비목","결제수단","등록자","명세서ID","결의서발행일"],
-    [[1,"2026-04-05","영광읍","집게",20,3000,60000,bn0,pn0,"","",""],
-     [2,"2026-04-05","영광읍","쓰레기봉투(100L)",50,500,25000,bn0,pn0,"","",""],
-     [3,"2026-04-06","법성면","장갑",30,1200,36000,bn0,pn0,"","",""]],
-    [6,12,12,18,8,12,14,14,14,12,16,14]);
+    ["No","구매일","부서","물품명","수량","단가(원)","합계(원)","세출대분류","세출중분류","카드/계좌","결제방법","거래처","비목","결제수단","등록자","명세서ID","결의서발행일"],
+    [[1,"2026-04-05","영광읍","집게",20,3000,60000,et0,"",cn0,"지정카드","○○마트",bn0,pn0,"","",""],
+     [2,"2026-04-05","영광읍","쓰레기봉투(100L)",50,500,25000,et0,"",cn0,"","",bn0,pn0,"","",""],
+     [3,"2026-04-06","법성면","장갑",30,1200,36000,"","","","","",bn0,pn0,"","",""]],
+    [6,12,12,18,8,12,14,14,14,14,12,14,14,14,12,16,14]);
   XLSX.writeFile(wb,"양식_물품구매.xlsx");toast("물품구매 양식 다운로드");
 }
 function tmplBud(){
@@ -16623,17 +16624,26 @@ async function doImp(inp){
       }
       // 구매 — 벌크 (명세서ID 그룹핑은 서버에서 처리하지 않으므로 클라에서 inv 매핑)
       if(checkList.some(function(x){return x.sheet==="물품구매";})){
-        var r2=XLSX.utils.sheet_to_json(wb.Sheets["물품구매"],{raw:false, dateNF:'yyyy-mm-dd HH:MM:SS'});
+        var r2=XLSX.utils.sheet_to_json(wb.Sheets["물품구매"],{dateNF:'yyyy-mm-dd'});
         var invMap={};
         var pRows=r2.map(function(x){
           var bi=null;for(var j=0;j<BG.length;j++)if(BG[j].n==String(x["비목"]||x["예산비목"]||""))bi=BG[j].id;
           var key=String(x["명세서ID"]||"").trim();
           var inv=key?(invMap[key]||(invMap[key]="INV"+Date.now()+Math.floor(Math.random()*9999))):("INV"+Date.now()+Math.floor(Math.random()*9999));
-          var _qt=String(x["수량"]||"").replace(/,/g,"");
-          var _un=String(x["단가(원)"]||x["단가"]||"").replace(/,/g,"");
-          var _tot=String(x["합계(원)"]||x["합계(천원)"]||x["합계"]||"").replace(/,/g,"");
-          if(!x["합계(원)"]&&!x["합계"]&&x["합계(천원)"]&&_tot) _tot=String(Number(_tot)*1000);
-          return {dt:String(x["구매일"]||""),ar:String(x["부서"]||""),it:String(x["물품명"]||""),qt:_qt,un:_un,tot:_tot,bi:bi||(BG[0]?BG[0].id:"B5"),ph:[],rc:[],by:String(x["등록자"]||CID),prtD:String(x["결의서발행일"]||""),inv:inv};
+          var _qt=Number(String(x["수량"]||"1").replace(/,/g,""))||1;
+          var _un=Number(String(x["단가(원)"]||x["단가"]||"0").replace(/,/g,""))||0;
+          var _tot=Number(String(x["합계(원)"]||x["합계(천원)"]||x["합계"]||"0").replace(/,/g,""))||0;
+          if(!x["합계(원)"]&&!x["합계"]&&x["합계(천원)"]&&_tot) _tot=_tot*1000;
+          if(!_un && _tot && _qt) _un=Math.round(_tot/_qt);
+          if(!_tot && _un && _qt) _tot=_un*_qt;
+          var _dt=x["구매일"]||"";
+          if(typeof _dt==="number"){ var d=XLSX.SSF.parse_date_code(_dt); _dt=d?d.y+"-"+String(d.m).padStart(2,"0")+"-"+String(d.d).padStart(2,"0"):""; }
+          var _expTp=String(x["세출대분류"]||x["세출 대분류"]||"").trim();
+          var _expMid=String(x["세출중분류"]||x["세출 중분류"]||"").trim();
+          var _card=String(x["카드/계좌"]||x["카드"]||x["계좌"]||"").trim();
+          var _payM=String(x["결제방법"]||"").trim();
+          var _vendor=String(x["거래처"]||x["지급처"]||"").trim();
+          return {dt:String(_dt),ar:String(x["부서"]||""),it:String(x["물품명"]||""),qt:String(_qt),un:String(_un),tot:String(_tot),expTp:_expTp,expMid:_expMid,card:_card,payM:_payM,vendor:_vendor,bi:bi||(BG[0]?BG[0].id:"B5"),ph:[],rc:[],by:String(x["등록자"]||CID),prtD:String(x["결의서발행일"]||""),inv:inv};
         });
         if(pRows.length){
           showLoading("물품구매 "+pRows.length+"건 일괄 저장중...");
