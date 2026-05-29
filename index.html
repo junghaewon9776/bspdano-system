@@ -14799,8 +14799,8 @@ function _rptExpAccPreview(){
     if(!gw.tpMap[tp]){ gw.tpMap[tp]={name:tp,items:[],planTot:0,actTot:0}; gw.tpOrder.push(tp); }
     var tpObj=gw.tpMap[tp];
     tpObj.items.push(p);
-    tpObj.planTot+=p.planAm; tpObj.actTot+=p.actAm;
-    if(!p.mid){ gw.planTot+=p.planAm; }
+    if(!p.mid){ tpObj.planTot+=p.planAm; gw.planTot+=p.planAm; }
+    tpObj.actTot+=p.actAm;
     gw.actTot+=p.actAm;
   });
   var gPlan=0,gAct=0;
@@ -15017,8 +15017,8 @@ function rptExpAccExcel(){
     if(!gw.tpMap[tp]){ gw.tpMap[tp]={name:tp,items:[],planTot:0,actTot:0}; gw.tpOrder.push(tp); }
     var tpObj=gw.tpMap[tp];
     tpObj.items.push(plan[k]);
-    tpObj.planTot+=plan[k].planAm; tpObj.actTot+=plan[k].actAm;
-    if(!plan[k].mid){ gw.planTot+=plan[k].planAm; }
+    if(!plan[k].mid){ tpObj.planTot+=plan[k].planAm; gw.planTot+=plan[k].planAm; }
+    tpObj.actTot+=plan[k].actAm;
     gw.actTot+=plan[k].actAm;
   });
   var gPlan=0,gAct=0;
