@@ -8082,6 +8082,9 @@ function dInc(){
     fbDb.ref('/evtData/'+CUR_EVT.evtId+'/Inc').set(inc);
   }
 
+  // 원본 인덱스 스탬프
+  inc.forEach(function(r,i){ r._idx = i; });
+
   // 필터 적용
   var rows = inc.slice();
   if(incFilter.tp)   rows = rows.filter(function(r){ return r.tp === incFilter.tp; });
@@ -8159,7 +8162,7 @@ function dInc(){
         h += '<th style="padding:8px 10px;text-align:left;border-bottom:1px solid #e5e7eb">비고</th>';
         h += '<th style="padding:8px 10px;border-bottom:1px solid #e5e7eb;width:90px"></th></tr></thead><tbody>';
         gRows.forEach(function(r){
-          var incIdx = inc.indexOf(r);
+          var incIdx = r._idx;
           h += '<tr style="border-bottom:1px solid #f1f5f9">';
           h += '<td style="padding:7px 10px">'+esc(r.sub||"")+'</td>';
           h += '<td style="padding:7px 10px">'+esc(r.card||"")+'</td>';
