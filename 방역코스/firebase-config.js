@@ -1,12 +1,12 @@
-// Firebase 설정 - 본인 프로젝트 정보로 교체
+// Firebase 설정 - 단오시스템 (방역코스/코스관리)
 const firebaseConfig = {
-  apiKey: "AIzaSyAjIylhIDFtjNBanVp6NBcTKao_LWQss54",
-  authDomain: "bspcourse-634ba.firebaseapp.com",
-  databaseURL: "https://bspcourse-634ba-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "bspcourse-634ba",
-  storageBucket: "bspcourse-634ba.firebasestorage.app",
-  messagingSenderId: "206030425284",
-  appId: "1:206030425284:web:becdf9886fae0d35a6cd91"
+  apiKey: "AIzaSyBx6pqkbjdjba7185H7AtGEA5NN9f0XlMQ",
+  authDomain: "bspdano-system.firebaseapp.com",
+  databaseURL: "https://bspdano-system-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "bspdano-system",
+  storageBucket: "bspdano-system.firebasestorage.app",
+  messagingSenderId: "614152392942",
+  appId: "1:614152392942:web:de6ddc09a3d9225d83a3ff"
 };
 
 // Firebase compat SDK 로드 후 초기화
