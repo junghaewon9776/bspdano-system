@@ -9797,7 +9797,7 @@ function popDpst(){
   var io='<option value="">— 선택 —</option>';(incTypes||[]).forEach(function(t){io+='<option value="'+esc(t)+'">'+esc(t)+'</option>';});
   openPopup('<h3>입금 등록 <button class="close-x" onclick="closePopup()">&times;</button></h3>'+
     '<div class="frow fr2"><div><label>날짜 *</label><input type="date" id="dpD" value="'+today()+'"></div>'+
-    '<div><label>금액(원) *</label><input type="number" id="dpA"></div></div>'+
+    '<div><label>금액(원) *</label><input type="text" inputmode="numeric" id="dpA" placeholder="0" oninput="this.value=this.value.replace(/[^0-9]/g,\'\').replace(/\\B(?=(\\d{3})+(?!\\d))/g,\',\')"></div></div>'+
     '<div class="frow fr2">'+(cards.length?'<div><label>카드/계좌</label><select id="dpP">'+po+'</select></div>':'')+
     '<div><label>세입종류</label><select id="dpIncTp">'+io+'</select></div></div>'+
     '<div class="frow"><div><label>내용</label><input type="text" id="dpDs" placeholder="예: 이월액, 보조금 입금, 후원금" style="width:100%"></div></div>'+
@@ -9805,7 +9805,7 @@ function popDpst(){
     '<div style="text-align:right;margin-top:14px"><button class="btn btn-b" onclick="addDpst()">등록</button></div>');
 }
 async function addDpst(){
-  var d=document.getElementById("dpD").value,a=document.getElementById("dpA").value;
+  var d=document.getElementById("dpD").value,a=document.getElementById("dpA").value.replace(/,/g,"");
   if(!d||!a){alert("날짜/금액 필수");return}
   var p={dt:d,payM:document.getElementById("dpP").value,am:a,incTp:document.getElementById("dpIncTp").value,ds:document.getElementById("dpDs").value,by:CID};
   showLoading("저장 중...");
@@ -9823,7 +9823,7 @@ function edDpst(id){
   var io='<option value="">— 선택 —</option>';(incTypes||[]).forEach(function(t){io+='<option value="'+esc(t)+'"'+(d.incTp===t?' selected':'')+'>'+esc(t)+'</option>';});
   openPopup('<h3>입금 수정 <button class="close-x" onclick="closePopup()">&times;</button></h3>'+
     '<div class="frow fr2"><div><label>날짜</label><input type="date" id="edpD" value="'+esc(d.dt)+'"></div>'+
-    '<div><label>금액(원)</label><input type="number" id="edpA" value="'+esc(d.am)+'"></div></div>'+
+    '<div><label>금액(원)</label><input type="text" inputmode="numeric" id="edpA" value="'+Number(d.am).toLocaleString()+'" oninput="this.value=this.value.replace(/[^0-9]/g,\'\').replace(/\\B(?=(\\d{3})+(?!\\d))/g,\',\')"></div></div>'+
     '<div class="frow fr2">'+(cards.length?'<div><label>카드/계좌</label><select id="edpP">'+po+'</select></div>':'')+
     '<div><label>세입종류</label><select id="edpIncTp">'+io+'</select></div></div>'+
     '<div class="frow"><div><label>내용</label><input type="text" id="edpDs" value="'+esc(d.ds||"")+'" style="width:100%"></div></div>'+
@@ -9831,7 +9831,7 @@ function edDpst(id){
     '<div style="text-align:right;margin-top:14px"><button class="btn btn-b" onclick="saveDpst(\''+id+'\')">저장</button></div>');
 }
 async function saveDpst(id){
-  var p={id:id,dt:document.getElementById("edpD").value,payM:document.getElementById("edpP").value,am:document.getElementById("edpA").value,incTp:document.getElementById("edpIncTp").value,ds:document.getElementById("edpDs").value};
+  var p={id:id,dt:document.getElementById("edpD").value,payM:document.getElementById("edpP").value,am:document.getElementById("edpA").value.replace(/,/g,""),incTp:document.getElementById("edpIncTp").value,ds:document.getElementById("edpDs").value};
   showLoading("저장 중...");
   var r=await api("updateDpst",p);
   hideLoading();
