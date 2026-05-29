@@ -14704,6 +14704,14 @@ function dReport(){
   h+='<button class="btn" style="background:#ea580c;color:#fff;width:100%" onclick="event.stopPropagation();rptExpSrcExcel()">📥 엑셀 다운로드</button>';
   h+='</div>';
 
+  // 마) 정산보고서
+  h+='<div class="card" style="border:1px solid #0891b2;cursor:pointer" onclick="RPT_SHOW=(RPT_SHOW===\'settle\'?\'\':\'settle\');draw()">';
+  h+='<div style="font-size:13px;color:#155e75;font-weight:700;margin-bottom:4px">마) '+(RPT_SHOW==="settle"?"▲":"▼")+'</div>';
+  h+='<h3 style="margin:0 0 8px">📊 정산보고서</h3>';
+  h+='<div class="mut" style="font-size:12px;margin-bottom:10px">총 수입·지출 요약 + 그래프 + 세부 내역</div>';
+  h+='<button class="btn" style="background:#0891b2;color:#fff;width:100%" onclick="event.stopPropagation();rptSettlePrint()">🖨️ 인쇄 / PDF</button>';
+  h+='</div>';
+
   h+='</div>';
 
   // 데이터 상태 요약
@@ -14727,6 +14735,7 @@ function dReport(){
   else if(RPT_SHOW==="expAcc") h+=_rptExpAccPreview();
   else if(RPT_SHOW==="expCat") h+=_rptExpCatPreview();
   else if(RPT_SHOW==="expSrc") h+=_rptExpSrcPreview();
+  else if(RPT_SHOW==="settle") h+=_rptSettlePreview();
 
   return h;
 }
@@ -15088,6 +15097,168 @@ function rptExpSrcExcel(){
   });
   XLSX.writeFile(wb,"세부세출내역서_재원별_"+today().replace(/-/g,"")+".xlsx");
   toast("세부 세출 내역서(재원별) 다운로드 완료");
+}
+
+// ===== 마) 정산보고서 =====
+function _settleData(){
+  // 수입: 입금내역(dpst)
+  var incTotal=0, incByTp={}, incRows=[];
+  (dpst||[]).forEach(function(d){
+    var am=pn(d.am); incTotal+=am;
+    var tp=d.incTp||"(미분류)";
+    incByTp[tp]=(incByTp[tp]||0)+am;
+    var payNm=""; (pays||[]).forEach(function(p){if(String(p.id)===String(d.payM))payNm=p.nm;});
+    incRows.push({dt:d.dt,tp:tp,ds:d.ds||"",pay:payNm,am:am});
+  });
+  // 세입 계획도 포함
+  var incPlan=0; (inc||[]).forEach(function(r){incPlan+=pn(r.am);});
+  // 지출: 구매(purs) + 기타지출(exps)
+  var expTotal=0, expByTp={}, expRows=[];
+  (purs||[]).forEach(function(p){
+    var am=pn(p.tot); expTotal+=am;
+    var tp=p.expTp||"(미분류)";
+    expByTp[tp]=(expByTp[tp]||0)+am;
+    expRows.push({dt:p.dt,tp:tp,ds:p.it||"",pay:"",am:am,src:"구매"});
+  });
+  (exps||[]).forEach(function(e){
+    var am=pn(e.am); expTotal+=am;
+    var tp=e.expTp||"(미분류)";
+    expByTp[tp]=(expByTp[tp]||0)+am;
+    expRows.push({dt:e.dt,tp:tp,ds:e.ds||e.nm||"",pay:"",am:am,src:"지출"});
+  });
+  incRows.sort(function(a,b){return(a.dt||"").localeCompare(b.dt||"");});
+  expRows.sort(function(a,b){return(a.dt||"").localeCompare(b.dt||"");});
+  return {incTotal:incTotal,expTotal:expTotal,incPlan:incPlan,incByTp:incByTp,expByTp:expByTp,incRows:incRows,expRows:expRows};
+}
+
+function _rptSettlePreview(){
+  var d=_settleData();
+  var bal=d.incTotal-d.expTotal;
+  var h='<div class="card" style="margin-top:12px;border-left:4px solid #0891b2">';
+  h+='<h3 style="margin:0 0 14px;color:#155e75">📊 정산보고서 미리보기</h3>';
+  // 요약 카드
+  h+='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px">';
+  h+='<div style="background:#f0fdf4;border:2px solid #16a34a;border-radius:10px;padding:14px;text-align:center"><div style="font-size:12px;color:#166534;font-weight:600">총 수입</div><div style="font-size:22px;font-weight:800;color:#16a34a;margin-top:4px">'+fmu(d.incTotal)+'<span style="font-size:13px">원</span></div></div>';
+  h+='<div style="background:#fef2f2;border:2px solid #dc2626;border-radius:10px;padding:14px;text-align:center"><div style="font-size:12px;color:#991b1b;font-weight:600">총 지출</div><div style="font-size:22px;font-weight:800;color:#dc2626;margin-top:4px">'+fmu(d.expTotal)+'<span style="font-size:13px">원</span></div></div>';
+  h+='<div style="background:'+(bal>=0?'#eff6ff':'#fef2f2')+';border:2px solid '+(bal>=0?'#2563eb':'#dc2626')+';border-radius:10px;padding:14px;text-align:center"><div style="font-size:12px;color:'+(bal>=0?'#1e40af':'#991b1b')+';font-weight:600">잔 액</div><div style="font-size:22px;font-weight:800;color:'+(bal>=0?'#2563eb':'#dc2626')+';margin-top:4px">'+fmu(bal)+'<span style="font-size:13px">원</span></div></div>';
+  h+='</div>';
+  // 그래프: 수입/지출 종류별 비교
+  var allTp={};
+  Object.keys(d.incByTp).forEach(function(k){if(!allTp[k])allTp[k]={inc:0,exp:0};allTp[k].inc=d.incByTp[k];});
+  Object.keys(d.expByTp).forEach(function(k){if(!allTp[k])allTp[k]={inc:0,exp:0};allTp[k].exp=d.expByTp[k];});
+  var maxAm=1; Object.keys(allTp).forEach(function(k){var m=Math.max(allTp[k].inc,allTp[k].exp);if(m>maxAm)maxAm=m;});
+  h+='<div style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:14px;margin-bottom:14px">';
+  h+='<div style="font-size:13px;font-weight:700;color:#334155;margin-bottom:10px">📊 수입·지출 종류별 현황</div>';
+  var tpKeys=Object.keys(allTp);
+  if(!tpKeys.length) h+='<div class="mut" style="text-align:center;padding:10px">데이터 없음</div>';
+  tpKeys.forEach(function(k){
+    var v=allTp[k];
+    h+='<div style="margin-bottom:10px"><div style="font-size:12px;font-weight:600;color:#374151;margin-bottom:3px">'+esc(k)+'</div>';
+    if(v.inc>0) h+='<div style="display:flex;align-items:center;gap:6px;margin-bottom:2px"><span style="font-size:10px;color:#16a34a;min-width:28px">수입</span><div style="flex:1;background:#dcfce7;border-radius:4px;height:16px;overflow:hidden"><div style="width:'+Math.max(Math.round(v.inc/maxAm*100),2)+'%;height:100%;background:#16a34a;border-radius:4px"></div></div><span style="font-size:11px;font-weight:600;min-width:80px;text-align:right;color:#16a34a">'+fmu(v.inc)+'</span></div>';
+    if(v.exp>0) h+='<div style="display:flex;align-items:center;gap:6px"><span style="font-size:10px;color:#dc2626;min-width:28px">지출</span><div style="flex:1;background:#fee2e2;border-radius:4px;height:16px;overflow:hidden"><div style="width:'+Math.max(Math.round(v.exp/maxAm*100),2)+'%;height:100%;background:#dc2626;border-radius:4px"></div></div><span style="font-size:11px;font-weight:600;min-width:80px;text-align:right;color:#dc2626">'+fmu(v.exp)+'</span></div>';
+    h+='</div>';
+  });
+  h+='</div>';
+  // 수입내역
+  h+='<div style="margin-bottom:14px"><div style="font-size:13px;font-weight:700;color:#16a34a;margin-bottom:6px">💰 수입 내역 ('+d.incRows.length+'건)</div>';
+  if(!d.incRows.length) h+='<div class="mut" style="padding:8px;text-align:center;font-size:12px">입금 내역 없음</div>';
+  else{
+    h+='<div style="overflow:auto;max-height:300px;border:1px solid #e5e7eb;border-radius:6px"><table style="width:100%;border-collapse:collapse;font-size:12px">';
+    h+='<thead style="background:#dcfce7;position:sticky;top:0"><tr><th style="padding:6px;text-align:left">날짜</th><th style="padding:6px;text-align:left">종류</th><th style="padding:6px;text-align:left">적요</th><th style="padding:6px;text-align:left">결제수단</th><th style="padding:6px;text-align:right">금액</th></tr></thead><tbody>';
+    d.incRows.forEach(function(r){
+      h+='<tr style="border-bottom:1px solid #f1f5f9"><td style="padding:5px 6px">'+esc(r.dt||"")+'</td><td style="padding:5px 6px">'+esc(r.tp)+'</td><td style="padding:5px 6px">'+esc(r.ds)+'</td><td style="padding:5px 6px">'+esc(r.pay)+'</td><td style="padding:5px 6px;text-align:right;font-weight:600;color:#16a34a">'+fmu(r.am)+'</td></tr>';
+    });
+    h+='<tr style="background:#f0fdf4;font-weight:700"><td colspan="4" style="padding:6px;text-align:right">합계</td><td style="padding:6px;text-align:right;color:#16a34a">'+fmu(d.incTotal)+'</td></tr>';
+    h+='</tbody></table></div>';
+  }
+  h+='</div>';
+  // 지출내역
+  h+='<div><div style="font-size:13px;font-weight:700;color:#dc2626;margin-bottom:6px">💸 지출 내역 ('+d.expRows.length+'건)</div>';
+  if(!d.expRows.length) h+='<div class="mut" style="padding:8px;text-align:center;font-size:12px">지출 내역 없음</div>';
+  else{
+    h+='<div style="overflow:auto;max-height:300px;border:1px solid #e5e7eb;border-radius:6px"><table style="width:100%;border-collapse:collapse;font-size:12px">';
+    h+='<thead style="background:#fee2e2;position:sticky;top:0"><tr><th style="padding:6px;text-align:left">날짜</th><th style="padding:6px;text-align:left">구분</th><th style="padding:6px;text-align:left">종류</th><th style="padding:6px;text-align:left">내역</th><th style="padding:6px;text-align:right">금액</th></tr></thead><tbody>';
+    d.expRows.forEach(function(r){
+      h+='<tr style="border-bottom:1px solid #f1f5f9"><td style="padding:5px 6px">'+esc(r.dt||"")+'</td><td style="padding:5px 6px">'+esc(r.src)+'</td><td style="padding:5px 6px">'+esc(r.tp)+'</td><td style="padding:5px 6px">'+esc(r.ds)+'</td><td style="padding:5px 6px;text-align:right;font-weight:600;color:#dc2626">'+fmu(r.am)+'</td></tr>';
+    });
+    h+='<tr style="background:#fef2f2;font-weight:700"><td colspan="4" style="padding:6px;text-align:right">합계</td><td style="padding:6px;text-align:right;color:#dc2626">'+fmu(d.expTotal)+'</td></tr>';
+    h+='</tbody></table></div>';
+  }
+  h+='</div></div>';
+  return h;
+}
+
+function rptSettlePrint(){
+  var d=_settleData();
+  var bal=d.incTotal-d.expTotal;
+  var un='원';
+  // 종류별 그래프 데이터
+  var allTp={};
+  Object.keys(d.incByTp).forEach(function(k){if(!allTp[k])allTp[k]={inc:0,exp:0};allTp[k].inc=d.incByTp[k];});
+  Object.keys(d.expByTp).forEach(function(k){if(!allTp[k])allTp[k]={inc:0,exp:0};allTp[k].exp=d.expByTp[k];});
+  var maxAm=1; Object.keys(allTp).forEach(function(k){var m=Math.max(allTp[k].inc,allTp[k].exp);if(m>maxAm)maxAm=m;});
+  var tpKeys=Object.keys(allTp);
+  var chart='';
+  tpKeys.forEach(function(k){
+    var v=allTp[k];
+    chart+='<div style="margin-bottom:8px"><div style="font-size:11px;font-weight:600;margin-bottom:2px">'+esc(k)+'</div>';
+    if(v.inc>0) chart+='<div style="display:flex;align-items:center;gap:4px;margin-bottom:1px"><span style="font-size:9px;color:#16a34a;min-width:24px">수입</span><div style="flex:1;background:#dcfce7;height:14px;overflow:hidden"><div style="width:'+Math.max(Math.round(v.inc/maxAm*100),3)+'%;height:100%;background:#16a34a"></div></div><span style="font-size:10px;font-weight:600;min-width:70px;text-align:right">'+fmu(v.inc)+'</span></div>';
+    if(v.exp>0) chart+='<div style="display:flex;align-items:center;gap:4px"><span style="font-size:9px;color:#dc2626;min-width:24px">지출</span><div style="flex:1;background:#fee2e2;height:14px;overflow:hidden"><div style="width:'+Math.max(Math.round(v.exp/maxAm*100),3)+'%;height:100%;background:#dc2626"></div></div><span style="font-size:10px;font-weight:600;min-width:70px;text-align:right">'+fmu(v.exp)+'</span></div>';
+    chart+='</div>';
+  });
+  // 수입내역 테이블
+  var incTbl='<table><thead><tr><th>날짜</th><th>종류</th><th>적요</th><th>결제수단</th><th style="text-align:right">금액</th></tr></thead><tbody>';
+  d.incRows.forEach(function(r){
+    incTbl+='<tr><td>'+esc(r.dt||"")+'</td><td>'+esc(r.tp)+'</td><td>'+esc(r.ds)+'</td><td>'+esc(r.pay)+'</td><td style="text-align:right">'+fmu(r.am)+'</td></tr>';
+  });
+  incTbl+='<tr class="total"><td colspan="4" style="text-align:right">합계</td><td style="text-align:right">'+fmu(d.incTotal)+'</td></tr></tbody></table>';
+  // 지출내역 테이블
+  var expTbl='<table><thead><tr><th>날짜</th><th>구분</th><th>종류</th><th>내역</th><th style="text-align:right">금액</th></tr></thead><tbody>';
+  d.expRows.forEach(function(r){
+    expTbl+='<tr><td>'+esc(r.dt||"")+'</td><td>'+esc(r.src)+'</td><td>'+esc(r.tp)+'</td><td>'+esc(r.ds)+'</td><td style="text-align:right">'+fmu(r.am)+'</td></tr>';
+  });
+  expTbl+='<tr class="total"><td colspan="4" style="text-align:right">합계</td><td style="text-align:right">'+fmu(d.expTotal)+'</td></tr></tbody></table>';
+
+  var html='<!DOCTYPE html><html><head><meta charset="utf-8"><title>정산보고서 - '+esc(SYS_NAME)+'</title><style>'+
+    '@page{size:A4;margin:15mm}'+
+    'body{font-family:"Malgun Gothic","맑은 고딕",sans-serif;font-size:12px;color:#111;line-height:1.5;margin:0;padding:20px}'+
+    'h1{text-align:center;font-size:20px;margin:0 0 4px;color:#111}'+
+    '.subtitle{text-align:center;font-size:13px;color:#555;margin-bottom:20px}'+
+    '.summary{display:flex;justify-content:center;gap:16px;margin-bottom:24px}'+
+    '.sbox{flex:1;max-width:200px;border:2px solid #ddd;border-radius:10px;padding:14px;text-align:center}'+
+    '.sbox .label{font-size:12px;font-weight:600;color:#555}'+
+    '.sbox .value{font-size:22px;font-weight:800;margin-top:4px}'+
+    '.sbox.inc{border-color:#16a34a;background:#f0fdf4} .sbox.inc .value{color:#16a34a}'+
+    '.sbox.exp{border-color:#dc2626;background:#fef2f2} .sbox.exp .value{color:#dc2626}'+
+    '.sbox.bal{border-color:#2563eb;background:#eff6ff} .sbox.bal .value{color:#2563eb}'+
+    '.sbox.bal.minus{border-color:#dc2626;background:#fef2f2} .sbox.bal.minus .value{color:#dc2626}'+
+    '.section{margin-top:20px}'+
+    '.section h2{font-size:14px;margin:0 0 8px;padding-bottom:4px;border-bottom:2px solid #e5e7eb}'+
+    '.section h2.inc{color:#16a34a;border-color:#16a34a} .section h2.exp{color:#dc2626;border-color:#dc2626}'+
+    '.chart-area{border:1px solid #e5e7eb;border-radius:6px;padding:12px;margin-bottom:8px;page-break-inside:avoid}'+
+    'table{width:100%;border-collapse:collapse;font-size:11px;page-break-inside:auto}'+
+    'thead{background:#f8fafc} th{padding:6px 8px;text-align:left;border-bottom:2px solid #cbd5e0;font-weight:700}'+
+    'td{padding:5px 8px;border-bottom:1px solid #e5e7eb}'+
+    'tr.total{background:#f1f5f9;font-weight:700;border-top:2px solid #94a3b8}'+
+    '.footer{margin-top:30px;text-align:center;font-size:10px;color:#999;border-top:1px solid #e5e7eb;padding-top:10px}'+
+    '@media print{body{padding:0} .no-print{display:none}}'+
+    '</style></head><body>'+
+    '<div class="no-print" style="text-align:right;margin-bottom:10px"><button onclick="window.print()" style="padding:8px 20px;font-size:13px;background:#0891b2;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600">🖨️ 인쇄</button></div>'+
+    '<h1>'+esc(SYS_NAME)+' 정산보고서</h1>'+
+    '<div class="subtitle">'+esc(SYS_PARENT)+' · 작성일 '+today()+'</div>'+
+    '<div class="summary">'+
+      '<div class="sbox inc"><div class="label">총 수입</div><div class="value">'+fmu(d.incTotal)+'<span style="font-size:13px">'+un+'</span></div></div>'+
+      '<div class="sbox exp"><div class="label">총 지출</div><div class="value">'+fmu(d.expTotal)+'<span style="font-size:13px">'+un+'</span></div></div>'+
+      '<div class="sbox bal'+(bal<0?' minus':'')+'"><div class="label">잔 액</div><div class="value">'+fmu(bal)+'<span style="font-size:13px">'+un+'</span></div></div>'+
+    '</div>'+
+    '<div class="section"><h2 style="color:#334155;border-color:#0891b2">📊 수입·지출 종류별 현황</h2><div class="chart-area">'+(tpKeys.length?chart:'<div style="text-align:center;color:#999;padding:10px">데이터 없음</div>')+'</div></div>'+
+    '<div class="section"><h2 class="inc">💰 수입 내역 ('+d.incRows.length+'건)</h2>'+(d.incRows.length?incTbl:'<div style="text-align:center;color:#999;padding:14px">입금 내역 없음</div>')+'</div>'+
+    '<div class="section"><h2 class="exp">💸 지출 내역 ('+d.expRows.length+'건)</h2>'+(d.expRows.length?expTbl:'<div style="text-align:center;color:#999;padding:14px">지출 내역 없음</div>')+'</div>'+
+    '<div class="footer">'+esc(SYS_ORG)+' · '+esc(SYS_TAGLINE)+'<br>본 정산보고서는 시스템 등록 자료 기준으로 자동 생성되었습니다.</div>'+
+    '</body></html>';
+  var w=window.open('','_blank','width=800,height=900');
+  w.document.write(html);
+  w.document.close();
 }
 
 // ===== 내 정보 (비밀번호 변경) — 비관리자용 =====
