@@ -8694,7 +8694,7 @@ function expAddSave(){
   if (!tp){ toast("대분류를 선택하세요", true); return; }
   if (!mid){ toast("중분류(예산 단위)를 입력하세요", true); return; }
   showLoading("저장 중...");
-  api("addExp",{id:CID, tp:tp, mid:mid, sub:sub, planAm:am, note:note}).then(function(r){
+  api("addExpBG",{id:CID, tp:tp, mid:mid, sub:sub, planAm:am, note:note}).then(function(r){
     hideLoading();
     if(!r||!r.ok){ toast((r&&r.err)||"실패", true); return; }
     closePopup();
@@ -8735,8 +8735,7 @@ function expEditSave(rowId){
   var note = document.getElementById("expE_note").value;
   if (!tp||!mid){ toast("대분류/중분류는 필수입니다", true); return; }
   showLoading("저장 중...");
-  api("updateExp",{id:CID, rowId:rowId, tp:tp, mid:mid, sub:sub, planAm:am, note:note}).then(function(r){
-    // Note: server api uses `id` param differently — server takes p.id for row. We pass both id(CID) and rowId but server looks for p.id — need fix
+  api("updateExpBG",{id:CID, rowId:rowId, tp:tp, mid:mid, sub:sub, planAm:am, note:note}).then(function(r){
     hideLoading();
     if(!r||!r.ok){ toast((r&&r.err)||"실패", true); return; }
     closePopup();
@@ -8747,7 +8746,7 @@ function expEditSave(rowId){
 function expDel(rowId){
   if(!confirm("이 세출 항목을 삭제하시겠습니까?")) return;
   showLoading("삭제 중...");
-  api("deleteExp",{id:CID, rowId:rowId}).then(function(r){
+  api("deleteExpBG",{id:CID, rowId:rowId}).then(function(r){
     hideLoading();
     if(!r||!r.ok){ toast((r&&r.err)||"실패", true); return; }
     expBG = expBG.filter(function(it){ return it.id !== rowId; });
