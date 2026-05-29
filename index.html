@@ -15995,18 +15995,33 @@ function tmplExpBG(){
   toast("세출예산 양식 다운로드");
 }
 // 세입관리 엑셀 양식
-function tmplInc(){
+async function tmplInc(){
   if(typeof XLSX=="undefined"){toast("엑셀 라이브러리 로딩중",true);return}
   var wb=XLSX.utils.book_new();
+  var tp0=(incTypes||[])[0]||"이월금";
+  var cn0=(incCards||[])[0]?(incCards[0].name||""):"보존회통장";
+  var pm0=(incCards||[])[0]&&incCards[0].pays&&incCards[0].pays[0]?incCards[0].pays[0]:"계좌이체";
+  var allSubs=[];
+  (inc||[]).forEach(function(r){ if(r.sub && allSubs.indexOf(r.sub)<0) allSubs.push(r.sub); });
   tmplSheet(wb,"세입관리",["대분류","중분류","금액(원)","카드/계좌","결제방법","비고"],
     [
-      ["이월금","전년도 이월","3000000","보존회통장","계좌이체","전년도 잔액 이월 (회계연도 초기 1회)"],
-      ["보조금","국고보조","5000000","보존회통장","계좌이체","예시 행"],
-      ["지원금","한수원지원","2000000","한수원카드","지정카드",""],
-      ["자체수입","이자수입","50000","보존회통장","계좌이체","예금 이자"]
+      [tp0,"","3000000",cn0,pm0,"전년도 잔액 이월 (회계연도 초기 1회)"],
+      [tp0,"","5000000",cn0,pm0,"예시 행"],
+      [(incTypes||[])[1]||tp0,"","2000000",cn0,"",""],
+      [(incTypes||[])[2]||tp0,"","50000",cn0,"","예금 이자"]
     ],
     [18,24,14,16,14,28]);
-  XLSX.writeFile(wb,"양식_세입관리.xlsx");toast("세입관리 양식 다운로드");
+  var vals=[];
+  if((incTypes||[]).length) vals.push({sheet:"세입관리",col:"A",fromRow:2,toRow:500,list:incTypes.join(",")});
+  if(allSubs.length) vals.push({sheet:"세입관리",col:"B",fromRow:2,toRow:500,list:allSubs.join(",")});
+  var cardNames=(incCards||[]).map(function(c){return c.name||""}).filter(Boolean);
+  if(cardNames.length) vals.push({sheet:"세입관리",col:"D",fromRow:2,toRow:500,list:cardNames.join(",")});
+  var allPays={};
+  (incCards||[]).forEach(function(c){(c.pays||[]).forEach(function(p){allPays[p]=1})});
+  var payList=Object.keys(allPays);
+  if(payList.length) vals.push({sheet:"세입관리",col:"E",fromRow:2,toRow:500,list:payList.join(",")});
+  await writeXlsxWithDropdowns(wb,"양식_세입관리.xlsx",vals);
+  toast("세입관리 양식 다운로드");
 }
 // 계정관리 엑셀 내보내기 — 부서 + 담당자계정
 async function expAcct(){
