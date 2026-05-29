@@ -16629,7 +16629,11 @@ async function doImp(inp){
           var bi=null;for(var j=0;j<BG.length;j++)if(BG[j].n==String(x["비목"]||x["예산비목"]||""))bi=BG[j].id;
           var key=String(x["명세서ID"]||"").trim();
           var inv=key?(invMap[key]||(invMap[key]="INV"+Date.now()+Math.floor(Math.random()*9999))):("INV"+Date.now()+Math.floor(Math.random()*9999));
-          return {dt:String(x["구매일"]||""),ar:String(x["부서"]||""),it:String(x["물품명"]||""),qt:String(x["수량"]||""),un:String(x["단가(원)"]||x["단가"]||""),tot:String(x["합계(원)"]||x["합계(천원)"]||x["합계"]||""),bi:bi||(BG[0]?BG[0].id:"B5"),ph:[],rc:[],by:String(x["등록자"]||CID),prtD:String(x["결의서발행일"]||""),inv:inv};
+          var _qt=String(x["수량"]||"").replace(/,/g,"");
+          var _un=String(x["단가(원)"]||x["단가"]||"").replace(/,/g,"");
+          var _tot=String(x["합계(원)"]||x["합계(천원)"]||x["합계"]||"").replace(/,/g,"");
+          if(!x["합계(원)"]&&!x["합계"]&&x["합계(천원)"]&&_tot) _tot=String(Number(_tot)*1000);
+          return {dt:String(x["구매일"]||""),ar:String(x["부서"]||""),it:String(x["물품명"]||""),qt:_qt,un:_un,tot:_tot,bi:bi||(BG[0]?BG[0].id:"B5"),ph:[],rc:[],by:String(x["등록자"]||CID),prtD:String(x["결의서발행일"]||""),inv:inv};
         });
         if(pRows.length){
           showLoading("물품구매 "+pRows.length+"건 일괄 저장중...");
@@ -16642,7 +16646,9 @@ async function doImp(inp){
         var r3=XLSX.utils.sheet_to_json(wb.Sheets["지출내역"],{raw:false, dateNF:'yyyy-mm-dd HH:MM:SS'});
         var eRows=r3.map(function(x){
           var bi=null;var biNm=String(_rowGet(x,["비목","예산비목"])||"");for(var j=0;j<BG.length;j++)if(BG[j].n==biNm)bi=BG[j].id;
-          return {dt:String(_rowGet(x,["날짜","일자","지출일"])||""),bi:bi||(BG[0]?BG[0].id:"B1"),ar:String(_rowGet(x,["부서","소속"])||""),am:String(_rowGet(x,["금액(원)","금액(천원)","금액","지출액","지출액(원)"])||""),ds:String(_rowGet(x,["적요","내용","비고"])||""),by:CID};
+          var _eAm=String(_rowGet(x,["금액(원)","금액(천원)","금액","지출액","지출액(원)"])||"").replace(/,/g,"");
+          if(!_rowGet(x,["금액(원)","금액","지출액","지출액(원)"])&&_rowGet(x,"금액(천원)")&&_eAm) _eAm=String(Number(_eAm)*1000);
+          return {dt:String(_rowGet(x,["날짜","일자","지출일"])||""),bi:bi||(BG[0]?BG[0].id:"B1"),ar:String(_rowGet(x,["부서","소속"])||""),am:_eAm,ds:String(_rowGet(x,["적요","내용","비고"])||""),by:CID};
         });
         if(eRows.length){
           showLoading("지출내역 "+eRows.length+"건 일괄 저장중...");
