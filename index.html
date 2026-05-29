@@ -9763,12 +9763,13 @@ async function delPay(id){
   toast("삭제 완료");draw();
 }
 function popDpst(){
-  if(!pays.length){alert("등록된 결제수단(카드/계좌)이 없습니다.\n먼저 결제수단을 추가해주세요.");return}
-  var po='';for(var i=0;i<pays.length;i++)po+='<option value="'+pays[i].id+'">'+esc(pays[i].nm)+(pays[i].no4?" ("+esc(pays[i].no4)+")":"")+'</option>';
+  var cards=incCards||[];
+  if(!cards.length){alert("등록된 카드/계좌가 없습니다.\n세입관리 탭의 💳 카드/계좌 버튼으로 먼저 등록해주세요.");return}
+  var po='<option value="">— 선택 —</option>';cards.forEach(function(c){po+='<option value="'+esc(c.name)+'">'+esc(c.name)+'</option>';});
   var io='<option value="">— 선택 —</option>';(incTypes||[]).forEach(function(t){io+='<option value="'+esc(t)+'">'+esc(t)+'</option>';});
   openPopup('<h3>입금 등록 <button class="close-x" onclick="closePopup()">&times;</button></h3>'+
     '<div class="frow fr2"><div><label>날짜 *</label><input type="date" id="dpD" value="'+today()+'"></div>'+
-    '<div><label>결제수단 *</label><select id="dpP">'+po+'</select></div></div>'+
+    '<div><label>카드/계좌 *</label><select id="dpP">'+po+'</select></div></div>'+
     '<div class="frow fr2"><div><label>금액(원) *</label><input type="number" id="dpA"></div>'+
     '<div><label>세입종류</label><select id="dpIncTp">'+io+'</select></div></div>'+
     '<div class="frow"><div><label>적요</label><input type="text" id="dpDs" placeholder="예: 보조금 입금" style="width:100%"></div></div>'+
@@ -9788,11 +9789,12 @@ async function addDpst(){
 function edDpst(id){
   var d;for(var i=0;i<dpst.length;i++)if(dpst[i].id==id){d=dpst[i];break}
   if(!d)return;
-  var po='';for(var i=0;i<pays.length;i++)po+='<option value="'+pays[i].id+'"'+(pays[i].id==d.payM?' selected':'')+'>'+esc(pays[i].nm)+(pays[i].no4?" ("+esc(pays[i].no4)+")":"")+'</option>';
+  var cards=incCards||[];
+  var po='<option value="">— 선택 —</option>';cards.forEach(function(c){po+='<option value="'+esc(c.name)+'"'+(d.payM===c.name?' selected':'')+'>'+esc(c.name)+'</option>';});
   var io='<option value="">— 선택 —</option>';(incTypes||[]).forEach(function(t){io+='<option value="'+esc(t)+'"'+(d.incTp===t?' selected':'')+'>'+esc(t)+'</option>';});
   openPopup('<h3>입금 수정 <button class="close-x" onclick="closePopup()">&times;</button></h3>'+
     '<div class="frow fr2"><div><label>날짜</label><input type="date" id="edpD" value="'+esc(d.dt)+'"></div>'+
-    '<div><label>결제수단</label><select id="edpP">'+po+'</select></div></div>'+
+    '<div><label>카드/계좌</label><select id="edpP">'+po+'</select></div></div>'+
     '<div class="frow fr2"><div><label>금액(원)</label><input type="number" id="edpA" value="'+esc(d.am)+'"></div>'+
     '<div><label>세입종류</label><select id="edpIncTp">'+io+'</select></div></div>'+
     '<div class="frow"><div><label>적요</label><input type="text" id="edpDs" value="'+esc(d.ds||"")+'" style="width:100%"></div></div>'+
@@ -15111,7 +15113,7 @@ function _settleData(){
     var am=pn(d.am); incTotal+=am;
     var tp=d.incTp||"(미분류)";
     incByTp[tp]=(incByTp[tp]||0)+am;
-    var payNm=""; (pays||[]).forEach(function(p){if(String(p.id)===String(d.payM))payNm=p.nm;});
+    var payNm=d.payM||"";
     incRows.push({dt:d.dt,tp:tp,ds:d.ds||"",pay:payNm,am:am});
   });
   // 세입 계획도 포함
