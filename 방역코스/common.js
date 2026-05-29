@@ -596,6 +596,21 @@ function checkAdminAuth() {
       if (user && user.email) {
         resolved = true;
         initFirebaseSync();
+        // 캐시 자동로그인 알림 (세션당 1회만)
+        if (!sessionStorage.getItem('_loginNotified')) {
+          sessionStorage.setItem('_loginNotified', '1');
+          const page = location.pathname.split('/').pop() || 'index.html';
+          onDataReady(() => {
+            const ui = (loadData().users || {})[user.uid] || {};
+            const member = getMemberByUid(loadData(), user.uid);
+            const name = ui.name || (member && member.name) || user.email;
+            const role = ui.role || (member ? '회원' : '-');
+            getClientIP().then(ip => {
+              const dev = getDeviceType();
+              sendTelegram(`🔓 <b>자동접속</b>\n이름: ${name}\nID: ${user.email}\n권한: ${role}\n페이지: ${page}\n시각: ${new Date().toLocaleString('ko-KR')}\n접속: ${dev} · IP ${ip}`);
+            });
+          });
+        }
         resolve(true);
       } else {
         resolved = true;
