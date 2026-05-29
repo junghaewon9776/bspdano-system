@@ -6016,7 +6016,8 @@ function dDashIncExp(){
   var expPlan = 0;
   expBG.forEach(function(r){ if(!r.mid) expPlan += Number(r.planAm)||0; });
   var expActual = 0;
-  txn.forEach(function(t){ expActual += Number(t.outAm)||0; });
+  (purs||[]).forEach(function(p){ expActual += Number(p.tot)||0; });
+  (exps||[]).forEach(function(e){ expActual += Number(e.am)||0; });
 
   // 세입종류별 (계획 vs 입금)
   var incByTp = {};
@@ -6037,10 +6038,15 @@ function dDashIncExp(){
     if (!expByTp[r.tp]) expByTp[r.tp] = {plan:0, actual:0};
     expByTp[r.tp].plan += Number(r.planAm)||0;
   });
-  txn.forEach(function(t){
-    if (!t.expTp || !t.outAm) return;
-    if (!expByTp[t.expTp]) expByTp[t.expTp] = {plan:0, actual:0};
-    expByTp[t.expTp].actual += Number(t.outAm)||0;
+  (purs||[]).forEach(function(p){
+    var k = p.expTp || "(미분류)";
+    if (!expByTp[k]) expByTp[k] = {plan:0, actual:0};
+    expByTp[k].actual += Number(p.tot)||0;
+  });
+  (exps||[]).forEach(function(e){
+    var k = e.expTp || "(미분류)";
+    if (!expByTp[k]) expByTp[k] = {plan:0, actual:0};
+    expByTp[k].actual += Number(e.am)||0;
   });
 
   // 결제종류별 (상위 6)
