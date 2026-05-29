@@ -9537,7 +9537,7 @@ function dPay(){
   var dp=dpst.slice();
   if(pdf.f)dp=dp.filter(function(e){return inRange(e.dt,pdf.f,pdf.t)});
   var dpTot=0;for(var i=0;i<dp.length;i++)dpTot+=pn(dp[i].am);
-  h+='<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><h3 style="margin:0">입금 내역 ('+dp.length+'건, '+fmu(dpTot)+un+')</h3><button class="btn btn-g btn-s" onclick="popDpst()"'+(!pays.length?' disabled':'')+'>+ 입금 등록</button></div>';
+  h+='<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><h3 style="margin:0">입금 내역 ('+dp.length+'건, '+fmu(dpTot)+un+')</h3><button class="btn btn-g btn-s" onclick="popDpst()">+ 입금 등록</button></div>';
   h+=periodBar("pay");
   if(!dp.length){
     h+='<div class="empty2" style="margin-top:10px">'+(dpst.length?'조건에 맞는 입금 내역이 없습니다':'입금 내역이 없습니다. 이월액 외 추가 입금이 있을 때 등록하세요.')+'</div>';
@@ -9763,14 +9763,13 @@ async function delPay(id){
   toast("삭제 완료");draw();
 }
 function popDpst(){
-  if(!pays.length){alert("먼저 결제수단을 추가하세요");return}
-  var po='';for(var i=0;i<pays.length;i++)po+='<option value="'+pays[i].id+'">'+esc(pays[i].nm)+(pays[i].no4?" ("+esc(pays[i].no4)+")":"")+'</option>';
+  var po='<option value="">— 선택 —</option>';for(var i=0;i<pays.length;i++)po+='<option value="'+pays[i].id+'">'+esc(pays[i].nm)+(pays[i].no4?" ("+esc(pays[i].no4)+")":"")+'</option>';
   var io='<option value="">— 선택 —</option>';(incTypes||[]).forEach(function(t){io+='<option value="'+esc(t)+'">'+esc(t)+'</option>';});
   openPopup('<h3>입금 등록 <button class="close-x" onclick="closePopup()">&times;</button></h3>'+
     '<div class="frow fr2"><div><label>날짜 *</label><input type="date" id="dpD" value="'+today()+'"></div>'+
-    '<div><label>결제수단 *</label><select id="dpP">'+po+'</select></div></div>'+
-    '<div class="frow fr2"><div><label>금액(원) *</label><input type="number" id="dpA"></div>'+
-    '<div><label>세입종류</label><select id="dpIncTp">'+io+'</select></div></div>'+
+    '<div><label>금액(원) *</label><input type="number" id="dpA"></div></div>'+
+    '<div class="frow fr2"><div><label>세입종류</label><select id="dpIncTp">'+io+'</select></div>'+
+    '<div><label>결제수단</label><select id="dpP">'+po+'</select></div></div>'+
     '<div class="frow"><div><label>적요</label><input type="text" id="dpDs" placeholder="예: 보조금 입금" style="width:100%"></div></div>'+
     '<div style="text-align:right;margin-top:14px"><button class="btn btn-b" onclick="addDpst()">등록</button></div>');
 }
