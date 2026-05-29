@@ -446,7 +446,7 @@ label{display:block;font-size:10px;color:#999;margin-bottom:3px}
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 <script src="firebase-config.js"></script>
-<script src="common.js?v=20260529f"></script>
+<script src="common.js?v=20260529g"></script>
 
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" onerror="console.warn('XLSX CDN load failed')"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js" onerror="console.warn('xlsx-js-style CDN load failed')"></script>
@@ -565,6 +565,7 @@ document.addEventListener("DOMContentLoaded", function(){
 var AR=[], BG=[], US={}, acts=[], purs=[], exps=[], mems=[], notices=[], pays=[], dpst=[], inc=[], incTypes=[], expBG=[], txn=[], expTypes=[], gwanTypes=[], incCards=[], awards=[], memGroups=[], vendors=[], fees=[], assets=[], rentals=[], assetCats=[], assetLocs=[];
 var SHARE_MEMS=false;
 var FIELD_MENU="on";
+var LINK_TABS="on";
 var ACCOUNTANT_NAME = ""; // 회계담당자 고정 이름 (Config에서 로드)
 var RPT_SHOW = ""; // 현재 선택된 결산서 미리보기 ("" | inc | expAcc | expCat | expSrc)
 var EXP_LOADED = false; // 세출관리 데이터 로드 완료 플래그
@@ -1028,6 +1029,7 @@ async function refreshData(showToast){
   acts=r.acts||[];purs=r.purs||[];exps=r.exps||[];mems=r.mems||[];notices=r.notices||[];pays=r.pays||[];dpst=r.dpst||[];inc=r.inc||[];incTypes=r.incTypes||[];expBG=r.expBG||[];txn=r.txn||[];expTypes=r.expTypes||[];gwanTypes=r.gwanTypes||[];incCards=r.incCards||[];awards=r.awards||[];memGroups=r.memGroups||r.groups||[];vendors=r.vendors||vendors||[];fees=r.fees||[];assets=r.assets||[];rentals=r.rentals||[];assetCats=r.assetCats||[];assetLocs=r.assetLocs||[];fees=r.fees||fees||[];
   SHARE_MEMS=!!r.shareMems;
   if(r.fieldMenu!=null) FIELD_MENU=r.fieldMenu||"on";
+  if(r.linkTabs!=null) LINK_TABS=r.linkTabs||"on";
   if(r.accountantName!=null) ACCOUNTANT_NAME=r.accountantName||"";
   if(r.feeCycle!=null) FEE_CYCLE = r.feeCycle || "yearly";
   if(r.feeDefaultAmt!=null) FEE_DEFAULT_AMT = Number(r.feeDefaultAmt)||0;
@@ -16848,6 +16850,16 @@ function _evtMgrHtml(){
     + 'td[data-cell].dirty{background:#fef9c3 !important;box-shadow:inset 0 0 0 2px #eab308}'
     + 'td[data-cell].dirty select{font-weight:700;color:#b45309}'
     + '</style>';
+  // 연동 탭 토글
+  var ltOn = LINK_TABS==="on";
+  var linkToggle = '<div class="card" style="padding:20px">'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap">'
+    +'<div><h3 style="margin:0;font-size:18px">🔗 연동 탭</h3>'
+    +'<div class="mut" style="margin-top:4px">외부 사이트 iframe 연동 (방역코스 등)</div></div>'
+    +'<button onclick="toggleLinkTabs()" style="min-width:120px;padding:16px 32px;border:none;border-radius:12px;font-size:18px;font-weight:800;cursor:pointer;'
+    +(ltOn?'background:#16a34a;color:#fff':'background:#dc2626;color:#fff')+'">'
+    +(ltOn?'✅ ON':'❌ OFF')+'</button>'
+    +'</div></div>';
   // 현장메뉴 토글
   var fmOn = FIELD_MENU==="on";
   var fieldToggle = '<div class="card" style="padding:20px">'
@@ -16859,7 +16871,7 @@ function _evtMgrHtml(){
     +(fmOn?'✅ ON':'❌ OFF')+'</button>'
     +'</div></div>';
 
-  return css + fieldToggle + evTable + matrix;
+  return css + linkToggle + fieldToggle + evTable + matrix;
 }
 
 // 전역: 행사에서 활성화 가능한 모든 모듈 — 새 모듈 추가 시 여기만 수정
@@ -16874,6 +16886,16 @@ function toggleFieldMenu(){
     mkTabs();
     draw();
     toast("현장 메뉴 "+(next==="on"?"켜짐":"꺼짐"));
+  });
+}
+function toggleLinkTabs(){
+  var next = LINK_TABS==="on" ? "off" : "on";
+  api("setConfigValue",{id:CID,key:"LINK_TABS",value:next}).then(function(r){
+    if(!r||!r.ok){ toast("저장 실패",true); return; }
+    LINK_TABS=next;
+    mkTabs();
+    draw();
+    toast("연동 탭 "+(next==="on"?"켜짐":"꺼짐"));
   });
 }
 
