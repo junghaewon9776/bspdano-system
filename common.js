@@ -230,6 +230,9 @@ function _dispatch(p) {
         case "bulkAddFees": _apiBulkAdd(p, "Fees").then(resolve); return;
 
         // 예산
+        case "addExpBG":        _apiAddRow(p, "ExpBG").then(resolve); return;
+        case "updateExpBG":    _apiUpdateRow(p, "ExpBG").then(resolve); return;
+        case "deleteExpBG":    _apiDeleteRow(p, "ExpBG").then(resolve); return;
         case "bulkAddExpBG":    _apiBulkAdd(p, "ExpBG").then(resolve); return;
         case "bulkUpsertExpBig":_apiBulkUpsert(p, "ExpBG").then(resolve); return;
 
