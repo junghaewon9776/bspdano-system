@@ -95,6 +95,17 @@ label{display:block;font-size:10px;color:#999;margin-bottom:3px}
 .modal.show{display:flex}
 .modal img{max-width:90vw;max-height:90vh;border-radius:8px}
 .toast2{display:none;position:fixed;bottom:24px;left:50%;transform:translateX(-50%);padding:12px 22px;border-radius:8px;color:#fff;font-size:13px;font-weight:600;z-index:2147483647;box-shadow:0 4px 16px rgba(0,0,0,.2)}
+.evt-switch-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:2000;align-items:center;justify-content:center;animation:esFadeIn .2s}
+.evt-switch-modal.show{display:flex}
+@keyframes esFadeIn{from{opacity:0}to{opacity:1}}
+@keyframes esPop{from{transform:scale(.85);opacity:0}to{transform:scale(1);opacity:1}}
+.esm-box{background:#fff;border-radius:16px;padding:28px 32px;text-align:center;box-shadow:0 24px 80px rgba(0,0,0,.3);animation:esPop .25s ease-out;max-width:340px;width:90%}
+.esm-icon{font-size:42px;margin-bottom:8px}
+.esm-title{font-size:18px;font-weight:800;color:#1e293b;margin-bottom:4px}
+.esm-name{font-size:22px;font-weight:900;color:#7c3aed;margin:8px 0 12px}
+.esm-stats{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-bottom:16px}
+.esm-stat{background:#f1f5f9;border-radius:8px;padding:6px 12px;font-size:11px;color:#475569;font-weight:600}
+.esm-stat b{display:block;font-size:16px;color:#1e293b}
 
 .popup{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:900;align-items:center;justify-content:center;padding:16px}
 .popup.show{display:flex}
@@ -423,6 +434,7 @@ label{display:block;font-size:10px;color:#999;margin-bottom:3px}
 
 <div class="modal" id="pModal" onclick="this.className='modal'"><img id="pImg" onclick="event.stopPropagation()"></div>
 <div class="toast2" id="toast2"></div>
+<div class="evt-switch-modal" id="evtSwitchModal" onclick="this.classList.remove('show')"><div class="esm-box" onclick="event.stopPropagation()"><div class="esm-icon" id="esmIcon">✅</div><div class="esm-title">행사 전환 완료</div><div class="esm-name" id="esmName"></div><div class="esm-stats" id="esmStats"></div><button onclick="document.getElementById('evtSwitchModal').classList.remove('show')" style="background:#7c3aed;color:#fff;border:none;border-radius:8px;padding:8px 24px;font-size:13px;font-weight:700;cursor:pointer">확인</button></div></div>
 <div class="popup" id="popup" onmousedown="if(event.target==this)closePopup()"><div class="popup-box" id="popBody"></div></div>
 <div class="popup" id="popup2" style="z-index:1000" onmousedown="if(event.target==this)closePopup2()"><div class="popup-box" id="popBody2"></div></div>
 <input type="file" id="attF" style="display:none" accept="image/*" multiple onchange="doAttach(this)">
@@ -434,7 +446,7 @@ label{display:block;font-size:10px;color:#999;margin-bottom:3px}
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 <script src="firebase-config.js"></script>
-<script src="common.js?v=20260529d"></script>
+<script src="common.js?v=20260529e"></script>
 
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" onerror="console.warn('XLSX CDN load failed')"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js" onerror="console.warn('xlsx-js-style CDN load failed')"></script>
@@ -1047,7 +1059,21 @@ async function switchEvent(evtId){
   // 페인트 완료까지 기다렸다가 오버레이 해제 (시각적 순서 보장)
   await new Promise(function(res){ requestAnimationFrame(function(){ requestAnimationFrame(res); }); });
   hideLoading();
-  toast((CUR_EVT && CUR_EVT.nm) ? ("✅ "+CUR_EVT.nm+" 데이터 준비됨") : "전환 완료");
+  // 행사 전환 모달 표시
+  showEvtSwitchModal();
+}
+function showEvtSwitchModal(){
+  var nm=(CUR_EVT&&CUR_EVT.nm)||"행사";
+  document.getElementById("esmName").textContent=nm;
+  var st=document.getElementById("esmStats");
+  var items=[
+    {l:"인원",v:mems.length},{l:"활동",v:acts.length},{l:"수입",v:inc.length},
+    {l:"지출",v:exps.length},{l:"물품",v:purs.length}
+  ];
+  st.innerHTML=items.map(function(it){return'<div class="esm-stat"><b>'+it.v+'</b>'+it.l+'</div>'}).join("");
+  var m=document.getElementById("evtSwitchModal");
+  m.classList.add("show");
+  setTimeout(function(){m.classList.remove("show")},3000);
 }
 
 // 페이지 로드 시 자동 로그인 시도
