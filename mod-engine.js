@@ -709,10 +709,13 @@ function saveModDef(keyOrNew){
   var driveInput=((document.getElementById('mdf_driveUrl')||{}).value||'').trim();
   var driveUrl=driveInput || ((typeof DRIVE_UPLOAD_URL!=='undefined' && DRIVE_UPLOAD_URL)||'');
 
+  // 행사별 모듈은 현재 행사에 소속 (그 행사에서만 탭 표시) / 공통은 evtId 없음(전체 표시)
+  var modEvtId = global ? '' : ((typeof CUR_EVT!=='undefined' && CUR_EVT && CUR_EVT.evtId)||'');
+
   var def={
     key:key, label:label, icon:icon,
     cat:'custom', catLabel:catLabel||'', catIcon:icon,
-    fbPath:'Mod_'+key, global:global,
+    fbPath:'Mod_'+key, global:global, evtId:modEvtId,
     columns:cols,
     formTitle:formTitle, formDesc:formDesc,
     driveUploadUrl:driveUrl,

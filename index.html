@@ -447,7 +447,7 @@ label{display:block;font-size:10px;color:#999;margin-bottom:3px}
 <!-- firebase-storage 제거: 구글 드라이브 프록시로 대체 -->
 <script src="firebase-config.js"></script>
 <script src="common.js?v=20260529n"></script>
-<script src="mod-engine.js?v=20260601p"></script>
+<script src="mod-engine.js?v=20260602a"></script>
 
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" onerror="console.warn('XLSX CDN load failed')"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js" onerror="console.warn('xlsx-js-style CDN load failed')"></script>
@@ -1320,10 +1320,14 @@ function mkTabs(){
   cats.push({id:"sys",label:"⚙️ 시스템",items:c5});
 
   // ── 커스텀 모듈 탭 ──
+  // 공통(global) 모듈 = 모든 행사에서 표시 / 행사별 모듈 = 소속 행사(evtId)에서만 표시
   if(typeof _modDefs!=='undefined'){
+    var _curEvtId=(typeof CUR_EVT!=='undefined'&&CUR_EVT)?CUR_EVT.evtId:'';
     var _catGroups={};
     Object.keys(_modDefs).forEach(function(k){
       var d=_modDefs[k];
+      // 행사별 모듈인데 소속 행사가 정해져 있고 현재 행사와 다르면 숨김
+      if(!d.global && d.evtId && d.evtId!==_curEvtId) return;
       var cl=d.catLabel||'커스텀';
       if(!_catGroups[cl]) _catGroups[cl]={icon:d.catIcon||d.icon||'📦',items:[]};
       _catGroups[cl].items.push({k:'mod_'+k,l:(d.icon?d.icon+' ':'')+d.label});
