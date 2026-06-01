@@ -447,7 +447,7 @@ label{display:block;font-size:10px;color:#999;margin-bottom:3px}
 <!-- firebase-storage 제거: 구글 드라이브 프록시로 대체 -->
 <script src="firebase-config.js"></script>
 <script src="common.js?v=20260529n"></script>
-<script src="mod-engine.js?v=20260602a"></script>
+<script src="mod-engine.js?v=20260602b"></script>
 
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" onerror="console.warn('XLSX CDN load failed')"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js" onerror="console.warn('xlsx-js-style CDN load failed')"></script>
@@ -1328,6 +1328,8 @@ function mkTabs(){
       var d=_modDefs[k];
       // 행사별 모듈인데 소속 행사가 정해져 있고 현재 행사와 다르면 숨김
       if(!d.global && d.evtId && d.evtId!==_curEvtId) return;
+      // 관리자 전용 탭이면 SUBADMIN 이상만 표시
+      if(d.adminTab && !isA()) return;
       var cl=d.catLabel||'커스텀';
       if(!_catGroups[cl]) _catGroups[cl]={icon:d.catIcon||d.icon||'📦',items:[]};
       _catGroups[cl].items.push({k:'mod_'+k,l:(d.icon?d.icon+' ':'')+d.label});
@@ -1343,6 +1345,7 @@ function mkTabs(){
     var _ctabs = _getCustomTabs();
     _ctabs.forEach(function(cat,ci){
       if(cat.hidden) return;
+      if(cat.admin && !isA()) return; // 관리자(SUBADMIN 이상)만 보기
       var ctItems=(cat.items||[]).map(function(it,ii){
         return {k:"ct_"+cat.id+"_"+ii, l:(it.icon?it.icon+" ":"")+it.label};
       });
@@ -17383,6 +17386,7 @@ function popLinkCat(idx){
   h+='<div style="padding:14px">';
   h+='<div class="fr"><label>아이콘</label>'+_emojiSelect("lc_icon",cat.icon||"🔗")+'</div>';
   h+='<div class="fr"><label>이름</label><input id="lc_label" value="'+esc(cat.label||"")+'" placeholder="예: 방역"></div>';
+  h+='<div class="fr"><label>노출</label><label style="font-weight:400;font-size:13px;display:flex;align-items:center;gap:6px"><input type="checkbox" id="lc_admin"'+(cat.admin?' checked':'')+'> 관리자(SUBADMIN 이상)만 보기 <span style="color:#94a3b8;font-size:11px">(미체크: 모든 사용자)</span></label></div>';
   h+='<div style="text-align:right;margin-top:12px"><button class="btn" onclick="closePopup()">취소</button> <button class="btn btn-b" onclick="saveLinkCat('+idx+')">저장</button></div>';
   h+='</div>';
   openPopup(h,400);
@@ -17391,13 +17395,15 @@ function popLinkCat(idx){
 function saveLinkCat(idx){
   var icon=(document.getElementById("lc_icon").value||"🔗").trim();
   var label=(document.getElementById("lc_label").value||"").trim();
+  var admin=((document.getElementById("lc_admin")||{}).checked)||false;
   if(!label) return toast("이름을 입력하세요",true);
   var tabs=JSON.parse(JSON.stringify(_getCustomTabs()));
   if(idx<0){
-    tabs.push({id:_ctUid(), label:label, icon:icon, items:[]});
+    tabs.push({id:_ctUid(), label:label, icon:icon, admin:admin, items:[]});
   } else {
     tabs[idx].label=label;
     tabs[idx].icon=icon;
+    tabs[idx].admin=admin;
   }
   showLoading("저장 중...");
   _saveCustomTabs(tabs).then(function(){

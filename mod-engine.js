@@ -565,6 +565,8 @@ function popModDef(keyOrIdx){
   h+='<input id="mdf_catLabel" value="'+esc(def.catLabel||"")+'" placeholder="비우면 기본 커스텀 (이모지 제외)">';
   h+='<label style="font-size:12px;font-weight:700;color:#64748b">데이터 범위</label>';
   h+='<select id="mdf_global"><option value="false"'+(def.global?'':' selected')+'>행사별 (각 행사 데이터 분리)</option><option value="true"'+(def.global?' selected':'')+'>공통 (전체 행사 공유)</option></select>';
+  h+='<label style="font-size:12px;font-weight:700;color:#64748b">탭 노출 권한</label>';
+  h+='<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#475569"><input type="checkbox" id="mdf_adminTab"'+(def.adminTab?' checked':'')+'> 관리자(SUBADMIN 이상)만 이 탭 보기 <span style="color:#94a3b8">(체크 안 하면 모든 사용자에게 표시)</span></label>';
   h+='<label style="font-size:12px;font-weight:700;color:#64748b">공개 신청폼</label>';
   var afOn=def.features&&def.features.applyForm;
   h+='<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#475569"><input type="checkbox" id="mdf_applyForm"'+(afOn?' checked':'')+'> 켜면 신청폼 링크가 생기고 외부에서 신청 → 선정/탈락 처리 가능</label>';
@@ -695,6 +697,7 @@ function saveModDef(keyOrNew){
   var global=document.getElementById('mdf_global').value==='true';
   var afEl=document.getElementById('mdf_applyForm');
   var applyForm=afEl?afEl.checked:false;
+  var adminTab=((document.getElementById('mdf_adminTab')||{}).checked)||false;
   var formTitle=((document.getElementById('mdf_formTitle')||{}).value||'').trim();
   var formDesc=((document.getElementById('mdf_formDesc')||{}).value||'').trim();
 
@@ -716,6 +719,7 @@ function saveModDef(keyOrNew){
     key:key, label:label, icon:icon,
     cat:'custom', catLabel:catLabel||'', catIcon:icon,
     fbPath:'Mod_'+key, global:global, evtId:modEvtId,
+    adminTab:adminTab,
     columns:cols,
     formTitle:formTitle, formDesc:formDesc,
     driveUploadUrl:driveUrl,
