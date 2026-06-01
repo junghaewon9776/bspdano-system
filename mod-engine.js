@@ -2174,7 +2174,8 @@ function _renderModViewUI(def,row){
   if(dateCols.length>=2){
     var from=row[dateCols[0].key], to=row[dateCols[1].key];
     if(from&&to){
-      var today=new Date().toISOString().slice(0,10);
+      var _d=new Date(), _m=_d.getMonth()+1, _dd=_d.getDate();
+      var today=_d.getFullYear()+'-'+(_m<10?'0'+_m:_m)+'-'+(_dd<10?'0'+_dd:_dd); // 로컬(KST) 기준
       var bg,txt,ic,msg;
       if(today>=from && today<=to){ bg='#dcfce7';txt='#15803d';ic='✅';msg='정상 — 사용 가능'; }
       else if(today<from){ bg='#fef9c3';txt='#a16207';ic='⏳';msg='사용 기간 전'; }
