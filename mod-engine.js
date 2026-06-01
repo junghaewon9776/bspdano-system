@@ -333,31 +333,32 @@ function _modFormField(col,val){
   var id='mod_f_'+col.key;
   var ev=esc(String(val==null?'':val));
   var ph=col.placeholder?' placeholder="'+esc(col.placeholder)+'"':'';
+  var _w='width:100%;box-sizing:border-box;';  // 입력칸 너비 통일
   switch(col.type){
     case 'textarea':
-      return '<textarea id="'+id+'" rows="3" style="resize:vertical"'+ph+'>'+ev+'</textarea>';
+      return '<textarea id="'+id+'" rows="3" style="'+_w+'resize:vertical"'+ph+'>'+ev+'</textarea>';
     case 'select':
-      var h='<select id="'+id+'"><option value="">— 선택 —</option>';
+      var h='<select id="'+id+'" style="'+_w+'"><option value="">— 선택 —</option>';
       (col.options||[]).forEach(function(o){
         var ov=typeof o==='object'?o.value:o, ol=typeof o==='object'?o.label:o;
         h+='<option value="'+esc(ov)+'"'+(ov==val?' selected':'')+'>'+esc(ol)+'</option>';
       });
       return h+'</select>';
     case 'badge':
-      var h='<select id="'+id+'"><option value="">— 선택 —</option>';
+      var h='<select id="'+id+'" style="'+_w+'"><option value="">— 선택 —</option>';
       if(col.badgeMap) Object.keys(col.badgeMap).forEach(function(k){
         h+='<option value="'+esc(k)+'"'+(k==val?' selected':'')+'>'+esc(col.badgeMap[k].label||k)+'</option>';
       });
       return h+'</select>';
     case 'number':
       if(col.comma){
-        return '<input id="'+id+'" type="text" inputmode="numeric"'+ph+' value="'+(val?Number(val).toLocaleString():'')+'" oninput="this.value=this.value.replace(/[^\\d,]/g,\'\').replace(/,/g,\'\').replace(/\\B(?=(\\d{3})+(?!\\d))/g,\',\')">';
+        return '<input id="'+id+'" type="text" inputmode="numeric"'+ph+' value="'+(val?Number(val).toLocaleString():'')+'" style="'+_w+'" oninput="this.value=this.value.replace(/[^\\d,]/g,\'\').replace(/,/g,\'\').replace(/\\B(?=(\\d{3})+(?!\\d))/g,\',\')">';
       }
-      return '<input id="'+id+'" type="number"'+ph+' value="'+ev+'">';
+      return '<input id="'+id+'" type="number"'+ph+' value="'+ev+'" style="'+_w+'">';
     case 'date':
-      return '<input id="'+id+'" type="date" value="'+ev+'">';
+      return '<input id="'+id+'" type="date" value="'+ev+'" style="'+_w+'">';
     case 'tel':
-      return '<input id="'+id+'" type="tel" value="'+ev+'" placeholder="'+esc(col.placeholder||'010-0000-0000')+'" maxlength="13" oninput="var v=this.value.replace(/[^0-9]/g,\'\');if(v.length<=3)this.value=v;else if(v.length<=7)this.value=v.slice(0,3)+\'-\'+v.slice(3);else this.value=v.slice(0,3)+\'-\'+v.slice(3,7)+\'-\'+v.slice(7,11)">';
+      return '<input id="'+id+'" type="tel" value="'+ev+'" placeholder="'+esc(col.placeholder||'010-0000-0000')+'" maxlength="13" style="'+_w+'" oninput="var v=this.value.replace(/[^0-9]/g,\'\');if(v.length<=3)this.value=v;else if(v.length<=7)this.value=v.slice(0,3)+\'-\'+v.slice(3);else this.value=v.slice(0,3)+\'-\'+v.slice(3,7)+\'-\'+v.slice(7,11)">';
     case 'file':
       var fh='';
       if(val){
@@ -375,7 +376,7 @@ function _modFormField(col,val){
     case 'consent':
       return '<label style="display:flex;align-items:flex-start;gap:8px;font-size:13px;color:#475569;cursor:pointer;line-height:1.5"><input type="checkbox" id="'+id+'" style="margin-top:3px;flex-shrink:0"'+(val==='동의'?' checked':'')+'> <span>'+esc(col.consentText||col.label||'개인정보 수집·이용에 동의합니다')+'</span></label>';
     default:
-      return '<input id="'+id+'" type="text" value="'+ev+'"'+(col.placeholder?' placeholder="'+esc(col.placeholder)+'"':'')+'>';
+      return '<input id="'+id+'" type="text" value="'+ev+'"'+(col.placeholder?' placeholder="'+esc(col.placeholder)+'"':'')+' style="'+_w+'">';
   }
 }
 
