@@ -2004,7 +2004,7 @@ function popModLog(key){
       h+='<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="background:#f1f5f9;position:sticky;top:0">';
       h+='<th style="padding:6px 8px;text-align:left">일시</th><th style="padding:6px 8px;text-align:left">처리자</th><th style="padding:6px 8px;text-align:left">동작</th><th style="padding:6px 8px;text-align:left">대상</th></tr></thead><tbody>';
       arr.forEach(function(l){
-        var dt=String(l.t||'').replace('T',' ').slice(0,16);
+        var dt=_modFmtDateTime(l.t);
         var actColor = (l.act==='거부'||l.act==='탈락'||l.act==='삭제')?'#dc2626':(l.act==='발급'?'#475569':'#16a34a');
         h+='<tr style="border-bottom:1px solid #f1f5f9">';
         h+='<td style="padding:5px 8px;white-space:nowrap;color:#64748b">'+esc(dt)+'</td>';
