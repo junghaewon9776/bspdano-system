@@ -1837,6 +1837,7 @@ function _mlA4Grid(opt){
 function _modLabelPreview(){
   var key=window.__modLabelKey, def=_modDefs[key]; if(!def) return;
   var opt=_modLabelReadOpt();
+  _saveModLabelOpt(key,opt);   // 설정 변경 시마다 자동 저장 (크기·여백·표시항목·모드 유지)
   var ids=window.__modLabelRows||[];
   var row=(_modData[key]||[]).filter(function(r){return r._id===ids[0]})[0] || (_modData[key]||[])[0];
   var el=document.getElementById('ml_preview');
@@ -2138,6 +2139,8 @@ function _mllSave(){
   var L=window.__mlLayout; if(!L) return;
   var layout={mode:'free',pos:L.pos};
   _saveModLabelLayout(L.key,L.mode,layout);
+  // 재오픈 시 같은 모드로 열려 이 배치가 보이도록 opt의 mode도 못박음
+  try{ var o=JSON.parse(localStorage.getItem('modLabelOpt_'+L.key)||'{}'); o.mode=L.mode; localStorage.setItem('modLabelOpt_'+L.key, JSON.stringify(o)); }catch(e){}
   if(window.__mllCleanup) window.__mllCleanup();
   closePopup();
   toast('라벨 배치 저장됨 ('+(L.mode==='a4'?'A4용':'낱장용')+')');
