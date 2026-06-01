@@ -2523,7 +2523,7 @@ function _uploadToDrive(file, subFolder, label){
       fetch(DRIVE_UPLOAD_URL,{
         method:"POST",
         headers:{"Content-Type":"text/plain"},
-        body:JSON.stringify({base64:m[2],filename:file.name,mime:m[1],subFolder:subFolder})
+        body:JSON.stringify({action:"upload",base64:m[2],filename:file.name,mime:m[1],subFolder:subFolder})
       }).then(function(resp){return resp.json()})
         .then(function(r){
           if(r&&r.ok) res(r.url);
@@ -20856,7 +20856,7 @@ function apfUploadToDrive(file, subFolder, label){
       fetch(driveUrl,{
         method:"POST",
         headers:{"Content-Type":"text/plain"},
-        body:JSON.stringify({base64:m[2],filename:file.name,mime:m[1],subFolder:subFolder})
+        body:JSON.stringify({action:"upload",base64:m[2],filename:file.name,mime:m[1],subFolder:subFolder})
       }).then(function(resp){return resp.json()})
         .then(function(r){
           if(r&&r.ok) res(r.url);
