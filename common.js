@@ -280,17 +280,18 @@ function _dispatch(p) {
         case "getDbInfo":      resolve({ok:true, ssId:"firebase", ssUrl:"https://console.firebase.google.com"}); return;
         case "getSheetUrl":    resolve({ok:true, url:"https://console.firebase.google.com"}); return;
 
-        // SMS (GAS 프록시 필요 — 나중에 연동)
+        // SMS (알리고 GAS 프록시)
         case "sendSms":
-        case "testSms":
         case "sendSmsAligo":
-        case "sendFeeSms":
-        case "checkSmsConfig":
+        case "sendFeeSms":   _apiSendSmsAligo(p).then(resolve); return;
+        case "testSms":      _apiSendSmsAligo(Object.assign({},p,{testMode:true})).then(resolve); return;
+        case "checkSmsConfig": _apiCheckSmsConfig(p).then(resolve); return;
         case "getSmsCfg":
-        case "getAligoCfg":
-        case "smsLog":
-        case "smsLogList":
-          resolve({ok:false, err:"SMS는 아직 준비 중입니다"}); return;
+        case "getAligoCfg":  _apiGetAligoCfg(p).then(resolve); return;
+        case "smsLog":       _apiSmsLogAdd(p).then(resolve); return;
+        case "smsLogList":   _apiSmsLogList(p).then(resolve); return;
+        case "aligoReserveList":   _apiAligoProxy(p,"reserveList").then(resolve); return;
+        case "aligoReserveCancel": _apiAligoProxy(p,"reserveCancel").then(resolve); return;
 
         // 참가자
         case "listApply":      _apiListApply(p).then(resolve); return;
@@ -1165,6 +1166,143 @@ function _apiSetConfig(p) {
       _evtCaches[evtId].Config = cfg;
       return {ok:true};
     });
+  });
+}
+
+// ───────── SMS (알리고) ─────────
+function _getAligoCfg(evtId) {
+  return loadEvtData(evtId).then(function(data) {
+    var cfg = {};
+    (data.Config || []).forEach(function(c) { if(c && c.k) cfg[c.k] = c.v; });
+    return {
+      apiKey:    cfg.ALIGO_API_KEY  || "",
+      userId:    cfg.ALIGO_USER_ID  || "",
+      sender:    cfg.ALIGO_SENDER   || "",
+      proxyUrl:  cfg.SMS_PROXY_URL  || "",
+      senderKey: cfg.ALIGO_SENDER_KEY || "",
+      tplCode:   cfg.ALIGO_TPL_CODE   || "",
+      kakaoOn:   cfg.ALIGO_KAKAO_ON === "1",
+      smsSignature: cfg.SMS_SIGNATURE || ""
+    };
+  });
+}
+function _apiGetAligoCfg(p) {
+  var evtId = _getEvtId(p);
+  if (!evtId) return Promise.resolve({ok:false, err:"행사 미선택"});
+  return _getAligoCfg(evtId).then(function(c) {
+    return {
+      ok: true,
+      hasKey: !!c.apiKey,
+      aligoKeyMask: c.apiKey ? ("***" + c.apiKey.slice(-4)) : "",
+      aligoUser: c.userId,
+      aligoSender: c.sender,
+      proxyUrl: c.proxyUrl ? "설정됨" : "",
+      sensServiceId: "", sensSender: "", hasSensAccess:false, hasSensSecret:false,
+      sensAccessMask:"", sensSecretMask:"",
+      smsSignature: c.smsSignature,
+      tplCode: c.tplCode,
+      kakaoOn: c.kakaoOn
+    };
+  });
+}
+function _apiCheckSmsConfig(p) {
+  var evtId = _getEvtId(p);
+  if (!evtId) return Promise.resolve({ok:false, err:"행사 미선택"});
+  return _getAligoCfg(evtId).then(function(c) {
+    if (!c.proxyUrl) return {ok:false, err:"SMS 프록시 URL이 설정되지 않았습니다. 시스템설정 → SMS 설정에서 '알리고 프록시 URL'을 입력하세요."};
+    if (!c.apiKey || !c.userId || !c.sender) return {ok:false, err:"알리고 API Key / User ID / 발신번호를 설정하세요."};
+    return {ok:true};
+  });
+}
+function _apiSendSmsAligo(p) {
+  var evtId = _getEvtId(p);
+  if (!evtId) return Promise.resolve({ok:false, err:"행사 미선택"});
+  return _getAligoCfg(evtId).then(function(c) {
+    if (!c.proxyUrl) return {ok:false, err:"SMS 프록시 URL 미설정 — 시스템설정 → SMS 설정"};
+    if (!c.apiKey || !c.userId || !c.sender) return {ok:false, err:"알리고 설정 미완료 (API Key/User ID/발신번호)"};
+    var tels = p.tels || [];
+    if (!tels.length) return {ok:false, err:"수신번호 없음"};
+    var body = {
+      action:   "send",
+      apiKey:   c.apiKey,
+      userId:   c.userId,
+      sender:   c.sender,
+      tels:     tels,
+      msg:      p.msg || "",
+      title:    p.title || "",
+      testMode: !!p.testMode
+    };
+    if (p.rdate) { body.rdate = p.rdate; body.rtime = p.rtime || ""; }
+    return fetch(c.proxyUrl, {
+      method: "POST",
+      headers: {"Content-Type":"application/json"},
+      body: JSON.stringify(body)
+    }).then(function(resp) { return resp.json(); }).then(function(r) {
+      if (r && r.ok) {
+        _apiSmsLogAdd({
+          evtId: evtId,
+          by: (typeof CID !== 'undefined' ? CID : ""),
+          tels: tels,
+          msg: p.msg || "",
+          sent: r.sent || tels.length,
+          failed: r.failed || 0,
+          type: r.msgType || "SMS",
+          rdate: p.rdate || ""
+        });
+      }
+      return r;
+    }).catch(function(e) {
+      return {ok:false, err:"프록시 통신 실패: " + (e.message||e)};
+    });
+  });
+}
+function _apiAligoProxy(p, action) {
+  var evtId = _getEvtId(p);
+  if (!evtId) return Promise.resolve({ok:false, err:"행사 미선택"});
+  return _getAligoCfg(evtId).then(function(c) {
+    if (!c.proxyUrl) return {ok:false, err:"SMS 프록시 URL 미설정"};
+    if (!c.apiKey || !c.userId) return {ok:false, err:"알리고 설정 미완료"};
+    var body = {action: action, apiKey: c.apiKey, userId: c.userId};
+    if (p.mid) body.mid = p.mid;
+    if (p.page) body.page = p.page;
+    if (p.pageSize) body.pageSize = p.pageSize;
+    return fetch(c.proxyUrl, {
+      method: "POST",
+      headers: {"Content-Type":"application/json"},
+      body: JSON.stringify(body)
+    }).then(function(resp) { return resp.json(); }).catch(function(e) {
+      return {ok:false, err:"프록시 통신 실패: " + (e.message||e)};
+    });
+  });
+}
+function _apiSmsLogAdd(p) {
+  var evtId = p.evtId || _getEvtId(p);
+  if (!evtId) return Promise.resolve({ok:true});
+  return loadEvtData(evtId).then(function(data) {
+    var log = data.SmsLog || [];
+    log.push({
+      ts:      new Date().toISOString(),
+      by:      p.by || "",
+      cnt:     (p.tels||[]).length || p.sent || 0,
+      sent:    p.sent || 0,
+      failed:  p.failed || 0,
+      type:    p.type || "SMS",
+      preview: (p.msg||"").slice(0,80),
+      rdate:   p.rdate || ""
+    });
+    if (log.length > 500) log = log.slice(-500);
+    return saveEvtNode(evtId, "SmsLog", log).then(function() {
+      _evtCaches[evtId].SmsLog = log;
+      return {ok:true};
+    });
+  }).catch(function() { return {ok:true}; });
+}
+function _apiSmsLogList(p) {
+  var evtId = _getEvtId(p);
+  if (!evtId) return Promise.resolve({ok:false, err:"행사 미선택"});
+  return loadEvtData(evtId).then(function(data) {
+    var log = (data.SmsLog || []).slice().reverse();
+    return {ok:true, list: log.slice(0, p.limit || 100)};
   });
 }
 

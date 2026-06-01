@@ -72,7 +72,7 @@ td{padding:8px;border-bottom:1px solid #eee;font-size:12px;vertical-align:middle
 .btn-out{background:#fff;border:1.5px solid #2563eb;color:#2563eb;border-radius:6px;padding:5px 12px;cursor:pointer;font-size:11px;font-weight:600;font-family:inherit}
 .btn-out:hover{background:#eff6ff}
 .btn-ex{color:#217346;border-color:#217346}.btn-im{color:#2563eb;border-color:#2563eb}.btn-tp{color:#7c3aed;border-color:#7c3aed}
-input[type=text],input[type=password],input[type=number],input[type=date],input[type=file],select,textarea{border:1px solid #ddd;border-radius:6px;padding:8px 10px;font-size:13px;width:100%;font-family:inherit;background:#fff}
+input[type=text],input[type=password],input[type=number],input[type=date],input[type=tel],input[type=email],input[type=search],input[type=file],select,textarea{border:1px solid #ddd;border-radius:6px;padding:8px 10px;font-size:13px;width:100%;font-family:inherit;background:#fff}
 input:focus,select:focus,textarea:focus{outline:none;border-color:#2563eb}
 label{display:block;font-size:10px;color:#999;margin-bottom:3px}
 
@@ -183,7 +183,7 @@ label{display:block;font-size:10px;color:#999;margin-bottom:3px}
   .exbar .btn-out{font-size:10px;padding:5px 10px}
   .mobile-hide{display:none}
   /* 모바일에서 input 폰트 키워 한글 IME 안정화 */
-  input[type=text],input[type=password],input[type=number],input[type=date],select,textarea{font-size:16px;padding:10px}
+  input[type=text],input[type=password],input[type=number],input[type=date],input[type=tel],input[type=email],input[type=search],select,textarea{font-size:16px;padding:10px}
   .popup-box input,.popup-box select,.popup-box textarea{font-size:16px}
 }
 @media(max-width:480px){
@@ -446,8 +446,8 @@ label{display:block;font-size:10px;color:#999;margin-bottom:3px}
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <!-- firebase-storage 제거: 구글 드라이브 프록시로 대체 -->
 <script src="firebase-config.js"></script>
-<script src="common.js?v=20260529n"></script>
-<script src="mod-engine.js?v=20260602f"></script>
+<script src="common.js?v=20260602a"></script>
+<script src="mod-engine.js?v=20260602i"></script>
 
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" onerror="console.warn('XLSX CDN load failed')"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js" onerror="console.warn('xlsx-js-style CDN load failed')"></script>
@@ -15440,8 +15440,24 @@ function dAcct(){
     h+='</details>';
     h+='<div style="text-align:right;margin-top:10px"><button class="btn btn-s" style="background:#10b981;color:#fff;font-weight:700" onclick="saveSmsCfg()">💾 저장</button> <button class="btn btn-s" style="background:#059669;color:#fff" onclick="testSmsSend()">📱 내 번호로 테스트</button></div>';
     h+='</div>';
+    // 📲 알리고 SMS 설정
+    h+='<div class="card" style="border:1px solid #6366f1;background:#eef2ff">';
+    h+='<h3 style="margin:0 0 4px;color:#3730a3">📲 알리고 SMS 설정</h3>';
+    h+='<div style="font-size:11px;color:#4338ca;margin-bottom:10px"><a href="https://smartsms.aligo.in" target="_blank" style="color:#3730a3;font-weight:700">smartsms.aligo.in</a> → 회원가입 → API Key 발급 → 발신번호 등록 → 여기 입력</div>';
+    h+='<div class="frow fr1" style="margin-bottom:8px"><div><label>프록시 URL <span style="color:#ef4444">*</span> <span style="font-size:10px;color:#888">(GAS 웹앱 배포 URL — SmsAligo_GAS.js 참고)</span></label><input type="text" id="cfgAlProxy" placeholder="https://script.google.com/macros/s/...../exec"></div></div>';
+    h+='<div class="frow fr3" style="margin-bottom:8px"><div><label>API Key <span style="color:#ef4444">*</span></label><input type="password" id="cfgAlKey" placeholder="알리고 API Key" autocomplete="off"></div>';
+    h+='<div><label>User ID <span style="color:#ef4444">*</span></label><input type="text" id="cfgAlUser" placeholder="알리고 아이디"></div>';
+    h+='<div><label>발신번호 <span style="color:#ef4444">*</span></label><input type="text" id="cfgAlSender" placeholder="01012345678 (사전등록)"></div></div>';
+    h+='<details style="margin-top:8px;padding:8px;background:#fef3c7;border:1px solid #fbbf24;border-radius:6px"><summary style="cursor:pointer;font-weight:700;color:#78350f;font-size:13px">💬 카카오 알림톡 연동 (선택)</summary>';
+    h+='<div class="frow fr2" style="margin-top:8px"><div><label>Sender Key</label><input type="text" id="cfgAlSenderKey" placeholder="카카오 발신프로필 키"></div>';
+    h+='<div><label>템플릿 코드</label><input type="text" id="cfgAlTplCode" placeholder="TPL_0001"></div></div>';
+    h+='<label style="display:flex;align-items:center;gap:6px;margin-top:6px;cursor:pointer"><input type="checkbox" id="cfgAlKakaoOn"> <span style="font-weight:600">알림톡+SMS 대체발송</span></label>';
+    h+='</details>';
+    h+='<div style="text-align:right;margin-top:10px"><button class="btn btn-s" style="background:#6366f1;color:#fff;font-weight:700" onclick="saveAligoCfg()">💾 저장</button> <button class="btn btn-s" style="background:#4f46e5;color:#fff" onclick="testAligoSend()">📱 테스트 발송</button></div>';
+    h+='</div>';
     // 렌더 후 저장된 값 자동 로드
     setTimeout(_loadSmsCfgIntoForm, 50);
+    setTimeout(_loadAligoCfgIntoForm, 80);
   }
   // super 전용: 메인 스프레드시트 바로가기
   if(isSuper()){
@@ -15695,12 +15711,14 @@ async function saveFeeCfg(){
   draw();
 }
 async function saveAligoCfg(){
+  var proxy = ((document.getElementById("cfgAlProxy")||{}).value||"").trim();
   var key = ((document.getElementById("cfgAlKey")||{}).value||"").trim();
   var user = ((document.getElementById("cfgAlUser")||{}).value||"").trim();
   var send = ((document.getElementById("cfgAlSender")||{}).value||"").trim();
-  if(!key && !user && !send){ alert("하나라도 입력하세요"); return; }
+  if(!proxy && !key && !user && !send){ alert("하나라도 입력하세요"); return; }
   showLoading("저장 중...");
   var results = [];
+  if(proxy) results.push(await api("setConfigValue",{id:CID,key:"SMS_PROXY_URL",value:proxy}));
   if(key)  results.push(await api("setConfigValue",{id:CID,key:"ALIGO_API_KEY",value:key}));
   if(user) results.push(await api("setConfigValue",{id:CID,key:"ALIGO_USER_ID",value:user}));
   if(send) results.push(await api("setConfigValue",{id:CID,key:"ALIGO_SENDER",value:send}));
@@ -15715,8 +15733,32 @@ async function saveAligoCfg(){
   var ok = results.every(function(r){return r&&r.ok;});
   if(!ok){ toast("저장 실패",true); return; }
   toast("알리고 설정 저장됨");
-  // 입력란 마스킹
-  if(key){ var ke=document.getElementById("cfgAlKey"); if(ke)ke.value=""; ke.placeholder="✅ 저장됨 (변경시에만 입력)"; }
+  if(key){ var ke=document.getElementById("cfgAlKey"); if(ke){ke.value=""; ke.placeholder="✅ 저장됨 (변경시에만 입력)";} }
+  if(proxy){ var pe=document.getElementById("cfgAlProxy"); if(pe){pe.value=""; pe.placeholder="✅ 저장됨 (변경시에만 입력)";} }
+}
+function _loadAligoCfgIntoForm(){
+  api("getAligoCfg", {}).then(function(r){
+    if(!r||!r.ok) return;
+    var setPlace = function(id, txt){ var el=document.getElementById(id); if(el && txt) el.placeholder=txt; };
+    var setVal   = function(id, val){ var el=document.getElementById(id); if(el && val) el.value=val; };
+    if(r.proxyUrl) setPlace("cfgAlProxy", "✅ "+r.proxyUrl+" — 변경 시에만 입력");
+    if(r.hasKey)   setPlace("cfgAlKey", "✅ 저장됨 ("+r.aligoKeyMask+") — 변경 시에만 입력");
+    setVal("cfgAlUser", r.aligoUser);
+    setVal("cfgAlSender", r.aligoSender);
+    var k=document.getElementById("cfgAlKakaoOn"); if(k) k.checked=!!r.kakaoOn;
+    setVal("cfgAlTplCode", r.tplCode);
+  });
+}
+async function testAligoSend(){
+  var tel = prompt("테스트 수신번호 (본인 번호)를 입력하세요:", ((ME&&ME.tel)||""));
+  if(!tel) return;
+  tel = tel.replace(/[^0-9]/g,"");
+  if(tel.length<10){ alert("번호가 올바르지 않습니다"); return; }
+  showLoading("발송 중...");
+  var r = await api("sendSmsAligo",{id:CID, tels:[tel], msg:"[테스트] 알리고 SMS 연동 테스트입니다 - "+new Date().toLocaleString()});
+  hideLoading();
+  if(r&&r.ok) toast("✅ 테스트 발송 성공 ("+r.msgType+")");
+  else toast("❌ "+(r&&r.err||"실패"), true);
 }
 // 저장된 SMS 설정을 입력 폼에 자동 채워넣기 (네이버 SENS)
 function _loadSmsCfgIntoForm(){
