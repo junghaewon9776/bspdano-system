@@ -281,9 +281,10 @@ function popModEdit(key,id){
 function _modFormField(col,val){
   var id='mod_f_'+col.key;
   var ev=esc(String(val==null?'':val));
+  var ph=col.placeholder?' placeholder="'+esc(col.placeholder)+'"':'';
   switch(col.type){
     case 'textarea':
-      return '<textarea id="'+id+'" rows="3" style="resize:vertical">'+ev+'</textarea>';
+      return '<textarea id="'+id+'" rows="3" style="resize:vertical"'+ph+'>'+ev+'</textarea>';
     case 'select':
       var h='<select id="'+id+'"><option value="">— 선택 —</option>';
       (col.options||[]).forEach(function(o){
@@ -299,13 +300,13 @@ function _modFormField(col,val){
       return h+'</select>';
     case 'number':
       if(col.comma){
-        return '<input id="'+id+'" type="text" inputmode="numeric" value="'+(val?Number(val).toLocaleString():'')+'" oninput="this.value=this.value.replace(/[^\\d,]/g,\'\').replace(/,/g,\'\').replace(/\\B(?=(\\d{3})+(?!\\d))/g,\',\')">';
+        return '<input id="'+id+'" type="text" inputmode="numeric"'+ph+' value="'+(val?Number(val).toLocaleString():'')+'" oninput="this.value=this.value.replace(/[^\\d,]/g,\'\').replace(/,/g,\'\').replace(/\\B(?=(\\d{3})+(?!\\d))/g,\',\')">';
       }
-      return '<input id="'+id+'" type="number" value="'+ev+'">';
+      return '<input id="'+id+'" type="number"'+ph+' value="'+ev+'">';
     case 'date':
       return '<input id="'+id+'" type="date" value="'+ev+'">';
     case 'tel':
-      return '<input id="'+id+'" type="tel" value="'+ev+'" placeholder="010-0000-0000" maxlength="13" oninput="var v=this.value.replace(/[^0-9]/g,\'\');if(v.length<=3)this.value=v;else if(v.length<=7)this.value=v.slice(0,3)+\'-\'+v.slice(3);else this.value=v.slice(0,3)+\'-\'+v.slice(3,7)+\'-\'+v.slice(7,11)">';
+      return '<input id="'+id+'" type="tel" value="'+ev+'" placeholder="'+esc(col.placeholder||'010-0000-0000')+'" maxlength="13" oninput="var v=this.value.replace(/[^0-9]/g,\'\');if(v.length<=3)this.value=v;else if(v.length<=7)this.value=v.slice(0,3)+\'-\'+v.slice(3);else this.value=v.slice(0,3)+\'-\'+v.slice(3,7)+\'-\'+v.slice(7,11)">';
     case 'file':
       var fh='';
       if(val) fh+='<div style="font-size:12px;margin-bottom:4px"><a href="'+esc(String(val))+'" target="_blank" style="color:#2563eb">📎 기존 파일</a></div>';
@@ -497,6 +498,10 @@ function popModDef(keyOrIdx){
   h+='<label style="font-size:12px;font-weight:700;color:#64748b">공개 신청폼</label>';
   var afOn=def.features&&def.features.applyForm;
   h+='<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#475569"><input type="checkbox" id="mdf_applyForm"'+(afOn?' checked':'')+'> 켜면 신청폼 링크가 생기고 외부에서 신청 → 선정/탈락 처리 가능</label>';
+  h+='<label style="font-size:12px;font-weight:700;color:#64748b">신청폼 제목</label>';
+  h+='<input id="mdf_formTitle" value="'+esc(def.formTitle||"")+'" placeholder="비우면 「'+esc(def.label||"모듈명")+' 신청」">';
+  h+='<label style="font-size:12px;font-weight:700;color:#64748b">신청폼 안내문</label>';
+  h+='<input id="mdf_formDesc" value="'+esc(def.formDesc||"")+'" placeholder="예: 아래 내용을 작성 후 신청해 주세요">';
   h+='</div>';
 
   // 컬럼 섹션
@@ -559,6 +564,10 @@ function _renderModDefCols(){
     if(c.type==='file'){
       h+='<div style="margin-top:6px;font-size:11px;color:#94a3b8">📎 파일첨부는 자료실의 Drive 업로드 설정이 필요합니다. 신청자가 파일을 올리면 링크로 저장됩니다.</div>';
     }
+    // 예시 문구(placeholder) — 텍스트 입력류만
+    if(['text','tel','number','textarea'].indexOf(c.type)>=0){
+      h+='<div style="margin-top:6px"><input placeholder="입력칸 예시 문구 (회색 글씨, 예: 12가 3456)" value="'+esc(c.placeholder||'')+'" style="width:100%;font-size:12px;padding:5px 8px;border:1px solid #cbd5e1;border-radius:6px;color:#64748b" onchange="_modDefEditCols['+i+'].placeholder=this.value"></div>';
+    }
     h+='</div>';
   });
   return h;
@@ -613,6 +622,8 @@ function saveModDef(keyOrNew){
   var global=document.getElementById('mdf_global').value==='true';
   var afEl=document.getElementById('mdf_applyForm');
   var applyForm=afEl?afEl.checked:false;
+  var formTitle=((document.getElementById('mdf_formTitle')||{}).value||'').trim();
+  var formDesc=((document.getElementById('mdf_formDesc')||{}).value||'').trim();
 
   // 신청폼 켜면 선정용 status 컬럼 자동 보장
   if(applyForm && !cols.some(function(c){return c.key==='status'})){
@@ -625,6 +636,7 @@ function saveModDef(keyOrNew){
     cat:'custom', catLabel:catLabel||'', catIcon:icon,
     fbPath:'Mod_'+key, global:global,
     columns:cols,
+    formTitle:formTitle, formDesc:formDesc,
     features:{search:true,excel:true,applyForm:applyForm}
   };
 
@@ -721,8 +733,10 @@ function renderModApplyForm(key,evtId){
 
 function _renderModApplyUI(def,evtId){
   window.__modApplyDef=def; window.__modApplyEvt=evtId;
-  var h='<h2 style="text-align:center;color:#2563eb;margin-bottom:4px;font-size:20px">'+(def.icon||'📝')+' '+esc(def.label)+' 신청</h2>';
-  h+='<p style="text-align:center;color:#94a3b8;font-size:12px;margin-bottom:20px">아래 내용을 작성 후 신청해 주세요</p>';
+  var title=def.formTitle?esc(def.formTitle):((def.icon||'📝')+' '+esc(def.label)+' 신청');
+  var desc=def.formDesc?esc(def.formDesc):'아래 내용을 작성 후 신청해 주세요';
+  var h='<h2 style="text-align:center;color:#2563eb;margin-bottom:4px;font-size:20px">'+title+'</h2>';
+  h+='<p style="text-align:center;color:#94a3b8;font-size:12px;margin-bottom:20px">'+desc+'</p>';
   (def.columns||[]).forEach(function(c){
     if(c.auto||c.adminOnly||c.key==='status') return;
     h+='<div style="margin-bottom:12px"><label style="display:block;font-size:13px;color:#475569;font-weight:600;margin-bottom:4px">'+esc(c.label)+(c.required?' <span style="color:#ef4444">*</span>':'')+'</label>';
