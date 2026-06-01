@@ -84,6 +84,8 @@ function loadModDefs(callback){
 function _saveModDefs(){
   var arr=[];
   Object.keys(_modDefs).forEach(function(k){ arr.push(_modDefs[k]); });
+  // Firebase는 undefined 값을 거부 → JSON 직렬화로 undefined 필드 제거
+  arr = JSON.parse(JSON.stringify(arr));
   return fbDb.ref('/main/ModDefs').set(arr);
 }
 
