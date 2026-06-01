@@ -1300,7 +1300,7 @@ function mkTabs(){
     var _catGroups={};
     Object.keys(_modDefs).forEach(function(k){
       var d=_modDefs[k];
-      var cl=d.catLabel||'📦 커스텀';
+      var cl=d.catLabel||'커스텀';
       if(!_catGroups[cl]) _catGroups[cl]={icon:d.catIcon||d.icon||'📦',items:[]};
       _catGroups[cl].items.push({k:'mod_'+k,l:(d.icon?d.icon+' ':'')+d.label});
     });
