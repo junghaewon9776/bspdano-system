@@ -217,8 +217,12 @@ function _modListHtml(key){
     if(isA()){
       h+='<td class="ctr" style="white-space:nowrap">';
       if(hasSelect){
-        h+='<button class="btn btn-s" onclick="modSetStatus(\''+key+'\',\''+esc(row._id||'')+'\',\'선정\')" style="background:'+(st==='선정'?'#16a34a':'#dcfce7')+';color:'+(st==='선정'?'#fff':'#16a34a')+';font-weight:700" title="선정">✓</button> ';
-        h+='<button class="btn btn-s" onclick="modSetStatus(\''+key+'\',\''+esc(row._id||'')+'\',\'탈락\')" style="background:'+(st==='탈락'?'#dc2626':'#fee2e2')+';color:'+(st==='탈락'?'#fff':'#dc2626')+';font-weight:700" title="탈락">✕</button> ';
+        // status 배지에 정의된 상태값(대기 제외)을 각각 버튼으로 (모듈마다 다른 라벨 지원: 선정/탈락 또는 승인/거부 등)
+        Object.keys(statusCol.badgeMap||{}).forEach(function(sk){
+          if(sk==='대기') return;
+          var on=(st===sk), bm=statusCol.badgeMap[sk]||{};
+          h+='<button class="btn btn-s" onclick="modSetStatus(\''+key+'\',\''+esc(row._id||'')+'\',\''+esc(sk)+'\')" style="background:'+(on?(bm.bg||'#16a34a'):'#f1f5f9')+';color:'+(on?(bm.color||'#16a34a'):'#475569')+';font-weight:700;border:1px solid '+(bm.bg||'#cbd5e1')+'" title="'+esc(sk)+'">'+esc(bm.label||sk)+'</button> ';
+        });
       }
       h+='<button class="btn btn-s" onclick="popModEdit(\''+key+'\',\''+esc(row._id||'')+'\')">✏️</button> ';
       h+='<button class="btn btn-s" onclick="modDel(\''+key+'\',\''+esc(row._id||'')+'\')" style="color:#dc2626">🗑</button>';
