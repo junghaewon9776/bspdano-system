@@ -447,7 +447,7 @@ label{display:block;font-size:10px;color:#999;margin-bottom:3px}
 <!-- firebase-storage 제거: 구글 드라이브 프록시로 대체 -->
 <script src="firebase-config.js"></script>
 <script src="common.js?v=20260529n"></script>
-<script src="mod-engine.js?v=20260602c"></script>
+<script src="mod-engine.js?v=20260602d"></script>
 
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" onerror="console.warn('XLSX CDN load failed')"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js" onerror="console.warn('xlsx-js-style CDN load failed')"></script>
@@ -507,6 +507,7 @@ var MODFORM_KEY = "";
 var MODFORM_EVT_ID = "";
 var DEEP_TAB = "";   // ?tab= 딥링크 (로그인 후 해당 탭 자동 열기)
 var DEEP_EVT = "";   // ?evtId= 딥링크 (해당 행사 자동 선택)
+var IS_MODVIEW_MODE = false; var MODVIEW_KEY=""; var MODVIEW_ID=""; var MODVIEW_EVT="";  // QR 조회 페이지
 (function(){
   try {
     var sp = new URLSearchParams(window.location.search);
@@ -539,6 +540,16 @@ var DEEP_EVT = "";   // ?evtId= 딥링크 (해당 행사 자동 선택)
       document.getElementById("mainPage").style.display = "none";
       document.title = "📝 신청서";
     }
+    // ===== QR 조회 페이지 (?modview={key}&id={id}) =====
+    if (sp.get("modview")) {
+      IS_MODVIEW_MODE = true;
+      MODVIEW_KEY = sp.get("modview") || "";
+      MODVIEW_ID = sp.get("id") || "";
+      MODVIEW_EVT = sp.get("evtId") || "";
+      document.getElementById("loginPage").style.display = "none";
+      document.getElementById("mainPage").style.display = "none";
+      document.title = "📋 정보 조회";
+    }
   } catch(e){}
 })();
 
@@ -567,6 +578,11 @@ document.addEventListener("DOMContentLoaded", function(){
     // ===== 모듈 공개 신청폼 모드 =====
     if (IS_MODFORM_MODE) {
       if (typeof renderModApplyForm === 'function') renderModApplyForm(MODFORM_KEY, MODFORM_EVT_ID);
+      return; // 로그인 로직 스킵
+    }
+    // ===== QR 조회 페이지 =====
+    if (IS_MODVIEW_MODE) {
+      if (typeof renderModView === 'function') renderModView(MODVIEW_KEY, MODVIEW_ID, MODVIEW_EVT);
       return; // 로그인 로직 스킵
     }
 
