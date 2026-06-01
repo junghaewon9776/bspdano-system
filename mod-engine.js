@@ -22,6 +22,27 @@ function _modRowTitle(def,row){
   var c=(def.columns||[]).filter(function(x){return !x.adminOnly&&x.key!=='status'&&!x.hideTable;})[0];
   return c?String(row[c.key]||''):'';
 }
+// 모듈 처리 로그 저장 위치 (모듈 데이터와 같은 베이스의 ModLogs 노드)
+function _modLogBase(key){
+  var def=_modDefs[key]; if(!def) return '';
+  if(def.global) return '/main/ModLogs';
+  var evtId=(typeof CUR_EVT!=='undefined'&&CUR_EVT&&CUR_EVT.evtId)||'';
+  return evtId?('/evtData/'+evtId+'/ModLogs'):'';
+}
+// 로그 한 건 기록 (act: '승인'/'거부'/'발급'/'추가'/'수정'/'삭제' 등)
+function _modLogAdd(key,act,rowId,rowTitle,detail){
+  try{
+    var base=_modLogBase(key); if(!base||typeof fbDb==='undefined') return;
+    var def=_modDefs[key]||{};
+    fbDb.ref(base).push({
+      t:new Date().toISOString(),
+      by:(typeof CID!=='undefined'?CID:''),
+      byName:_modActor(),
+      modKey:key, modLabel:def.label||key,
+      act:act||'', rowId:rowId||'', rowTitle:rowTitle||'', detail:detail||''
+    });
+  }catch(e){}
+}
 
 // 저장된 Drive 주소(썸네일·view 등 어떤 형식이든)에서 파일ID를 뽑아 정상 보기 링크로 변환
 function _modDriveViewUrl(url){
@@ -135,6 +156,7 @@ function dMod(key){
   if(isA()) h+='<button class="btn" style="background:#16a34a;color:#fff" onclick="popModSheet(\''+key+'\')">📊 시트 편집</button>';
   if(isA()) h+='<button class="btn" style="background:#0d9488;color:#fff" onclick="modImportExcel(\''+key+'\')">📤 가져오기</button>';
   if(feat.excel!==false) h+='<button class="btn" onclick="modExportExcel(\''+key+'\')">📥 내보내기</button>';
+  if(typeof isSuper==='function'&&isSuper()) h+='<button class="btn" style="background:#7c3aed;color:#fff" onclick="popModLog(\''+key+'\')">📋 로그</button>';
   h+='</div></div>';
 
   // 검색 + 필터 (검색은 목록 영역만 갱신 → 입력 포커스 유지)
@@ -362,7 +384,7 @@ function modSetStatusSel(key,statusKey){
   var now=new Date().toISOString();
   data.forEach(function(r){ if(ids.indexOf(r._id)>=0){ r.status=statusKey; r._updatedAt=now; r._statusBy=(typeof CID!=='undefined'?CID:''); r._statusByName=actor; r._statusAt=now; } });
   showLoading('처리 중...');
-  fbDb.ref(path).set(data).then(function(){ hideLoading(); toast('✅ '+ids.length+'개 "'+lbl+'" 처리'+(actor?' · '+actor:'')); _modSel[key]={}; })
+  fbDb.ref(path).set(data).then(function(){ hideLoading(); toast('✅ '+ids.length+'개 "'+lbl+'" 처리'+(actor?' · '+actor:'')); _modLogAdd(key,lbl,'','('+ids.length+'개 일괄)','상태변경'); _modSel[key]={}; })
     .catch(function(e){ hideLoading(); toast('실패: '+(e.message||e),true); });
 }
 // 선택 항목 → 일괄 삭제
@@ -373,7 +395,7 @@ function modDelSel(key){
   if(!confirm(ids.length+'개 항목을 삭제할까요? (되돌릴 수 없습니다)')) return;
   var data=(_modData[key]||[]).filter(function(r){ return ids.indexOf(r._id)<0; });
   showLoading('삭제 중...');
-  fbDb.ref(path).set(data).then(function(){ hideLoading(); toast('🗑 '+ids.length+'개 삭제됨'); _modSel[key]={}; })
+  fbDb.ref(path).set(data).then(function(){ hideLoading(); toast('🗑 '+ids.length+'개 삭제됨'); _modLogAdd(key,'삭제','','('+ids.length+'개 일괄)','행 삭제'); _modSel[key]={}; })
     .catch(function(e){ hideLoading(); toast('실패: '+(e.message||e),true); });
 }
 
@@ -1170,7 +1192,7 @@ function modSetStatus(key,id,status){
   else { merged._statusBy=(typeof CID!=='undefined'?CID:''); merged._statusByName=actor; merged._statusAt=now; }
   data[idx]=merged;
   showLoading('처리 중...');
-  fbDb.ref(path).set(data).then(function(){ hideLoading(); toast('✅ "'+lbl+'" 처리됨'+(actor?' · '+actor:'')); })
+  fbDb.ref(path).set(data).then(function(){ hideLoading(); toast('✅ "'+lbl+'" 처리됨'+(actor?' · '+actor:'')); _modLogAdd(key,lbl,id,nm,'상태변경'); })
     .catch(function(e){ hideLoading(); toast('실패: '+e.message,true); });
 }
 
@@ -1766,7 +1788,42 @@ function modBumpPrint(key,ids){
   var now=new Date().toISOString();
   var actor=_modActor();
   data.forEach(function(r){ if(ids.indexOf(r._id)>=0){ r._printCount=pn(r._printCount)+1; r._printedAt=now; r._printBy=(typeof CID!=='undefined'?CID:''); r._printByName=actor; } });
-  fbDb.ref(path).set(data).then(function(){ toast('🖨 '+ids.length+'장 발급'+(actor?' · '+actor:'')); }).catch(function(e){toast('발급 기록 저장 실패: '+(e.message||e),true)});
+  fbDb.ref(path).set(data).then(function(){ toast('🖨 '+ids.length+'장 발급'+(actor?' · '+actor:'')); _modLogAdd(key,'발급','',(ids.length>1?'('+ids.length+'장)':_modRowTitle(_modDefs[key]||{},data.filter(function(r){return r._id===ids[0]})[0]||{})),'라벨 발급'); }).catch(function(e){toast('발급 기록 저장 실패: '+(e.message||e),true)});
+}
+
+// 📋 처리 로그 조회 (super 전용)
+function popModLog(key){
+  if(typeof isSuper==='function' && !isSuper()) return toast('super 관리자만 볼 수 있습니다',true);
+  var def=_modDefs[key]; if(!def) return;
+  var base=_modLogBase(key);
+  if(!base) return toast('로그 위치를 찾을 수 없습니다 (행사를 선택하세요)',true);
+  showLoading('로그 불러오는 중...');
+  fbDb.ref(base).once('value').then(function(s){
+    hideLoading();
+    var obj=s.val()||{};
+    var arr=Object.keys(obj).map(function(k){return obj[k];}).filter(function(l){return l&&l.modKey===key;});
+    arr.sort(function(a,b){return String(b.t||'').localeCompare(String(a.t||''));});
+    var h='<div class="pop-head"><h3>📋 '+esc(def.label)+' 처리 로그 <span style="font-size:11px;color:#94a3b8;font-weight:400">('+arr.length+'건 · super 전용)</span></h3></div>';
+    h+='<div style="padding:14px;max-height:75vh;overflow:auto">';
+    if(!arr.length){
+      h+='<div style="text-align:center;color:#94a3b8;padding:30px">기록된 로그가 없습니다</div>';
+    } else {
+      h+='<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="background:#f1f5f9;position:sticky;top:0">';
+      h+='<th style="padding:6px 8px;text-align:left">일시</th><th style="padding:6px 8px;text-align:left">처리자</th><th style="padding:6px 8px;text-align:left">동작</th><th style="padding:6px 8px;text-align:left">대상</th></tr></thead><tbody>';
+      arr.forEach(function(l){
+        var dt=String(l.t||'').replace('T',' ').slice(0,16);
+        var actColor = (l.act==='거부'||l.act==='탈락'||l.act==='삭제')?'#dc2626':(l.act==='발급'?'#475569':'#16a34a');
+        h+='<tr style="border-bottom:1px solid #f1f5f9">';
+        h+='<td style="padding:5px 8px;white-space:nowrap;color:#64748b">'+esc(dt)+'</td>';
+        h+='<td style="padding:5px 8px;font-weight:600;color:#0f172a">'+esc(l.byName||l.by||'-')+'</td>';
+        h+='<td style="padding:5px 8px"><b style="color:'+actColor+'">'+esc(l.act||'')+'</b>'+(l.detail?' <span style="color:#94a3b8;font-size:11px">'+esc(l.detail)+'</span>':'')+'</td>';
+        h+='<td style="padding:5px 8px">'+esc(l.rowTitle||'')+'</td></tr>';
+      });
+      h+='</tbody></table>';
+    }
+    h+='<div style="text-align:right;margin-top:12px"><button class="btn" onclick="closePopup()">닫기</button></div></div>';
+    openPopup(h,640);
+  }).catch(function(e){ hideLoading(); toast('로그 조회 실패: '+(e.message||e),true); });
 }
 
 // ═══════════════════════════════════════════
