@@ -8,6 +8,8 @@ var _modData={};   // key → 데이터 배열
 var _modSort={};   // key → {col, asc}
 var _modSearch={}; // key → 검색어
 var _modFilter={}; // key → 필터값
+var _modSel={};    // key → {_id: true} 선택된 행
+var _modSelLast={};// key → 마지막 클릭 인덱스 (Shift 범위선택)
 var _modListeners={};
 var MOD_DEFS_LOADED=false;
 
@@ -200,21 +202,50 @@ function _modListHtml(key){
   var feat=def.features||{};
   if(!data.length) return '<div class="empty2" style="padding:40px">데이터가 없습니다</div>';
 
-  var h='<div style="overflow-x:auto;border:1px solid #e5e7eb;border-radius:10px">';
+  var statusCol=(def.columns||[]).find(function(c){return c.key==='status'&&c.type==='badge'});
+  var hasSelect=feat.applyForm && statusCol;
+
+  // 선택 상태 정리 (현재 데이터에 없는 id 제거) + 선택 작업 바
+  var selMap=_modSel[key]||(_modSel[key]={});
+  var dataIds={}; data.forEach(function(r){dataIds[r._id]=1;});
+  Object.keys(selMap).forEach(function(id){ if(!dataIds[id]) delete selMap[id]; });
+  var selCount=Object.keys(selMap).length;
+  var h='';
+  if(isA()){
+    h+='<div id="_modSelBar_'+key+'" style="display:'+(selCount?'flex':'none')+';align-items:center;gap:8px;flex-wrap:wrap;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:8px 12px;margin-bottom:8px">';
+    h+='<b style="color:#2563eb;font-size:13px"><span id="_modSelCnt_'+key+'">'+selCount+'</span>개 선택</b>';
+    h+='<button class="btn btn-s" style="background:#475569;color:#fff" onclick="popModLabelSel(\''+key+'\')">🖨 라벨 출력</button>';
+    if(statusCol){
+      Object.keys(statusCol.badgeMap||{}).forEach(function(sk){
+        if(sk==='대기') return;
+        var bm=statusCol.badgeMap[sk]||{};
+        h+='<button class="btn btn-s" onclick="modSetStatusSel(\''+key+'\',\''+esc(sk)+'\')" style="background:'+(bm.bg||'#f1f5f9')+';color:'+(bm.color||'#475569')+';border:1px solid '+(bm.bg||'#cbd5e1')+';font-weight:700">'+esc(bm.label||sk)+' 처리</button>';
+      });
+    }
+    h+='<button class="btn btn-s" style="color:#dc2626" onclick="modDelSel(\''+key+'\')">🗑 선택 삭제</button>';
+    h+='<button class="btn btn-s" style="margin-left:auto" onclick="_modSelClear(\''+key+'\')">선택 해제</button>';
+    h+='</div>';
+  }
+
+  h+='<div style="overflow-x:auto;border:1px solid #e5e7eb;border-radius:10px">';
   h+='<table class="tbl"><thead><tr>';
+  if(isA()){
+    var allOn=data.length>0 && selCount>=data.length;
+    h+='<th style="width:32px"><input type="checkbox" id="_modSelAll_'+key+'"'+(allOn?' checked':'')+' onclick="_modSelAll(\''+key+'\',this.checked)" title="전체 선택/해제"></th>';
+  }
   h+='<th style="width:36px">#</th>';
   cols.forEach(function(c){
     var arrow=sort.col===c.key?(sort.asc?' ▲':' ▼'):'';
     h+='<th style="cursor:pointer;white-space:nowrap" onclick="_modToggleSort(\''+key+'\',\''+c.key+'\')">'+esc(c.label)+arrow+'</th>';
   });
-  var statusCol=(def.columns||[]).find(function(c){return c.key==='status'&&c.type==='badge'});
-  var hasSelect=feat.applyForm && statusCol;
   if(isA()) h+='<th style="width:'+(hasSelect?'150':'80')+'px"></th>';
   h+='</tr></thead><tbody>';
 
   data.forEach(function(row,idx){
     var st=row.status||'';
-    h+='<tr'+(st==='탈락'?' style="opacity:.5"':'')+'>';
+    var sel=!!selMap[row._id];
+    h+='<tr'+(st==='탈락'?' style="opacity:.5"':'')+(sel?' class="_modSelRow" style="background:#eff6ff"':'')+'>';
+    if(isA()) h+='<td class="ctr"><input type="checkbox" class="_modChk" data-id="'+esc(row._id||'')+'" data-idx="'+idx+'"'+(sel?' checked':'')+' onclick="_modSelToggle(event,\''+key+'\',\''+esc(row._id||'')+'\','+idx+')"></td>';
     h+='<td class="ctr" style="color:#94a3b8">'+(idx+1)+'</td>';
     cols.forEach(function(c){ h+='<td>'+_modFmtCell(c,row[c.key])+'</td>'; });
     if(isA()){
@@ -254,6 +285,67 @@ function _modSearchTyped(key,val){
   _modSearch[key]=val;
   var b=document.getElementById('_modBody_'+key);
   if(b) b.innerHTML=_modListHtml(key);
+}
+
+// ─── 명단 행 선택(체크박스) ───
+function _modSelToggle(ev,key,id,idx){
+  var selMap=_modSel[key]||(_modSel[key]={});
+  var data=_modFilteredData(key);
+  var checked=ev.target.checked;
+  if(ev.shiftKey && _modSelLast[key]!=null && _modSelLast[key]!==idx){
+    var a=Math.min(_modSelLast[key],idx), b=Math.max(_modSelLast[key],idx);
+    for(var i=a;i<=b;i++){ if(data[i]){ if(checked) selMap[data[i]._id]=true; else delete selMap[data[i]._id]; } }
+  } else {
+    if(checked) selMap[id]=true; else delete selMap[id];
+  }
+  _modSelLast[key]=idx;
+  _modSelRefresh(key);
+}
+function _modSelAll(key,on){
+  var selMap=_modSel[key]={};
+  if(on){ _modFilteredData(key).forEach(function(r){ selMap[r._id]=true; }); }
+  _modSelLast[key]=null;
+  _modSelRefresh(key);
+}
+function _modSelClear(key){ _modSel[key]={}; _modSelLast[key]=null; _modSelRefresh(key); }
+function _modSelIds(key){ return Object.keys(_modSel[key]||{}); }
+// 목록 영역만 다시 그려 체크 상태/작업바 반영
+function _modSelRefresh(key){
+  var b=document.getElementById('_modBody_'+key);
+  if(b) b.innerHTML=_modListHtml(key);
+}
+// 선택 항목 → 라벨 출력
+function popModLabelSel(key){
+  var ids=_modSelIds(key);
+  if(!ids.length) return toast('선택된 항목이 없습니다',true);
+  popModLabel(key,null,ids);
+}
+// 선택 항목 → 일괄 상태 변경
+function modSetStatusSel(key,statusKey){
+  var ids=_modSelIds(key);
+  if(!ids.length) return toast('선택된 항목이 없습니다',true);
+  var path=_modFbPath(key); if(!path) return;
+  var def=_modDefs[key];
+  var bm=(def.columns.find(function(c){return c.key==='status';})||{}).badgeMap||{};
+  var lbl=(bm[statusKey]&&bm[statusKey].label)||statusKey;
+  if(!confirm(ids.length+'개 항목을 "'+lbl+'" 상태로 변경할까요?')) return;
+  var data=(_modData[key]||[]).slice();
+  var now=new Date().toISOString();
+  data.forEach(function(r){ if(ids.indexOf(r._id)>=0){ r.status=statusKey; r._updatedAt=now; } });
+  showLoading('처리 중...');
+  fbDb.ref(path).set(data).then(function(){ hideLoading(); toast('✅ '+ids.length+'개 "'+lbl+'" 처리'); _modSel[key]={}; })
+    .catch(function(e){ hideLoading(); toast('실패: '+(e.message||e),true); });
+}
+// 선택 항목 → 일괄 삭제
+function modDelSel(key){
+  var ids=_modSelIds(key);
+  if(!ids.length) return toast('선택된 항목이 없습니다',true);
+  var path=_modFbPath(key); if(!path) return;
+  if(!confirm(ids.length+'개 항목을 삭제할까요? (되돌릴 수 없습니다)')) return;
+  var data=(_modData[key]||[]).filter(function(r){ return ids.indexOf(r._id)<0; });
+  showLoading('삭제 중...');
+  fbDb.ref(path).set(data).then(function(){ hideLoading(); toast('🗑 '+ids.length+'개 삭제됨'); _modSel[key]={}; })
+    .catch(function(e){ hideLoading(); toast('실패: '+(e.message||e),true); });
 }
 
 // ─── 셀 포맷 ───
@@ -1257,10 +1349,13 @@ function _modLabelHtml(def,row,opt){
   return h;
 }
 
-function popModLabel(key,singleId){
+function popModLabel(key,singleId,idsList){
   var def=_modDefs[key]; if(!def) return;
   var opt=_modLabelOpt(key);
-  var rows = singleId ? (_modData[key]||[]).filter(function(r){return r._id===singleId}) : _modFilteredData(key);
+  var rows;
+  if(singleId) rows=(_modData[key]||[]).filter(function(r){return r._id===singleId});
+  else if(idsList&&idsList.length) rows=(_modData[key]||[]).filter(function(r){return idsList.indexOf(r._id)>=0});
+  else rows=_modFilteredData(key);
   if(!rows.length) return toast('출력할 항목이 없습니다',true);
   window.__modLabelKey = key;
   window.__modLabelAll = rows;            // 후보 행 객체(순서 유지)
