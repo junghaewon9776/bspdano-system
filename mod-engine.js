@@ -220,6 +220,10 @@ function _modFmtCell(col,val){
       return esc(String(val));
     case 'textarea':
       var s=String(val); return '<span title="'+esc(s)+'">'+esc(s.length>40?s.slice(0,40)+'…':s)+'</span>';
+    case 'file':
+      return '<a href="'+esc(String(val))+'" target="_blank" style="color:#2563eb;text-decoration:none">📎 파일</a>';
+    case 'consent':
+      return val==='동의'?'<span style="color:#16a34a;font-weight:700">✅ 동의</span>':'<span style="color:#cbd5e1">미동의</span>';
     default:
       return esc(String(val));
   }
@@ -302,6 +306,14 @@ function _modFormField(col,val){
       return '<input id="'+id+'" type="date" value="'+ev+'">';
     case 'tel':
       return '<input id="'+id+'" type="tel" value="'+ev+'" placeholder="010-0000-0000" maxlength="13" oninput="var v=this.value.replace(/[^0-9]/g,\'\');if(v.length<=3)this.value=v;else if(v.length<=7)this.value=v.slice(0,3)+\'-\'+v.slice(3);else this.value=v.slice(0,3)+\'-\'+v.slice(3,7)+\'-\'+v.slice(7,11)">';
+    case 'file':
+      var fh='';
+      if(val) fh+='<div style="font-size:12px;margin-bottom:4px"><a href="'+esc(String(val))+'" target="_blank" style="color:#2563eb">📎 기존 파일</a></div>';
+      fh+='<input id="'+id+'" type="file"'+(col.accept?' accept="'+esc(col.accept)+'"':'')+' style="font-size:13px">';
+      fh+='<input type="hidden" id="'+id+'_prev" value="'+ev+'">';
+      return fh;
+    case 'consent':
+      return '<label style="display:flex;align-items:flex-start;gap:8px;font-size:13px;color:#475569;cursor:pointer;line-height:1.5"><input type="checkbox" id="'+id+'" style="margin-top:3px;flex-shrink:0"'+(val==='동의'?' checked':'')+'> <span>'+esc(col.consentText||col.label||'개인정보 수집·이용에 동의합니다')+'</span></label>';
     default:
       return '<input id="'+id+'" type="text" value="'+ev+'"'+(col.placeholder?' placeholder="'+esc(col.placeholder)+'"':'')+'>';
   }
@@ -313,10 +325,21 @@ function _modFormField(col,val){
 
 function modSave(key,editId){
   var def=_modDefs[key]; if(!def) return;
-  var obj={}, valid=true;
+  var obj={}, valid=true, fileTasks=[];
   (def.columns||[]).forEach(function(c){
     if(c.auto) return;
     var el=document.getElementById('mod_f_'+c.key); if(!el) return;
+    if(c.type==='consent'){
+      var ok=el.checked;
+      if(c.required&&!ok){ toast(c.label+'에 동의가 필요합니다',true); valid=false; }
+      obj[c.key]=ok?'동의':''; return;
+    }
+    if(c.type==='file'){
+      var prev=(document.getElementById('mod_f_'+c.key+'_prev')||{}).value||'';
+      if(el.files&&el.files[0]){ fileTasks.push({col:c,file:el.files[0]}); }
+      else { obj[c.key]=prev; if(c.required&&!prev){ toast(c.label+' 파일을 첨부하세요',true); valid=false; } }
+      return;
+    }
     var v=(el.value||"").trim();
     if(c.type==='number'&&c.comma) v=v.replace(/,/g,'');
     if(c.type==='number'&&v) v=Number(v);
@@ -328,27 +351,35 @@ function modSave(key,editId){
   var path=_modFbPath(key);
   if(!path) return toast('행사를 선택하세요',true);
 
-  showLoading('저장 중...');
+  showLoading(fileTasks.length?'파일 업로드 중...':'저장 중...');
 
-  if(editId){
-    var data=(_modData[key]||[]).slice();
-    var idx=-1;
-    for(var i=0;i<data.length;i++){if(data[i]._id===editId){idx=i;break}}
-    if(idx<0){hideLoading();toast('데이터를 찾을 수 없습니다',true);return}
-    obj._id=editId;
-    obj._updatedAt=new Date().toISOString();
-    var merged={}; for(var k in data[idx])merged[k]=data[idx][k]; for(var k in obj)merged[k]=obj[k];
-    data[idx]=merged;
-    fbDb.ref(path).set(data).then(function(){hideLoading();toast('✅ 수정됨');closePopup()})
-      .catch(function(e){hideLoading();toast('실패: '+e.message,true)});
-  } else {
-    obj._id=_modId();
-    obj._createdAt=new Date().toISOString();
-    var data=(_modData[key]||[]).slice();
-    data.push(obj);
-    fbDb.ref(path).set(data).then(function(){hideLoading();toast('✅ 추가됨');closePopup()})
-      .catch(function(e){hideLoading();toast('실패: '+e.message,true)});
-  }
+  // 파일 업로드 먼저
+  var upChain=Promise.resolve();
+  fileTasks.forEach(function(t){
+    upChain=upChain.then(function(){
+      return _uploadToDrive(t.file,'mod_'+key,t.col.label).then(function(url){ obj[t.col.key]=url; });
+    });
+  });
+
+  upChain.then(function(){
+    if(editId){
+      var data=(_modData[key]||[]).slice();
+      var idx=-1;
+      for(var i=0;i<data.length;i++){if(data[i]._id===editId){idx=i;break}}
+      if(idx<0){hideLoading();toast('데이터를 찾을 수 없습니다',true);return}
+      obj._id=editId;
+      obj._updatedAt=new Date().toISOString();
+      var merged={}; for(var k in data[idx])merged[k]=data[idx][k]; for(var k in obj)merged[k]=obj[k];
+      data[idx]=merged;
+      return fbDb.ref(path).set(data).then(function(){hideLoading();toast('✅ 수정됨');closePopup()});
+    } else {
+      obj._id=_modId();
+      obj._createdAt=new Date().toISOString();
+      var data=(_modData[key]||[]).slice();
+      data.push(obj);
+      return fbDb.ref(path).set(data).then(function(){hideLoading();toast('✅ 추가됨');closePopup()});
+    }
+  }).catch(function(e){hideLoading();toast('실패: '+(e.message||e),true)});
 }
 
 function modDel(key,id){
@@ -395,9 +426,11 @@ function modExportExcel(key){
 // ═══════════════════════════════════════════
 
 var MOD_COL_TYPES=[
-  {v:"text",l:"텍스트"},{v:"number",l:"숫자"},{v:"date",l:"날짜"},{v:"tel",l:"연락처"},
-  {v:"select",l:"선택(드롭다운)"},{v:"textarea",l:"긴 텍스트"},{v:"badge",l:"상태배지"}
+  {v:"text",l:"텍스트"},{v:"number",l:"숫자/금액"},{v:"date",l:"날짜"},{v:"tel",l:"연락처(하이픈)"},
+  {v:"select",l:"선택(드롭다운)"},{v:"textarea",l:"긴 텍스트"},{v:"badge",l:"상태배지"},
+  {v:"file",l:"파일첨부"},{v:"consent",l:"개인정보 동의"}
 ];
+function _modColKey(){ return 'c'+Date.now().toString(36)+Math.random().toString(36).slice(2,5); }
 
 function dModManager(){
   var defs=[];
@@ -457,10 +490,6 @@ function popModDef(keyOrIdx){
   h+=_emojiSelect("mdf_icon",def.icon||"📦");
   h+='<label style="font-size:12px;font-weight:700;color:#64748b">이름 <span style="color:#ef4444">*</span></label>';
   h+='<input id="mdf_label" value="'+esc(def.label||"")+'" placeholder="예: 행사차량">';
-  if(isNew){
-    h+='<label style="font-size:12px;font-weight:700;color:#64748b">키 (영문)</label>';
-    h+='<input id="mdf_key" value="'+esc(def.key||"")+'" placeholder="예: vehicle" style="font-family:monospace" oninput="this.value=this.value.replace(/[^a-zA-Z0-9_]/g,\'\')">';
-  }
   h+='<label style="font-size:12px;font-weight:700;color:#64748b">카테고리</label>';
   h+='<input id="mdf_catLabel" value="'+esc(def.catLabel||"")+'" placeholder="비우면 기본 커스텀 (이모지 제외)">';
   h+='<label style="font-size:12px;font-weight:700;color:#64748b">데이터 범위</label>';
@@ -488,38 +517,47 @@ function popModDef(keyOrIdx){
 }
 
 function _renderModDefCols(){
-  if(!_modDefEditCols.length) return '<div style="color:#94a3b8;font-size:12px;padding:12px;text-align:center">컬럼을 추가하세요</div>';
+  if(!_modDefEditCols.length) return '<div style="color:#94a3b8;font-size:12px;padding:16px;text-align:center;border:1px dashed #cbd5e1;border-radius:8px">아직 컬럼이 없습니다. <b>➕ 컬럼 추가</b>를 눌러 항목(열)을 만드세요.</div>';
   var h='';
   _modDefEditCols.forEach(function(c,i){
     h+='<div style="border:1px solid #e5e7eb;border-radius:8px;padding:10px;margin-bottom:6px;background:#fff">';
     h+='<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">';
-    // 키
-    h+='<input value="'+esc(c.key||'')+'" placeholder="key" style="width:80px;font-family:monospace;font-size:11px;padding:4px 6px" onchange="_modDefEditCols['+i+'].key=this.value.replace(/[^a-zA-Z0-9_]/g,\'\')">';
-    // 이름
-    h+='<input value="'+esc(c.label||'')+'" placeholder="이름" style="width:80px;font-size:12px;padding:4px 6px" onchange="_modDefEditCols['+i+'].label=this.value">';
+    h+='<span style="font-size:11px;color:#cbd5e1;font-weight:700;width:16px">'+(i+1)+'</span>';
+    // 이름 (넓게)
+    h+='<input value="'+esc(c.label||'')+'" placeholder="항목 이름 (예: 업체명)" style="flex:1;min-width:120px;font-size:13px;padding:6px 8px;border:1px solid #cbd5e1;border-radius:6px" onchange="_modDefEditCols['+i+'].label=this.value">';
     // 타입
-    h+='<select style="font-size:11px;padding:3px" onchange="_modDefEditCols['+i+'].type=this.value;_modDefRefreshCols()">';
+    h+='<select style="font-size:12px;padding:5px;border:1px solid #cbd5e1;border-radius:6px" onchange="_modDefEditCols['+i+'].type=this.value;_modDefRefreshCols()">';
     MOD_COL_TYPES.forEach(function(t){
       h+='<option value="'+t.v+'"'+(c.type===t.v?' selected':'')+'>'+t.l+'</option>';
     });
     h+='</select>';
-    // 체크박스들
-    h+='<label style="font-size:10px;display:flex;align-items:center;gap:2px"><input type="checkbox"'+(c.required?' checked':'')+' onchange="_modDefEditCols['+i+'].required=this.checked">필수</label>';
-    h+='<label style="font-size:10px;display:flex;align-items:center;gap:2px"><input type="checkbox"'+(c.search?' checked':'')+' onchange="_modDefEditCols['+i+'].search=this.checked">검색</label>';
-    h+='<label style="font-size:10px;display:flex;align-items:center;gap:2px"><input type="checkbox"'+(c.filter?' checked':'')+' onchange="_modDefEditCols['+i+'].filter=this.checked">필터</label>';
-    h+='<label style="font-size:10px;display:flex;align-items:center;gap:2px"><input type="checkbox"'+(c.comma?' checked':'')+' onchange="_modDefEditCols['+i+'].comma=this.checked">콤마</label>';
-    h+='<label style="font-size:10px;display:flex;align-items:center;gap:2px" title="체크 시 공개 신청폼에는 안 보이고 관리자만 입력/조회"><input type="checkbox"'+(c.adminOnly?' checked':'')+' onchange="_modDefEditCols['+i+'].adminOnly=this.checked">관리자전용</label>';
+    // 필수 (모든 타입)
+    h+='<label style="font-size:11px;display:flex;align-items:center;gap:3px;background:#fef2f2;padding:3px 6px;border-radius:5px"><input type="checkbox"'+(c.required?' checked':'')+' onchange="_modDefEditCols['+i+'].required=this.checked"><b style="color:#dc2626">필수</b></label>';
+    // 콤마 (숫자/금액만)
+    if(c.type==='number') h+='<label style="font-size:11px;display:flex;align-items:center;gap:3px"><input type="checkbox"'+(c.comma?' checked':'')+' onchange="_modDefEditCols['+i+'].comma=this.checked">금액(콤마)</label>';
+    // 필터 (선택/배지만)
+    if(c.type==='select'||c.type==='badge') h+='<label style="font-size:11px;display:flex;align-items:center;gap:3px"><input type="checkbox"'+(c.filter?' checked':'')+' onchange="_modDefEditCols['+i+'].filter=this.checked">필터</label>';
+    // 검색 (텍스트류만)
+    if(['text','tel','textarea','number','select'].indexOf(c.type)>=0) h+='<label style="font-size:11px;display:flex;align-items:center;gap:3px"><input type="checkbox"'+(c.search?' checked':'')+' onchange="_modDefEditCols['+i+'].search=this.checked">검색</label>';
+    // 관리자전용
+    h+='<label style="font-size:11px;display:flex;align-items:center;gap:3px" title="체크 시 공개 신청폼엔 안 보이고 관리자만 입력/조회"><input type="checkbox"'+(c.adminOnly?' checked':'')+' onchange="_modDefEditCols['+i+'].adminOnly=this.checked">관리자전용</label>';
     // 순서 / 삭제
-    if(i>0) h+='<button onclick="_modDefMoveCol('+i+',-1)" style="border:none;background:none;cursor:pointer;font-size:12px">▲</button>';
-    if(i<_modDefEditCols.length-1) h+='<button onclick="_modDefMoveCol('+i+',1)" style="border:none;background:none;cursor:pointer;font-size:12px">▼</button>';
-    h+='<button onclick="_modDefRemoveCol('+i+')" style="border:none;background:none;cursor:pointer;color:#dc2626;font-size:12px">✕</button>';
+    if(i>0) h+='<button onclick="_modDefMoveCol('+i+',-1)" style="border:none;background:none;cursor:pointer;font-size:13px">▲</button>';
+    if(i<_modDefEditCols.length-1) h+='<button onclick="_modDefMoveCol('+i+',1)" style="border:none;background:none;cursor:pointer;font-size:13px">▼</button>';
+    h+='<button onclick="_modDefRemoveCol('+i+')" style="border:none;background:none;cursor:pointer;color:#dc2626;font-size:14px">✕</button>';
     h+='</div>';
-    // select/badge일 때 옵션 입력
+    // 타입별 추가 옵션
     if(c.type==='select'){
-      h+='<div style="margin-top:4px"><input placeholder="옵션 (쉼표로 구분: 대기,승인,거부)" value="'+esc((c.options||[]).join(','))+'" style="width:100%;font-size:11px;padding:4px 6px" onchange="_modDefEditCols['+i+'].options=this.value.split(\',\').map(function(s){return s.trim()}).filter(Boolean)"></div>';
+      h+='<div style="margin-top:6px"><input placeholder="선택 항목 (쉼표로 구분: 대기,승인,거부)" value="'+esc((c.options||[]).join(','))+'" style="width:100%;font-size:12px;padding:5px 8px;border:1px solid #cbd5e1;border-radius:6px" onchange="_modDefEditCols['+i+'].options=this.value.split(\',\').map(function(s){return s.trim()}).filter(Boolean)"></div>';
     }
     if(c.type==='badge'){
-      h+='<div style="margin-top:4px"><input placeholder="배지 (key:이름:배경색:글자색, 쉼표구분)" value="'+esc(_badgeMapToStr(c.badgeMap||{}))+'" style="width:100%;font-size:11px;padding:4px 6px" onchange="_modDefEditCols['+i+'].badgeMap=_strToBadgeMap(this.value)"></div>';
+      h+='<div style="margin-top:6px"><input placeholder="배지 (key:이름:배경색:글자색, 쉼표구분)" value="'+esc(_badgeMapToStr(c.badgeMap||{}))+'" style="width:100%;font-size:12px;padding:5px 8px;border:1px solid #cbd5e1;border-radius:6px" onchange="_modDefEditCols['+i+'].badgeMap=_strToBadgeMap(this.value)"></div>';
+    }
+    if(c.type==='consent'){
+      h+='<div style="margin-top:6px"><input placeholder="동의 문구 (예: 개인정보 수집·이용에 동의합니다)" value="'+esc(c.consentText||'')+'" style="width:100%;font-size:12px;padding:5px 8px;border:1px solid #cbd5e1;border-radius:6px" onchange="_modDefEditCols['+i+'].consentText=this.value"></div>';
+    }
+    if(c.type==='file'){
+      h+='<div style="margin-top:6px;font-size:11px;color:#94a3b8">📎 파일첨부는 자료실의 Drive 업로드 설정이 필요합니다. 신청자가 파일을 올리면 링크로 저장됩니다.</div>';
     }
     h+='</div>';
   });
@@ -541,7 +579,7 @@ function _strToBadgeMap(s){
 }
 
 function _modDefAddCol(){
-  _modDefEditCols.push({key:'',label:'',type:'text',required:false,search:true,filter:false,comma:false});
+  _modDefEditCols.push({key:_modColKey(),label:'',type:'text',required:false,search:true,filter:false,comma:false});
   _modDefRefreshCols();
 }
 function _modDefRemoveCol(i){
@@ -563,13 +601,12 @@ function saveModDef(keyOrNew){
   var label=(document.getElementById('mdf_label').value||'').trim();
   if(!label) return toast('이름을 입력하세요',true);
 
-  var key=isNew?(document.getElementById('mdf_key').value||'').trim().toLowerCase():keyOrNew;
-  if(!key) return toast('키를 입력하세요',true);
-  if(isNew&&_modDefs[key]) return toast('이미 존재하는 키입니다',true);
+  var key=isNew ? ('m'+Date.now().toString(36)) : keyOrNew;
 
-  // 컬럼 검증
-  var cols=_modDefEditCols.filter(function(c){return c.key&&c.label});
-  if(!cols.length) return toast('컬럼을 최소 1개 추가하세요',true);
+  // 컬럼 검증 (key 자동 부여)
+  var cols=_modDefEditCols.filter(function(c){return (c.label||'').trim()});
+  cols.forEach(function(c){ if(!c.key) c.key=_modColKey(); });
+  if(!cols.length) return toast('항목(컬럼)을 최소 1개 추가하세요',true);
 
   var icon=(document.getElementById('mdf_icon').value||'📦').trim();
   var catLabel=(document.getElementById('mdf_catLabel').value||'').trim();
@@ -669,7 +706,16 @@ function renderModApplyForm(key,evtId){
     var def=null; for(var i=0;i<defs.length;i++){if(defs[i]&&defs[i].key===key){def=defs[i];break}}
     if(!def){ document.getElementById('modApplyCard').innerHTML='<div style="text-align:center;color:#64748b;padding:20px">신청폼을 찾을 수 없습니다</div>'; return; }
     if(!(def.features&&def.features.applyForm)){ document.getElementById('modApplyCard').innerHTML='<div style="text-align:center;color:#64748b;padding:20px">이 모듈은 공개 신청을 받지 않습니다</div>'; return; }
-    _renderModApplyUI(def,evtId);
+    // 파일첨부 컬럼이 있으면 Drive 업로드 URL 로드 (비로그인)
+    var hasFile=(def.columns||[]).some(function(c){return c.type==='file'&&!c.adminOnly});
+    if(hasFile && evtId && typeof api==='function'){
+      api('getApplyConfig',{evtId:evtId}).then(function(cfg){
+        if(cfg&&cfg.driveUploadUrl){ try{DRIVE_UPLOAD_URL=cfg.driveUploadUrl;}catch(e){} }
+        _renderModApplyUI(def,evtId);
+      }).catch(function(){ _renderModApplyUI(def,evtId); });
+    } else {
+      _renderModApplyUI(def,evtId);
+    }
   }).catch(function(e){ document.getElementById('modApplyCard').innerHTML='<div style="text-align:center;color:#ef4444">오류: '+esc(e.message)+'</div>'; });
 }
 
@@ -691,24 +737,45 @@ function _renderModApplyUI(def,evtId){
 function submitModApply(){
   var def=window.__modApplyDef, evtId=window.__modApplyEvt;
   if(!def) return;
-  var obj={}, valid=true, firstBad=null;
+  var obj={}, valid=true, firstBad=null, fileTasks=[];
   (def.columns||[]).forEach(function(c){
     if(c.auto||c.adminOnly||c.key==='status') return;
     var el=document.getElementById('mod_f_'+c.key); if(!el) return;
+    if(c.type==='consent'){
+      if(c.required&&!el.checked){ valid=false; if(!firstBad)firstBad=c.label+'에 동의해 주세요'; }
+      obj[c.key]=el.checked?'동의':''; return;
+    }
+    if(c.type==='file'){
+      if(el.files&&el.files[0]){ fileTasks.push({col:c,file:el.files[0]}); }
+      else if(c.required){ valid=false; if(!firstBad)firstBad=c.label+' 파일을 첨부해 주세요'; }
+      return;
+    }
     var v=(el.value||'').trim();
     if(c.type==='number'&&c.comma) v=v.replace(/,/g,'');
     if(c.type==='number'&&v) v=Number(v);
-    if(c.required&&!v&&v!==0){ valid=false; if(!firstBad)firstBad=c.label; }
+    if(c.required&&!v&&v!==0){ valid=false; if(!firstBad)firstBad=c.label+'을(를) 입력하세요'; }
     obj[c.key]=v;
   });
   var msg=document.getElementById('modApplyMsg');
-  if(!valid){ if(msg)msg.innerHTML='<span style="color:#ef4444">'+esc(firstBad)+'을(를) 입력하세요</span>'; return; }
+  if(!valid){ if(msg)msg.innerHTML='<span style="color:#ef4444">'+esc(firstBad)+'</span>'; return; }
   obj._id='m'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
   obj._createdAt=new Date().toISOString();
   obj.status='대기';
-  var btn=document.getElementById('modApplyBtn'); if(btn){btn.disabled=true;btn.textContent='신청 중...';}
+  var btn=document.getElementById('modApplyBtn'); if(btn){btn.disabled=true;btn.textContent=fileTasks.length?'파일 업로드 중...':'신청 중...';}
+
+  // 파일 업로드 먼저 (Drive)
+  var upChain=Promise.resolve();
+  fileTasks.forEach(function(t){
+    upChain=upChain.then(function(){
+      return _uploadToDrive(t.file,'mod_'+def.key,t.col.label).then(function(url){ obj[t.col.key]=url; });
+    });
+  });
+
   var path=def.global?'/main/'+def.fbPath:'/evtData/'+evtId+'/'+def.fbPath;
-  fbDb.ref(path).once('value').then(function(snap){
+  upChain.then(function(){
+    if(btn)btn.textContent='신청 중...';
+    return fbDb.ref(path).once('value');
+  }).then(function(snap){
     var arr=snap.val()||[]; if(!Array.isArray(arr))arr=Object.values(arr);
     arr.push(obj);
     return fbDb.ref(path).set(arr);
@@ -716,6 +783,6 @@ function submitModApply(){
     document.getElementById('modApplyCard').innerHTML='<div style="text-align:center;padding:30px"><div style="font-size:48px">✅</div><h2 style="color:#16a34a;margin:12px 0;font-size:20px">신청 완료</h2><p style="color:#64748b;font-size:14px;line-height:1.6">신청이 정상 접수되었습니다.<br>검토 후 개별 안내드리겠습니다.</p></div>';
   }).catch(function(e){
     if(btn){btn.disabled=false;btn.textContent='신청하기';}
-    if(msg)msg.innerHTML='<span style="color:#ef4444">제출 실패: '+esc(e.message)+'</span>';
+    if(msg)msg.innerHTML='<span style="color:#ef4444">제출 실패: '+esc(e.message||e)+'</span>';
   });
 }
