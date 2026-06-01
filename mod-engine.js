@@ -1209,14 +1209,41 @@ function popModFormLink(key){
   var base=location.href.split('?')[0];
   var evtId=def.global?'':((CUR_EVT&&CUR_EVT.evtId)||'');
   var url=base+'?modform='+encodeURIComponent(key)+(evtId?'&evtId='+encodeURIComponent(evtId):'');
+  window.__modFormUrl=url; window.__modFormName=def.label||'신청폼';
+  var qrPrev='https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=8&data='+encodeURIComponent(url);
   var h='<div class="pop-head"><h3>🔗 '+esc(def.label)+' 신청폼 공유</h3></div>';
   h+='<div style="padding:14px">';
   h+='<p style="color:#64748b;font-size:13px;margin-bottom:14px;line-height:1.6">아래 링크를 카톡·문자로 공유하면 누구나 신청할 수 있습니다.<br>신청 내용은 이 목록에 쌓이고, <b>✓ 선정</b> / <b>✕ 탈락</b> 버튼으로 처리할 수 있습니다.</p>';
   h+='<div style="display:flex;gap:6px"><input id="modFormLinkInput" type="text" readonly value="'+esc(url)+'" onclick="this.select()" style="flex:1;padding:9px 11px;border:1px solid #cbd5e1;border-radius:8px;font-size:12px;font-family:monospace">';
   h+='<button class="btn btn-b" onclick="_copyModFormLink()" style="white-space:nowrap">📋 복사</button></div>';
+  // QR 미리보기 + JPG 저장
+  h+='<div style="text-align:center;margin-top:16px;padding-top:14px;border-top:1px dashed #e2e8f0">';
+  h+='<img src="'+qrPrev+'" style="width:160px;height:160px;border:1px solid #e2e8f0;border-radius:8px"><div style="font-size:11px;color:#94a3b8;margin-top:4px">스캔하면 신청폼으로 연결</div>';
+  h+='<div style="margin-top:10px"><button class="btn btn-b" style="background:#16a34a" onclick="_saveQrJpg(window.__modFormUrl, window.__modFormName+\'_신청폼QR\')">🖼 QR 이미지 저장 (JPG)</button></div>';
+  h+='</div>';
   h+='<div style="margin-top:14px;text-align:right"><button class="btn" onclick="closePopup()">닫기</button></div>';
   h+='</div>';
   openPopup(h,520);
+}
+// QR 코드를 JPG 파일로 저장 (URL → QR 이미지 → canvas → jpeg 다운로드)
+function _saveQrJpg(url, filename){
+  if(!url) return toast('링크가 없습니다',true);
+  var qurl='https://api.qrserver.com/v1/create-qr-code/?size=600x600&margin=12&data='+encodeURIComponent(url);
+  var img=new Image(); img.crossOrigin='anonymous';
+  img.onload=function(){
+    try{
+      var c=document.createElement('canvas'); c.width=img.width||600; c.height=img.height||600;
+      var ctx=c.getContext('2d'); ctx.fillStyle='#fff'; ctx.fillRect(0,0,c.width,c.height); ctx.drawImage(img,0,0);
+      c.toBlob(function(blob){
+        if(!blob){ toast('QR 변환 실패',true); return; }
+        var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=(filename||'QR').replace(/[\\/:*?"<>|]/g,'_')+'.jpg'; a.click();
+        setTimeout(function(){ URL.revokeObjectURL(a.href); },1500);
+        toast('📥 QR 이미지 저장됨');
+      },'image/jpeg',0.92);
+    }catch(e){ toast('QR 저장 실패: '+(e.message||e),true); }
+  };
+  img.onerror=function(){ toast('QR 이미지 로드 실패 — 네트워크 확인',true); };
+  img.src=qurl;
 }
 function _copyModFormLink(){
   var el=document.getElementById('modFormLinkInput'); if(!el) return;

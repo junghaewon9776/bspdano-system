@@ -447,7 +447,7 @@ label{display:block;font-size:10px;color:#999;margin-bottom:3px}
 <!-- firebase-storage 제거: 구글 드라이브 프록시로 대체 -->
 <script src="firebase-config.js"></script>
 <script src="common.js?v=20260602a"></script>
-<script src="mod-engine.js?v=20260602y"></script>
+<script src="mod-engine.js?v=20260602z"></script>
 
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" onerror="console.warn('XLSX CDN load failed')"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js" onerror="console.warn('xlsx-js-style CDN load failed')"></script>
@@ -2382,6 +2382,7 @@ function dApform(){
     h+='<div style="display:flex;gap:6px;align-items:center">';
     h+='<input id="apformLink" type="text" readonly value="'+esc(formLink)+'" onclick="this.select()" style="flex:1;padding:6px 8px;border:1px solid #bfdbfe;border-radius:6px;background:#fff;font-size:12px;font-family:monospace">';
     h+='<button class="btn" style="padding:8px 14px;font-size:13px;font-weight:700;background:#10b981" onclick="cpApformLink()">📋 링크 복사</button>';
+    h+='<button class="btn" style="padding:8px 14px;font-size:13px;font-weight:700;background:#6366f1;color:#fff" onclick="_saveQrJpg(document.getElementById(\'apformLink\').value,\'공개신청폼QR\')">🖼 QR 저장</button>';
     h+='</div></div>';
   }
 
@@ -4132,6 +4133,7 @@ function applyConfigOpen(){
     h+='<div style="display:flex;gap:6px;align-items:center">';
     h+='<input id="cfgFormLink" type="text" readonly value="'+esc(displayUrl)+'" onclick="this.select()" style="flex:1;padding:6px 8px;border:1px solid #bfdbfe;border-radius:6px;background:#fff;font-size:12px;font-family:monospace">';
     h+='<button type="button" class="btn" onclick="applyConfigCopyLink()" style="white-space:nowrap;padding:8px 14px;font-size:13px;font-weight:700;background:#10b981">📋 링크 복사</button>';
+    h+='<button type="button" class="btn" onclick="_saveQrJpg(document.getElementById(\'cfgFormLink\').value,\'신청폼QR\')" style="white-space:nowrap;padding:8px 14px;font-size:13px;font-weight:700;background:#6366f1;color:#fff">🖼 QR 저장</button>';
     h+='</div>';
     h+='<div class="mut" style="font-size:11px;margin-top:4px">· 기본: 내장 신청폼 탭 링크 · 외부 URL 입력 시 해당 URL로 대체</div>';
     h+='<div style="margin-top:8px">';
@@ -19252,6 +19254,7 @@ function _ctRender(kind){
   h+='    <div style="display:flex;gap:6px;flex-wrap:wrap">';
   h+='      <button class="btn btn-b btn-s" onclick="ctOpenForm(\''+kind+'\')">+ 직접 입력</button>';
   h+='      <button class="btn btn-g btn-s" onclick="ctCopyFormUrl(\''+kind+'\')">🔗 공개폼 링크 복사</button>';
+  h+='      <button class="btn btn-s" style="background:#6366f1;color:#fff" onclick="_saveQrJpg(_ctPublicUrl(\''+kind+'\'),\''+kind+'_공개폼QR\')">🖼 QR 저장</button>';
   h+='      <button class="btn btn-y btn-s" onclick="ctToggleFieldEditor(\''+kind+'\')">⚙️ 폼필드 편집</button>';
   h+='    </div>';
   h+='  </div>';
