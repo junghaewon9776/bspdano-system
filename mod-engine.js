@@ -128,8 +128,10 @@ function dMod(key){
   // 헤더
   h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">';
   h+='<h3 style="margin:0">'+(def.icon||"📦")+' '+esc(def.label)+' <span style="color:#94a3b8;font-weight:400">('+data.length+')</span></h3>';
+  var _hasTel=(def.columns||[]).some(function(c){return c.type==='tel'});
   h+='<div style="display:flex;gap:6px;flex-wrap:wrap">';
   if(isA() && feat.applyForm) h+='<button class="btn" style="background:#0ea5e9;color:#fff" onclick="popModFormLink(\''+key+'\')">🔗 신청폼 링크</button>';
+  if(isA() && _hasTel) h+='<button class="btn" style="background:#8b5cf6;color:#fff" onclick="popModSms(\''+key+'\')">💬 문자 발송</button>';
   if(isA()) h+='<button class="btn btn-b" onclick="popModAdd(\''+key+'\')">➕ 추가</button>';
   if(feat.excel) h+='<button class="btn" onclick="modExportExcel(\''+key+'\')">📥 엑셀</button>';
   h+='</div></div>';
@@ -799,4 +801,70 @@ function submitModApply(){
     if(btn){btn.disabled=false;btn.textContent='신청하기';}
     if(msg)msg.innerHTML='<span style="color:#ef4444">제출 실패: '+esc(e.message||e)+'</span>';
   });
+}
+
+// ═══════════════════════════════════════════
+// 문자(SMS) 발송 — 연락처 컬럼이 있는 모듈
+// ═══════════════════════════════════════════
+
+function popModSms(key){
+  var def=_modDefs[key]; if(!def) return;
+  var telCol=(def.columns||[]).find(function(c){return c.type==='tel'});
+  if(!telCol) return toast('연락처 컬럼이 없습니다',true);
+  var hasStatus=(def.columns||[]).some(function(c){return c.key==='status'&&c.type==='badge'});
+  window.__modSmsKey=key; window.__modSmsTelKey=telCol.key;
+
+  var h='<div class="pop-head"><h3>💬 '+esc(def.label)+' 문자 발송</h3></div>';
+  h+='<div style="padding:14px">';
+  // 대상 선택
+  h+='<label style="font-size:12px;font-weight:700;color:#64748b;display:block;margin-bottom:6px">발송 대상</label>';
+  h+='<select id="modSmsTarget" onchange="_modSmsCount()" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;margin-bottom:12px">';
+  h+='<option value="all">전체</option>';
+  if(hasStatus){
+    h+='<option value="선정" selected>선정된 항목만</option>';
+    h+='<option value="대기">대기 항목만</option>';
+    h+='<option value="notReject">탈락 제외</option>';
+  }
+  h+='</select>';
+  // 본문
+  h+='<label style="font-size:12px;font-weight:700;color:#64748b;display:block;margin-bottom:6px">메시지 내용</label>';
+  h+='<textarea id="modSmsBody" rows="5" placeholder="예: [법성포단오제] 푸드트럭 입점 선정 안내드립니다. ..." style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;resize:vertical;box-sizing:border-box"></textarea>';
+  h+='<div style="font-size:11px;color:#94a3b8;margin-top:4px">90byte 초과 시 LMS(장문)로 자동 전환됩니다</div>';
+  h+='<div id="modSmsCount" style="font-size:13px;color:#2563eb;font-weight:700;margin-top:10px"></div>';
+  h+='<div style="text-align:right;margin-top:14px">';
+  h+='<button class="btn" onclick="closePopup()">취소</button> ';
+  h+='<button class="btn btn-b" style="background:#8b5cf6" onclick="modSmsSend()">💬 발송</button>';
+  h+='</div></div>';
+  openPopup(h,460);
+  setTimeout(_modSmsCount,50);
+}
+
+function _modSmsTargetRows(){
+  var key=window.__modSmsKey, telKey=window.__modSmsTelKey;
+  var tgt=(document.getElementById('modSmsTarget')||{}).value||'all';
+  var rows=(_modData[key]||[]).slice();
+  if(tgt==='all') return rows;
+  if(tgt==='notReject') return rows.filter(function(r){return r.status!=='탈락'});
+  return rows.filter(function(r){return r.status===tgt});
+}
+function _modSmsCount(){
+  var telKey=window.__modSmsTelKey;
+  var rows=_modSmsTargetRows().filter(function(r){return (r[telKey]||'').replace(/[^0-9]/g,'').length>=10});
+  var el=document.getElementById('modSmsCount');
+  if(el) el.textContent='📨 '+rows.length+'명에게 발송됩니다';
+}
+function modSmsSend(){
+  var telKey=window.__modSmsTelKey;
+  var body=(document.getElementById('modSmsBody').value||'').trim();
+  if(!body) return toast('메시지 내용을 입력하세요',true);
+  var rows=_modSmsTargetRows();
+  var tels=rows.map(function(r){return (r[telKey]||'').replace(/[^0-9]/g,'')}).filter(function(t){return t.length>=10});
+  if(!tels.length) return toast('발송할 연락처가 없습니다',true);
+  if(!confirm(tels.length+'명에게 문자를 발송할까요?')) return;
+  showLoading('발송 중...');
+  api('sendSmsAligo',{id:CID, tels:tels, msg:body}).then(function(r){
+    hideLoading();
+    if(r&&r.ok){ toast('✅ '+tels.length+'건 발송 완료'); closePopup(); }
+    else toast('발송 실패: '+((r&&r.err)||'알 수 없는 오류'),true);
+  }).catch(function(e){hideLoading();toast('발송 오류: '+(e.message||e),true)});
 }
