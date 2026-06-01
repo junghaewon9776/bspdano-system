@@ -1603,6 +1603,14 @@ function _modViewUrl(def,row){
   return base+'?modview='+encodeURIComponent(def.key)+'&id='+encodeURIComponent(row._id||'')+(evtId?'&evtId='+encodeURIComponent(evtId):'');
 }
 function _modPlain(c,v){ if(c.type==='number'&&c.comma) return Number(v).toLocaleString(); return String(v); }
+// free 배치 요소의 줄바꿈/정렬/폭 CSS (pos 항목 p 기준)
+function _mlBoxCss(p){
+  p=p||{};
+  var widthPct=100-(p.x||0);
+  if(p.wrap) return 'width:'+widthPct+'%;white-space:normal;word-break:break-all;'+(p.align?'text-align:'+p.align+';':'');
+  if(p.align) return 'width:'+widthPct+'%;white-space:nowrap;overflow:hidden;text-align:'+p.align+';';
+  return 'white-space:nowrap;';
+}
 
 function _modLabelHtml(def,row,opt){
   var allc=(def.columns||[]).filter(function(c){return !c.adminOnly&&c.key!=='status'&&!c.hideTable&&c.type!=='file'&&c.type!=='consent'});
@@ -1627,14 +1635,16 @@ function _modLabelHtml(def,row,opt){
     }
     if(showTitle){
       var tp=pos['_title']||{x:4,y:4,fs:14};
-      h+='<div style="position:absolute;left:'+tp.x+'%;top:'+tp.y+'%;font-size:'+(tp.fs||14)+'pt;font-weight:800;line-height:1.1;white-space:nowrap">'+esc(String(titleV))+'</div>';
+      h+='<div style="position:absolute;left:'+tp.x+'%;top:'+tp.y+'%;font-size:'+(tp.fs||14)+'pt;font-weight:800;line-height:1.1;'+_mlBoxCss(tp)+'">'+esc(String(titleV))+'</div>';
     }
     cols.forEach(function(c){
       if(c.key===opt.titleKey) return;
       var v=row[c.key]; if(v==null||v==='') return;
       var fp=pos[c.key]||null;
       if(!fp) return;
-      h+='<div style="position:absolute;left:'+fp.x+'%;top:'+fp.y+'%;font-size:'+(fp.fs||7.5)+'pt;line-height:1.3;color:#222;white-space:nowrap"><b>'+esc(c.label)+'</b> '+esc(_modPlain(c,v))+'</div>';
+      var sep=fp.colon?': ':' ';
+      var lbl=fp.bold?esc(c.label):'<b>'+esc(c.label)+'</b>';
+      h+='<div style="position:absolute;left:'+fp.x+'%;top:'+fp.y+'%;font-size:'+(fp.fs||7.5)+'pt;line-height:1.3;color:#222;'+(fp.bold?'font-weight:800;':'')+_mlBoxCss(fp)+'">'+lbl+sep+esc(_modPlain(c,v))+'</div>';
     });
     h+='</div>';
     return h;
@@ -2200,13 +2210,13 @@ function _mllRender(){
 
   var items=[];
   var tp=pos['_title']||{x:4,y:4,fs:14};
-  items.push({id:'_title',label:'제목',text:String(titleV),x:tp.x,y:tp.y,fs:tp.fs||14,bold:true,color:'#6366f1'});
+  items.push({id:'_title',label:'제목',text:String(titleV),x:tp.x,y:tp.y,fs:tp.fs||14,bold:true,wrap:tp.wrap,align:tp.align,color:'#6366f1'});
   L.cols.forEach(function(c){
     if(c.key===L.opt.titleKey) return;
     var fp=pos[c.key]||{x:4,y:20,fs:7.5};
     ci=(ci+1)%colors.length;
     var v=row[c.key]||'샘플';
-    items.push({id:c.key,label:c.label,text:c.label+' '+v,x:fp.x,y:fp.y,fs:fp.fs||7.5,bold:false,color:colors[ci]});
+    items.push({id:c.key,label:c.label,text:c.label+(fp.colon?': ':' ')+v,x:fp.x,y:fp.y,fs:fp.fs||7.5,bold:fp.bold,wrap:fp.wrap,align:fp.align,color:colors[ci]});
   });
   var qp=pos['_qr']||{x:70,y:4,w:25};
   var qSize=Math.round((qp.w||25)*SCALE);
@@ -2218,7 +2228,9 @@ function _mllRender(){
       html+='<div class="mll_el" data-id="'+it.id+'" style="position:absolute;left:'+left+'px;top:'+top+'px;width:'+qSize+'px;height:'+qSize+'px;border:2px dashed '+it.color+';border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:11px;color:'+it.color+';font-weight:700;cursor:move;background:rgba(51,65,85,.08)">QR</div>';
     } else {
       var fsPx=it.fs*SCALE*0.35;
-      html+='<div class="mll_el" data-id="'+it.id+'" style="position:absolute;left:'+left+'px;top:'+top+'px;border:1.5px dashed '+it.color+';border-radius:3px;padding:2px 4px;font-size:'+fsPx+'px;'+(it.bold?'font-weight:800;':'')+'color:'+it.color+';cursor:move;white-space:nowrap;background:rgba(255,255,255,.85)">'+esc(it.text)+'</div>';
+      var wpx=(100-(it.x||0))/100*cW;
+      var box=it.wrap?('width:'+wpx+'px;white-space:normal;word-break:break-all;'+(it.align?'text-align:'+it.align+';':'')):(it.align?('width:'+wpx+'px;white-space:nowrap;overflow:hidden;text-align:'+it.align+';'):'white-space:nowrap;');
+      html+='<div class="mll_el" data-id="'+it.id+'" style="position:absolute;left:'+left+'px;top:'+top+'px;border:1.5px dashed '+it.color+';border-radius:3px;padding:2px 4px;font-size:'+fsPx+'px;'+(it.bold?'font-weight:800;':'')+'color:'+it.color+';cursor:move;background:rgba(255,255,255,.85);box-sizing:border-box;'+box+'">'+esc(it.text)+'</div>';
     }
   });
   canvas.innerHTML=html;
@@ -2303,8 +2315,32 @@ function _mllShowCtrl(id){
   } else {
     h+='<label style="display:block;margin-bottom:6px;margin-top:6px">글자 크기 <b>'+(p.fs||(id==='_title'?14:7.5))+'pt</b></label>';
     h+='<input type="range" min="5" max="24" step="0.5" value="'+(p.fs||(id==='_title'?14:7.5))+'" style="width:100%" oninput="_mllSetPos(\''+id+'\',\'fs\',this.value)">';
+    // 텍스트 서식 옵션
+    var bs=function(on){return 'padding:5px 7px;border:1px solid '+(on?'#6366f1':'#cbd5e1')+';border-radius:5px;background:'+(on?'#eef2ff':'#fff')+';color:#334155;font-size:12px;cursor:pointer;font-weight:700';};
+    h+='<div style="margin-top:10px;border-top:1px solid #e2e8f0;padding-top:8px;font-size:11px;color:#94a3b8;margin-bottom:5px">서식</div>';
+    h+='<div style="display:flex;flex-wrap:wrap;gap:4px">';
+    h+='<button onclick="_mllToggle(\''+id+'\',\'bold\')" style="'+bs(p.bold)+'">B 굵게</button>';
+    h+='<button onclick="_mllToggle(\''+id+'\',\'wrap\')" style="'+bs(p.wrap)+'">↵ 줄바꿈</button>';
+    if(id!=='_title') h+='<button onclick="_mllToggle(\''+id+'\',\'colon\')" style="'+bs(p.colon)+'">: 표시</button>';
+    h+='</div>';
+    h+='<div style="display:flex;gap:4px;margin-top:5px">';
+    h+='<button onclick="_mllSetAlign(\''+id+'\',\'left\')" style="flex:1;'+bs(!p.align||p.align==='left')+'">⬅ 왼쪽</button>';
+    h+='<button onclick="_mllSetAlign(\''+id+'\',\'center\')" style="flex:1;'+bs(p.align==='center')+'">↔ 가운데</button>';
+    h+='</div>';
   }
   el.innerHTML=h;
+}
+function _mllToggle(id,prop){
+  var L=window.__mlLayout; if(!L) return;
+  if(!L.pos[id]) L.pos[id]={};
+  L.pos[id][prop]=!L.pos[id][prop];
+  _mllRender(); _mllBindEvents(); _mllShowCtrl(id);
+}
+function _mllSetAlign(id,al){
+  var L=window.__mlLayout; if(!L) return;
+  if(!L.pos[id]) L.pos[id]={};
+  L.pos[id].align=(al==='left')?'':al;  // 왼쪽=기본(없음)
+  _mllRender(); _mllBindEvents(); _mllShowCtrl(id);
 }
 
 function _mllSetPos(id,prop,val){
