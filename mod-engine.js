@@ -1650,6 +1650,12 @@ function popModLabel(key,singleId,idsList){
   h+='</div>';
   h+='</div>';
 
+  // ── QZ Tray (라벨 프린터 직접 출력) ──
+  h+='<div style="margin-bottom:12px;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:8px;padding:8px 10px">';
+  h+='<div style="font-size:11px;color:#6d28d9;font-weight:700;margin-bottom:6px">🖨 라벨 프린터 직접 출력 (QZ Tray) <span style="font-weight:400;color:#94a3b8">— 브라우저 인쇄로 규격이 안 맞을 때</span></div>';
+  h+='<div id="ml_qz_box" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"></div>';
+  h+='</div>';
+
   // ── 출력 방식 선택 ──
   h+='<div style="display:flex;gap:8px;margin-bottom:12px">';
   h+='<label class="ml_mode_opt" style="flex:1;display:flex;align-items:center;gap:6px;padding:9px 10px;border:2px solid '+(isA4?'#cbd5e1':'#6366f1')+';border-radius:8px;cursor:pointer;background:'+(isA4?'#fff':'#eef2ff')+'" onclick="_mlSetMode(\'label\')"><input type="radio" name="ml_mode" value="label"'+(isA4?'':' checked')+'> <span style="font-size:13px;font-weight:700">🏷 라벨 낱장</span><span style="font-size:10px;color:#94a3b8">라벨 프린터</span></label>';
@@ -1728,7 +1734,7 @@ function popModLabel(key,singleId,idsList){
   h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px"><button class="btn" style="background:#6366f1;color:#fff" onclick="popModLabelLayout(\''+key+'\')">📐 배치 편집</button><div><button class="btn" onclick="closePopup()">취소</button> <button class="btn btn-b" style="background:#475569" onclick="modDoPrint()">🖨 <span id="ml_printcnt">'+rows.length+'</span>장 출력</button></div></div>';
   h+='</div>';
   openPopup(h,560);
-  setTimeout(function(){ _modLabelPreview(); _mlUpdatePickCount(); },60);
+  setTimeout(function(){ _modLabelPreview(); _mlUpdatePickCount(); _qzUpdateUI(); },60);
 }
 
 // 입력칸 → 현재 모드 크기 슬롯에 동기화
@@ -1870,6 +1876,11 @@ function modDoPrint(){
   var all=window.__modLabelAll||(_modData[key]||[]);
   var rows=all.filter(function(r){return ids.indexOf(r._id)>=0});
   if(!rows.length) return toast('출력할 항목이 없습니다',true);
+  // QZ Tray 연결+프린터선택 시 → 라벨 프린터로 직접 출력 (낱장 모드)
+  if(opt.mode==='label' && qzIsReady()){
+    _qzPrintLabels(def, rows, opt).then(function(ok){ if(ok){ modBumpPrint(key, ids); closePopup(); } });
+    return;
+  }
   var labels=rows.map(function(r){return _modLabelHtml(def,r,opt);}).join('');
   var win=window.open('','_modprint','width=600,height=720');
   if(!win){ toast('팝업 차단을 해제해 주세요',true); return; }
@@ -1936,6 +1947,148 @@ function popModLog(key){
     h+='<div style="text-align:right;margin-top:12px"><button class="btn" onclick="closePopup()">닫기</button></div></div>';
     openPopup(h,640);
   }).catch(function(e){ hideLoading(); toast('로그 조회 실패: '+(e.message||e),true); });
+}
+
+// ═══════════════════════════════════════════
+// QZ Tray — 라벨 프린터 직접 출력 (브라우저 인쇄로 규격 인식 안 될 때)
+// 인증서/키는 푸드트럭 POS와 동일 (BulpanPOS 자체서명) → 같은 PC면 그대로 동작
+// ═══════════════════════════════════════════
+var _qzConnected=false;
+function _qzCert(){
+  var cert='-----BEGIN CERTIFICATE-----\n'+
+'MIIDjTCCAnWgAwIBAgIUIDgYFxPIVJuODn57VyiuyyCuNXEwDQYJKoZIhvcNAQEN\n'+
+'BQAwVTESMBAGA1UEAwwJQnVscGFuUE9TMRIwEAYDVQQKDAlCdWxwYW5QT1MxDjAM\n'+
+'BgNVBAcMBVNlb3VsMQ4wDAYDVQQIDAVTZW91bDELMAkGA1UEBhMCS1IwIBcNMjYw\n'+
+'NDAzMDQ1NzE1WhgPMjA1NzA5MjYwNDU3MTVaMFUxEjAQBgNVBAMMCUJ1bHBhblBP\n'+
+'UzESMBAGA1UECgwJQnVscGFuUE9TMQ4wDAYDVQQHDAVTZW91bDEOMAwGA1UECAwF\n'+
+'U2VvdWwxCzAJBgNVBAYTAktSMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKC\n'+
+'AQEAsh36NLKUNwTfmd72E0H1ZeqLoEU7DGs7W/Gi/PzuwZkQ444Alr/PAQUwB/Zb\n'+
+'NeLiaZJBQ5ZD815HewmogHq6aej610UlsjOOnVFcW918kQ43bNTdD7krOT7FCj9M\n'+
+'9DU1aPjs+fSb6Sj3Xeb7h18mwGtmSNPjYCavREpsoQmmRG2UxeXJyk48CtgdqUOA\n'+
+'MlpFTkug71AWi+gOOiJyqeu5HNLbAp/oI4g46W4o9Rf8PI4ZL6d0VN0c6vClKltI\n'+
+'shO0QSHJ2F0ebLKzIpXdR8G2+vrSl5ZmS2cjTZV+lZDWJVAM+ryUEWUS0nx40kCV\n'+
+'G7N3sQoqnxv8c/nKtnFGfMFR+wIDAQABo1MwUTAdBgNVHQ4EFgQUiT9IwnM9yFXp\n'+
+'H6sLN82+XzxEGiAwHwYDVR0jBBgwFoAUiT9IwnM9yFXpH6sLN82+XzxEGiAwDwYD\n'+
+'VR0TAQH/BAUwAwEB/zANBgkqhkiG9w0BAQ0FAAOCAQEACTTCO0ymBOwYMDVQYs+Z\n'+
+'d1ltfNWoY6boN7uyk0g3nyaISHmcDrnTkXKvuwWOX3Dxw2zJm2IzqqqEXIOayElG\n'+
+'mFSMD3a/jqsJB0cligBv+NrsLqy2HEpL6Eh8nRIMeIpWktV/KbuC/9qzsv9Gcc36\n'+
+'42adQlr7rptyr4mC6CIStXZI7GoP6l58m23oc7GoFBUF3XOWH5kOCD2hcl50ACyo\n'+
+'MPzVD8v3vWBJ/Yfwg0u9rEZZmEBuxkgdoTGuXuJ88cjo/W6z9wFCsoveli3v8zPv\n'+
+'uH5HWvG8tILLUTfaKXVwOCJ8icXEBdcoCMjLN41/6zSMXCwM5nZs94nABJ55zyGH\n'+
+'iw==\n'+
+'-----END CERTIFICATE-----';
+  var key='-----BEGIN PRIVATE KEY-----\n'+
+'MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCyHfo0spQ3BN+Z\n'+
+'3vYTQfVl6ougRTsMaztb8aL8/O7BmRDjjgCWv88BBTAH9ls14uJpkkFDlkPzXkd7\n'+
+'CaiAerpp6PrXRSWyM46dUVxb3XyRDjds1N0PuSs5PsUKP0z0NTVo+Oz59JvpKPdd\n'+
+'5vuHXybAa2ZI0+NgJq9ESmyhCaZEbZTF5cnKTjwK2B2pQ4AyWkVOS6DvUBaL6A46\n'+
+'InKp67kc0tsCn+gjiDjpbij1F/w8jhkvp3RU3Rzq8KUqW0iyE7RBIcnYXR5ssrMi\n'+
+'ld1Hwbb6+tKXlmZLZyNNlX6VkNYlUAz6vJQRZRLSfHjSQJUbs3exCiqfG/xz+cq2\n'+
+'cUZ8wVH7AgMBAAECggEACCLfFgnTmWZ17FUcpSk4fiJQ+c46cfPIBLLXViUbpujz\n'+
+'YOGmBzzVxjR9dYT8X6FwjuVTvomeVanzK/H3VNRxBXt9/IK3w8R1JEczfS1zOOZk\n'+
+'WRVUJRlj7xEooQeJNV06MQRbQYO58imhOxSHstmsLyf4xno0rboL/DDwy15hzkhQ\n'+
+'3SFU9SsiE4wj1hngCGsG2uHET5Rm2nfqrelU9V7Jge40bnKAmQ2WaHJEWbI+K+JC\n'+
+'ilN5bqdMmOZgw8wV/CUcit++btw+u0GDaVfQJr3vUWI/c/m7gfS0GJwssHr63dnQ\n'+
+'5329jrP1WDaYdfOrHYd8Vvw94Ii/FIUUCJmG1L3OOQKBgQDuvFqzNyxiIM7+v3/C\n'+
+'RmUfR3LmsHotv5U7dfL1iG2cEgW3byDw45GAvbR5eBZWY4JSKZDaM3SBgArim+QT\n'+
+'eC8a14XoyrqtZC7nqDBXfSIB/B1xEw0MJ7lO4I0pzwcds8EOasZBudRzZxmM0/Y0\n'+
+'xn/JHsMrE8HGlZ8cnsTzsPiCLQKBgQC+/2hOFmNkEy2ET91FQ9xay+5ueqJkmtSm\n'+
+'MyctM2pQLNT5rPTM0OTWCm5kx+T0ezNOOmScg5Kv3epvVic+GY97kcajZzHwsO19\n'+
+'ao6rZg1b8smVjE1sLlJaoJpOZDmtp6Fmm0B8jEhqnT8BYcoDpbupAE/9K0umJ20w\n'+
+'cXF7RzZFxwKBgQCkHR9Mq9T68Arb3ND6wGGrivZV12NmJ5ly8rY+S7bt3wXG/8Hp\n'+
+'VscjdUWnawIQCQABc0l8dnrUuyzAcuHq8GeRUC9hxFtn7sK/xULWIdNLAgFLRglm\n'+
+'HbipnHvuDb+aj4NbYdNAQ3rkii9qPBu4U+xsWZVY+4/t79UdW5eQ3ks3UQKBgE/1\n'+
+'RIlMPherH6cAeDWDD0DDlvGRTWKontVlHMWDfMJLwm0zxtfnq6UfgM+YD3V6DiR1\n'+
+'taEAQ+x0DqzFeHA66yJkCLBnhzSoHQQgE9IVSwpvPYzpy4+6ZKekDHU86BiW0K7P\n'+
+'19NMNxTK95Fwis20GDfL9bCa63SHlOJu238sdMAJAoGAP0Pc/lVsEqWAB5eMrTnO\n'+
+'RL10MwSfQYsAyK7EohO3aPcAwXLW/cJWm1r6Fy0tOkbjv792HlkdB2LL0LD+v1G/\n'+
+'rdhA1fLYjz6NIe0gxMNdiiiSRTHhwiz3BXAFmACAy0oF/g2DQLIEaJY4OSjUFzUc\n'+
+'3CL6B/oxq483iesPrr51bKI=\n'+
+'-----END PRIVATE KEY-----';
+  return {cert:cert,key:key};
+}
+function _qzPrinterName(){ try{ return localStorage.getItem('modQzPrinter')||''; }catch(e){ return ''; } }
+function _qzSetPrinter(n){ try{ localStorage.setItem('modQzPrinter',n||''); }catch(e){} _qzUpdateUI(); }
+function qzIsReady(){ return _qzConnected && typeof qz!=='undefined' && qz.websocket && qz.websocket.isActive() && !!_qzPrinterName(); }
+
+function qzConnect(){
+  if(typeof qz==='undefined'){ toast('QZ 라이브러리 로딩 안됨 — 새로고침 후 재시도',true); return; }
+  if(qz.websocket.isActive()){ _qzConnected=true; _qzUpdateUI(); _qzScan(); return; }
+  var ck=_qzCert();
+  qz.security.setCertificatePromise(function(resolve){ resolve(ck.cert); });
+  qz.security.setSignatureAlgorithm('SHA512');
+  qz.security.setSignaturePromise(function(toSign){
+    return function(resolve,reject){
+      try{
+        var pk=KEYUTIL.getKey(ck.key);
+        var sig=new KJUR.crypto.Signature({alg:'SHA512withRSA'});
+        sig.init(pk); sig.updateString(toSign);
+        resolve(stob64(hextorstr(sig.sign())));
+      }catch(err){ reject(err); }
+    };
+  });
+  toast('QZ Tray 연결 중...');
+  qz.websocket.connect({retries:3,delay:1}).then(function(){
+    _qzConnected=true; toast('✅ QZ Tray 연결됨'); _qzUpdateUI(); _qzScan();
+  }).catch(function(e){
+    _qzConnected=false; _qzUpdateUI();
+    var m=e.message||String(e);
+    if(/establish|refused/i.test(m)) m='QZ Tray 프로그램이 실행 중인지 확인하세요';
+    else if(/cert|sign|trust/i.test(m)) m='인증서 설치 필요 (아래 「인증서 다운로드」 → QZ Tray에 설치)';
+    toast('QZ 연결 실패: '+m,true);
+  });
+}
+function qzDisconnect(){
+  try{ if(typeof qz!=='undefined'&&qz.websocket.isActive()) qz.websocket.disconnect(); }catch(e){}
+  _qzConnected=false; _qzUpdateUI();
+}
+function _qzScan(){
+  if(typeof qz==='undefined'||!qz.websocket.isActive()) return;
+  qz.printers.find().then(function(ps){ window.__qzPrinters=ps||[]; _qzUpdateUI(); })
+    .catch(function(e){ toast('프린터 목록 오류: '+(e.message||e),true); });
+}
+function _qzDownloadCert(){
+  var c=_qzCert().cert;
+  var blob=new Blob([c],{type:'application/x-pem-file'});
+  var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='override.crt'; a.click();
+  toast('📥 override.crt 다운로드됨 — QZ Tray 설정 폴더(%APPDATA%\\qz)에 복사 후 재시작');
+}
+function _qzPrintLabels(def, rows, opt){
+  var pn=_qzPrinterName();
+  if(!qzIsReady()){ toast('QZ 프린터를 먼저 연결·선택하세요',true); return Promise.resolve(false); }
+  var w=opt.w, h=opt.h;
+  var cfg=qz.configs.create(pn,{colorType:'blackwhite',margins:0,units:'mm',jobName:'LABEL-'+def.key,size:{width:w,height:h||null}});
+  var chain=Promise.resolve();
+  rows.forEach(function(r){
+    chain=chain.then(function(){
+      var html='<div style="margin:0;padding:0">'+_modLabelHtml(def,r,opt)+'</div>';
+      return qz.print(cfg,[{type:'pixel',format:'html',flavor:'plain',data:html,options:{pageWidth:w,pageHeight:h||null}}]);
+    });
+  });
+  return chain.then(function(){ toast('🖨 QZ로 '+rows.length+'장 출력'); return true; })
+    .catch(function(e){ toast('QZ 출력 실패: '+(e.message||e),true); return false; });
+}
+// 라벨 팝업 내 QZ 영역 갱신
+function _qzUpdateUI(){
+  var box=document.getElementById('ml_qz_box'); if(!box) return;
+  var ready=(typeof qz!=='undefined'&&qz.websocket&&qz.websocket.isActive());
+  _qzConnected=ready;
+  var printers=window.__qzPrinters||[];
+  var curP=_qzPrinterName();
+  var h='';
+  if(!ready){
+    h+='<span style="font-size:12px;color:#dc2626;font-weight:700">● QZ 미연결</span>';
+    h+='<button class="btn btn-s" style="background:#6366f1;color:#fff;font-size:11px" onclick="qzConnect()">QZ Tray 연결</button>';
+    h+='<button class="btn btn-s" style="font-size:11px" onclick="_qzDownloadCert()">인증서 다운로드</button>';
+  } else {
+    h+='<span style="font-size:12px;color:#16a34a;font-weight:700">● QZ 연결됨</span>';
+    h+='<select onchange="_qzSetPrinter(this.value)" style="padding:5px 8px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;max-width:200px"><option value="">프린터 선택…</option>';
+    printers.forEach(function(p){ h+='<option value="'+esc(p)+'"'+(p===curP?' selected':'')+'>'+esc(p)+'</option>'; });
+    h+='</select>';
+    h+='<button class="btn btn-s" style="font-size:11px" onclick="_qzScan()">새로고침</button>';
+    h+='<button class="btn btn-s" style="font-size:11px" onclick="qzDisconnect()">해제</button>';
+  }
+  box.innerHTML=h;
 }
 
 // ═══════════════════════════════════════════
