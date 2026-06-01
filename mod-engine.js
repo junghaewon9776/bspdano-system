@@ -388,6 +388,11 @@ function modSave(key,editId){
 
   showLoading(fileTasks.length?'파일 업로드 중...':'저장 중...');
 
+  // 파일 업로드 전: 전역 Drive URL 비어있으면 모듈 정의에 저장된 URL 사용
+  if(fileTasks.length && def.driveUploadUrl && (typeof DRIVE_UPLOAD_URL==='undefined' || !DRIVE_UPLOAD_URL)){
+    try{ DRIVE_UPLOAD_URL=def.driveUploadUrl; }catch(e){}
+  }
+
   // 파일 업로드 먼저
   var upChain=Promise.resolve();
   fileTasks.forEach(function(t){
