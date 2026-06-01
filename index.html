@@ -505,9 +505,14 @@ var APPLY_EVT_ID = "";
 var IS_MODFORM_MODE = false;
 var MODFORM_KEY = "";
 var MODFORM_EVT_ID = "";
+var DEEP_TAB = "";   // ?tab= 딥링크 (로그인 후 해당 탭 자동 열기)
+var DEEP_EVT = "";   // ?evtId= 딥링크 (해당 행사 자동 선택)
 (function(){
   try {
     var sp = new URLSearchParams(window.location.search);
+    // 딥링크: 특정 탭/행사로 바로 진입 (연동 iframe용)
+    if (sp.get("tab")) DEEP_TAB = sp.get("tab");
+    if (sp.get("evtId") && !sp.get("apply") && !sp.get("modform")) DEEP_EVT = sp.get("evtId");
     // 구 URL(?p=applyform) → 새 URL(?apply=1) 리다이렉트
     if (sp.get("p") === "applyform") {
       var eid = sp.get("evtId") || "";
@@ -956,9 +961,9 @@ async function doLogin(id,pw,keep,silent){
   // ⚡ lazy 모드: 무거운 데이터는 빈 배열로 초기화 (apiRefresh 에서 채움)
   acts=[];purs=[];exps=[];mems=[];notices=[];pays=[];dpst=[];inc=[];incTypes=[];expBG=[];txn=[];expTypes=[];gwanTypes=[];incCards=[];awards=[];memGroups=[];
 
-  // 행사 선택: 이전에 저장된 행사 ID가 있으면 복원, 없으면 첫 번째 행사
-  var _savedEvtId = null;
-  try { _savedEvtId = localStorage.getItem("lastEvtId"); } catch(e){}
+  // 행사 선택: URL 딥링크(evtId) > 이전 저장 > 첫 번째 행사
+  var _savedEvtId = DEEP_EVT || null;
+  if(!_savedEvtId){ try { _savedEvtId = localStorage.getItem("lastEvtId"); } catch(e){} }
   CUR_EVT = null;
   if(_savedEvtId && EVENTS.length){
     for(var _ei=0;_ei<EVENTS.length;_ei++){
@@ -977,8 +982,9 @@ async function doLogin(id,pw,keep,silent){
   // 거래처 관리 버튼 — super/admin/subAdm
   var _vb=document.getElementById("vendorBtn");
   if(_vb) _vb.style.display = _isGlobalAdm() ? "" : "none";
-  CTAB="dash";FILT=isA()?"전체":myar();
-  // 커스텀 모듈 정의 로드 후 탭 렌더
+  CTAB = DEEP_TAB || "dash";  // URL 딥링크 탭 우선
+  FILT=isA()?"전체":myar();
+  // 커스텀 모듈 정의 로드 후 탭 렌더 (딥링크가 모듈 탭이면 로드 후 자동 표시)
   if(typeof loadModDefs==='function') loadModDefs(function(){modLoadAll();mkTabs();draw()});
   mkTabs();drawEventBar();draw();
   if(keep)saveAuth(id,pw); else clearAuth();
