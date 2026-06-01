@@ -582,6 +582,7 @@ function modSave(key,editId){
     if(c.type==='number'&&c.comma) v=v.replace(/,/g,'');
     if(c.type==='number'&&v) v=Number(v);
     if(c.required&&!v&&v!==0){ toast(c.label+'을(를) 입력하세요',true); valid=false; }
+    else { var verr=_modValidateField(c,v); if(verr){ toast(verr,true); valid=false; } }
     obj[c.key]=v;
   });
   if(!valid) return;
@@ -1071,14 +1072,67 @@ function _renderModDefCols(){
     }
     // 기본값 / 고정값 — file·consent 제외
     if(['text','tel','number','textarea','select','badge','date'].indexOf(c.type)>=0){
-      h+='<div style="margin-top:6px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">';
-      h+='<input placeholder="기본값 (미입력 시 자동 채움, 예: 2026 단오제)" value="'+esc(c.defVal||'')+'" style="flex:1;min-width:150px;font-size:12px;padding:5px 8px;border:1px solid #cbd5e1;border-radius:6px" onchange="_modDefEditCols['+i+'].defVal=this.value">';
+      var _dvSt='flex:1;min-width:150px;font-size:12px;padding:5px 8px;border:1px solid #cbd5e1;border-radius:6px';
+      var defInput;
+      if(c.type==='date'){
+        defInput='<input type="date" value="'+esc(c.defVal||'')+'" style="'+_dvSt+'" onchange="_modDefEditCols['+i+'].defVal=this.value">';
+      } else if(c.type==='select'){
+        defInput='<select style="'+_dvSt+'" onchange="_modDefEditCols['+i+'].defVal=this.value"><option value="">기본값 없음</option>'+(c.options||[]).map(function(o){var ov=typeof o==='object'?o.value:o,ol=typeof o==='object'?o.label:o;return '<option value="'+esc(ov)+'"'+(String(c.defVal)===String(ov)?' selected':'')+'>'+esc(ol)+'</option>';}).join('')+'</select>';
+      } else if(c.type==='badge'){
+        defInput='<select style="'+_dvSt+'" onchange="_modDefEditCols['+i+'].defVal=this.value"><option value="">기본값 없음</option>'+Object.keys(c.badgeMap||{}).map(function(k){return '<option value="'+esc(k)+'"'+(String(c.defVal)===String(k)?' selected':'')+'>'+esc(c.badgeMap[k].label||k)+'</option>';}).join('')+'</select>';
+      } else {
+        defInput='<input placeholder="기본값 (미입력 시 자동 채움, 예: 2026 단오제)" value="'+esc(c.defVal||'')+'" style="'+_dvSt+'" onchange="_modDefEditCols['+i+'].defVal=this.value">';
+      }
+      h+='<div style="margin-top:6px;display:flex;gap:6px;align-items:center;flex-wrap:wrap"><span style="font-size:11px;color:#94a3b8">기본값</span>';
+      h+=defInput;
       h+='<label style="font-size:11px;display:flex;align-items:center;gap:3px;background:#eef2ff;padding:4px 7px;border-radius:5px;white-space:nowrap" title="체크 시 기본값으로 고정되고 입력칸에서 수정할 수 없습니다"><input type="checkbox"'+(c.fixed?' checked':'')+' onchange="_modDefEditCols['+i+'].fixed=this.checked"><b style="color:#4338ca">🔒 고정</b></label>';
+      h+='</div>';
+    }
+    // 글자수 제한 — 텍스트류 (예: 차량번호 최소 7자)
+    if(['text','tel','textarea'].indexOf(c.type)>=0){
+      h+='<div style="margin-top:6px;display:flex;gap:6px;align-items:center;flex-wrap:wrap"><span style="font-size:11px;color:#94a3b8">글자수</span>';
+      h+='<label style="font-size:11px;color:#475569">최소<input type="number" min="0" value="'+(c.minLen||'')+'" placeholder="0" style="width:58px;font-size:12px;padding:4px 6px;border:1px solid #cbd5e1;border-radius:5px;margin-left:3px" onchange="_modDefEditCols['+i+'].minLen=this.value?parseInt(this.value,10):0"></label>';
+      h+='<label style="font-size:11px;color:#475569">최대<input type="number" min="0" value="'+(c.maxLen||'')+'" placeholder="제한없음" style="width:70px;font-size:12px;padding:4px 6px;border:1px solid #cbd5e1;border-radius:5px;margin-left:3px" onchange="_modDefEditCols['+i+'].maxLen=this.value?parseInt(this.value,10):0"></label>';
+      h+='<span style="font-size:10px;color:#94a3b8">(예: 차량번호 최소 7)</span>';
+      h+='</div>';
+    }
+    // 숫자 값 범위 (number)
+    if(c.type==='number'){
+      h+='<div style="margin-top:6px;display:flex;gap:6px;align-items:center;flex-wrap:wrap"><span style="font-size:11px;color:#94a3b8">값 범위</span>';
+      h+='<label style="font-size:11px;color:#475569">최소<input type="number" value="'+(c.minVal!=null&&c.minVal!==''?c.minVal:'')+'" placeholder="없음" style="width:70px;font-size:12px;padding:4px 6px;border:1px solid #cbd5e1;border-radius:5px;margin-left:3px" onchange="_modDefEditCols['+i+'].minVal=this.value!==\'\'?parseFloat(this.value):\'\'"></label>';
+      h+='<label style="font-size:11px;color:#475569">최대<input type="number" value="'+(c.maxVal!=null&&c.maxVal!==''?c.maxVal:'')+'" placeholder="없음" style="width:70px;font-size:12px;padding:4px 6px;border:1px solid #cbd5e1;border-radius:5px;margin-left:3px" onchange="_modDefEditCols['+i+'].maxVal=this.value!==\'\'?parseFloat(this.value):\'\'"></label>';
+      h+='</div>';
+    }
+    // 형식 검사 (text/tel)
+    if(['text','tel'].indexOf(c.type)>=0){
+      var _fmt=c.format||'';
+      var fo=function(v,l){return '<option value="'+v+'"'+(_fmt===v?' selected':'')+'>'+l+'</option>';};
+      h+='<div style="margin-top:6px;display:flex;gap:6px;align-items:center"><span style="font-size:11px;color:#94a3b8">형식 검사</span>';
+      h+='<select style="font-size:12px;padding:4px 6px;border:1px solid #cbd5e1;border-radius:5px" onchange="_modDefEditCols['+i+'].format=this.value">'+fo('','자유 입력')+fo('email','이메일')+fo('num','숫자만')+fo('alnum','영문+숫자')+'</select>';
       h+='</div>';
     }
     h+='</div>';
   });
   return h;
+}
+// 컬럼 값 검증 — 통과 시 null, 실패 시 에러 메시지
+function _modValidateField(c, v){
+  var s=String(v==null?'':v);
+  if(s==='') return null; // 빈 값은 required에서 별도 처리
+  if(c.type==='number'){
+    var n=Number(String(s).replace(/,/g,''));
+    if(!isNaN(n)){
+      if(c.minVal!=null&&c.minVal!==''&&n<c.minVal) return c.label+'은(는) '+c.minVal+' 이상이어야 합니다';
+      if(c.maxVal!=null&&c.maxVal!==''&&n>c.maxVal) return c.label+'은(는) '+c.maxVal+' 이하여야 합니다';
+    }
+  } else {
+    if(c.minLen&&s.length<c.minLen) return c.label+'은(는) 최소 '+c.minLen+'자 이상 입력하세요 (현재 '+s.length+'자)';
+    if(c.maxLen&&s.length>c.maxLen) return c.label+'은(는) 최대 '+c.maxLen+'자까지 가능합니다';
+    if(c.format==='email'&&!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(s)) return c.label+' 이메일 형식이 아닙니다';
+    if(c.format==='num'&&!/^[0-9]+$/.test(s)) return c.label+'은(는) 숫자만 입력하세요';
+    if(c.format==='alnum'&&!/^[A-Za-z0-9]+$/.test(s)) return c.label+'은(는) 영문/숫자만 입력하세요';
+  }
+  return null;
 }
 
 function _badgeMapToStr(bm){
@@ -1321,6 +1375,7 @@ function submitModApply(){
     if(c.type==='number'&&c.comma) v=v.replace(/,/g,'');
     if(c.type==='number'&&v) v=Number(v);
     if(c.required&&!v&&v!==0){ valid=false; if(!firstBad)firstBad=c.label+'을(를) 입력하세요'; }
+    else { var verr=_modValidateField(c,v); if(verr){ valid=false; if(!firstBad)firstBad=verr; } }
     obj[c.key]=v;
   });
   var msg=document.getElementById('modApplyMsg');
