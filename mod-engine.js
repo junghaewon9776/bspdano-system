@@ -132,29 +132,25 @@ function dMod(key){
 
   // 검색 + 필터 (검색은 목록 영역만 갱신 → 입력 포커스 유지)
   if(feat.search!==false){
+    var fcur=(_modFilter[key]&&typeof _modFilter[key]==='object')?_modFilter[key]:{};
     h+='<div style="margin-bottom:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">';
     h+='<input id="_modSearch_'+key+'" type="text" placeholder="🔍 검색..." value="'+esc(search)+'" oninput="_modSearchTyped(\''+key+'\',this.value)" style="flex:1;min-width:150px;padding:8px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:13px">';
-    var fc=(def.columns||[]).find(function(c){return c.filter});
-    if(fc){
-      var fopts;
-      if(fc.type==='select') fopts=(fc.options||[]).slice();
-      else if(fc.type==='badge') fopts=Object.keys(fc.badgeMap||{});
-      else {
-        // 그 외 타입(텍스트 등) → 실제 데이터의 고유값 자동 수집
-        var seen={}; fopts=[];
-        (_modData[key]||[]).forEach(function(r){ var v=String(r[fc.key]||''); if(v&&!seen[v]){seen[v]=1;fopts.push(v);} });
-        fopts.sort();
-      }
-      if(fopts.length){
-        h+='<span style="font-size:11px;color:#94a3b8;font-weight:700">'+esc(fc.label)+':</span>';
-        h+='<button class="btn btn-s'+(!filter?' btn-b':'')+'" onclick="_modFilter[\''+key+'\']=\'\';draw()" style="font-size:11px">전체</button>';
-        fopts.forEach(function(o){
-          var ov=typeof o==='object'?o.value:o;
-          var ol=typeof o==='object'?o.label:(fc.badgeMap&&fc.badgeMap[ov]?fc.badgeMap[ov].label:ov);
-          h+='<button class="btn btn-s'+(filter===String(ov)?' btn-b':'')+'" onclick="_modFilter[\''+key+'\']=\''+esc(String(ov))+'\';draw()" style="font-size:11px">'+esc(ol)+'</button>';
-        });
-      }
-    }
+    // 필터 가능한 모든 컬럼을 각각 드롭다운으로
+    var fcols=(def.columns||[]).filter(function(c){return c.filter;});
+    var anyActive=false;
+    fcols.forEach(function(fc){
+      var fopts=_modFilterOpts(key,fc);
+      if(!fopts.length) return;
+      var cur=fcur[fc.key]||'';
+      if(cur) anyActive=true;
+      h+='<select onchange="_modSetFilter(\''+key+'\',\''+esc(fc.key)+'\',this.value)" style="padding:7px 10px;border:1px solid '+(cur?'#2563eb':'#d1d5db')+';border-radius:8px;font-size:13px;background:'+(cur?'#eff6ff':'#fff')+';color:#334155;font-weight:'+(cur?'700':'400')+'">';
+      h+='<option value="">'+esc(fc.label)+' 전체</option>';
+      fopts.forEach(function(o){
+        h+='<option value="'+esc(String(o.v))+'"'+(String(cur)===String(o.v)?' selected':'')+'>'+esc(o.l)+'</option>';
+      });
+      h+='</select>';
+    });
+    if(anyActive) h+='<button class="btn btn-s" style="font-size:11px" onclick="_modClearFilter(\''+key+'\')">필터 해제</button>';
     h+='</div>';
   }
 
@@ -178,7 +174,14 @@ function _modFilteredData(key){
       });
     });
   }
-  if(filter){
+  if(filter && typeof filter==='object'){
+    // 다중 필터 (모든 조건 AND)
+    Object.keys(filter).forEach(function(ck){
+      var fv=filter[ck]; if(fv==='') return;
+      data=data.filter(function(row){return String(row[ck]||'')===String(fv)});
+    });
+  } else if(filter){
+    // 레거시 단일 문자열 호환
     var fc=(def.columns||[]).find(function(c){return c.filter});
     if(fc) data=data.filter(function(row){return String(row[fc.key]||'')===filter});
   }
@@ -286,6 +289,23 @@ function _modSearchTyped(key,val){
   var b=document.getElementById('_modBody_'+key);
   if(b) b.innerHTML=_modListHtml(key);
 }
+
+// ─── 필터 (컬럼별 드롭다운, 다중 동시 적용) ───
+function _modFilterOpts(key,fc){
+  if(fc.type==='select') return (fc.options||[]).map(function(o){ return {v:typeof o==='object'?o.value:o, l:typeof o==='object'?o.label:o}; });
+  if(fc.type==='badge') return Object.keys(fc.badgeMap||{}).map(function(k){ return {v:k, l:(fc.badgeMap[k].label||k)}; });
+  // 그 외(텍스트 등) → 실제 데이터의 고유값 자동 수집
+  var seen={}, out=[];
+  (_modData[key]||[]).forEach(function(r){ var v=String(r[fc.key]||''); if(v&&!seen[v]){seen[v]=1;out.push({v:v,l:v});} });
+  out.sort(function(a,b){return String(a.l).localeCompare(String(b.l));});
+  return out;
+}
+function _modSetFilter(key,colKey,val){
+  if(!_modFilter[key]||typeof _modFilter[key]!=='object') _modFilter[key]={};
+  if(val==='') delete _modFilter[key][colKey]; else _modFilter[key][colKey]=val;
+  draw();
+}
+function _modClearFilter(key){ _modFilter[key]={}; draw(); }
 
 // ─── 명단 행 선택(체크박스) ───
 function _modSelToggle(ev,key,id,idx){
