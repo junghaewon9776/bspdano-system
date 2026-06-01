@@ -663,12 +663,18 @@ function saveModDef(keyOrNew){
       badgeMap:{'대기':{label:'대기',bg:'#fef3c7',color:'#d97706'},'선정':{label:'선정',bg:'#dcfce7',color:'#16a34a'},'탈락':{label:'탈락',bg:'#fee2e2',color:'#dc2626'}}});
   }
 
+  // 파일첨부 컬럼이 있으면 현재 행사 Drive URL을 모듈 정의에 복사
+  // (신청폼은 비로그인이라 evtData를 못 읽으므로 공개 경로 ModDefs에 저장)
+  var hasFileCol=cols.some(function(c){return c.type==='file'});
+  var driveUrl=hasFileCol ? ((typeof DRIVE_UPLOAD_URL!=='undefined' && DRIVE_UPLOAD_URL)||'') : '';
+
   var def={
     key:key, label:label, icon:icon,
     cat:'custom', catLabel:catLabel||'', catIcon:icon,
     fbPath:'Mod_'+key, global:global,
     columns:cols,
     formTitle:formTitle, formDesc:formDesc,
+    driveUploadUrl:driveUrl,
     features:{search:true,excel:true,applyForm:applyForm}
   };
 
@@ -750,16 +756,9 @@ function renderModApplyForm(key,evtId){
     var def=null; for(var i=0;i<defs.length;i++){if(defs[i]&&defs[i].key===key){def=defs[i];break}}
     if(!def){ document.getElementById('modApplyCard').innerHTML='<div style="text-align:center;color:#64748b;padding:20px">신청폼을 찾을 수 없습니다</div>'; return; }
     if(!(def.features&&def.features.applyForm)){ document.getElementById('modApplyCard').innerHTML='<div style="text-align:center;color:#64748b;padding:20px">이 모듈은 공개 신청을 받지 않습니다</div>'; return; }
-    // 파일첨부 컬럼이 있으면 Drive 업로드 URL 로드 (비로그인)
-    var hasFile=(def.columns||[]).some(function(c){return c.type==='file'&&!c.adminOnly});
-    if(hasFile && evtId && typeof api==='function'){
-      api('getApplyConfig',{evtId:evtId}).then(function(cfg){
-        if(cfg&&cfg.driveUploadUrl){ try{DRIVE_UPLOAD_URL=cfg.driveUploadUrl;}catch(e){} }
-        _renderModApplyUI(def,evtId);
-      }).catch(function(){ _renderModApplyUI(def,evtId); });
-    } else {
-      _renderModApplyUI(def,evtId);
-    }
+    // 파일첨부용 Drive URL — 모듈 정의에 저장된 값 사용 (비로그인은 evtData 접근 불가)
+    if(def.driveUploadUrl){ try{ DRIVE_UPLOAD_URL=def.driveUploadUrl; }catch(e){} }
+    _renderModApplyUI(def,evtId);
   }).catch(function(e){ document.getElementById('modApplyCard').innerHTML='<div style="text-align:center;color:#ef4444">오류: '+esc(e.message)+'</div>'; });
 }
 
