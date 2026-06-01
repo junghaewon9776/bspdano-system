@@ -1470,6 +1470,85 @@ function _saveModLabelOpt(key,opt){
   }catch(e){}
 }
 
+// ─── 라벨 프리셋 (커스텀 규격: 크기·여백·표시항목·배치 통째 저장) ───
+function _mlPresets(key){
+  try{ var s=localStorage.getItem('modLabelPresets_'+key); if(s) return JSON.parse(s)||[]; }catch(e){}
+  return [];
+}
+function _mlSavePresets(key,arr){ try{ localStorage.setItem('modLabelPresets_'+key, JSON.stringify(arr)); }catch(e){} }
+function _mlPresetOptions(key){
+  return _mlPresets(key).map(function(p,i){ return '<option value="'+i+'">'+esc(p.name||('프리셋'+(i+1)))+(p.mode==='a4'?' (A4)':' (낱장)')+'</option>'; }).join('');
+}
+function _mlRefreshPresetSelect(key,selIdx){
+  var sel=document.getElementById('ml_preset'); if(!sel) return;
+  sel.innerHTML='<option value="">— 직접 설정 —</option>'+_mlPresetOptions(key);
+  if(selIdx!=null) sel.value=String(selIdx);
+}
+// 현재 설정을 프리셋 객체로
+function _mlCurrentPreset(name){
+  var opt=_modLabelReadOpt();
+  return {
+    name:name, mode:opt.mode,
+    w:opt.w,h:opt.h,pt:opt.pt,pr:opt.pr,pb:opt.pb,pl:opt.pl,
+    gap:opt.gap,sheetMargin:opt.sheetMargin,border:opt.border,qr:opt.qr,orientation:opt.orientation,
+    titleKey:opt.titleKey, fields:opt.fields, layout:opt.layout
+  };
+}
+function _mlPresetSaveNew(){
+  var key=window.__modLabelKey; if(!key) return;
+  var name=(prompt('프리셋 이름을 입력하세요 (예: 100x30 라벨)','')||'').trim();
+  if(!name) return;
+  var arr=_mlPresets(key);
+  arr.push(_mlCurrentPreset(name));
+  _mlSavePresets(key,arr);
+  _mlRefreshPresetSelect(key, arr.length-1);
+  toast('프리셋 "'+name+'" 저장됨');
+}
+function _mlPresetUpdate(){
+  var key=window.__modLabelKey; if(!key) return;
+  var sel=document.getElementById('ml_preset'); if(!sel||sel.value==='') return toast('수정할 프리셋을 먼저 선택하세요',true);
+  var arr=_mlPresets(key); var i=pn(sel.value); if(!arr[i]) return;
+  var name=arr[i].name;
+  if(!confirm('"'+name+'" 프리셋을 현재 설정으로 덮어쓸까요?')) return;
+  arr[i]=_mlCurrentPreset(name);
+  _mlSavePresets(key,arr);
+  toast('프리셋 "'+name+'" 수정됨');
+}
+function _mlPresetDelete(){
+  var key=window.__modLabelKey; if(!key) return;
+  var sel=document.getElementById('ml_preset'); if(!sel||sel.value==='') return toast('삭제할 프리셋을 선택하세요',true);
+  var arr=_mlPresets(key); var i=pn(sel.value); if(!arr[i]) return;
+  if(!confirm('"'+arr[i].name+'" 프리셋을 삭제할까요?')) return;
+  arr.splice(i,1);
+  _mlSavePresets(key,arr);
+  _mlRefreshPresetSelect(key, '');
+  toast('삭제됨');
+}
+function _mlPresetLoad(){
+  var key=window.__modLabelKey; if(!key) return;
+  var sel=document.getElementById('ml_preset'); if(!sel||sel.value==='') return toast('불러올 프리셋을 선택하세요',true);
+  var arr=_mlPresets(key); var p=arr[pn(sel.value)]; if(!p) return;
+  var mode=p.mode||'label';
+  window.__mlMode=mode;
+  if(!window.__mlSizes) window.__mlSizes={};
+  window.__mlSizes[mode]=Object.assign(window.__mlSizes[mode]||{},{
+    w:p.w,h:p.h,pt:p.pt,pr:p.pr,pb:p.pb,pl:p.pl,gap:p.gap,sheetMargin:p.sheetMargin,border:p.border,qr:p.qr,orientation:p.orientation
+  });
+  // 모드 UI 토글
+  document.querySelectorAll('.ml_mode_opt').forEach(function(el){
+    var on=el.querySelector('input').value===mode;
+    el.style.borderColor=on?'#6366f1':'#cbd5e1'; el.style.background=on?'#eef2ff':'#fff'; el.querySelector('input').checked=on;
+  });
+  var a4=document.getElementById('ml_a4opts'); if(a4) a4.style.display=(mode==='a4')?'block':'none';
+  _mlSetSizeInputs(window.__mlSizes[mode]);
+  var t=document.getElementById('ml_title'); if(t&&p.titleKey) t.value=p.titleKey;
+  document.querySelectorAll('.ml_field').forEach(function(cb){ cb.checked = p.fields ? (p.fields.indexOf(cb.value)>=0) : true; });
+  if(p.layout) _saveModLabelLayout(key, mode, p.layout);
+  else { try{ localStorage.removeItem('modLabelLayout_'+key+'_'+mode); }catch(e){} }
+  _modLabelPreview();
+  toast('프리셋 "'+p.name+'" 적용');
+}
+
 // QR이 가리킬 조회 URL (스캔 시 그 항목 정보 페이지)
 function _modViewUrl(def,row){
   var base=location.href.split('?')[0];
@@ -1479,8 +1558,12 @@ function _modViewUrl(def,row){
 function _modPlain(c,v){ if(c.type==='number'&&c.comma) return Number(v).toLocaleString(); return String(v); }
 
 function _modLabelHtml(def,row,opt){
-  var cols=(def.columns||[]).filter(function(c){return !c.adminOnly&&c.key!=='status'&&!c.hideTable&&c.type!=='file'&&c.type!=='consent'});
-  if(opt.fields&&opt.fields.length) cols=cols.filter(function(c){return opt.fields.indexOf(c.key)>=0;});
+  var allc=(def.columns||[]).filter(function(c){return !c.adminOnly&&c.key!=='status'&&!c.hideTable&&c.type!=='file'&&c.type!=='consent'});
+  var hasFields=!!(opt.fields&&opt.fields.length);
+  var cols=hasFields ? allc.filter(function(c){return opt.fields.indexOf(c.key)>=0;}) : allc;
+  // 표시 여부: 항목 체크가 있으면 그에 따름. 제목/ QR도 동일하게 제어
+  var showTitle = !hasFields || opt.fields.indexOf(opt.titleKey)>=0;
+  var showQr = !hasFields || opt.fields.indexOf('_qr')>=0;
   var url=_modViewUrl(def,row);
   var qr='https://api.qrserver.com/v1/create-qr-code/?size=160x160&margin=0&data='+encodeURIComponent(url);
   var titleV = opt.titleKey ? (row[opt.titleKey]||'') : (cols[0]?row[cols[0].key]:'');
@@ -1491,10 +1574,14 @@ function _modLabelHtml(def,row,opt){
   if(layout && layout.mode==='free' && layout.pos){
     var pos=layout.pos;
     var h='<div class="mlabel" style="width:'+opt.w+'mm;height:'+opt.h+'mm;position:relative;box-sizing:border-box;overflow:hidden">';
-    var qp=pos['_qr']||{x:70,y:4,w:25};
-    h+='<img src="'+qr+'" style="position:absolute;left:'+qp.x+'%;top:'+qp.y+'%;width:'+(qp.w||25)+'mm;height:'+(qp.w||25)+'mm">';
-    var tp=pos['_title']||{x:4,y:4,fs:14};
-    h+='<div style="position:absolute;left:'+tp.x+'%;top:'+tp.y+'%;font-size:'+(tp.fs||14)+'pt;font-weight:800;line-height:1.1;white-space:nowrap">'+esc(String(titleV))+'</div>';
+    if(showQr){
+      var qp=pos['_qr']||{x:70,y:4,w:25};
+      h+='<img src="'+qr+'" style="position:absolute;left:'+qp.x+'%;top:'+qp.y+'%;width:'+(qp.w||25)+'mm;height:'+(qp.w||25)+'mm">';
+    }
+    if(showTitle){
+      var tp=pos['_title']||{x:4,y:4,fs:14};
+      h+='<div style="position:absolute;left:'+tp.x+'%;top:'+tp.y+'%;font-size:'+(tp.fs||14)+'pt;font-weight:800;line-height:1.1;white-space:nowrap">'+esc(String(titleV))+'</div>';
+    }
     cols.forEach(function(c){
       if(c.key===opt.titleKey) return;
       var v=row[c.key]; if(v==null||v==='') return;
@@ -1507,14 +1594,14 @@ function _modLabelHtml(def,row,opt){
   }
   var h='<div class="mlabel" style="width:'+opt.w+'mm;height:'+opt.h+'mm;padding:'+opt.pt+'mm '+opt.pr+'mm '+opt.pb+'mm '+opt.pl+'mm;box-sizing:border-box;display:flex;gap:2mm;overflow:hidden">';
   h+='<div style="flex:1;min-width:0;overflow:hidden">';
-  h+='<div style="font-size:14pt;font-weight:800;line-height:1.1;margin-bottom:1mm;word-break:break-all">'+esc(String(titleV))+'</div>';
+  if(showTitle) h+='<div style="font-size:14pt;font-weight:800;line-height:1.1;margin-bottom:1mm;word-break:break-all">'+esc(String(titleV))+'</div>';
   cols.forEach(function(c){
     if(c.key===opt.titleKey) return;
     var v=row[c.key]; if(v==null||v==='') return;
     h+='<div style="font-size:7.5pt;line-height:1.3;color:#222"><b>'+esc(c.label)+'</b> '+esc(_modPlain(c,v))+'</div>';
   });
   h+='</div>';
-  h+='<img src="'+qr+'" style="width:'+qrmm+'mm;height:'+qrmm+'mm;align-self:flex-start;flex-shrink:0">';
+  if(showQr) h+='<img src="'+qr+'" style="width:'+qrmm+'mm;height:'+qrmm+'mm;align-self:flex-start;flex-shrink:0">';
   h+='</div>';
   return h;
 }
@@ -1535,11 +1622,21 @@ function popModLabel(key,singleId,idsList){
   window.__mlSizes = JSON.parse(JSON.stringify(opt.sizes||{})); // 모드별 크기 작업 사본
   var allCols=(def.columns||[]).filter(function(c){return !c.adminOnly&&c.key!=='status'&&!c.hideTable&&c.type!=='file'&&c.type!=='consent'});
   var fieldOpts=allCols.map(function(c){return '<option value="'+esc(c.key)+'"'+(opt.titleKey===c.key?' selected':'')+'>'+esc(c.label)+'</option>';}).join('');
-  var checkedFields=(opt.fields&&opt.fields.length)?opt.fields:allCols.map(function(c){return c.key;});
+  var checkedFields=(opt.fields&&opt.fields.length)?opt.fields:allCols.map(function(c){return c.key;}).concat(['_qr']);
   var isA4=(opt.mode==='a4');
 
   var h='<div class="pop-head"><h3>🖨 '+esc(def.label)+' 라벨 출력</h3></div>';
   h+='<div style="padding:14px;max-height:78vh;overflow:auto">';
+
+  // ── 라벨 프리셋 (커스텀 규격 저장/불러오기) ──
+  h+='<div style="display:flex;gap:6px;align-items:center;margin-bottom:12px;flex-wrap:wrap;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px">';
+  h+='<span style="font-size:12px;font-weight:700;color:#475569">📐 프리셋</span>';
+  h+='<select id="ml_preset" style="flex:1;min-width:140px;padding:6px 8px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px"><option value="">— 직접 설정 —</option>'+_mlPresetOptions(key)+'</select>';
+  h+='<button class="btn btn-s" style="background:#6366f1;color:#fff;font-size:11px" onclick="_mlPresetLoad()">불러오기</button>';
+  h+='<button class="btn btn-s" style="font-size:11px" onclick="_mlPresetSaveNew()">+ 새로 저장</button>';
+  h+='<button class="btn btn-s" style="font-size:11px" onclick="_mlPresetUpdate()">수정저장</button>';
+  h+='<button class="btn btn-s" style="color:#dc2626;font-size:11px" onclick="_mlPresetDelete()">삭제</button>';
+  h+='</div>';
 
   // ── 출력 방식 선택 ──
   h+='<div style="display:flex;gap:8px;margin-bottom:12px">';
@@ -1579,6 +1676,8 @@ function popModLabel(key,singleId,idsList){
   allCols.forEach(function(c){
     h+='<label style="font-size:12px;display:flex;align-items:center;gap:3px;background:#f1f5f9;padding:3px 8px;border-radius:6px"><input type="checkbox" class="ml_field" value="'+esc(c.key)+'"'+(checkedFields.indexOf(c.key)>=0?' checked':'')+' onchange="_modLabelPreview()"> '+esc(c.label)+'</label>';
   });
+  // QR 코드 표시 항목 (작은 라벨에선 끌 수 있게)
+  h+='<label style="font-size:12px;display:flex;align-items:center;gap:3px;background:#ede9fe;padding:3px 8px;border-radius:6px;font-weight:700;color:#6d28d9"><input type="checkbox" class="ml_field" value="_qr"'+(checkedFields.indexOf('_qr')>=0?' checked':'')+' onchange="_modLabelPreview()"> ▣ QR코드</label>';
   h+='</div></div>';
 
   // ── 출력 대상 선택 (체크 / 전체선택·해제 / Shift 범위 / 상태별) ──
