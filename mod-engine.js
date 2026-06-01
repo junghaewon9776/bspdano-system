@@ -534,6 +534,9 @@ function popModDef(keyOrIdx){
   h+='<input id="mdf_formTitle" value="'+esc(def.formTitle||"")+'" placeholder="비우면 「'+esc(def.label||"모듈명")+' 신청」">';
   h+='<label style="font-size:12px;font-weight:700;color:#64748b">신청폼 안내문</label>';
   h+='<input id="mdf_formDesc" value="'+esc(def.formDesc||"")+'" placeholder="예: 아래 내용을 작성 후 신청해 주세요">';
+  h+='<label style="font-size:12px;font-weight:700;color:#64748b">파일 업로드 URL</label>';
+  var _curDrive=def.driveUploadUrl||(typeof DRIVE_UPLOAD_URL!=='undefined'?DRIVE_UPLOAD_URL:'')||'';
+  h+='<div><input id="mdf_driveUrl" value="'+esc(_curDrive)+'" placeholder="파일첨부 컬럼 쓸 때만 — 신청 설정의 Drive URL 붙여넣기" style="width:100%;font-family:monospace;font-size:11px"><div style="font-size:10px;color:#94a3b8;margin-top:2px">신청폼에서 파일첨부를 받으려면 필요 (참가신청 설정의 📤 Drive 업로드 URL과 동일한 값)</div></div>';
   h+='</div>';
 
   // 컬럼 섹션
@@ -663,10 +666,10 @@ function saveModDef(keyOrNew){
       badgeMap:{'대기':{label:'대기',bg:'#fef3c7',color:'#d97706'},'선정':{label:'선정',bg:'#dcfce7',color:'#16a34a'},'탈락':{label:'탈락',bg:'#fee2e2',color:'#dc2626'}}});
   }
 
-  // 파일첨부 컬럼이 있으면 현재 행사 Drive URL을 모듈 정의에 복사
+  // 파일첨부용 Drive URL — 입력칸 값 우선, 없으면 현재 행사 로드값
   // (신청폼은 비로그인이라 evtData를 못 읽으므로 공개 경로 ModDefs에 저장)
-  var hasFileCol=cols.some(function(c){return c.type==='file'});
-  var driveUrl=hasFileCol ? ((typeof DRIVE_UPLOAD_URL!=='undefined' && DRIVE_UPLOAD_URL)||'') : '';
+  var driveInput=((document.getElementById('mdf_driveUrl')||{}).value||'').trim();
+  var driveUrl=driveInput || ((typeof DRIVE_UPLOAD_URL!=='undefined' && DRIVE_UPLOAD_URL)||'');
 
   var def={
     key:key, label:label, icon:icon,
