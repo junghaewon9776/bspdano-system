@@ -345,12 +345,20 @@ function _modFormField(col,val){
     case 'textarea':
       return '<textarea id="'+id+'" rows="3" style="'+_w+'resize:vertical"'+ph+'>'+ev+'</textarea>';
     case 'select':
-      var h='<select id="'+id+'" style="'+_w+'"><option value="">— 선택 —</option>';
-      (col.options||[]).forEach(function(o){
+      var _sopts=col.options||[];
+      var _inList=false;
+      var _etcId=id+'_etc';
+      var h='<select id="'+id+'" style="'+_w+'" onchange="var _e=document.getElementById(\''+_etcId+'\');if(_e)_e.style.display=(this.value===\'__etc__\')?\'block\':\'none\'"><option value="">— 선택 —</option>';
+      _sopts.forEach(function(o){
         var ov=typeof o==='object'?o.value:o, ol=typeof o==='object'?o.label:o;
-        h+='<option value="'+esc(ov)+'"'+(ov==val?' selected':'')+'>'+esc(ol)+'</option>';
+        if(String(ov)===String(val)) _inList=true;
+        h+='<option value="'+esc(ov)+'"'+(String(ov)==String(val)?' selected':'')+'>'+esc(ol)+'</option>';
       });
-      return h+'</select>';
+      var _etcOn=(!_inList && val!=null && val!=='');
+      h+='<option value="__etc__"'+(_etcOn?' selected':'')+'>+ 직접 입력</option>';
+      h+='</select>';
+      h+='<input id="'+_etcId+'" placeholder="직접 입력" value="'+(_etcOn?ev:'')+'" style="'+_w+'margin-top:4px;display:'+(_etcOn?'block':'none')+'">';
+      return h;
     case 'badge':
       var h='<select id="'+id+'" style="'+_w+'"><option value="">— 선택 —</option>';
       if(col.badgeMap) Object.keys(col.badgeMap).forEach(function(k){
@@ -409,6 +417,7 @@ function modSave(key,editId){
       return;
     }
     var v=(el.value||"").trim();
+    if(c.type==='select'&&v==='__etc__'){ var _et=document.getElementById('mod_f_'+c.key+'_etc'); v=_et?(_et.value||'').trim():''; }
     if(c.type==='number'&&c.comma) v=v.replace(/,/g,'');
     if(c.type==='number'&&v) v=Number(v);
     if(c.required&&!v&&v!==0){ toast(c.label+'을(를) 입력하세요',true); valid=false; }
@@ -851,6 +860,7 @@ function submitModApply(){
       return;
     }
     var v=(el.value||'').trim();
+    if(c.type==='select'&&v==='__etc__'){ var _et=document.getElementById('mod_f_'+c.key+'_etc'); v=_et?(_et.value||'').trim():''; }
     if(c.type==='number'&&c.comma) v=v.replace(/,/g,'');
     if(c.type==='number'&&v) v=Number(v);
     if(c.required&&!v&&v!==0){ valid=false; if(!firstBad)firstBad=c.label+'을(를) 입력하세요'; }
