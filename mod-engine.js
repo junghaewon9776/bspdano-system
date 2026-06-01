@@ -17,6 +17,13 @@ var MOD_DEFS_LOADED=false;
 function _modId(){return 'm'+Date.now().toString(36)+Math.random().toString(36).slice(2,6)}
 // 현재 처리자(로그인 사용자) 이름/아이디
 function _modActor(){ try{ return (typeof ME!=='undefined'&&ME)?(ME.nm||ME.id||''):''; }catch(e){ return ''; } }
+// ISO 타임스탬프 → 로컬(KST) "YYYY-MM-DD HH:MM"
+function _modFmtDateTime(iso){
+  if(!iso) return '';
+  var d=new Date(iso); if(isNaN(d.getTime())) return String(iso).slice(0,16).replace('T',' ');
+  var p=function(n){return n<10?'0'+n:''+n;};
+  return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes());
+}
 // 행 대표 제목(첫 표시 컬럼 값)
 function _modRowTitle(def,row){
   var c=(def.columns||[]).filter(function(x){return !x.adminOnly&&x.key!=='status'&&!x.hideTable;})[0];
@@ -2350,13 +2357,13 @@ function _renderModViewUI(def,row){
   var statusCol=(def.columns||[]).find(function(c){return c.key==='status'&&c.type==='badge'});
   if(statusCol && row.status && statusCol.badgeMap && statusCol.badgeMap[row.status]){
     var bm=statusCol.badgeMap[row.status];
-    h+='<div style="text-align:center;margin-bottom:14px"><span style="padding:6px 18px;border-radius:20px;font-size:15px;font-weight:800;background:'+(bm.bg||'#e2e8f0')+';color:'+(bm.color||'#475569')+'">'+esc(bm.label||row.status)+'</span>';
-    if(row._statusByName){
-      var atd=row._statusAt?(' · '+String(row._statusAt).slice(0,10)):'';
-      h+='<div style="font-size:11px;color:#94a3b8;margin-top:5px">처리: '+esc(row._statusByName)+esc(atd)+'</div>';
-    }
-    h+='</div>';
+    h+='<div style="text-align:center;margin-bottom:8px"><span style="padding:6px 18px;border-radius:20px;font-size:15px;font-weight:800;background:'+(bm.bg||'#e2e8f0')+';color:'+(bm.color||'#475569')+'">'+esc(bm.label||row.status)+'</span></div>';
   }
+  // 처리자 / 발행자 (회색)
+  var meta='';
+  if(row._statusByName) meta+='<div>승인처리자: <b style="color:#475569">'+esc(row._statusByName)+'</b>'+(row._statusAt?' · '+esc(_modFmtDateTime(row._statusAt)):'')+'</div>';
+  if(row._printByName) meta+='<div>라벨발행자: <b style="color:#475569">'+esc(row._printByName)+'</b>'+(row._printedAt?' · '+esc(_modFmtDateTime(row._printedAt)):'')+'</div>';
+  if(meta) h+='<div style="text-align:center;font-size:11px;color:#94a3b8;margin-bottom:14px;line-height:1.7">'+meta+'</div>';
 
   h+='<table style="width:100%;border-collapse:collapse;font-size:14px">';
   (def.columns||[]).forEach(function(c){
