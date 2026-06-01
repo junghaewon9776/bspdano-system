@@ -218,6 +218,7 @@ function _modListHtml(key){
     h+='<div id="_modSelBar_'+key+'" style="display:'+(selCount?'flex':'none')+';align-items:center;gap:8px;flex-wrap:wrap;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:8px 12px;margin-bottom:8px">';
     h+='<b style="color:#2563eb;font-size:13px"><span id="_modSelCnt_'+key+'">'+selCount+'</span>개 선택</b>';
     h+='<button class="btn btn-s" style="background:#475569;color:#fff" onclick="popModLabelSel(\''+key+'\')">🖨 라벨 출력</button>';
+    if((def.columns||[]).some(function(c){return c.type==='tel';})) h+='<button class="btn btn-s" style="background:#8b5cf6;color:#fff" onclick="popModSmsSel(\''+key+'\')">💬 문자 발송</button>';
     if(statusCol){
       Object.keys(statusCol.badgeMap||{}).forEach(function(sk){
         if(sk==='대기') return;
@@ -601,13 +602,14 @@ function modExportExcel(key){
   var def=_modDefs[key]; if(!def) return;
   var data=_modData[key]||[];
   var cols=(def.columns||[]).filter(function(c){return !c.hideTable});
-  var rows=[cols.map(function(c){return c.label})];
+  // 첫 열은 고유번호(QR id) — 다시 가져올 때 기존 행을 식별/업데이트하기 위함
+  var rows=[['고유번호'].concat(cols.map(function(c){return c.label}))];
   data.forEach(function(row){
-    rows.push(cols.map(function(c){
+    rows.push([row._id||''].concat(cols.map(function(c){
       var v=row[c.key]; if(v==null) return '';
       if(c.type==='badge'&&c.badgeMap&&c.badgeMap[v]) return c.badgeMap[v].label||v;
       return v;
-    }));
+    })));
   });
   if(typeof XLSX!=='undefined'){
     var wb=XLSX.utils.book_new();
@@ -816,6 +818,9 @@ function _mshImportAoa(key, aoa){
   aoa=(aoa||[]).filter(function(r){ return r&&r.some(function(v){return String(v).trim()!==''; }); });
   if(aoa.length<2) return toast('데이터가 없습니다 (첫 행=제목, 둘째 행부터 데이터)',true);
   var header=aoa[0].map(function(s){return String(s).trim();});
+  // "고유번호" 열 위치 (있으면 그 행은 기존 데이터 업데이트, 비었으면 신규)
+  var idCol=-1;
+  header.forEach(function(hl,i){ if(hl==='고유번호'||hl==='_id'||hl==='QR번호') idCol=i; });
   // 헤더 라벨 → 컬럼 인덱스 매핑
   var colMap=header.map(function(hLabel){
     for(var i=0;i<cols.length;i++){ if(cols[i].label===hLabel||cols[i].key===hLabel) return cols[i]; }
@@ -823,27 +828,47 @@ function _mshImportAoa(key, aoa){
   });
   var matched=colMap.filter(Boolean).length;
   if(!matched) return toast('일치하는 컬럼명이 없습니다. 제목 행이 "'+cols.map(function(c){return c.label;}).join(', ')+'" 와 같아야 합니다',true);
-  var newRows=[];
+
+  // 기존 데이터 (고유번호로 찾기)
+  var data=(_modData[key]||[]).slice();
+  var byId={}; data.forEach(function(r,i){ if(r._id) byId[r._id]=i; });
+  var now=new Date().toISOString();
+  var nNew=0, nUpd=0, nMiss=0;
+
   for(var r=1;r<aoa.length;r++){
-    var obj={}, anyVal=false;
+    var fields={}, anyVal=false;
     colMap.forEach(function(c,ci){
       if(!c) return;
       var v=String(aoa[r][ci]==null?'':aoa[r][ci]).trim();
       if(v!=='') anyVal=true;
       if(c.type==='number'){ v=v.replace(/,/g,''); if(v!=='') v=Number(v); }
       else if(c.type==='badge') v=_mshBadgeToKey(c,v);
-      obj[c.key]=v;
+      fields[c.key]=v;
     });
-    if(anyVal){ obj._id=_modId(); obj._createdAt=new Date().toISOString(); newRows.push(obj); }
+    if(!anyVal) continue;
+    var rid = idCol>=0 ? String(aoa[r][idCol]==null?'':aoa[r][idCol]).trim() : '';
+    if(rid && byId[rid]!=null){
+      // 기존 행 업데이트 (고유번호·QR 유지)
+      var idx=byId[rid];
+      var merged={}; for(var k in data[idx]) merged[k]=data[idx][k];
+      for(var k2 in fields) merged[k2]=fields[k2];
+      merged._id=rid; merged._updatedAt=now;
+      data[idx]=merged; nUpd++;
+    } else {
+      if(rid) nMiss++; // 엑셀엔 번호 있는데 기존에 없음 → 신규로 처리
+      fields._id=_modId(); fields._createdAt=now; data.push(fields); nNew++;
+    }
   }
-  if(!newRows.length) return toast('가져올 데이터 행이 없습니다',true);
-  var existing=(_modData[key]||[]).length;
-  var msg='엑셀에서 '+newRows.length+'행을 읽었습니다.\n\n[확인] 기존 '+existing+'행 뒤에 추가\n[취소] 중단\n\n(기존 데이터를 전부 교체하려면 시트 편집에서 직접 지우세요)';
+  if(!nNew && !nUpd) return toast('가져올 데이터 행이 없습니다',true);
+  var msg='엑셀 가져오기 결과\n\n';
+  msg+='• 새로 추가: '+nNew+'행'+(nMiss?' (그중 '+nMiss+'행은 고유번호가 기존에 없어 신규 생성)':'')+'\n';
+  msg+='• 기존 업데이트: '+nUpd+'행 (고유번호/QR 유지)\n\n';
+  msg+=(idCol<0?'※ "고유번호" 열이 없어 모두 새로 추가됩니다.\n   (기존 행을 수정하려면 내보내기 파일의 고유번호 열을 그대로 두고 편집하세요)\n\n':'');
+  msg+='적용할까요?';
   if(!confirm(msg)) return;
   var path=_modFbPath(key);
-  var data=(_modData[key]||[]).slice().concat(newRows);
   showLoading('가져오는 중...');
-  fbDb.ref(path).set(data).then(function(){ hideLoading(); toast('✅ '+newRows.length+'행 가져옴'); })
+  fbDb.ref(path).set(data).then(function(){ hideLoading(); toast('✅ 신규 '+nNew+' / 수정 '+nUpd+'행 반영'); })
     .catch(function(e){ hideLoading(); toast('실패: '+(e.message||e),true); });
 }
 
@@ -1245,25 +1270,47 @@ function submitModApply(){
 // 문자(SMS) 발송 — 연락처 컬럼이 있는 모듈
 // ═══════════════════════════════════════════
 
-function popModSms(key){
+function popModSmsSel(key){
+  var ids=_modSelIds(key);
+  if(!ids.length) return toast('선택된 항목이 없습니다',true);
+  popModSms(key, ids);
+}
+function popModSms(key, preSelIds){
   var def=_modDefs[key]; if(!def) return;
   var telCol=(def.columns||[]).find(function(c){return c.type==='tel'});
   if(!telCol) return toast('연락처 컬럼이 없습니다',true);
   var hasStatus=(def.columns||[]).some(function(c){return c.key==='status'&&c.type==='badge'});
   window.__modSmsKey=key; window.__modSmsTelKey=telCol.key;
+  window.__modSmsPreSel=(preSelIds&&preSelIds.length)?preSelIds.slice():null;
+  window.__modSmsFilter={};
 
   var h='<div class="pop-head"><h3>💬 '+esc(def.label)+' 문자 발송</h3></div>';
   h+='<div style="padding:14px">';
-  // 대상 선택
-  h+='<label style="font-size:12px;font-weight:700;color:#64748b;display:block;margin-bottom:6px">발송 대상</label>';
-  h+='<select id="modSmsTarget" onchange="_modSmsCount()" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;margin-bottom:12px">';
-  h+='<option value="all">전체</option>';
-  if(hasStatus){
-    h+='<option value="선정" selected>선정된 항목만</option>';
-    h+='<option value="대기">대기 항목만</option>';
-    h+='<option value="notReject">탈락 제외</option>';
+  if(window.__modSmsPreSel){
+    // 명단에서 선택한 대상에게
+    h+='<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:13px;color:#2563eb;font-weight:700">📋 명단에서 선택한 '+window.__modSmsPreSel.length+'명에게 발송</div>';
+  } else {
+    // 대상 선택 (상태 + 필터)
+    h+='<label style="font-size:12px;font-weight:700;color:#64748b;display:block;margin-bottom:6px">발송 대상</label>';
+    h+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">';
+    if(hasStatus){
+      h+='<select id="modSmsTarget" onchange="_modSmsCount()" style="flex:1;min-width:130px;padding:8px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px">';
+      h+='<option value="all">상태 전체</option>';
+      h+='<option value="선정" selected>선정된 항목만</option>';
+      h+='<option value="대기">대기 항목만</option>';
+      h+='<option value="notReject">탈락 제외</option>';
+      h+='</select>';
+    }
+    // 필터 가능한 모든 컬럼 드롭다운 (status 컬럼 제외)
+    (def.columns||[]).filter(function(c){return c.filter && c.key!=='status';}).forEach(function(fc){
+      var fopts=_modFilterOpts(key,fc); if(!fopts.length) return;
+      h+='<select onchange="_modSmsSetFilter(\''+esc(fc.key)+'\',this.value)" style="flex:1;min-width:130px;padding:8px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px">';
+      h+='<option value="">'+esc(fc.label)+' 전체</option>';
+      fopts.forEach(function(o){ h+='<option value="'+esc(String(o.v))+'">'+esc(o.l)+'</option>'; });
+      h+='</select>';
+    });
+    h+='</div>';
   }
-  h+='</select>';
   // 본문
   h+='<label style="font-size:12px;font-weight:700;color:#64748b;display:block;margin-bottom:6px">메시지 내용</label>';
   h+='<textarea id="modSmsBody" rows="5" placeholder="예: [법성포단오제] 푸드트럭 입점 선정 안내드립니다. ..." style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;resize:vertical;box-sizing:border-box"></textarea>';
@@ -1276,14 +1323,31 @@ function popModSms(key){
   openPopup(h,460);
   setTimeout(_modSmsCount,50);
 }
+function _modSmsSetFilter(colKey,val){
+  if(!window.__modSmsFilter) window.__modSmsFilter={};
+  if(val==='') delete window.__modSmsFilter[colKey]; else window.__modSmsFilter[colKey]=val;
+  _modSmsCount();
+}
 
 function _modSmsTargetRows(){
-  var key=window.__modSmsKey, telKey=window.__modSmsTelKey;
-  var tgt=(document.getElementById('modSmsTarget')||{}).value||'all';
+  var key=window.__modSmsKey;
   var rows=(_modData[key]||[]).slice();
-  if(tgt==='all') return rows;
-  if(tgt==='notReject') return rows.filter(function(r){return r.status!=='탈락'});
-  return rows.filter(function(r){return r.status===tgt});
+  // 명단 선택분이면 그것만
+  if(window.__modSmsPreSel){
+    var sel=window.__modSmsPreSel;
+    return rows.filter(function(r){return sel.indexOf(r._id)>=0;});
+  }
+  // 상태 필터
+  var tgt=(document.getElementById('modSmsTarget')||{}).value||'all';
+  if(tgt==='notReject') rows=rows.filter(function(r){return r.status!=='탈락'});
+  else if(tgt!=='all') rows=rows.filter(function(r){return r.status===tgt});
+  // 컬럼 필터 (다중 AND)
+  var f=window.__modSmsFilter||{};
+  Object.keys(f).forEach(function(ck){
+    if(f[ck]==='') return;
+    rows=rows.filter(function(r){return String(r[ck]||'')===String(f[ck]);});
+  });
+  return rows;
 }
 function _modSmsCount(){
   var telKey=window.__modSmsTelKey;
