@@ -1375,16 +1375,57 @@ function modSmsSend(){
 // 라벨 출력 (QR 포함) + 출력 카운팅
 // ═══════════════════════════════════════════
 
+// 모드별 기본 크기 — 낱장은 크게, A4 모아찍기는 작게
+var _MODLBL_DEFAULTS={
+  label:{w:90,h:50,pt:4,pr:4,pb:4,pl:4,gap:0,sheetMargin:0,border:false},
+  a4:{w:50,h:30,pt:2,pr:2,pb:2,pl:2,gap:2,sheetMargin:10,border:true}
+};
+// 모드별 크기 세트 로드 (+ 구버전 평면 구조 마이그레이션)
+function _modLabelSizes(key){
+  var sz={label:Object.assign({},_MODLBL_DEFAULTS.label), a4:Object.assign({},_MODLBL_DEFAULTS.a4)};
+  try{
+    var s=localStorage.getItem('modLabelOpt_'+key);
+    if(s){
+      var o=JSON.parse(s);
+      if(o.sizes){
+        if(o.sizes.label) sz.label=Object.assign(sz.label,o.sizes.label);
+        if(o.sizes.a4)    sz.a4=Object.assign(sz.a4,o.sizes.a4);
+      } else if(o.w!=null){
+        // 구버전: 평면 {w,h,...} → 그 당시 모드 슬롯으로 이전
+        var slot=(o.mode==='a4')?'a4':'label';
+        sz[slot]=Object.assign(sz[slot],{w:o.w,h:o.h,pt:o.pt,pr:o.pr,pb:o.pb,pl:o.pl});
+        if(o.mode==='a4'){ sz.a4.gap=o.gap; sz.a4.sheetMargin=o.sheetMargin; sz.a4.border=o.border; }
+      }
+    }
+  }catch(e){}
+  return sz;
+}
+// 모드별 배치(레이아웃) — 위치도 낱장/A4 완전 분리
+function _modLabelLayout(key,mode){
+  try{ var s=localStorage.getItem('modLabelLayout_'+key+'_'+mode); if(s) return JSON.parse(s); }catch(e){}
+  // 구버전(모드 무관 단일 레이아웃)은 낱장에만 승계
+  if(mode==='label'){ try{ var s2=localStorage.getItem('modLabelLayout_'+key); if(s2) return JSON.parse(s2); }catch(e){} }
+  return null;
+}
+function _saveModLabelLayout(key,mode,layout){ try{ localStorage.setItem('modLabelLayout_'+key+'_'+mode, JSON.stringify(layout)); }catch(e){} }
+
 function _modLabelOpt(key){
   var def=_modDefs[key]||{};
-  var d={w:90,h:50,pt:4,pr:4,pb:4,pl:4,titleKey:'',mode:'label',gap:2,sheetMargin:10,border:false};
-  try{ var s=localStorage.getItem('modLabelOpt_'+key); if(s) d=Object.assign(d,JSON.parse(s)); }catch(e){}
-  if(!d.titleKey){ var c0=(def.columns||[]).filter(function(c){return !c.adminOnly&&c.key!=='status'&&!c.hideTable})[0]; d.titleKey=c0?c0.key:''; }
-  if(!d.mode) d.mode='label';
-  try{ var ly=localStorage.getItem('modLabelLayout_'+key); if(ly) d.layout=JSON.parse(ly); }catch(e){}
+  var mode='label', titleKey='', fields=null;
+  try{ var s=localStorage.getItem('modLabelOpt_'+key); if(s){ var o=JSON.parse(s); mode=o.mode||'label'; titleKey=o.titleKey||''; fields=o.fields||null; } }catch(e){}
+  if(!titleKey){ var c0=(def.columns||[]).filter(function(c){return !c.adminOnly&&c.key!=='status'&&!c.hideTable})[0]; titleKey=c0?c0.key:''; }
+  var sizes=_modLabelSizes(key);
+  var cur=sizes[mode]||sizes.label;
+  var d=Object.assign({mode:mode,titleKey:titleKey,fields:fields,sizes:sizes}, cur);
+  d.layout=_modLabelLayout(key,mode);
   return d;
 }
-function _saveModLabelOpt(key,opt){ try{ localStorage.setItem('modLabelOpt_'+key, JSON.stringify(opt)); }catch(e){} }
+function _saveModLabelOpt(key,opt){
+  try{
+    var save={mode:opt.mode,titleKey:opt.titleKey,fields:opt.fields,sizes:opt.sizes};
+    localStorage.setItem('modLabelOpt_'+key, JSON.stringify(save));
+  }catch(e){}
+}
 
 // QR이 가리킬 조회 URL (스캔 시 그 항목 정보 페이지)
 function _modViewUrl(def,row){
@@ -1445,6 +1486,8 @@ function popModLabel(key,singleId,idsList){
   window.__modLabelAll = rows;            // 후보 행 객체(순서 유지)
   window.__modLabelRows = rows.map(function(r){return r._id;});  // 미리보기용(첫 행)
   window.__mlPickLast = -1;
+  window.__mlMode = opt.mode||'label';    // 현재 출력 모드
+  window.__mlSizes = JSON.parse(JSON.stringify(opt.sizes||{})); // 모드별 크기 작업 사본
   var allCols=(def.columns||[]).filter(function(c){return !c.adminOnly&&c.key!=='status'&&!c.hideTable&&c.type!=='file'&&c.type!=='consent'});
   var fieldOpts=allCols.map(function(c){return '<option value="'+esc(c.key)+'"'+(opt.titleKey===c.key?' selected':'')+'>'+esc(c.label)+'</option>';}).join('');
   var checkedFields=(opt.fields&&opt.fields.length)?opt.fields:allCols.map(function(c){return c.key;});
@@ -1517,8 +1560,28 @@ function popModLabel(key,singleId,idsList){
   setTimeout(function(){ _modLabelPreview(); _mlUpdatePickCount(); },60);
 }
 
-// 출력 모드 전환
+// 입력칸 → 현재 모드 크기 슬롯에 동기화
+function _mlSyncSizeFromInputs(){
+  if(!window.__mlSizes||!window.__mlMode) return;
+  var g=function(id){ var e=document.getElementById(id); return e?(pn(e.value)||0):0; };
+  var s={w:g('ml_w')||90,h:g('ml_h')||50,pt:g('ml_pt'),pr:g('ml_pr'),pb:g('ml_pb'),pl:g('ml_pl')};
+  if(window.__mlMode==='a4'){ s.gap=g('ml_gap'); s.sheetMargin=g('ml_smargin'); s.border=!!(document.getElementById('ml_border')||{}).checked; }
+  window.__mlSizes[window.__mlMode]=Object.assign(window.__mlSizes[window.__mlMode]||{},s);
+}
+// 모드 크기 슬롯 → 입력칸 반영
+function _mlSetSizeInputs(sz){
+  sz=sz||{};
+  var set=function(id,v){ var e=document.getElementById(id); if(e) e.value=(v==null?'':v); };
+  set('ml_w',sz.w); set('ml_h',sz.h); set('ml_pt',sz.pt); set('ml_pr',sz.pr); set('ml_pb',sz.pb); set('ml_pl',sz.pl);
+  set('ml_gap',sz.gap); set('ml_smargin',sz.sheetMargin);
+  var b=document.getElementById('ml_border'); if(b) b.checked=!!sz.border;
+}
+// 출력 모드 전환 — 크기/여백/간격/배치를 모드별로 스왑
 function _mlSetMode(mode){
+  if(window.__mlMode===mode) return;
+  _mlSyncSizeFromInputs();                 // 현재 모드 입력값 보존
+  window.__mlMode=mode;
+  _mlSetSizeInputs((window.__mlSizes||{})[mode]); // 새 모드 크기 로드
   var a4=document.getElementById('ml_a4opts'); if(a4) a4.style.display=(mode==='a4')?'block':'none';
   document.querySelectorAll('.ml_mode_opt').forEach(function(el){
     var on=el.querySelector('input').value===mode;
@@ -1559,24 +1622,21 @@ function _mlSelectedIds(){
   return ids;
 }
 function _modLabelReadOpt(){
+  var key=window.__modLabelKey||'';
+  var mode=window.__mlMode||'label';
+  _mlSyncSizeFromInputs();
+  var sizes=window.__mlSizes||_modLabelSizes(key);
+  var cur=sizes[mode]||{};
   var fields=[];
   document.querySelectorAll('.ml_field:checked').forEach(function(el){ fields.push(el.value); });
-  var key=window.__modLabelKey||'';
-  var layout=_modLabelLayout(key);
-  var modeEl=document.querySelector('input[name="ml_mode"]:checked');
-  var gp=function(id,d){ var el=document.getElementById(id); return el?(pn(el.value)||0):d; };
-  return {
-    w:pn(document.getElementById('ml_w').value)||90,
-    h:pn(document.getElementById('ml_h').value)||50,
-    pt:gp('ml_pt',0), pr:gp('ml_pr',0), pb:gp('ml_pb',0), pl:gp('ml_pl',0),
-    titleKey:document.getElementById('ml_title').value,
+  var layout=_modLabelLayout(key,mode);
+  return Object.assign({
+    mode:mode,
+    titleKey:(document.getElementById('ml_title')||{}).value||'',
     fields:fields,
     layout:layout,
-    mode:modeEl?modeEl.value:'label',
-    gap:gp('ml_gap',2),
-    sheetMargin:gp('ml_smargin',10),
-    border:!!(document.getElementById('ml_border')||{}).checked
-  };
+    sizes:sizes
+  }, cur);
 }
 // A4 한 장에 들어가는 칸 수 계산 (210x297mm)
 function _mlA4Grid(opt){
@@ -1645,21 +1705,16 @@ function modBumpPrint(key,ids){
 // 라벨 배치 편집기 (드래그 자유 배치)
 // ═══════════════════════════════════════════
 
-function _modLabelLayout(key){
-  try{ var s=localStorage.getItem('modLabelLayout_'+key); if(s) return JSON.parse(s); }catch(e){}
-  return null;
-}
-function _saveModLabelLayout(key,layout){
-  try{ localStorage.setItem('modLabelLayout_'+key, JSON.stringify(layout)); }catch(e){}
-}
-
 function popModLabelLayout(key){
   var def=_modDefs[key]; if(!def) return;
   var opt=_modLabelOpt(key);
+  // 라벨 팝업이 열려있으면 그 모드/입력값을 우선 사용 (모드별 분리)
+  var mode=window.__mlMode||opt.mode||'label';
+  if(window.__mlMode && window.__mlSizes){ _mlSyncSizeFromInputs(); opt=Object.assign({},opt,window.__mlSizes[mode]||{}); }
   var allCols=(def.columns||[]).filter(function(c){return !c.adminOnly&&c.key!=='status'&&!c.hideTable&&c.type!=='file'&&c.type!=='consent'});
   var checkedFields=(opt.fields&&opt.fields.length)?opt.fields:allCols.map(function(c){return c.key;});
   var cols=allCols.filter(function(c){return checkedFields.indexOf(c.key)>=0;});
-  var existing=_modLabelLayout(key);
+  var existing=_modLabelLayout(key,mode);
   var pos=(existing&&existing.pos)?JSON.parse(JSON.stringify(existing.pos)):{};
   if(!pos['_qr']) pos['_qr']={x:70,y:4,w:25};
   if(!pos['_title']) pos['_title']={x:4,y:4,fs:14};
@@ -1668,12 +1723,13 @@ function popModLabelLayout(key){
     if(c.key===opt.titleKey) return;
     if(!pos[c.key]) { pos[c.key]={x:4,y:yOff,fs:7.5}; yOff+=10; }
   });
-  window.__mlLayout={key:key,def:def,opt:opt,cols:cols,pos:pos,dragging:null};
+  window.__mlLayout={key:key,def:def,opt:opt,mode:mode,cols:cols,pos:pos,dragging:null};
 
   var SCALE=5;
   var cW=opt.w*SCALE, cH=opt.h*SCALE;
 
-  var h='<div class="pop-head"><h3>📐 '+esc(def.label)+' 라벨 배치 편집</h3></div>';
+  var modeName=(mode==='a4')?'📄 A4용':'🏷 낱장용';
+  var h='<div class="pop-head"><h3>📐 '+esc(def.label)+' 라벨 배치 편집 <span style="font-size:12px;color:#6366f1;font-weight:700">('+modeName+' '+opt.w+'×'+opt.h+'mm)</span></h3></div>';
   h+='<div style="padding:14px;max-height:80vh;overflow:auto">';
   h+='<div style="font-size:12px;color:#64748b;margin-bottom:10px">요소를 드래그하여 위치를 조정하세요. 클릭하면 크기 조절 패널이 나타납니다.</div>';
   h+='<div style="display:flex;gap:14px;flex-wrap:wrap">';
@@ -1841,22 +1897,20 @@ function _mllReset(){
 
 function _mllClearLayout(){
   var L=window.__mlLayout; if(!L) return;
-  try{ localStorage.removeItem('modLabelLayout_'+L.key); }catch(e){}
+  try{ localStorage.removeItem('modLabelLayout_'+L.key+'_'+L.mode); }catch(e){}
   if(window.__mllCleanup) window.__mllCleanup();
   closePopup();
-  toast('자동 배치로 복원됨 — 라벨 출력 시 기본 레이아웃 사용');
+  toast('자동 배치로 복원됨 ('+(L.mode==='a4'?'A4용':'낱장용')+')');
+  popModLabel(L.key);
 }
 
 function _mllSave(){
   var L=window.__mlLayout; if(!L) return;
   var layout={mode:'free',pos:L.pos};
-  _saveModLabelLayout(L.key,layout);
-  var opt=_modLabelOpt(L.key);
-  opt.layout=layout;
-  _saveModLabelOpt(L.key,opt);
+  _saveModLabelLayout(L.key,L.mode,layout);
   if(window.__mllCleanup) window.__mllCleanup();
   closePopup();
-  toast('라벨 배치 저장됨');
+  toast('라벨 배치 저장됨 ('+(L.mode==='a4'?'A4용':'낱장용')+')');
   popModLabel(L.key);
 }
 
