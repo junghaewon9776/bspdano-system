@@ -490,6 +490,15 @@ function popModEdit(key,id){
 
 function _modFormField(col,val){
   var id='mod_f_'+col.key;
+  // 기본값: 빈 값이면 정의된 기본값으로 자동 채움
+  if((val==null||val==='') && col.defVal!=null && col.defVal!=='') val=col.defVal;
+  // 고정값: 수정 불가 — 값 표시 + hidden input(저장용)
+  if(col.fixed){
+    var fv=(val!=null&&val!=='')?String(val):(col.defVal||'');
+    var disp=fv;
+    if(col.type==='badge'&&col.badgeMap&&col.badgeMap[fv]) disp=col.badgeMap[fv].label||fv;
+    return '<input type="hidden" id="'+id+'" value="'+esc(fv)+'"><div style="padding:8px 10px;background:#eef2ff;border:1px solid #c7d2fe;border-radius:6px;color:#4338ca;font-size:13px;font-weight:600">🔒 '+esc(disp||'(값 없음)')+' <span style="font-size:10px;color:#818cf8;font-weight:400">고정</span></div>';
+  }
   var ev=esc(String(val==null?'':val));
   var ph=col.placeholder?' placeholder="'+esc(col.placeholder)+'"':'';
   var _w='width:100%;box-sizing:border-box;';  // 입력칸 너비 통일
@@ -1059,6 +1068,13 @@ function _renderModDefCols(){
     // 예시 문구(placeholder) — 텍스트 입력류만
     if(['text','tel','number','textarea'].indexOf(c.type)>=0){
       h+='<div style="margin-top:6px"><input placeholder="입력칸 예시 문구 (회색 글씨, 예: 12가 3456)" value="'+esc(c.placeholder||'')+'" style="width:100%;font-size:12px;padding:5px 8px;border:1px solid #cbd5e1;border-radius:6px;color:#64748b" onchange="_modDefEditCols['+i+'].placeholder=this.value"></div>';
+    }
+    // 기본값 / 고정값 — file·consent 제외
+    if(['text','tel','number','textarea','select','badge','date'].indexOf(c.type)>=0){
+      h+='<div style="margin-top:6px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">';
+      h+='<input placeholder="기본값 (미입력 시 자동 채움, 예: 2026 단오제)" value="'+esc(c.defVal||'')+'" style="flex:1;min-width:150px;font-size:12px;padding:5px 8px;border:1px solid #cbd5e1;border-radius:6px" onchange="_modDefEditCols['+i+'].defVal=this.value">';
+      h+='<label style="font-size:11px;display:flex;align-items:center;gap:3px;background:#eef2ff;padding:4px 7px;border-radius:5px;white-space:nowrap" title="체크 시 기본값으로 고정되고 입력칸에서 수정할 수 없습니다"><input type="checkbox"'+(c.fixed?' checked':'')+' onchange="_modDefEditCols['+i+'].fixed=this.checked"><b style="color:#4338ca">🔒 고정</b></label>';
+      h+='</div>';
     }
     h+='</div>';
   });
