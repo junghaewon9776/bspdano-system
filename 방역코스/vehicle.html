@@ -270,7 +270,12 @@ document.getElementById('formLinkInput').value=baseUrl+'?mode=form';
 
 var _isFormMode = location.search.indexOf('mode=form') >= 0;
 if(_isFormMode){
-  setTimeout(function(){switchTab('form',document.querySelectorAll('.tab')[1])},100);
+  // 폼 모드: 헤더·탭·관리화면 숨기고 신청폼만 표시
+  document.querySelector('header').style.display='none';
+  document.querySelector('.tabs').style.display='none';
+  document.getElementById('tabMgmt').style.display='none';
+  document.getElementById('tabForm').style.display='block';
+  document.getElementById('tabFormlink').style.display='none';
 }
 
 // ═══ 연락처 하이폰 자동 포맷 ═══
