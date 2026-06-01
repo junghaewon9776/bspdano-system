@@ -15,6 +15,13 @@ var MOD_DEFS_LOADED=false;
 
 // ─── 유틸 ───
 function _modId(){return 'm'+Date.now().toString(36)+Math.random().toString(36).slice(2,6)}
+// 현재 처리자(로그인 사용자) 이름/아이디
+function _modActor(){ try{ return (typeof ME!=='undefined'&&ME)?(ME.nm||ME.id||''):''; }catch(e){ return ''; } }
+// 행 대표 제목(첫 표시 컬럼 값)
+function _modRowTitle(def,row){
+  var c=(def.columns||[]).filter(function(x){return !x.adminOnly&&x.key!=='status'&&!x.hideTable;})[0];
+  return c?String(row[c.key]||''):'';
+}
 
 // 저장된 Drive 주소(썸네일·view 등 어떤 형식이든)에서 파일ID를 뽑아 정상 보기 링크로 변환
 function _modDriveViewUrl(url){
@@ -349,12 +356,13 @@ function modSetStatusSel(key,statusKey){
   var def=_modDefs[key];
   var bm=(def.columns.find(function(c){return c.key==='status';})||{}).badgeMap||{};
   var lbl=(bm[statusKey]&&bm[statusKey].label)||statusKey;
-  if(!confirm(ids.length+'개 항목을 "'+lbl+'" 상태로 변경할까요?')) return;
+  var actor=_modActor();
+  if(!confirm(ids.length+'개 항목을 "'+lbl+'"(으)로 변경할까요?'+(actor?'\n\n처리자: '+actor:''))) return;
   var data=(_modData[key]||[]).slice();
   var now=new Date().toISOString();
-  data.forEach(function(r){ if(ids.indexOf(r._id)>=0){ r.status=statusKey; r._updatedAt=now; } });
+  data.forEach(function(r){ if(ids.indexOf(r._id)>=0){ r.status=statusKey; r._updatedAt=now; r._statusBy=(typeof CID!=='undefined'?CID:''); r._statusByName=actor; r._statusAt=now; } });
   showLoading('처리 중...');
-  fbDb.ref(path).set(data).then(function(){ hideLoading(); toast('✅ '+ids.length+'개 "'+lbl+'" 처리'); _modSel[key]={}; })
+  fbDb.ref(path).set(data).then(function(){ hideLoading(); toast('✅ '+ids.length+'개 "'+lbl+'" 처리'+(actor?' · '+actor:'')); _modSel[key]={}; })
     .catch(function(e){ hideLoading(); toast('실패: '+(e.message||e),true); });
 }
 // 선택 항목 → 일괄 삭제
@@ -1141,16 +1149,26 @@ function delModDef(key){
 // 선정/탈락 상태 변경
 function modSetStatus(key,id,status){
   var path=_modFbPath(key); if(!path) return;
+  var def=_modDefs[key]||{};
+  var bm=((def.columns||[]).find(function(c){return c.key==='status';})||{}).badgeMap||{};
   var data=(_modData[key]||[]).slice();
   var idx=-1; for(var i=0;i<data.length;i++){if(data[i]._id===id){idx=i;break}}
   if(idx<0) return;
   // 이미 같은 상태면 '대기'로 토글
   var newStatus = (data[idx].status===status) ? '대기' : status;
+  var lbl=(bm[newStatus]&&bm[newStatus].label)||newStatus;
+  var actor=_modActor();
+  var nm=_modRowTitle(def,data[idx]);
+  if(!confirm('"'+(nm||'이 항목')+'"을(를) "'+lbl+'"(으)로 변경할까요?'+(actor?'\n\n처리자: '+actor:''))) return;
+  var now=new Date().toISOString();
   var merged={}; for(var k in data[idx])merged[k]=data[idx][k];
-  merged.status=newStatus; merged._updatedAt=new Date().toISOString();
+  merged.status=newStatus; merged._updatedAt=now;
+  if(newStatus==='대기'){ merged._statusBy=''; merged._statusByName=''; merged._statusAt=''; }
+  else { merged._statusBy=(typeof CID!=='undefined'?CID:''); merged._statusByName=actor; merged._statusAt=now; }
   data[idx]=merged;
-  fbDb.ref(path).set(data).then(function(){toast(newStatus+' 처리됨')})
-    .catch(function(e){toast('실패: '+e.message,true)});
+  showLoading('처리 중...');
+  fbDb.ref(path).set(data).then(function(){ hideLoading(); toast('✅ "'+lbl+'" 처리됨'+(actor?' · '+actor:'')); })
+    .catch(function(e){ hideLoading(); toast('실패: '+e.message,true); });
 }
 
 // 신청폼 링크 팝업
@@ -1377,8 +1395,8 @@ function modSmsSend(){
 
 // 모드별 기본 크기 — 낱장은 크게, A4 모아찍기는 작게
 var _MODLBL_DEFAULTS={
-  label:{w:90,h:50,pt:4,pr:4,pb:4,pl:4,gap:0,sheetMargin:0,border:false},
-  a4:{w:50,h:30,pt:2,pr:2,pb:2,pl:2,gap:2,sheetMargin:10,border:true}
+  label:{w:90,h:50,pt:4,pr:4,pb:4,pl:4,gap:0,sheetMargin:0,border:false,qr:0,orientation:'portrait'},
+  a4:{w:50,h:30,pt:2,pr:2,pb:2,pl:2,gap:2,sheetMargin:10,border:true,qr:0,orientation:'portrait'}
 };
 // 모드별 크기 세트 로드 (+ 구버전 평면 구조 마이그레이션)
 function _modLabelSizes(key){
@@ -1441,7 +1459,9 @@ function _modLabelHtml(def,row,opt){
   var url=_modViewUrl(def,row);
   var qr='https://api.qrserver.com/v1/create-qr-code/?size=160x160&margin=0&data='+encodeURIComponent(url);
   var titleV = opt.titleKey ? (row[opt.titleKey]||'') : (cols[0]?row[cols[0].key]:'');
-  var qrmm = Math.max(12, Math.min((opt.h-opt.pt-opt.pb), opt.w*0.34));
+  // QR 크기: 지정(opt.qr>0)하면 그 mm로 정사각형, 아니면 자동. 라벨 안 넘치게 제한
+  var qrmm = (opt.qr&&opt.qr>0) ? opt.qr : Math.min((opt.h-opt.pt-opt.pb), opt.w*0.34);
+  qrmm = Math.max(8, Math.min(qrmm, opt.h-opt.pt-opt.pb, opt.w-opt.pl-opt.pr));
   var layout = opt.layout || null;
   if(layout && layout.mode==='free' && layout.pos){
     var pos=layout.pos;
@@ -1509,11 +1529,17 @@ function popModLabel(key,singleId,idsList){
   h+='<label style="font-size:12px;color:#475569">아래 여백(mm)<input id="ml_pb" type="number" value="'+opt.pb+'" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:6px" oninput="_modLabelPreview()"></label>';
   h+='<label style="font-size:12px;color:#475569">왼쪽 여백(mm)<input id="ml_pl" type="number" value="'+opt.pl+'" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:6px" oninput="_modLabelPreview()"></label>';
   h+='<label style="font-size:12px;color:#475569">오른쪽 여백(mm)<input id="ml_pr" type="number" value="'+opt.pr+'" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:6px" oninput="_modLabelPreview()"></label>';
+  h+='<label style="font-size:12px;color:#475569;grid-column:1/3">QR 크기(mm) <span style="font-size:10px;color:#94a3b8">(0=자동, 정사각형)</span><input id="ml_qr" type="number" value="'+(opt.qr||0)+'" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:6px" oninput="_modLabelPreview()"></label>';
   h+='</div>';
 
   // ── A4 전용 옵션 ──
   h+='<div id="ml_a4opts" style="display:'+(isA4?'block':'none')+';background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px;margin-bottom:10px">';
   h+='<div style="font-size:11px;font-weight:700;color:#6366f1;margin-bottom:6px">📄 A4 모아찍기 설정</div>';
+  h+='<div style="display:flex;gap:6px;margin-bottom:8px">';
+  var isLand=(opt.orientation==='landscape');
+  h+='<label class="ml_ori_opt" style="flex:1;text-align:center;padding:7px;border:2px solid '+(isLand?'#cbd5e1':'#6366f1')+';border-radius:6px;cursor:pointer;font-size:12px;font-weight:700;background:'+(isLand?'#fff':'#eef2ff')+'" onclick="_mlSetOri(\'portrait\')"><input type="radio" name="ml_ori" value="portrait"'+(isLand?'':' checked')+' style="display:none">📄 세로</label>';
+  h+='<label class="ml_ori_opt" style="flex:1;text-align:center;padding:7px;border:2px solid '+(isLand?'#6366f1':'#cbd5e1')+';border-radius:6px;cursor:pointer;font-size:12px;font-weight:700;background:'+(isLand?'#eef2ff':'#fff')+'" onclick="_mlSetOri(\'landscape\')"><input type="radio" name="ml_ori" value="landscape"'+(isLand?' checked':'')+' style="display:none">📄 가로</label>';
+  h+='</div>';
   h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
   h+='<label style="font-size:12px;color:#475569">라벨 간격(mm)<input id="ml_gap" type="number" value="'+opt.gap+'" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:6px" oninput="_modLabelPreview()"></label>';
   h+='<label style="font-size:12px;color:#475569">용지 여백(mm)<input id="ml_smargin" type="number" value="'+opt.sheetMargin+'" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:6px" oninput="_modLabelPreview()"></label>';
@@ -1530,12 +1556,21 @@ function popModLabel(key,singleId,idsList){
   });
   h+='</div></div>';
 
-  // ── 출력 대상 선택 (체크 / 전체선택·해제 / Shift 범위) ──
+  // ── 출력 대상 선택 (체크 / 전체선택·해제 / Shift 범위 / 상태별) ──
   if(!singleId){
+    var statusColL=(def.columns||[]).find(function(c){return c.key==='status'&&c.type==='badge';});
     h+='<div style="font-size:12px;font-weight:700;color:#475569;margin-bottom:4px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">출력 대상 선택';
     h+='<button class="btn btn-s" style="font-size:11px;padding:2px 8px" onclick="_mlPickAll(true)">전체 선택</button>';
     h+='<button class="btn btn-s" style="font-size:11px;padding:2px 8px" onclick="_mlPickAll(false)">전체 해제</button>';
-    h+='<span style="font-size:10px;color:#94a3b8;font-weight:400">(Shift+클릭: 범위 선택)</span>';
+    if(statusColL){
+      h+='<select onchange="_mlPickByStatus(this.value)" style="font-size:11px;padding:3px 6px;border:1px solid #cbd5e1;border-radius:6px" title="상태별로 체크">';
+      h+='<option value="">상태별 선택…</option>';
+      Object.keys(statusColL.badgeMap||{}).forEach(function(sk){
+        h+='<option value="'+esc(sk)+'">'+esc((statusColL.badgeMap[sk].label||sk))+'만</option>';
+      });
+      h+='</select>';
+    }
+    h+='<span style="font-size:10px;color:#94a3b8;font-weight:400">(Shift+클릭: 범위)</span>';
     h+='<span id="ml_pickcnt" style="margin-left:auto;color:#2563eb;font-weight:700"></span></div>';
     h+='<div style="border:1px solid #e2e8f0;border-radius:8px;max-height:200px;overflow:auto;margin-bottom:12px">';
     rows.forEach(function(r,i){
@@ -1564,17 +1599,42 @@ function popModLabel(key,singleId,idsList){
 function _mlSyncSizeFromInputs(){
   if(!window.__mlSizes||!window.__mlMode) return;
   var g=function(id){ var e=document.getElementById(id); return e?(pn(e.value)||0):0; };
-  var s={w:g('ml_w')||90,h:g('ml_h')||50,pt:g('ml_pt'),pr:g('ml_pr'),pb:g('ml_pb'),pl:g('ml_pl')};
-  if(window.__mlMode==='a4'){ s.gap=g('ml_gap'); s.sheetMargin=g('ml_smargin'); s.border=!!(document.getElementById('ml_border')||{}).checked; }
-  window.__mlSizes[window.__mlMode]=Object.assign(window.__mlSizes[window.__mlMode]||{},s);
+  var prev=window.__mlSizes[window.__mlMode]||{};
+  var s={w:g('ml_w')||90,h:g('ml_h')||50,pt:g('ml_pt'),pr:g('ml_pr'),pb:g('ml_pb'),pl:g('ml_pl'),qr:g('ml_qr')};
+  if(window.__mlMode==='a4'){
+    s.gap=g('ml_gap'); s.sheetMargin=g('ml_smargin'); s.border=!!(document.getElementById('ml_border')||{}).checked;
+    var oriEl=document.querySelector('input[name="ml_ori"]:checked'); s.orientation=oriEl?oriEl.value:(prev.orientation||'portrait');
+  }
+  window.__mlSizes[window.__mlMode]=Object.assign(prev,s);
 }
 // 모드 크기 슬롯 → 입력칸 반영
 function _mlSetSizeInputs(sz){
   sz=sz||{};
   var set=function(id,v){ var e=document.getElementById(id); if(e) e.value=(v==null?'':v); };
-  set('ml_w',sz.w); set('ml_h',sz.h); set('ml_pt',sz.pt); set('ml_pr',sz.pr); set('ml_pb',sz.pb); set('ml_pl',sz.pl);
+  set('ml_w',sz.w); set('ml_h',sz.h); set('ml_pt',sz.pt); set('ml_pr',sz.pr); set('ml_pb',sz.pb); set('ml_pl',sz.pl); set('ml_qr',sz.qr||0);
   set('ml_gap',sz.gap); set('ml_smargin',sz.sheetMargin);
   var b=document.getElementById('ml_border'); if(b) b.checked=!!sz.border;
+  _mlSetOriUI(sz.orientation||'portrait');
+}
+// A4 방향 토글
+function _mlSetOriUI(ori){
+  document.querySelectorAll('.ml_ori_opt').forEach(function(el){
+    var inp=el.querySelector('input'); var on=inp&&inp.value===ori;
+    if(inp) inp.checked=on;
+    el.style.borderColor=on?'#6366f1':'#cbd5e1';
+    el.style.background=on?'#eef2ff':'#fff';
+  });
+}
+function _mlSetOri(ori){ _mlSetOriUI(ori); _modLabelPreview(); }
+// 상태별 체크 (예: 승인된 것만)
+function _mlPickByStatus(status){
+  if(status==='') return;
+  var all=window.__modLabelAll||[];
+  _mlPicks().forEach(function(cb){
+    var r=all[pn(cb.getAttribute('data-idx'))];
+    cb.checked = !!(r && r.status===status);
+  });
+  _mlUpdatePickCount();
 }
 // 출력 모드 전환 — 크기/여백/간격/배치를 모드별로 스왑
 function _mlSetMode(mode){
@@ -1638,9 +1698,11 @@ function _modLabelReadOpt(){
     sizes:sizes
   }, cur);
 }
-// A4 한 장에 들어가는 칸 수 계산 (210x297mm)
+// A4 한 장에 들어가는 칸 수 계산 (세로 210x297, 가로 297x210)
 function _mlA4Grid(opt){
-  var availW=210-opt.sheetMargin*2, availH=297-opt.sheetMargin*2;
+  var land=(opt.orientation==='landscape');
+  var pw=land?297:210, ph=land?210:297;
+  var availW=pw-opt.sheetMargin*2, availH=ph-opt.sheetMargin*2;
   var cols=Math.max(1,Math.floor((availW+opt.gap)/(opt.w+opt.gap)));
   var rowsN=Math.max(1,Math.floor((availH+opt.gap)/(opt.h+opt.gap)));
   return {cols:cols, rows:rowsN, perPage:cols*rowsN};
@@ -1677,10 +1739,12 @@ function modDoPrint(){
   var css, bodyHtml;
   if(opt.mode==='a4'){
     var bd=opt.border?'.mlabel{border:1px dashed #bbb}':'';
-    css='@page{size:A4;margin:'+opt.sheetMargin+'mm}html,body{margin:0;padding:0}'
+    var land=(opt.orientation==='landscape');
+    var sheetW=land?'297mm':'210mm';
+    css='@page{size:A4 '+(land?'landscape':'portrait')+';margin:'+opt.sheetMargin+'mm}html,body{margin:0;padding:0}'
       +'.sheet{display:flex;flex-wrap:wrap;align-content:flex-start;gap:'+opt.gap+'mm}'
       +'.mlabel{box-sizing:border-box;break-inside:avoid;page-break-inside:avoid}'+bd
-      +'@media screen{body{background:#e2e8f0;padding:10px}.sheet{background:#fff;width:210mm;margin:0 auto;padding:'+opt.sheetMargin+'mm;box-sizing:border-box;box-shadow:0 1px 6px rgba(0,0,0,.2)}}';
+      +'@media screen{body{background:#e2e8f0;padding:10px}.sheet{background:#fff;width:'+sheetW+';margin:0 auto;padding:'+opt.sheetMargin+'mm;box-sizing:border-box;box-shadow:0 1px 6px rgba(0,0,0,.2)}}';
     bodyHtml='<div class="sheet">'+labels+'</div>';
   } else {
     css='@page{size:'+opt.w+'mm '+opt.h+'mm;margin:0}html,body{margin:0;padding:0}.mlabel{page-break-after:always}'
@@ -1697,8 +1761,9 @@ function modBumpPrint(key,ids){
   var path=_modFbPath(key); if(!path) return;
   var data=(_modData[key]||[]).slice();
   var now=new Date().toISOString();
-  data.forEach(function(r){ if(ids.indexOf(r._id)>=0){ r._printCount=pn(r._printCount)+1; r._printedAt=now; } });
-  fbDb.ref(path).set(data).then(function(){ toast('🖨 '+ids.length+'장 출력 (카운트 반영)'); }).catch(function(e){toast('카운트 저장 실패: '+(e.message||e),true)});
+  var actor=_modActor();
+  data.forEach(function(r){ if(ids.indexOf(r._id)>=0){ r._printCount=pn(r._printCount)+1; r._printedAt=now; r._printBy=(typeof CID!=='undefined'?CID:''); r._printByName=actor; } });
+  fbDb.ref(path).set(data).then(function(){ toast('🖨 '+ids.length+'장 발급'+(actor?' · '+actor:'')); }).catch(function(e){toast('발급 기록 저장 실패: '+(e.message||e),true)});
 }
 
 // ═══════════════════════════════════════════
@@ -1725,18 +1790,21 @@ function popModLabelLayout(key){
   });
   window.__mlLayout={key:key,def:def,opt:opt,mode:mode,cols:cols,pos:pos,dragging:null};
 
-  var SCALE=5;
-  var cW=opt.w*SCALE, cH=opt.h*SCALE;
+  // 캔버스 크기를 화면에 맞게 제한 (우측 조절 패널이 잘리지 않도록)
+  var SCALE=Math.min(6, 320/opt.w, 360/opt.h);
+  if(!(SCALE>0)) SCALE=4;
+  window.__mlLayout.SCALE=SCALE;
+  var cW=Math.round(opt.w*SCALE), cH=Math.round(opt.h*SCALE);
 
   var modeName=(mode==='a4')?'📄 A4용':'🏷 낱장용';
   var h='<div class="pop-head"><h3>📐 '+esc(def.label)+' 라벨 배치 편집 <span style="font-size:12px;color:#6366f1;font-weight:700">('+modeName+' '+opt.w+'×'+opt.h+'mm)</span></h3></div>';
   h+='<div style="padding:14px;max-height:80vh;overflow:auto">';
   h+='<div style="font-size:12px;color:#64748b;margin-bottom:10px">요소를 드래그하여 위치를 조정하세요. 클릭하면 크기 조절 패널이 나타납니다.</div>';
-  h+='<div style="display:flex;gap:14px;flex-wrap:wrap">';
-  h+='<div style="flex:1;min-width:300px">';
+  h+='<div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start">';
+  h+='<div style="flex-shrink:0">';
   h+='<div id="mll_canvas" style="position:relative;width:'+cW+'px;height:'+cH+'px;background:#fff;border:2px solid #334155;border-radius:4px;overflow:hidden;cursor:default;box-shadow:0 2px 10px rgba(0,0,0,.15);user-select:none"></div>';
   h+='</div>';
-  h+='<div style="width:180px" id="mll_panel">';
+  h+='<div style="width:190px;flex-shrink:0" id="mll_panel">';
   h+='<div style="font-size:12px;font-weight:700;color:#334155;margin-bottom:6px">요소 선택하면 여기서 조절</div>';
   h+='<div id="mll_ctrl" style="font-size:12px;color:#94a3b8">요소를 클릭하세요</div>';
   h+='</div>';
@@ -1746,14 +1814,14 @@ function popModLabelLayout(key){
   h+=' <button class="btn" style="background:#94a3b8;color:#fff;font-size:12px" onclick="_mllClearLayout()">자동 배치로 되돌리기</button></div>';
   h+='<div><button class="btn" onclick="closePopup()">취소</button> <button class="btn btn-b" style="background:#6366f1" onclick="_mllSave()">💾 저장</button></div>';
   h+='</div></div>';
-  openPopup(h,Math.max(580,cW+220));
+  openPopup(h,Math.max(620,cW+250));
   setTimeout(function(){ _mllRender(); _mllBindEvents(); },50);
 }
 
 function _mllRender(){
   var L=window.__mlLayout; if(!L) return;
   var canvas=document.getElementById('mll_canvas'); if(!canvas) return;
-  var SCALE=5;
+  var SCALE=L.SCALE||5;
   var cW=L.opt.w*SCALE, cH=L.opt.h*SCALE;
   var pos=L.pos;
   var row=(_modData[L.key]||[])[0]||{};
@@ -1791,7 +1859,7 @@ function _mllRender(){
 function _mllBindEvents(){
   var canvas=document.getElementById('mll_canvas'); if(!canvas) return;
   var L=window.__mlLayout; if(!L) return;
-  var SCALE=5;
+  var SCALE=L.SCALE||5;
   var cW=L.opt.w*SCALE, cH=L.opt.h*SCALE;
   var dragging=null, offX=0, offY=0;
 
@@ -1950,11 +2018,16 @@ function _renderModViewUI(def,row){
     }
   }
 
-  // 상태 배지
+  // 상태 배지 + 처리자
   var statusCol=(def.columns||[]).find(function(c){return c.key==='status'&&c.type==='badge'});
   if(statusCol && row.status && statusCol.badgeMap && statusCol.badgeMap[row.status]){
     var bm=statusCol.badgeMap[row.status];
-    h+='<div style="text-align:center;margin-bottom:14px"><span style="padding:6px 18px;border-radius:20px;font-size:15px;font-weight:800;background:'+(bm.bg||'#e2e8f0')+';color:'+(bm.color||'#475569')+'">'+esc(bm.label||row.status)+'</span></div>';
+    h+='<div style="text-align:center;margin-bottom:14px"><span style="padding:6px 18px;border-radius:20px;font-size:15px;font-weight:800;background:'+(bm.bg||'#e2e8f0')+';color:'+(bm.color||'#475569')+'">'+esc(bm.label||row.status)+'</span>';
+    if(row._statusByName){
+      var atd=row._statusAt?(' · '+String(row._statusAt).slice(0,10)):'';
+      h+='<div style="font-size:11px;color:#94a3b8;margin-top:5px">처리: '+esc(row._statusByName)+esc(atd)+'</div>';
+    }
+    h+='</div>';
   }
 
   h+='<table style="width:100%;border-collapse:collapse;font-size:14px">';
