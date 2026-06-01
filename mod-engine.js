@@ -116,15 +116,26 @@ function dMod(key){
   if(feat.search!==false){
     h+='<div style="margin-bottom:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">';
     h+='<input id="_modSearch_'+key+'" type="text" placeholder="🔍 검색..." value="'+esc(search)+'" oninput="_modSearchTyped(\''+key+'\',this.value)" style="flex:1;min-width:150px;padding:8px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:13px">';
-    var fc=(def.columns||[]).find(function(c){return c.filter&&(c.type==="select"||c.type==="badge")});
+    var fc=(def.columns||[]).find(function(c){return c.filter});
     if(fc){
-      var fopts=fc.options||(fc.badgeMap?Object.keys(fc.badgeMap):[]);
-      h+='<button class="btn btn-s'+(!filter?' btn-b':'')+'" onclick="_modFilter[\''+key+'\']=\'\';draw()" style="font-size:11px">전체</button>';
-      fopts.forEach(function(o){
-        var ov=typeof o==='object'?o.value:o;
-        var ol=typeof o==='object'?o.label:(fc.badgeMap&&fc.badgeMap[ov]?fc.badgeMap[ov].label:ov);
-        h+='<button class="btn btn-s'+(filter===ov?' btn-b':'')+'" onclick="_modFilter[\''+key+'\']=\''+esc(ov)+'\';draw()" style="font-size:11px">'+esc(ol)+'</button>';
-      });
+      var fopts;
+      if(fc.type==='select') fopts=(fc.options||[]).slice();
+      else if(fc.type==='badge') fopts=Object.keys(fc.badgeMap||{});
+      else {
+        // 그 외 타입(텍스트 등) → 실제 데이터의 고유값 자동 수집
+        var seen={}; fopts=[];
+        (_modData[key]||[]).forEach(function(r){ var v=String(r[fc.key]||''); if(v&&!seen[v]){seen[v]=1;fopts.push(v);} });
+        fopts.sort();
+      }
+      if(fopts.length){
+        h+='<span style="font-size:11px;color:#94a3b8;font-weight:700">'+esc(fc.label)+':</span>';
+        h+='<button class="btn btn-s'+(!filter?' btn-b':'')+'" onclick="_modFilter[\''+key+'\']=\'\';draw()" style="font-size:11px">전체</button>';
+        fopts.forEach(function(o){
+          var ov=typeof o==='object'?o.value:o;
+          var ol=typeof o==='object'?o.label:(fc.badgeMap&&fc.badgeMap[ov]?fc.badgeMap[ov].label:ov);
+          h+='<button class="btn btn-s'+(filter===String(ov)?' btn-b':'')+'" onclick="_modFilter[\''+key+'\']=\''+esc(String(ov))+'\';draw()" style="font-size:11px">'+esc(ol)+'</button>';
+        });
+      }
     }
     h+='</div>';
   }
@@ -150,8 +161,8 @@ function _modFilteredData(key){
     });
   }
   if(filter){
-    var fc=(def.columns||[]).find(function(c){return c.filter&&(c.type==="select"||c.type==="badge")});
-    if(fc) data=data.filter(function(row){return row[fc.key]===filter});
+    var fc=(def.columns||[]).find(function(c){return c.filter});
+    if(fc) data=data.filter(function(row){return String(row[fc.key]||'')===filter});
   }
   if(sort.col){
     data.sort(function(a,b){
@@ -561,8 +572,8 @@ function _renderModDefCols(){
     h+='<label style="font-size:11px;display:flex;align-items:center;gap:3px;background:#fef2f2;padding:3px 6px;border-radius:5px"><input type="checkbox"'+(c.required?' checked':'')+' onchange="_modDefEditCols['+i+'].required=this.checked"><b style="color:#dc2626">필수</b></label>';
     // 콤마 (숫자/금액만)
     if(c.type==='number') h+='<label style="font-size:11px;display:flex;align-items:center;gap:3px"><input type="checkbox"'+(c.comma?' checked':'')+' onchange="_modDefEditCols['+i+'].comma=this.checked">금액(콤마)</label>';
-    // 필터 (선택/배지만)
-    if(c.type==='select'||c.type==='badge') h+='<label style="font-size:11px;display:flex;align-items:center;gap:3px"><input type="checkbox"'+(c.filter?' checked':'')+' onchange="_modDefEditCols['+i+'].filter=this.checked">필터</label>';
+    // 필터 (긴글·파일·동의 제외한 모든 타입) — 체크하면 그 컬럼 값으로 거르는 버튼 자동 생성
+    if(['select','badge','text','tel','number','date'].indexOf(c.type)>=0) h+='<label style="font-size:11px;display:flex;align-items:center;gap:3px" title="체크하면 이 컬럼 값(예: 선정/대기)으로 거르는 필터 버튼이 생깁니다"><input type="checkbox"'+(c.filter?' checked':'')+' onchange="_modDefEditCols['+i+'].filter=this.checked">필터</label>';
     // 검색 (텍스트류만)
     if(['text','tel','textarea','number','select'].indexOf(c.type)>=0) h+='<label style="font-size:11px;display:flex;align-items:center;gap:3px"><input type="checkbox"'+(c.search?' checked':'')+' onchange="_modDefEditCols['+i+'].search=this.checked">검색</label>';
     // 관리자전용
