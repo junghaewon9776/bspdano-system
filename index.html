@@ -982,7 +982,9 @@ async function doLogin(id,pw,keep,silent){
   // 거래처 관리 버튼 — super/admin/subAdm
   var _vb=document.getElementById("vendorBtn");
   if(_vb) _vb.style.display = _isGlobalAdm() ? "" : "none";
-  CTAB = DEEP_TAB || ((ME && ME.r==="applyView") ? "apply" : "dash");  // 참가자전용은 참가자관리, 그외 대시보드 (딥링크 우선)
+  // 전용 계정은 지정 화면, 그외 대시보드 (딥링크 우선)
+  var _viewTab = (ME&&ME.r==="applyView") ? "apply" : ((ME&&ME.r&&ME.r.indexOf("view:")===0) ? ME.r.slice(5) : "");
+  CTAB = DEEP_TAB || _viewTab || "dash";
   FILT=isA()?"전체":myar();
   // 커스텀 모듈 정의 로드 후 탭 렌더 (딥링크가 모듈 탭이면 로드 후 자동 표시)
   if(typeof loadModDefs==='function') loadModDefs(function(){modLoadAll();mkTabs();draw()});
@@ -1365,9 +1367,16 @@ function mkTabs(){
     cats.push({id:"field",label:"📍 현장",items:fieldItems});
   }
 
-  // 참가자 전용 역할(applyView): 참가자 관리만 보이게 (나머지 탭 전부 숨김)
-  if(ME && ME.r==="applyView"){
-    cats=[{id:"apply",label:"👥 참가자",items:[{k:"apply",l:"참가자 관리"},{k:"apstat",l:"참가자 현황"}]}];
+  // 전용 계정 역할: 지정한 화면 하나만 보이게 (나머지 탭 전부 숨김)
+  //   r="applyView" (구) 또는 r="view:{탭키}" → 참가자관리(apply) / 모듈(mod_xxx)
+  if(ME && ME.r && (ME.r==="applyView" || ME.r.indexOf("view:")===0)){
+    var _vt = (ME.r==="applyView") ? "apply" : ME.r.slice(5);
+    if(_vt==="apply"){
+      cats=[{id:"apply",label:"👥 참가자",items:[{k:"apply",l:"참가자 관리"},{k:"apstat",l:"참가자 현황"}]}];
+    } else if(_vt.indexOf("mod_")===0){
+      var _mk=_vt.slice(4); var _md=(typeof _modDefs!=='undefined')?_modDefs[_mk]:null;
+      cats = _md ? [{id:"vmod",label:(_md.icon?_md.icon+" ":"")+_md.label,items:[{k:_vt,l:_md.label}]}] : [];
+    } else { cats=[]; }
   }
 
   // _curCat이 유효한 카테고리인지 확인, 아니면 CTAB 기반으로 자동 선택
@@ -15454,18 +15463,40 @@ function dAcct(){
       }
     }
     h+='</table></div></div>';
+
+    // 👁 전용 계정 (지정 화면 하나만 보이는 계정)
+    var viewList=[];for(var kV in US){var rV=US[kV].r||'';if(rV==='applyView'||rV.indexOf('view:')===0)viewList.push(kV);}
+    h+='<div class="card" style="border:2px solid #0ea5e9;background:linear-gradient(135deg,#f0f9ff 0%,#e0f2fe 100%);box-shadow:0 2px 8px rgba(14,165,233,.1)">';
+    h+='<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:8px">';
+    h+='<h3 style="margin:0;color:#0369a1;font-weight:800">👁 전용 계정</h3>';
+    h+='<button class="btn btn-s" style="background:#0ea5e9;color:#fff;font-weight:700" onclick="popAddApplyView()">+ 전용 계정 추가</button>';
+    h+='</div>';
+    h+='<div style="font-size:11px;color:#0369a1;margin-bottom:8px">선택한 화면 하나만 보이는 계정입니다 (외부 담당자에게 특정 화면만 보여줄 때). 다른 탭은 전부 숨김.</div>';
+    h+='<div class="scrollx"><table><tr><th>아이디</th><th class="mobile-hide">비번</th><th>이름</th><th>보일 화면</th><th>관리</th></tr>';
+    if(!viewList.length){
+      h+='<tr><td colspan="5" style="text-align:center;color:#999;padding:14px">등록된 전용 계정이 없습니다</td></tr>';
+    } else {
+      for(var v0=0;v0<viewList.length;v0++){
+        var vUid=viewList[v0],vU=US[vUid];
+        h+='<tr>'+
+          '<td style="font-family:monospace;font-weight:600">'+esc(vUid)+'</td>'+
+          '<td class="mobile-hide" style="font-family:monospace;color:#888">'+esc(vU.pw||'-')+'</td>'+
+          '<td>'+esc(vU.nm||'-')+'</td>'+
+          '<td style="color:#0369a1;font-weight:600">'+esc(_viewRoleLabel(vU.r))+'</td>'+
+          '<td><button class="btn btn-r btn-s" onclick="delViewAcct(\''+esc(vUid)+'\')">삭제</button></td>'+
+        '</tr>';
+      }
+    }
+    h+='</table></div></div>';
   }
   // super OR admin: SUBADMIN 계정 관리
   if(isGlobalAdmin()){
     h+='<div class="card" style="border:2px solid #7c3aed;background:linear-gradient(135deg,#faf5ff 0%,#f3e8ff 100%);box-shadow:0 2px 8px rgba(124,58,237,.1)">';
     h+='<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:8px">';
     h+='<h3 style="margin:0;color:#6d28d9;font-weight:800">🛡️ SUBADMIN 계정</h3>';
-    h+='<div style="display:flex;gap:6px;flex-wrap:wrap">';
-    h+='<button class="btn btn-s" style="background:#0ea5e9;color:#fff;font-weight:700" onclick="popAddApplyView()">+ 참가자 전용 계정</button>';
     h+='<button class="btn btn-s" style="background:#7c3aed;color:#fff;font-weight:700" onclick="popAddSub()">+ SUBADMIN 계정 추가</button>';
     h+='</div>';
-    h+='</div>';
-    h+='<div style="font-size:11px;color:#6d28d9;margin-bottom:8px">SUBADMIN 계정은 행사관리를 제외한 대부분의 기능을 사용할 수 있습니다. <b style="color:#0369a1">참가자 전용 계정</b>은 참가자 관리 탭만 보입니다.</div>';
+    h+='<div style="font-size:11px;color:#6d28d9;margin-bottom:8px">SUBADMIN 계정은 행사관리를 제외한 대부분의 기능을 사용할 수 있습니다.</div>';
     h+='<div class="scrollx"><table><tr><th>아이디</th><th class="mobile-hide">비번</th><th>이름</th><th class="mobile-hide">연락처</th><th>관리</th></tr>';
     var subList=[];for(var k0 in US){if(US[k0].r==="subAdm")subList.push(k0)}
     if(!subList.length){
@@ -16063,28 +16094,56 @@ async function addSubX(){
   closePopup();toast("단오제보존회 계정 추가 완료");draw();
 }
 // 참가자 전용 계정 (로그인 시 참가자 관리 탭만 표시)
+function _viewOptsHtml(sel){
+  var o='<option value="apply"'+(sel==='apply'?' selected':'')+'>참가자 관리</option>';
+  if(typeof _modDefs!=='undefined') Object.keys(_modDefs).forEach(function(k){
+    var v='mod_'+k; o+='<option value="'+v+'"'+(sel===v?' selected':'')+'>'+esc(_modDefs[k].label)+' (모듈)</option>';
+  });
+  return o;
+}
 function popAddApplyView(){
   if(!isGlobalAdmin()){toast("관리자만 가능합니다",true);return}
-  openPopup('<h3>👁 참가자 전용 계정 추가 <button class="close-x" onclick="closePopup()">&times;</button></h3>'+
-    '<div style="font-size:12px;color:#0369a1;margin-bottom:10px">이 계정으로 로그인하면 <b>참가자 관리 탭만</b> 보입니다. (재정·인원 등 다른 탭은 숨김)</div>'+
+  openPopup('<h3>👁 전용 계정 추가 <button class="close-x" onclick="closePopup()">&times;</button></h3>'+
+    '<div style="font-size:12px;color:#0369a1;margin-bottom:10px">선택한 <b>화면 하나만</b> 보이는 계정입니다. (다른 탭은 전부 숨김 — 외부 담당자에게 특정 화면만 보여줄 때)</div>'+
+    '<div class="fr"><label>보일 화면 *</label><select id="avView" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:8px">'+_viewOptsHtml('')+'</select></div>'+
     '<div class="frow fr2"><div><label>아이디 *</label><input type="text" id="avId" placeholder="예: view01"></div>'+
     '<div><label>비밀번호 *</label><input type="text" id="avPw" value="1234"></div></div>'+
-    '<div class="frow fr2"><div><label>이름</label><input type="text" id="avNm" placeholder="예: 참가자조회"></div>'+
+    '<div class="frow fr2"><div><label>이름</label><input type="text" id="avNm" placeholder="예: 조회용"></div>'+
     '<div><label>연락처</label><input type="text" id="avTel" placeholder="010-0000-0000" oninput="this.value=fmTel(this.value)"></div></div>'+
     '<div style="text-align:right;margin-top:14px"><button class="btn" style="background:#0ea5e9;color:#fff" onclick="addApplyViewX()">추가</button></div>');
 }
 async function addApplyViewX(){
   if(!isGlobalAdmin()){toast("관리자만 가능합니다",true);return}
+  var view=(document.getElementById("avView")||{}).value||"apply";
   var id=document.getElementById("avId").value.trim(),pw=document.getElementById("avPw").value,nm=document.getElementById("avNm").value.trim(),tel=document.getElementById("avTel").value;
   if(!id||!pw){alert("아이디/비번 필수");return}
   if(pw.length<4){alert("비번 4자 이상");return}
   if(US[id]){alert("이미 사용 중인 아이디입니다");return}
+  var role="view:"+view;
   showLoading("추가 중...");
-  var r=await api("addAcct",{id:id,pw:pw,r:"applyView",ar:"",nm:nm||"참가자조회",tel:tel,_who:CID});
+  var r=await api("addAcct",{id:id,pw:pw,r:role,ar:"",nm:nm||"전용계정",tel:tel,_who:CID});
   hideLoading();
   if(!r.ok){alert(r.err||"실패");return}
-  US[id]={pw:pw,r:"applyView",ar:"",nm:nm||"참가자조회",tel:tel};
-  closePopup();toast("참가자 전용 계정 추가 완료");draw();
+  US[id]={pw:pw,r:role,ar:"",nm:nm||"전용계정",tel:tel};
+  closePopup();toast("전용 계정 추가 완료");draw();
+}
+// 전용 계정 역할 → 보일 화면 이름
+function _viewRoleLabel(r){
+  if(!r) return '';
+  var vt = r==='applyView' ? 'apply' : (r.indexOf('view:')===0 ? r.slice(5) : '');
+  if(vt==='apply') return '참가자 관리';
+  if(vt.indexOf('mod_')===0){ var d=(typeof _modDefs!=='undefined')?_modDefs[vt.slice(4)]:null; return d?d.label:vt; }
+  return '';
+}
+async function delViewAcct(uid){
+  if(!isGlobalAdmin()){toast("관리자만 가능합니다",true);return}
+  if(!confirm("전용 계정 '"+uid+"'을(를) 삭제할까요?"))return;
+  showLoading("삭제 중...");
+  var r=await api("deleteAcct",{id:uid,_who:CID});
+  hideLoading();
+  if(!r.ok){toast(r.err||"실패",true);return}
+  delete US[uid];
+  toast("삭제 완료");draw();
 }
 function popEditSub(curId){
   if(!isGlobalAdmin()){toast("관리자만 가능합니다",true);return}
