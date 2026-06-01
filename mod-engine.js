@@ -41,6 +41,8 @@ function _modFbPath(key){
 // ─── 데이터 실시간 동기화 ───
 function modLoadData(key){
   var path=_modFbPath(key); if(!path) return;
+  // 이미 같은 경로를 구독 중이면 재등록하지 않음 (무한 재귀 방지)
+  if(_modListeners[key] && _modListeners[key].path===path) return;
   if(_modListeners[key]){
     fbDb.ref(_modListeners[key].path).off('value',_modListeners[key].cb);
   }
@@ -49,7 +51,11 @@ function modLoadData(key){
     if(!val) _modData[key]=[];
     else if(Array.isArray(val)) _modData[key]=val;
     else _modData[key]=Object.values(val);
-    if(typeof CTAB!=='undefined' && CTAB==='mod_'+key) draw();
+    // 현재 이 모듈 탭을 보고 있을 때만 다시 그림 (modLoadData 재호출 없이 dMod만)
+    if(typeof CTAB!=='undefined' && CTAB==='mod_'+key){
+      var el=document.getElementById('mc');
+      if(el) el.innerHTML=dMod(key);
+    }
   };
   fbDb.ref(path).on('value',cb);
   _modListeners[key]={path:path,cb:cb};
