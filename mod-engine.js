@@ -265,7 +265,10 @@ function _modFmtCell(col,val){
     case 'textarea':
       var s=String(val); return '<span title="'+esc(s)+'">'+esc(s.length>40?s.slice(0,40)+'…':s)+'</span>';
     case 'file':
-      return '<a href="'+esc(_modDriveViewUrl(String(val)))+'" target="_blank" style="color:#2563eb;text-decoration:none">📎 파일</a>';
+      var _fparts=String(val).split(/[\n|]/).filter(function(u){return u.trim()});
+      return _fparts.map(function(u,i){
+        return '<a href="'+esc(_modDriveViewUrl(u.trim()))+'" target="_blank" style="color:#2563eb;text-decoration:none;white-space:nowrap">📎'+(_fparts.length>1?' '+(i+1):'')+'</a>';
+      }).join(' ');
     case 'consent':
       return val==='동의'?'<span style="color:#16a34a;font-weight:700">✅ 동의</span>':'<span style="color:#cbd5e1">미동의</span>';
     default:
@@ -354,8 +357,13 @@ function _modFormField(col,val){
       return '<input id="'+id+'" type="tel" value="'+ev+'" placeholder="'+esc(col.placeholder||'010-0000-0000')+'" maxlength="13" oninput="var v=this.value.replace(/[^0-9]/g,\'\');if(v.length<=3)this.value=v;else if(v.length<=7)this.value=v.slice(0,3)+\'-\'+v.slice(3);else this.value=v.slice(0,3)+\'-\'+v.slice(3,7)+\'-\'+v.slice(7,11)">';
     case 'file':
       var fh='';
-      if(val) fh+='<div style="font-size:12px;margin-bottom:4px"><a href="'+esc(_modDriveViewUrl(String(val)))+'" target="_blank" style="color:#2563eb">📎 기존 파일</a></div>';
-      fh+='<input id="'+id+'" type="file"'+(col.accept?' accept="'+esc(col.accept)+'"':'')+' style="font-size:13px">';
+      if(val){
+        String(val).split(/[\n|]/).filter(function(u){return u.trim()}).forEach(function(u,i){
+          fh+='<div style="font-size:12px;margin-bottom:4px"><a href="'+esc(_modDriveViewUrl(u.trim()))+'" target="_blank" style="color:#2563eb">📎 기존 파일'+(i+1)+'</a></div>';
+        });
+      }
+      fh+='<input id="'+id+'" type="file" multiple'+(col.accept?' accept="'+esc(col.accept)+'"':'')+' style="font-size:13px">';
+      fh+='<div style="font-size:11px;color:#94a3b8;margin-top:2px">여러 개 선택 가능 (새로 선택하면 기존 파일은 교체됩니다)</div>';
       fh+='<input type="hidden" id="'+id+'_prev" value="'+ev+'">';
       return fh;
     case 'consent':
@@ -382,7 +390,7 @@ function modSave(key,editId){
     }
     if(c.type==='file'){
       var prev=(document.getElementById('mod_f_'+c.key+'_prev')||{}).value||'';
-      if(el.files&&el.files[0]){ fileTasks.push({col:c,file:el.files[0]}); }
+      if(el.files&&el.files.length){ fileTasks.push({col:c,files:Array.prototype.slice.call(el.files)}); }
       else { obj[c.key]=prev; if(c.required&&!prev){ toast(c.label+' 파일을 첨부하세요',true); valid=false; } }
       return;
     }
@@ -404,11 +412,16 @@ function modSave(key,editId){
     try{ DRIVE_UPLOAD_URL=def.driveUploadUrl; }catch(e){}
   }
 
-  // 파일 업로드 먼저
+  // 파일 업로드 먼저 (컬럼당 여러 파일 → 줄바꿈으로 연결)
   var upChain=Promise.resolve();
   fileTasks.forEach(function(t){
     upChain=upChain.then(function(){
-      return _uploadToDrive(t.file,'mod_'+key,t.col.label).then(function(url){ obj[t.col.key]=url; });
+      var urls=[];
+      var sub=Promise.resolve();
+      t.files.forEach(function(f){
+        sub=sub.then(function(){ return _uploadToDrive(f,'mod_'+key,t.col.label).then(function(url){ urls.push(url); }); });
+      });
+      return sub.then(function(){ obj[t.col.key]=urls.join('\n'); });
     });
   });
 
@@ -812,7 +825,7 @@ function submitModApply(){
       obj[c.key]=el.checked?'동의':''; return;
     }
     if(c.type==='file'){
-      if(el.files&&el.files[0]){ fileTasks.push({col:c,file:el.files[0]}); }
+      if(el.files&&el.files.length){ fileTasks.push({col:c,files:Array.prototype.slice.call(el.files)}); }
       else if(c.required){ valid=false; if(!firstBad)firstBad=c.label+' 파일을 첨부해 주세요'; }
       return;
     }
@@ -829,11 +842,16 @@ function submitModApply(){
   obj.status='대기';
   var btn=document.getElementById('modApplyBtn'); if(btn){btn.disabled=true;btn.textContent=fileTasks.length?'파일 업로드 중...':'신청 중...';}
 
-  // 파일 업로드 먼저 (Drive)
+  // 파일 업로드 먼저 (Drive) — 컬럼당 여러 파일 → 줄바꿈으로 연결
   var upChain=Promise.resolve();
   fileTasks.forEach(function(t){
     upChain=upChain.then(function(){
-      return _uploadToDrive(t.file,'mod_'+def.key,t.col.label).then(function(url){ obj[t.col.key]=url; });
+      var urls=[];
+      var sub=Promise.resolve();
+      t.files.forEach(function(f){
+        sub=sub.then(function(){ return _uploadToDrive(f,'mod_'+def.key,t.col.label).then(function(url){ urls.push(url); }); });
+      });
+      return sub.then(function(){ obj[t.col.key]=urls.join('\n'); });
     });
   });
 
