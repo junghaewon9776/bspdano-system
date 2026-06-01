@@ -1958,6 +1958,16 @@ function modDoPrint(){
   var all=window.__modLabelAll||(_modData[key]||[]);
   var rows=all.filter(function(r){return ids.indexOf(r._id)>=0});
   if(!rows.length) return toast('출력할 항목이 없습니다',true);
+  // 거부/탈락 상태는 라벨 발급 불가 — 포함 시 경고 모달
+  var _isRej=function(r){ return /거부|탈락|반려|불가|취소|거절/.test(String(r.status||'')); };
+  var rej=rows.filter(_isRej);
+  if(rej.length){
+    var rest=rows.length-rej.length;
+    if(rest<=0){ alert('⛔ 선택한 항목이 모두 거부/탈락 상태입니다.\n라벨을 발급할 수 없습니다.'); return; }
+    if(!confirm('⛔ 거부/탈락 상태 '+rej.length+'개가 포함되어 있습니다.\n이 항목은 라벨을 발급할 수 없습니다.\n\n[확인] 제외하고 나머지 '+rest+'개만 출력\n[취소] 중단')) return;
+    rows=rows.filter(function(r){return !_isRej(r);});
+    ids=rows.map(function(r){return r._id;});
+  }
   // QZ Tray 연결+프린터선택 시 → 라벨 프린터로 직접 출력 (낱장 모드)
   if(opt.mode==='label' && qzIsReady()){
     _qzPrintLabels(def, rows, opt).then(function(ok){ if(ok){ modBumpPrint(key, ids); closePopup(); } });
