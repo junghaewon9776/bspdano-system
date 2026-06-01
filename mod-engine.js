@@ -1603,13 +1603,26 @@ function _modViewUrl(def,row){
   return base+'?modview='+encodeURIComponent(def.key)+'&id='+encodeURIComponent(row._id||'')+(evtId?'&evtId='+encodeURIComponent(evtId):'');
 }
 function _modPlain(c,v){ if(c.type==='number'&&c.comma) return Number(v).toLocaleString(); return String(v); }
-// free 배치 요소의 줄바꿈/정렬/폭 CSS (pos 항목 p 기준)
-function _mlBoxCss(p){
+// free 배치 요소의 처리방식별 CSS + 폰트크기 계산
+// mode: 'line'(한줄) / 'wrap'(박스폭 넘으면 줄바꿈) / 'fit'(박스폭에 맞게 글자 축소)
+// 반환 {css, fs}. labelWmm=라벨 전체 가로(mm)
+function _mlElemFit(p, plain, baseFs, labelWmm){
   p=p||{};
-  var widthPct=100-(p.x||0);
-  if(p.wrap) return 'width:'+widthPct+'%;white-space:normal;word-break:break-all;'+(p.align?'text-align:'+p.align+';':'');
-  if(p.align) return 'width:'+widthPct+'%;white-space:nowrap;overflow:hidden;text-align:'+p.align+';';
-  return 'white-space:nowrap;';
+  var w=(p.w!=null?p.w:(100-(p.x||0)));
+  var mode=p.mode||(p.wrap?'wrap':'line'); // 구버전 wrap 불린 호환
+  var fs=baseFs, css;
+  var alignCss=p.align?'text-align:'+p.align+';':'';
+  if(mode==='fit'){
+    var wmm=w/100*(labelWmm||50);
+    var n=(plain&&String(plain).length)||1;
+    fs=Math.min(baseFs, Math.max(4, wmm*2.83/n*1.7)); // 글자수·박스폭 기반 근사 축소
+    css='width:'+w+'%;white-space:nowrap;overflow:hidden;'+alignCss;
+  } else if(mode==='wrap'){
+    css='width:'+w+'%;white-space:normal;word-break:keep-all;overflow-wrap:break-word;'+alignCss;
+  } else {
+    css=p.align?('width:'+w+'%;white-space:nowrap;overflow:hidden;'+alignCss):'white-space:nowrap;';
+  }
+  return {css:css, fs:fs};
 }
 
 function _modLabelHtml(def,row,opt){
@@ -1635,16 +1648,20 @@ function _modLabelHtml(def,row,opt){
     }
     if(showTitle){
       var tp=pos['_title']||{x:4,y:4,fs:14};
-      h+='<div style="position:absolute;left:'+tp.x+'%;top:'+tp.y+'%;font-size:'+(tp.fs||14)+'pt;font-weight:800;line-height:1.1;'+_mlBoxCss(tp)+'">'+esc(String(titleV))+'</div>';
+      var tef=_mlElemFit(tp, String(titleV), tp.fs||14, opt.w);
+      h+='<div style="position:absolute;left:'+tp.x+'%;top:'+tp.y+'%;font-size:'+tef.fs+'pt;font-weight:800;line-height:1.1;'+tef.css+'">'+esc(String(titleV))+'</div>';
     }
     cols.forEach(function(c){
       if(c.key===opt.titleKey) return;
       var v=row[c.key]; if(v==null||v==='') return;
       var fp=pos[c.key]||null;
       if(!fp) return;
-      var sep=fp.colon?': ':' ';
+      var pv=_modPlain(c,v);
+      var plain=c.label+(fp.colon?': ':' ')+pv;
+      var ef=_mlElemFit(fp, plain, fp.fs||7.5, opt.w);
+      var sep=fp.brk?((fp.colon?':':'')+'<br>'):(fp.colon?': ':' ');
       var lbl=fp.bold?esc(c.label):'<b>'+esc(c.label)+'</b>';
-      h+='<div style="position:absolute;left:'+fp.x+'%;top:'+fp.y+'%;font-size:'+(fp.fs||7.5)+'pt;line-height:1.3;color:#222;'+(fp.bold?'font-weight:800;':'')+_mlBoxCss(fp)+'">'+lbl+sep+esc(_modPlain(c,v))+'</div>';
+      h+='<div style="position:absolute;left:'+fp.x+'%;top:'+fp.y+'%;font-size:'+ef.fs+'pt;line-height:1.3;color:#222;'+(fp.bold?'font-weight:800;':'')+ef.css+'">'+lbl+sep+esc(pv)+'</div>';
     });
     h+='</div>';
     return h;
@@ -2210,13 +2227,14 @@ function _mllRender(){
 
   var items=[];
   var tp=pos['_title']||{x:4,y:4,fs:14};
-  items.push({id:'_title',label:'제목',text:String(titleV),x:tp.x,y:tp.y,fs:tp.fs||14,bold:true,wrap:tp.wrap,align:tp.align,color:'#6366f1'});
+  items.push({id:'_title',label:'제목',text:String(titleV),x:tp.x,y:tp.y,fs:tp.fs||14,bold:true,mode:(tp.mode||(tp.wrap?'wrap':'line')),w:tp.w,align:tp.align,color:'#6366f1'});
   L.cols.forEach(function(c){
     if(c.key===L.opt.titleKey) return;
     var fp=pos[c.key]||{x:4,y:20,fs:7.5};
     ci=(ci+1)%colors.length;
     var v=row[c.key]||'샘플';
-    items.push({id:c.key,label:c.label,text:c.label+(fp.colon?': ':' ')+v,x:fp.x,y:fp.y,fs:fp.fs||7.5,bold:fp.bold,wrap:fp.wrap,align:fp.align,color:colors[ci]});
+    var sepC=fp.brk?((fp.colon?':':'')+'\n'):(fp.colon?': ':' ');
+    items.push({id:c.key,label:c.label,text:c.label+sepC+v,x:fp.x,y:fp.y,fs:fp.fs||7.5,bold:fp.bold,mode:(fp.mode||(fp.wrap?'wrap':'line')),w:fp.w,align:fp.align,color:colors[ci]});
   });
   var qp=pos['_qr']||{x:70,y:4,w:25};
   var qSize=Math.round((qp.w||25)*SCALE);
@@ -2228,8 +2246,18 @@ function _mllRender(){
       html+='<div class="mll_el" data-id="'+it.id+'" style="position:absolute;left:'+left+'px;top:'+top+'px;width:'+qSize+'px;height:'+qSize+'px;border:2px dashed '+it.color+';border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:11px;color:'+it.color+';font-weight:700;cursor:move;background:rgba(51,65,85,.08)">QR</div>';
     } else {
       var fsPx=it.fs*SCALE*0.35;
-      var wpx=(100-(it.x||0))/100*cW;
-      var box=it.wrap?('width:'+wpx+'px;white-space:normal;word-break:break-all;'+(it.align?'text-align:'+it.align+';':'')):(it.align?('width:'+wpx+'px;white-space:nowrap;overflow:hidden;text-align:'+it.align+';'):'white-space:nowrap;');
+      var bw=(it.w!=null?it.w:(100-(it.x||0)));
+      var bwpx=bw/100*cW;
+      var box;
+      if(it.mode==='fit'){
+        var wmm=bw/100*L.opt.w; var n=(String(it.text).length)||1;
+        fsPx=Math.min(it.fs, Math.max(4, wmm*2.83/n*1.7))*SCALE*0.35;
+        box='width:'+bwpx+'px;white-space:nowrap;overflow:hidden;'+(it.align?'text-align:'+it.align+';':'');
+      } else if(it.mode==='wrap'){
+        box='width:'+bwpx+'px;white-space:pre-line;word-break:keep-all;'+(it.align?'text-align:'+it.align+';':'');
+      } else {
+        box=(it.align?'width:'+bwpx+'px;white-space:pre;overflow:hidden;text-align:'+it.align+';':'white-space:pre;');
+      }
       html+='<div class="mll_el" data-id="'+it.id+'" style="position:absolute;left:'+left+'px;top:'+top+'px;border:1.5px dashed '+it.color+';border-radius:3px;padding:2px 4px;font-size:'+fsPx+'px;'+(it.bold?'font-weight:800;':'')+'color:'+it.color+';cursor:move;background:rgba(255,255,255,.85);box-sizing:border-box;'+box+'">'+esc(it.text)+'</div>';
     }
   });
@@ -2315,13 +2343,21 @@ function _mllShowCtrl(id){
   } else {
     h+='<label style="display:block;margin-bottom:6px;margin-top:6px">글자 크기 <b>'+(p.fs||(id==='_title'?14:7.5))+'pt</b></label>';
     h+='<input type="range" min="5" max="24" step="0.5" value="'+(p.fs||(id==='_title'?14:7.5))+'" style="width:100%" oninput="_mllSetPos(\''+id+'\',\'fs\',this.value)">';
-    // 텍스트 서식 옵션
+    // 텍스트 처리 방식 (한 줄 / 줄바꿈 / 박스맞춤)
     var bs=function(on){return 'padding:5px 7px;border:1px solid '+(on?'#6366f1':'#cbd5e1')+';border-radius:5px;background:'+(on?'#eef2ff':'#fff')+';color:#334155;font-size:12px;cursor:pointer;font-weight:700';};
-    h+='<div style="margin-top:10px;border-top:1px solid #e2e8f0;padding-top:8px;font-size:11px;color:#94a3b8;margin-bottom:5px">서식</div>';
+    var mode=p.mode||(p.wrap?'wrap':'line');
+    var mb=function(m,lbl){return '<button onclick="_mllSetMode(\''+id+'\',\''+m+'\')" style="flex:1;'+bs(mode===m)+'">'+lbl+'</button>';};
+    h+='<div style="margin-top:10px;border-top:1px solid #e2e8f0;padding-top:8px;font-size:11px;color:#94a3b8;margin-bottom:5px">텍스트 처리</div>';
+    h+='<div style="display:flex;gap:4px">'+mb('line','한 줄')+mb('wrap','줄바꿈')+mb('fit','박스맞춤')+'</div>';
+    if(mode==='wrap'||mode==='fit'){
+      var bw=(p.w!=null?p.w:(100-(p.x||0)));
+      h+='<label style="display:block;margin-top:6px;font-size:12px">박스 폭 <b>'+Math.round(bw)+'%</b> '+(mode==='fit'?'<span style="color:#94a3b8;font-size:10px">(좁히면 글자 작아짐)</span>':'<span style="color:#94a3b8;font-size:10px">(좁히면 줄바꿈)</span>')+'</label>';
+      h+='<input type="range" min="10" max="100" step="1" value="'+bw+'" style="width:100%" oninput="_mllSetPos(\''+id+'\',\'w\',this.value)">';
+    }
+    h+='<div style="margin-top:8px;font-size:11px;color:#94a3b8;margin-bottom:5px">서식</div>';
     h+='<div style="display:flex;flex-wrap:wrap;gap:4px">';
     h+='<button onclick="_mllToggle(\''+id+'\',\'bold\')" style="'+bs(p.bold)+'">B 굵게</button>';
-    h+='<button onclick="_mllToggle(\''+id+'\',\'wrap\')" style="'+bs(p.wrap)+'">↵ 줄바꿈</button>';
-    if(id!=='_title') h+='<button onclick="_mllToggle(\''+id+'\',\'colon\')" style="'+bs(p.colon)+'">: 표시</button>';
+    if(id!=='_title'){ h+='<button onclick="_mllToggle(\''+id+'\',\'brk\')" style="'+bs(p.brk)+'">↵ 라벨/값</button>'; h+='<button onclick="_mllToggle(\''+id+'\',\'colon\')" style="'+bs(p.colon)+'">: 표시</button>'; }
     h+='</div>';
     h+='<div style="display:flex;gap:4px;margin-top:5px">';
     h+='<button onclick="_mllSetAlign(\''+id+'\',\'left\')" style="flex:1;'+bs(!p.align||p.align==='left')+'">⬅ 왼쪽</button>';
@@ -2329,6 +2365,12 @@ function _mllShowCtrl(id){
     h+='</div>';
   }
   el.innerHTML=h;
+}
+function _mllSetMode(id,m){
+  var L=window.__mlLayout; if(!L) return;
+  if(!L.pos[id]) L.pos[id]={};
+  L.pos[id].mode=m; L.pos[id].wrap=(m==='wrap'); // 구버전 호환 필드도 갱신
+  _mllRender(); _mllBindEvents(); _mllShowCtrl(id);
 }
 function _mllToggle(id,prop){
   var L=window.__mlLayout; if(!L) return;
