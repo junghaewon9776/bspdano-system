@@ -1517,6 +1517,7 @@ function _mlPresetSaveNew(){
   var arr=_mlPresets(key);
   arr.push(_mlCurrentPreset(name));
   _mlSavePresets(key,arr);
+  window.__mlActivePreset=arr.length-1;        // 새 프리셋을 활성으로
   _mlRefreshPresetSelect(key, arr.length-1);
   toast('프리셋 "'+name+'" 저장됨');
 }
@@ -1528,6 +1529,7 @@ function _mlPresetUpdate(){
   if(!confirm('"'+name+'" 프리셋을 현재 설정으로 덮어쓸까요?')) return;
   arr[i]=_mlCurrentPreset(name);
   _mlSavePresets(key,arr);
+  window.__mlActivePreset=i;
   toast('프리셋 "'+name+'" 수정됨');
 }
 function _mlPresetDelete(){
@@ -1537,6 +1539,7 @@ function _mlPresetDelete(){
   if(!confirm('"'+arr[i].name+'" 프리셋을 삭제할까요?')) return;
   arr.splice(i,1);
   _mlSavePresets(key,arr);
+  window.__mlActivePreset=null;
   _mlRefreshPresetSelect(key, '');
   toast('삭제됨');
 }
@@ -1561,6 +1564,7 @@ function _mlPresetLoad(){
   document.querySelectorAll('.ml_field').forEach(function(cb){ cb.checked = p.fields ? (p.fields.indexOf(cb.value)>=0) : true; });
   if(p.layout) _saveModLabelLayout(key, mode, p.layout);
   else { try{ localStorage.removeItem('modLabelLayout_'+key+'_'+mode); }catch(e){} }
+  window.__mlActivePreset=pn(sel.value);        // 활성 프리셋 기억
   _modLabelPreview();
   toast('프리셋 "'+p.name+'" 적용');
 }
@@ -1630,6 +1634,7 @@ function popModLabel(key,singleId,idsList){
   else if(idsList&&idsList.length) rows=(_modData[key]||[]).filter(function(r){return idsList.indexOf(r._id)>=0});
   else rows=_modFilteredData(key);
   if(!rows.length) return toast('출력할 항목이 없습니다',true);
+  if(window.__modLabelKey!==key) window.__mlActivePreset=null; // 다른 모듈이면 활성 프리셋 초기화
   window.__modLabelKey = key;
   window.__modLabelAll = rows;            // 후보 행 객체(순서 유지)
   window.__modLabelRows = rows.map(function(r){return r._id;});  // 미리보기용(첫 행)
@@ -1741,7 +1746,11 @@ function popModLabel(key,singleId,idsList){
   h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px"><button class="btn" style="background:#6366f1;color:#fff" onclick="popModLabelLayout(\''+key+'\')">📐 배치 편집</button><div><button class="btn" onclick="closePopup()">취소</button> <button class="btn btn-b" style="background:#475569" onclick="modDoPrint()">🖨 <span id="ml_printcnt">'+rows.length+'</span>장 출력</button></div></div>';
   h+='</div>';
   openPopup(h,560);
-  setTimeout(function(){ _modLabelPreview(); _mlUpdatePickCount(); _qzUpdateUI(); },60);
+  setTimeout(function(){
+    // 활성 프리셋 드롭다운 선택 복원 (배치편집 갔다 와도 풀리지 않게)
+    if(window.__mlActivePreset!=null){ var ps=document.getElementById('ml_preset'); if(ps){ var ov=String(window.__mlActivePreset); var ok=false; for(var i=0;i<ps.options.length;i++){ if(ps.options[i].value===ov){ok=true;break;} } if(ok) ps.value=ov; else window.__mlActivePreset=null; } }
+    _modLabelPreview(); _mlUpdatePickCount(); _qzUpdateUI();
+  },60);
 }
 
 // 입력칸 → 현재 모드 크기 슬롯에 동기화
@@ -2310,6 +2319,9 @@ function _mllSave(){
   _saveModLabelLayout(L.key,L.mode,layout);
   // 재오픈 시 같은 모드로 열려 이 배치가 보이도록 opt의 mode도 못박음
   try{ var o=JSON.parse(localStorage.getItem('modLabelOpt_'+L.key)||'{}'); o.mode=L.mode; localStorage.setItem('modLabelOpt_'+L.key, JSON.stringify(o)); }catch(e){}
+  // 활성 프리셋이 있으면 그 프리셋의 배치도 자동 갱신 (프리셋 다시 골라도 이 배치 유지)
+  var ap=window.__mlActivePreset;
+  if(ap!=null){ var pr=_mlPresets(L.key); if(pr[ap]){ pr[ap].layout=layout; pr[ap].mode=L.mode; _mlSavePresets(L.key,pr); } }
   if(window.__mllCleanup) window.__mllCleanup();
   closePopup();
   toast('라벨 배치 저장됨 ('+(L.mode==='a4'?'A4용':'낱장용')+')');
