@@ -2105,8 +2105,8 @@ function popModLog(key, rowId){
     if(!arr.length){
       h+='<div style="text-align:center;color:#94a3b8;padding:30px">기록된 로그가 없습니다</div>';
     } else {
-      h+='<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="background:#f1f5f9;position:sticky;top:0">';
-      h+='<th style="padding:6px 8px;text-align:left">일시</th><th style="padding:6px 8px;text-align:left">처리자</th><th style="padding:6px 8px;text-align:left">동작</th><th style="padding:6px 8px;text-align:left">대상</th></tr></thead><tbody>';
+      h+='<table style="width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed"><thead><tr style="background:#f1f5f9;position:sticky;top:0">';
+      h+='<th style="padding:6px 8px;text-align:left;width:120px">일시</th><th style="padding:6px 8px;text-align:left;width:70px">처리자</th><th style="padding:6px 8px;text-align:left;width:80px">동작</th><th style="padding:6px 8px;text-align:left">대상</th></tr></thead><tbody>';
       arr.forEach(function(l){
         var dt=_modFmtDateTime(l.t);
         var actColor = (l.act==='거부'||l.act==='탈락'||l.act==='삭제')?'#dc2626':(l.act==='발급'?'#475569':'#16a34a');
@@ -2114,12 +2114,12 @@ function popModLog(key, rowId){
         h+='<td style="padding:5px 8px;white-space:nowrap;color:#64748b">'+esc(dt)+'</td>';
         h+='<td style="padding:5px 8px;font-weight:600;color:#0f172a">'+esc(l.byName||l.by||'-')+'</td>';
         h+='<td style="padding:5px 8px"><b style="color:'+actColor+'">'+esc(l.act||'')+'</b>'+(l.detail?' <span style="color:#94a3b8;font-size:11px">'+esc(l.detail)+'</span>':'')+'</td>';
-        h+='<td style="padding:5px 8px">'+esc(l.rowTitle||'')+'</td></tr>';
+        h+='<td style="padding:5px 8px;word-break:break-all;white-space:normal">'+esc(l.rowTitle||'')+'</td></tr>';
       });
       h+='</tbody></table>';
     }
     h+='<div style="text-align:right;margin-top:12px"><button class="btn" onclick="closePopup()">닫기</button></div></div>';
-    openPopup(h,640);
+    openPopup(h,820);
   }).catch(function(e){ hideLoading(); toast('로그 조회 실패: '+(e.message||e),true); });
 }
 
