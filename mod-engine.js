@@ -981,6 +981,7 @@ function _modPlain(c,v){ if(c.type==='number'&&c.comma) return Number(v).toLocal
 
 function _modLabelHtml(def,row,opt){
   var cols=(def.columns||[]).filter(function(c){return !c.adminOnly&&c.key!=='status'&&!c.hideTable&&c.type!=='file'&&c.type!=='consent'});
+  if(opt.fields&&opt.fields.length) cols=cols.filter(function(c){return opt.fields.indexOf(c.key)>=0;});
   var url=_modViewUrl(def,row);
   var qr='https://api.qrserver.com/v1/create-qr-code/?size=160x160&margin=0&data='+encodeURIComponent(url);
   var titleV = opt.titleKey ? (row[opt.titleKey]||'') : (cols[0]?row[cols[0].key]:'');
@@ -1006,7 +1007,9 @@ function popModLabel(key,singleId){
   if(!rows.length) return toast('출력할 항목이 없습니다',true);
   window.__modLabelRows = rows.map(function(r){return r._id;});
   window.__modLabelKey = key;
-  var fieldOpts=(def.columns||[]).filter(function(c){return !c.adminOnly&&c.key!=='status'&&!c.hideTable}).map(function(c){return '<option value="'+esc(c.key)+'"'+(opt.titleKey===c.key?' selected':'')+'>'+esc(c.label)+'</option>';}).join('');
+  var allCols=(def.columns||[]).filter(function(c){return !c.adminOnly&&c.key!=='status'&&!c.hideTable&&c.type!=='file'&&c.type!=='consent'});
+  var fieldOpts=allCols.map(function(c){return '<option value="'+esc(c.key)+'"'+(opt.titleKey===c.key?' selected':'')+'>'+esc(c.label)+'</option>';}).join('');
+  var checkedFields=(opt.fields&&opt.fields.length)?opt.fields:allCols.map(function(c){return c.key;});
   var h='<div class="pop-head"><h3>🖨 '+esc(def.label)+' 라벨 출력 ('+rows.length+'장)</h3></div>';
   h+='<div style="padding:14px;max-height:75vh;overflow:auto">';
   h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">';
@@ -1018,6 +1021,12 @@ function popModLabel(key,singleId){
   h+='<label style="font-size:12px;color:#475569">오른쪽 여백(mm)<input id="ml_pr" type="number" value="'+opt.pr+'" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:6px" oninput="_modLabelPreview()"></label>';
   h+='</div>';
   h+='<label style="font-size:12px;color:#475569;display:block;margin-bottom:10px">크게 표시할 항목<select id="ml_title" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:6px" onchange="_modLabelPreview()">'+fieldOpts+'</select></label>';
+  h+='<div style="font-size:12px;color:#475569;margin-bottom:10px">라벨에 표시할 항목 <span style="font-size:10px;color:#94a3b8">(체크한 것만, 컬럼 순서대로)</span>';
+  h+='<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:5px">';
+  allCols.forEach(function(c){
+    h+='<label style="font-size:12px;display:flex;align-items:center;gap:3px;background:#f1f5f9;padding:3px 8px;border-radius:6px"><input type="checkbox" class="ml_field" value="'+esc(c.key)+'"'+(checkedFields.indexOf(c.key)>=0?' checked':'')+' onchange="_modLabelPreview()"> '+esc(c.label)+'</label>';
+  });
+  h+='</div></div>';
   h+='<div style="font-size:12px;font-weight:700;margin-bottom:4px;color:#475569">미리보기 (QR 스캔 → 정보 조회 페이지)</div>';
   h+='<div id="ml_preview" style="background:#e2e8f0;padding:12px;border-radius:8px;overflow:auto;text-align:center"></div>';
   h+='<div style="text-align:right;margin-top:14px"><button class="btn" onclick="closePopup()">취소</button> <button class="btn btn-b" style="background:#475569" onclick="modDoPrint()">🖨 '+rows.length+'장 출력</button></div>';
@@ -1026,6 +1035,8 @@ function popModLabel(key,singleId){
   setTimeout(_modLabelPreview,60);
 }
 function _modLabelReadOpt(){
+  var fields=[];
+  document.querySelectorAll('.ml_field:checked').forEach(function(el){ fields.push(el.value); });
   return {
     w:pn(document.getElementById('ml_w').value)||90,
     h:pn(document.getElementById('ml_h').value)||50,
@@ -1033,7 +1044,8 @@ function _modLabelReadOpt(){
     pr:pn(document.getElementById('ml_pr').value)||0,
     pb:pn(document.getElementById('ml_pb').value)||0,
     pl:pn(document.getElementById('ml_pl').value)||0,
-    titleKey:document.getElementById('ml_title').value
+    titleKey:document.getElementById('ml_title').value,
+    fields:fields
   };
 }
 function _modLabelPreview(){
@@ -1088,17 +1100,41 @@ function renderModView(key,id,evtId){
   }).catch(function(e){ document.getElementById('modViewCard').innerHTML='<div style="text-align:center;color:#ef4444">오류: '+esc(e.message)+'</div>'; });
 }
 function _renderModViewUI(def,row){
-  var h='<div style="text-align:center;margin-bottom:16px"><div style="font-size:40px">'+(def.icon||'📋')+'</div><h2 style="color:#0f172a;margin:6px 0;font-size:19px">'+esc(def.label)+'</h2></div>';
+  var h='<div style="text-align:center;margin-bottom:14px"><div style="font-size:40px">'+(def.icon||'📋')+'</div><h2 style="color:#0f172a;margin:6px 0;font-size:19px">'+esc(def.label)+'</h2></div>';
+
+  // 기간 정상 판정 (날짜 컬럼 2개 = 시작/종료) → 오늘이 기간 안이면 정상
+  var dateCols=(def.columns||[]).filter(function(c){return c.type==='date'});
+  if(dateCols.length>=2){
+    var from=row[dateCols[0].key], to=row[dateCols[1].key];
+    if(from&&to){
+      var today=new Date().toISOString().slice(0,10);
+      var bg,txt,ic,msg;
+      if(today>=from && today<=to){ bg='#dcfce7';txt='#15803d';ic='✅';msg='정상 — 사용 가능'; }
+      else if(today<from){ bg='#fef9c3';txt='#a16207';ic='⏳';msg='사용 기간 전'; }
+      else { bg='#fee2e2';txt='#b91c1c';ic='⛔';msg='사용 기간 만료'; }
+      h+='<div style="background:'+bg+';color:'+txt+';border-radius:12px;padding:14px;text-align:center;font-weight:800;font-size:17px;margin-bottom:14px">'+ic+' '+msg+'<div style="font-size:12px;font-weight:600;margin-top:4px;opacity:.85">'+esc(from)+' ~ '+esc(to)+'</div></div>';
+    }
+  }
+
+  // 상태 배지
   var statusCol=(def.columns||[]).find(function(c){return c.key==='status'&&c.type==='badge'});
   if(statusCol && row.status && statusCol.badgeMap && statusCol.badgeMap[row.status]){
     var bm=statusCol.badgeMap[row.status];
     h+='<div style="text-align:center;margin-bottom:14px"><span style="padding:6px 18px;border-radius:20px;font-size:15px;font-weight:800;background:'+(bm.bg||'#e2e8f0')+';color:'+(bm.color||'#475569')+'">'+esc(bm.label||row.status)+'</span></div>';
   }
+
   h+='<table style="width:100%;border-collapse:collapse;font-size:14px">';
   (def.columns||[]).forEach(function(c){
     if(c.key==='status'||c.type==='consent'||c.hideTable) return;
     var v=row[c.key]; if(v==null||v==='') return;
-    h+='<tr style="border-bottom:1px solid #f1f5f9"><td style="padding:9px 4px;color:#64748b;width:38%;vertical-align:top">'+esc(c.label)+'</td><td style="padding:9px 4px;font-weight:600;color:#0f172a">'+_modFmtCell(c,v)+'</td></tr>';
+    var valHtml;
+    if(c.type==='tel'){
+      var cl=String(v).replace(/[^0-9+]/g,'');
+      valHtml='<a href="tel:'+cl+'" style="display:inline-block;background:#16a34a;color:#fff;padding:8px 16px;border-radius:8px;text-decoration:none;font-weight:700;font-size:14px">📞 '+esc(String(v))+'</a>';
+    } else {
+      valHtml=_modFmtCell(c,v);
+    }
+    h+='<tr style="border-bottom:1px solid #f1f5f9"><td style="padding:9px 4px;color:#64748b;width:36%;vertical-align:middle">'+esc(c.label)+'</td><td style="padding:9px 4px;font-weight:600;color:#0f172a">'+valHtml+'</td></tr>';
   });
   h+='</table>';
   document.getElementById('modViewCard').innerHTML=h;
