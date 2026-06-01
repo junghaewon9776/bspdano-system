@@ -129,6 +129,7 @@ function dMod(key){
   h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">';
   h+='<h3 style="margin:0">'+(def.icon||"📦")+' '+esc(def.label)+' <span style="color:#94a3b8;font-weight:400">('+data.length+')</span></h3>';
   h+='<div style="display:flex;gap:6px;flex-wrap:wrap">';
+  if(isA() && feat.applyForm) h+='<button class="btn" style="background:#0ea5e9;color:#fff" onclick="popModFormLink(\''+key+'\')">🔗 신청폼 링크</button>';
   if(isA()) h+='<button class="btn btn-b" onclick="popModAdd(\''+key+'\')">➕ 추가</button>';
   if(feat.excel) h+='<button class="btn" onclick="modExportExcel(\''+key+'\')">📥 엑셀</button>';
   h+='</div></div>';
@@ -161,15 +162,23 @@ function dMod(key){
       var arrow=sort.col===c.key?(sort.asc?' ▲':' ▼'):'';
       h+='<th style="cursor:pointer;white-space:nowrap" onclick="_modToggleSort(\''+key+'\',\''+c.key+'\')">'+esc(c.label)+arrow+'</th>';
     });
-    if(isA()) h+='<th style="width:80px"></th>';
+    // 선정 기능: status 컬럼(badge)이 있으면 선정/탈락 버튼 노출
+    var statusCol=(def.columns||[]).find(function(c){return c.key==='status'&&c.type==='badge'});
+    var hasSelect=feat.applyForm && statusCol;
+    if(isA()) h+='<th style="width:'+(hasSelect?'150':'80')+'px"></th>';
     h+='</tr></thead><tbody>';
 
     data.forEach(function(row,idx){
-      h+='<tr>';
+      var st=row.status||'';
+      h+='<tr'+(st==='탈락'?' style="opacity:.5"':'')+'>';
       h+='<td class="ctr" style="color:#94a3b8">'+(idx+1)+'</td>';
       cols.forEach(function(c){ h+='<td>'+_modFmtCell(c,row[c.key])+'</td>'; });
       if(isA()){
-        h+='<td class="ctr">';
+        h+='<td class="ctr" style="white-space:nowrap">';
+        if(hasSelect){
+          h+='<button class="btn btn-s" onclick="modSetStatus(\''+key+'\',\''+esc(row._id||'')+'\',\'선정\')" style="background:'+(st==='선정'?'#16a34a':'#dcfce7')+';color:'+(st==='선정'?'#fff':'#16a34a')+';font-weight:700" title="선정">✓</button> ';
+          h+='<button class="btn btn-s" onclick="modSetStatus(\''+key+'\',\''+esc(row._id||'')+'\',\'탈락\')" style="background:'+(st==='탈락'?'#dc2626':'#fee2e2')+';color:'+(st==='탈락'?'#fff':'#dc2626')+';font-weight:700" title="탈락">✕</button> ';
+        }
         h+='<button class="btn btn-s" onclick="popModEdit(\''+key+'\',\''+esc(row._id||'')+'\')">✏️</button> ';
         h+='<button class="btn btn-s" onclick="modDel(\''+key+'\',\''+esc(row._id||'')+'\')" style="color:#dc2626">🗑</button>';
         h+='</td>';
@@ -453,9 +462,12 @@ function popModDef(keyOrIdx){
     h+='<input id="mdf_key" value="'+esc(def.key||"")+'" placeholder="예: vehicle" style="font-family:monospace" oninput="this.value=this.value.replace(/[^a-zA-Z0-9_]/g,\'\')">';
   }
   h+='<label style="font-size:12px;font-weight:700;color:#64748b">카테고리</label>';
-  h+='<input id="mdf_catLabel" value="'+esc(def.catLabel||"")+'" placeholder="비우면 기본 📦 커스텀">';
+  h+='<input id="mdf_catLabel" value="'+esc(def.catLabel||"")+'" placeholder="비우면 기본 커스텀 (이모지 제외)">';
   h+='<label style="font-size:12px;font-weight:700;color:#64748b">데이터 범위</label>';
   h+='<select id="mdf_global"><option value="false"'+(def.global?'':' selected')+'>행사별 (각 행사 데이터 분리)</option><option value="true"'+(def.global?' selected':'')+'>공통 (전체 행사 공유)</option></select>';
+  h+='<label style="font-size:12px;font-weight:700;color:#64748b">공개 신청폼</label>';
+  var afOn=def.features&&def.features.applyForm;
+  h+='<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#475569"><input type="checkbox" id="mdf_applyForm"'+(afOn?' checked':'')+'> 켜면 신청폼 링크가 생기고 외부에서 신청 → 선정/탈락 처리 가능</label>';
   h+='</div>';
 
   // 컬럼 섹션
@@ -496,6 +508,7 @@ function _renderModDefCols(){
     h+='<label style="font-size:10px;display:flex;align-items:center;gap:2px"><input type="checkbox"'+(c.search?' checked':'')+' onchange="_modDefEditCols['+i+'].search=this.checked">검색</label>';
     h+='<label style="font-size:10px;display:flex;align-items:center;gap:2px"><input type="checkbox"'+(c.filter?' checked':'')+' onchange="_modDefEditCols['+i+'].filter=this.checked">필터</label>';
     h+='<label style="font-size:10px;display:flex;align-items:center;gap:2px"><input type="checkbox"'+(c.comma?' checked':'')+' onchange="_modDefEditCols['+i+'].comma=this.checked">콤마</label>';
+    h+='<label style="font-size:10px;display:flex;align-items:center;gap:2px" title="체크 시 공개 신청폼에는 안 보이고 관리자만 입력/조회"><input type="checkbox"'+(c.adminOnly?' checked':'')+' onchange="_modDefEditCols['+i+'].adminOnly=this.checked">관리자전용</label>';
     // 순서 / 삭제
     if(i>0) h+='<button onclick="_modDefMoveCol('+i+',-1)" style="border:none;background:none;cursor:pointer;font-size:12px">▲</button>';
     if(i<_modDefEditCols.length-1) h+='<button onclick="_modDefMoveCol('+i+',1)" style="border:none;background:none;cursor:pointer;font-size:12px">▼</button>';
@@ -561,13 +574,21 @@ function saveModDef(keyOrNew){
   var icon=(document.getElementById('mdf_icon').value||'📦').trim();
   var catLabel=(document.getElementById('mdf_catLabel').value||'').trim();
   var global=document.getElementById('mdf_global').value==='true';
+  var afEl=document.getElementById('mdf_applyForm');
+  var applyForm=afEl?afEl.checked:false;
+
+  // 신청폼 켜면 선정용 status 컬럼 자동 보장
+  if(applyForm && !cols.some(function(c){return c.key==='status'})){
+    cols.push({key:'status',label:'선정상태',type:'badge',adminOnly:true,filter:true,
+      badgeMap:{'대기':{label:'대기',bg:'#fef3c7',color:'#d97706'},'선정':{label:'선정',bg:'#dcfce7',color:'#16a34a'},'탈락':{label:'탈락',bg:'#fee2e2',color:'#dc2626'}}});
+  }
 
   var def={
     key:key, label:label, icon:icon,
     cat:'custom', catLabel:catLabel||'', catIcon:icon,
     fbPath:'Mod_'+key, global:global,
     columns:cols,
-    features:{search:true,excel:true}
+    features:{search:true,excel:true,applyForm:applyForm}
   };
 
   showLoading('저장 중...');
@@ -596,4 +617,105 @@ function delModDef(key){
   _saveModDefs().then(function(){
     hideLoading();toast('삭제됨');mkTabs();draw();
   }).catch(function(e){hideLoading();toast('실패: '+e.message,true)});
+}
+
+// ═══════════════════════════════════════════
+// 공개 신청폼 + 선정
+// ═══════════════════════════════════════════
+
+// 선정/탈락 상태 변경
+function modSetStatus(key,id,status){
+  var path=_modFbPath(key); if(!path) return;
+  var data=(_modData[key]||[]).slice();
+  var idx=-1; for(var i=0;i<data.length;i++){if(data[i]._id===id){idx=i;break}}
+  if(idx<0) return;
+  // 이미 같은 상태면 '대기'로 토글
+  var newStatus = (data[idx].status===status) ? '대기' : status;
+  var merged={}; for(var k in data[idx])merged[k]=data[idx][k];
+  merged.status=newStatus; merged._updatedAt=new Date().toISOString();
+  data[idx]=merged;
+  fbDb.ref(path).set(data).then(function(){toast(newStatus+' 처리됨')})
+    .catch(function(e){toast('실패: '+e.message,true)});
+}
+
+// 신청폼 링크 팝업
+function popModFormLink(key){
+  var def=_modDefs[key]; if(!def) return;
+  var base=location.href.split('?')[0];
+  var evtId=def.global?'':((CUR_EVT&&CUR_EVT.evtId)||'');
+  var url=base+'?modform='+encodeURIComponent(key)+(evtId?'&evtId='+encodeURIComponent(evtId):'');
+  var h='<div class="pop-head"><h3>🔗 '+esc(def.label)+' 신청폼 공유</h3></div>';
+  h+='<div style="padding:14px">';
+  h+='<p style="color:#64748b;font-size:13px;margin-bottom:14px;line-height:1.6">아래 링크를 카톡·문자로 공유하면 누구나 신청할 수 있습니다.<br>신청 내용은 이 목록에 쌓이고, <b>✓ 선정</b> / <b>✕ 탈락</b> 버튼으로 처리할 수 있습니다.</p>';
+  h+='<div style="display:flex;gap:6px"><input id="modFormLinkInput" type="text" readonly value="'+esc(url)+'" onclick="this.select()" style="flex:1;padding:9px 11px;border:1px solid #cbd5e1;border-radius:8px;font-size:12px;font-family:monospace">';
+  h+='<button class="btn btn-b" onclick="_copyModFormLink()" style="white-space:nowrap">📋 복사</button></div>';
+  h+='<div style="margin-top:14px;text-align:right"><button class="btn" onclick="closePopup()">닫기</button></div>';
+  h+='</div>';
+  openPopup(h,520);
+}
+function _copyModFormLink(){
+  var el=document.getElementById('modFormLinkInput'); if(!el) return;
+  el.select();
+  if(navigator.clipboard) navigator.clipboard.writeText(el.value).then(function(){toast('링크 복사됨')}).catch(function(){document.execCommand('copy');toast('링크 복사됨')});
+  else { document.execCommand('copy'); toast('링크 복사됨'); }
+}
+
+// ── 비로그인 공개 신청폼 렌더 ──
+function renderModApplyForm(key,evtId){
+  document.body.innerHTML='<div style="min-height:100vh;display:flex;align-items:flex-start;justify-content:center;background:linear-gradient(135deg,#0ea5e9,#2563eb);padding:24px 16px"><div id="modApplyCard" style="background:#fff;border-radius:16px;padding:28px 24px;width:480px;max-width:100%;box-shadow:0 20px 60px rgba(0,0,0,.25)"><div style="text-align:center;color:#94a3b8;padding:30px">불러오는 중...</div></div></div>';
+  if(typeof fbDb==='undefined'){ document.getElementById('modApplyCard').innerHTML='<div style="text-align:center;color:#ef4444">시스템 초기화 오류</div>'; return; }
+  fbDb.ref('/main/ModDefs').once('value').then(function(snap){
+    var defs=snap.val()||[]; if(!Array.isArray(defs))defs=Object.values(defs);
+    var def=null; for(var i=0;i<defs.length;i++){if(defs[i]&&defs[i].key===key){def=defs[i];break}}
+    if(!def){ document.getElementById('modApplyCard').innerHTML='<div style="text-align:center;color:#64748b;padding:20px">신청폼을 찾을 수 없습니다</div>'; return; }
+    if(!(def.features&&def.features.applyForm)){ document.getElementById('modApplyCard').innerHTML='<div style="text-align:center;color:#64748b;padding:20px">이 모듈은 공개 신청을 받지 않습니다</div>'; return; }
+    _renderModApplyUI(def,evtId);
+  }).catch(function(e){ document.getElementById('modApplyCard').innerHTML='<div style="text-align:center;color:#ef4444">오류: '+esc(e.message)+'</div>'; });
+}
+
+function _renderModApplyUI(def,evtId){
+  window.__modApplyDef=def; window.__modApplyEvt=evtId;
+  var h='<h2 style="text-align:center;color:#2563eb;margin-bottom:4px;font-size:20px">'+(def.icon||'📝')+' '+esc(def.label)+' 신청</h2>';
+  h+='<p style="text-align:center;color:#94a3b8;font-size:12px;margin-bottom:20px">아래 내용을 작성 후 신청해 주세요</p>';
+  (def.columns||[]).forEach(function(c){
+    if(c.auto||c.adminOnly||c.key==='status') return;
+    h+='<div style="margin-bottom:12px"><label style="display:block;font-size:13px;color:#475569;font-weight:600;margin-bottom:4px">'+esc(c.label)+(c.required?' <span style="color:#ef4444">*</span>':'')+'</label>';
+    h+=_modFormField(c,'');
+    h+='</div>';
+  });
+  h+='<button id="modApplyBtn" onclick="submitModApply()" style="width:100%;padding:14px;border:none;border-radius:10px;background:#2563eb;color:#fff;font-size:15px;font-weight:700;cursor:pointer;margin-top:10px">신청하기</button>';
+  h+='<div id="modApplyMsg" style="text-align:center;margin-top:12px;font-size:13px"></div>';
+  document.getElementById('modApplyCard').innerHTML=h;
+}
+
+function submitModApply(){
+  var def=window.__modApplyDef, evtId=window.__modApplyEvt;
+  if(!def) return;
+  var obj={}, valid=true, firstBad=null;
+  (def.columns||[]).forEach(function(c){
+    if(c.auto||c.adminOnly||c.key==='status') return;
+    var el=document.getElementById('mod_f_'+c.key); if(!el) return;
+    var v=(el.value||'').trim();
+    if(c.type==='number'&&c.comma) v=v.replace(/,/g,'');
+    if(c.type==='number'&&v) v=Number(v);
+    if(c.required&&!v&&v!==0){ valid=false; if(!firstBad)firstBad=c.label; }
+    obj[c.key]=v;
+  });
+  var msg=document.getElementById('modApplyMsg');
+  if(!valid){ if(msg)msg.innerHTML='<span style="color:#ef4444">'+esc(firstBad)+'을(를) 입력하세요</span>'; return; }
+  obj._id='m'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+  obj._createdAt=new Date().toISOString();
+  obj.status='대기';
+  var btn=document.getElementById('modApplyBtn'); if(btn){btn.disabled=true;btn.textContent='신청 중...';}
+  var path=def.global?'/main/'+def.fbPath:'/evtData/'+evtId+'/'+def.fbPath;
+  fbDb.ref(path).once('value').then(function(snap){
+    var arr=snap.val()||[]; if(!Array.isArray(arr))arr=Object.values(arr);
+    arr.push(obj);
+    return fbDb.ref(path).set(arr);
+  }).then(function(){
+    document.getElementById('modApplyCard').innerHTML='<div style="text-align:center;padding:30px"><div style="font-size:48px">✅</div><h2 style="color:#16a34a;margin:12px 0;font-size:20px">신청 완료</h2><p style="color:#64748b;font-size:14px;line-height:1.6">신청이 정상 접수되었습니다.<br>검토 후 개별 안내드리겠습니다.</p></div>';
+  }).catch(function(e){
+    if(btn){btn.disabled=false;btn.textContent='신청하기';}
+    if(msg)msg.innerHTML='<span style="color:#ef4444">제출 실패: '+esc(e.message)+'</span>';
+  });
 }

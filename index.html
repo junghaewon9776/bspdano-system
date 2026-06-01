@@ -502,6 +502,9 @@ var SYS_SMS_SIG  = "["+SYS_PARENT+"] ";
 // ===== 공개 신청폼 모드 감지 =====
 var IS_APPLY_MODE = false;
 var APPLY_EVT_ID = "";
+var IS_MODFORM_MODE = false;
+var MODFORM_KEY = "";
+var MODFORM_EVT_ID = "";
 (function(){
   try {
     var sp = new URLSearchParams(window.location.search);
@@ -521,6 +524,15 @@ var APPLY_EVT_ID = "";
       document.getElementById("applyPage").style.display = "block";
       // 브라우저 탭/URL 공유 미리보기용 타이틀 즉시 변경
       document.title = "🎭 " + SYS_NAME + " 참가신청";
+    }
+    // ===== 모듈 공개 신청폼 모드 (?modform={key}) =====
+    if (sp.get("modform")) {
+      IS_MODFORM_MODE = true;
+      MODFORM_KEY = sp.get("modform") || "";
+      MODFORM_EVT_ID = sp.get("evtId") || "";
+      document.getElementById("loginPage").style.display = "none";
+      document.getElementById("mainPage").style.display = "none";
+      document.title = "📝 신청서";
     }
   } catch(e){}
 })();
@@ -544,6 +556,12 @@ document.addEventListener("DOMContentLoaded", function(){
       if (apfF) apfF.textContent = (SYS_PARENT || "") + " · " + SYS_NAME;
       apfBindFormatters();
       apfLoadStatus();
+      return; // 로그인 로직 스킵
+    }
+
+    // ===== 모듈 공개 신청폼 모드 =====
+    if (IS_MODFORM_MODE) {
+      if (typeof renderModApplyForm === 'function') renderModApplyForm(MODFORM_KEY, MODFORM_EVT_ID);
       return; // 로그인 로직 스킵
     }
 
