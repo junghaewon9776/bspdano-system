@@ -265,10 +265,13 @@ function _modFmtCell(col,val){
     case 'textarea':
       var s=String(val); return '<span title="'+esc(s)+'">'+esc(s.length>40?s.slice(0,40)+'…':s)+'</span>';
     case 'file':
-      var _fparts=String(val).split(/[\n|]/).filter(function(u){return u.trim()});
-      return _fparts.map(function(u,i){
-        return '<a href="'+esc(_modDriveViewUrl(u.trim()))+'" target="_blank" style="color:#2563eb;text-decoration:none;white-space:nowrap">📎'+(_fparts.length>1?' '+(i+1):'')+'</a>';
-      }).join(' ');
+      var _fparts=String(val).split(/\n/).filter(function(u){return u.trim()});
+      return _fparts.map(function(p){
+        var bi=p.indexOf('|');
+        var nm=bi>=0?p.slice(0,bi).trim():'';
+        var u =bi>=0?p.slice(bi+1).trim():p.trim();
+        return '<a href="'+esc(_modDriveViewUrl(u))+'" target="_blank" style="color:#2563eb;text-decoration:none;white-space:nowrap">📎'+(nm?' <span style="color:#94a3b8;font-weight:400;font-size:11px">'+esc(nm)+'</span>':'')+'</a>';
+      }).join('<br>');
     case 'consent':
       return val==='동의'?'<span style="color:#16a34a;font-weight:700">✅ 동의</span>':'<span style="color:#cbd5e1">미동의</span>';
     default:
@@ -358,8 +361,11 @@ function _modFormField(col,val){
     case 'file':
       var fh='';
       if(val){
-        String(val).split(/[\n|]/).filter(function(u){return u.trim()}).forEach(function(u,i){
-          fh+='<div style="font-size:12px;margin-bottom:4px"><a href="'+esc(_modDriveViewUrl(u.trim()))+'" target="_blank" style="color:#2563eb">📎 기존 파일'+(i+1)+'</a></div>';
+        String(val).split(/\n/).filter(function(u){return u.trim()}).forEach(function(p,i){
+          var bi=p.indexOf('|');
+          var nm=bi>=0?p.slice(0,bi).trim():('기존 파일'+(i+1));
+          var u =bi>=0?p.slice(bi+1).trim():p.trim();
+          fh+='<div style="font-size:12px;margin-bottom:4px"><a href="'+esc(_modDriveViewUrl(u))+'" target="_blank" style="color:#2563eb">📎 <span style="color:#64748b">'+esc(nm)+'</span></a></div>';
         });
       }
       fh+='<input id="'+id+'" type="file" multiple'+(col.accept?' accept="'+esc(col.accept)+'"':'')+' style="font-size:13px">';
@@ -419,7 +425,7 @@ function modSave(key,editId){
       var urls=[];
       var sub=Promise.resolve();
       t.files.forEach(function(f){
-        sub=sub.then(function(){ return _uploadToDrive(f,'mod_'+key,t.col.label).then(function(url){ urls.push(url); }); });
+        sub=sub.then(function(){ return _uploadToDrive(f,'mod_'+key,t.col.label).then(function(url){ urls.push(f.name.replace(/[|\n]/g,' ')+'|'+url); }); });
       });
       return sub.then(function(){ obj[t.col.key]=urls.join('\n'); });
     });
@@ -849,7 +855,7 @@ function submitModApply(){
       var urls=[];
       var sub=Promise.resolve();
       t.files.forEach(function(f){
-        sub=sub.then(function(){ return _uploadToDrive(f,'mod_'+def.key,t.col.label).then(function(url){ urls.push(url); }); });
+        sub=sub.then(function(){ return _uploadToDrive(f,'mod_'+def.key,t.col.label).then(function(url){ urls.push(f.name.replace(/[|\n]/g,' ')+'|'+url); }); });
       });
       return sub.then(function(){ obj[t.col.key]=urls.join('\n'); });
     });
