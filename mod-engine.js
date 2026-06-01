@@ -1526,7 +1526,7 @@ function _mlPresetDelete(){
 }
 function _mlPresetLoad(){
   var key=window.__modLabelKey; if(!key) return;
-  var sel=document.getElementById('ml_preset'); if(!sel||sel.value==='') return toast('불러올 프리셋을 선택하세요',true);
+  var sel=document.getElementById('ml_preset'); if(!sel||sel.value==='') return; // 직접 설정 — 조용히
   var arr=_mlPresets(key); var p=arr[pn(sel.value)]; if(!p) return;
   var mode=p.mode||'label';
   window.__mlMode=mode;
@@ -1629,13 +1629,16 @@ function popModLabel(key,singleId,idsList){
   h+='<div style="padding:14px;max-height:78vh;overflow:auto">';
 
   // ── 라벨 프리셋 (커스텀 규격 저장/불러오기) ──
-  h+='<div style="display:flex;gap:6px;align-items:center;margin-bottom:12px;flex-wrap:wrap;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px">';
-  h+='<span style="font-size:12px;font-weight:700;color:#475569">📐 프리셋</span>';
-  h+='<select id="ml_preset" style="flex:1;min-width:140px;padding:6px 8px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px"><option value="">— 직접 설정 —</option>'+_mlPresetOptions(key)+'</select>';
-  h+='<button class="btn btn-s" style="background:#6366f1;color:#fff;font-size:11px" onclick="_mlPresetLoad()">불러오기</button>';
-  h+='<button class="btn btn-s" style="font-size:11px" onclick="_mlPresetSaveNew()">+ 새로 저장</button>';
-  h+='<button class="btn btn-s" style="font-size:11px" onclick="_mlPresetUpdate()">수정저장</button>';
-  h+='<button class="btn btn-s" style="color:#dc2626;font-size:11px" onclick="_mlPresetDelete()">삭제</button>';
+  h+='<div style="margin-bottom:12px;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:8px;padding:10px">';
+  h+='<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:8px">';
+  h+='<span style="font-size:13px;font-weight:800;color:#334155">📐 라벨 프리셋</span>';
+  h+='<select id="ml_preset" onchange="_mlPresetLoad()" style="flex:1;min-width:160px;padding:8px 10px;border:1px solid #94a3b8;border-radius:6px;font-size:13px;background:#fff;font-weight:600"><option value="">— 프리셋 선택 (바로 적용) —</option>'+_mlPresetOptions(key)+'</select>';
+  h+='</div>';
+  h+='<div style="display:flex;gap:6px;flex-wrap:wrap">';
+  h+='<button class="btn btn-s" style="background:#16a34a;color:#fff;font-weight:700;font-size:12px;flex:1" onclick="_mlPresetSaveNew()">＋ 새 프리셋 저장</button>';
+  h+='<button class="btn btn-s" style="background:#f59e0b;color:#fff;font-weight:700;font-size:12px;flex:1" onclick="_mlPresetUpdate()">✎ 현재설정으로 수정</button>';
+  h+='<button class="btn btn-s" style="background:#ef4444;color:#fff;font-weight:700;font-size:12px" onclick="_mlPresetDelete()">🗑 삭제</button>';
+  h+='</div>';
   h+='</div>';
 
   // ── 출력 방식 선택 ──
