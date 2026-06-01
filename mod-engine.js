@@ -1471,11 +1471,20 @@ function _saveModLabelOpt(key,opt){
 }
 
 // ─── 라벨 프리셋 (커스텀 규격: 크기·여백·표시항목·배치 통째 저장) ───
+// Firebase(모듈정의 def.labelPresets)에 저장 → 모든 PC/계정 공유. localStorage는 백업.
 function _mlPresets(key){
-  try{ var s=localStorage.getItem('modLabelPresets_'+key); if(s) return JSON.parse(s)||[]; }catch(e){}
-  return [];
+  var def=_modDefs[key];
+  if(def && def.labelPresets && def.labelPresets.length) return def.labelPresets;
+  try{ var s=localStorage.getItem('modLabelPresets_'+key); if(s){ var a=JSON.parse(s)||[]; if(def&&a.length) def.labelPresets=a; return a; } }catch(e){}
+  return (def&&def.labelPresets)||[];
 }
-function _mlSavePresets(key,arr){ try{ localStorage.setItem('modLabelPresets_'+key, JSON.stringify(arr)); }catch(e){} }
+function _mlSavePresets(key,arr){
+  var def=_modDefs[key]; if(def) def.labelPresets=arr;
+  try{ localStorage.setItem('modLabelPresets_'+key, JSON.stringify(arr)); }catch(e){} // 로컬 백업
+  if(def && typeof _saveModDefs==='function'){
+    _saveModDefs().catch(function(e){ toast('프리셋 Firebase 저장 실패: '+(e.message||e),true); });
+  }
+}
 function _mlPresetOptions(key){
   return _mlPresets(key).map(function(p,i){ return '<option value="'+i+'">'+esc(p.name||('프리셋'+(i+1)))+(p.mode==='a4'?' (A4)':' (낱장)')+'</option>'; }).join('');
 }
