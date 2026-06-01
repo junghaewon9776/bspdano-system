@@ -2359,8 +2359,8 @@ function _renderModViewUI(def,row){
       var today=_d.getFullYear()+'-'+(_m<10?'0'+_m:_m)+'-'+(_dd<10?'0'+_dd:_dd); // 로컬(KST) 기준
       var bg,txt,ic,msg;
       if(today>=from && today<=to){ bg='#dcfce7';txt='#15803d';ic='✅';msg='정상 — 사용 가능'; }
-      else if(today<from){ bg='#fef9c3';txt='#a16207';ic='⏳';msg='사용 기간 전'; }
-      else { bg='#fee2e2';txt='#b91c1c';ic='⛔';msg='사용 기간 만료'; }
+      else if(today<from){ bg='#ffedd5';txt='#c2410e';ic='⛔';msg='사용불가 — 사용기간 전'; }
+      else { bg='#fee2e2';txt='#b91c1c';ic='⛔';msg='사용불가 — 기간 만료'; }
       h+='<div style="background:'+bg+';color:'+txt+';border-radius:12px;padding:14px;text-align:center;font-weight:800;font-size:17px;margin-bottom:14px">'+ic+' '+msg+'<div style="font-size:12px;font-weight:600;margin-top:4px;opacity:.85">'+esc(from)+' ~ '+esc(to)+'</div></div>';
     }
   }
