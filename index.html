@@ -447,6 +447,7 @@ label{display:block;font-size:10px;color:#999;margin-bottom:3px}
 <!-- firebase-storage 제거: 구글 드라이브 프록시로 대체 -->
 <script src="firebase-config.js"></script>
 <script src="common.js?v=20260529n"></script>
+<script src="mod-engine.js?v=20260601"></script>
 
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" onerror="console.warn('XLSX CDN load failed')"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js" onerror="console.warn('xlsx-js-style CDN load failed')"></script>
@@ -958,7 +959,10 @@ async function doLogin(id,pw,keep,silent){
   // 거래처 관리 버튼 — super/admin/subAdm
   var _vb=document.getElementById("vendorBtn");
   if(_vb) _vb.style.display = _isGlobalAdm() ? "" : "none";
-  CTAB="dash";FILT=isA()?"전체":myar();mkTabs();drawEventBar();draw();
+  CTAB="dash";FILT=isA()?"전체":myar();
+  // 커스텀 모듈 정의 로드 후 탭 렌더
+  if(typeof loadModDefs==='function') loadModDefs(function(){modLoadAll();mkTabs();draw()});
+  mkTabs();drawEventBar();draw();
   if(keep)saveAuth(id,pw); else clearAuth();
   startIdleWatch();
 
@@ -1288,7 +1292,23 @@ function mkTabs(){
   if(_isEvtAdmin()) c5.push({k:"evtMgr",l:"행사관리"});
   if(ME && (ME.r==="super" || ME.r==="admin")) c5.push({k:"forms",l:"폼 관리"});
   if(_isSuperAdmin()) c5.push({k:"linkTabs",l:"🔗 연동 탭"});
+  if(_isSuperAdmin()) c5.push({k:"modMgr",l:"📦 모듈 관리"});
   cats.push({id:"sys",label:"⚙️ 시스템",items:c5});
+
+  // ── 커스텀 모듈 탭 ──
+  if(typeof _modDefs!=='undefined'){
+    var _catGroups={};
+    Object.keys(_modDefs).forEach(function(k){
+      var d=_modDefs[k];
+      var cl=d.catLabel||'📦 커스텀';
+      if(!_catGroups[cl]) _catGroups[cl]={icon:d.catIcon||d.icon||'📦',items:[]};
+      _catGroups[cl].items.push({k:'mod_'+k,l:(d.icon?d.icon+' ':'')+d.label});
+    });
+    Object.keys(_catGroups).forEach(function(cl){
+      var g=_catGroups[cl];
+      cats.push({id:'modcat_'+cl,label:g.icon+' '+cl,items:g.items});
+    });
+  }
 
   // ── 연동 탭 (CustomTabs) ──
   if(LINK_TABS==="on"){
@@ -5758,6 +5778,8 @@ function draw(){
   else if(CTAB=="stat")el.innerHTML=dStat();
   else if(CTAB=="evtMgr"){ dEvtMgr(); }   // 행사관리 (super admin 전용, 비동기 렌더)
   else if(CTAB=="linkTabs"){ el.innerHTML=dLinkTabs(); }
+  else if(CTAB=="modMgr"){ el.innerHTML=dModManager(); }
+  else if(CTAB.indexOf("mod_")===0){ var _mk=CTAB.slice(4); if(_modDefs[_mk]){modLoadData(_mk);el.innerHTML=dMod(_mk)} else el.innerHTML='<div class="card"><div class="empty2">모듈 없음</div></div>'; }
   else {
     // frame 탭 처리
     var frameUrl=_getFrameUrl(CTAB);
