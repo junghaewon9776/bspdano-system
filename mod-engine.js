@@ -1454,8 +1454,8 @@ function modSmsSend(){
 
 // 모드별 기본 크기 — 낱장은 크게, A4 모아찍기는 작게
 var _MODLBL_DEFAULTS={
-  label:{w:90,h:50,pt:4,pr:4,pb:4,pl:4,gap:0,sheetMargin:0,border:false,qr:0,orientation:'portrait'},
-  a4:{w:50,h:30,pt:2,pr:2,pb:2,pl:2,gap:2,sheetMargin:10,border:true,qr:0,orientation:'portrait'}
+  label:{w:90,h:50,pt:4,pr:4,pb:4,pl:4,gap:0,sheetMargin:0,border:false,qr:0,orientation:'portrait',sheetW:210,sheetH:297},
+  a4:{w:50,h:30,pt:2,pr:2,pb:2,pl:2,gap:2,sheetMargin:10,border:true,qr:0,orientation:'portrait',sheetW:210,sheetH:297}
 };
 // 모드별 크기 세트 로드 (+ 구버전 평면 구조 마이그레이션)
 function _modLabelSizes(key){
@@ -1747,6 +1747,8 @@ function popModLabel(key,singleId,idsList){
   h+='<label class="ml_ori_opt" style="flex:1;text-align:center;padding:7px;border:2px solid '+(isLand?'#6366f1':'#cbd5e1')+';border-radius:6px;cursor:pointer;font-size:12px;font-weight:700;background:'+(isLand?'#eef2ff':'#fff')+'" onclick="_mlSetOri(\'landscape\')"><input type="radio" name="ml_ori" value="landscape"'+(isLand?' checked':'')+' style="display:none">📄 가로</label>';
   h+='</div>';
   h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
+  h+='<label style="font-size:12px;color:#475569">용지 가로(mm) <span style="font-size:10px;color:#94a3b8">(A4=210)</span><input id="ml_sheetW" type="number" value="'+(opt.sheetW||210)+'" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:6px" oninput="_modLabelPreview()"></label>';
+  h+='<label style="font-size:12px;color:#475569">용지 세로(mm) <span style="font-size:10px;color:#94a3b8">(A4=297)</span><input id="ml_sheetH" type="number" value="'+(opt.sheetH||297)+'" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:6px" oninput="_modLabelPreview()"></label>';
   h+='<label style="font-size:12px;color:#475569">라벨 간격(mm)<input id="ml_gap" type="number" value="'+opt.gap+'" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:6px" oninput="_modLabelPreview()"></label>';
   h+='<label style="font-size:12px;color:#475569">용지 여백(mm)<input id="ml_smargin" type="number" value="'+opt.sheetMargin+'" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:6px" oninput="_modLabelPreview()"></label>';
   h+='</div>';
@@ -1816,6 +1818,7 @@ function _mlSyncSizeFromInputs(){
   if(window.__mlMode==='a4'){
     s.gap=g('ml_gap'); s.sheetMargin=g('ml_smargin'); s.border=!!(document.getElementById('ml_border')||{}).checked;
     var oriEl=document.querySelector('input[name="ml_ori"]:checked'); s.orientation=oriEl?oriEl.value:(prev.orientation||'portrait');
+    s.sheetW=g('ml_sheetW')||210; s.sheetH=g('ml_sheetH')||297;
   }
   window.__mlSizes[window.__mlMode]=Object.assign(prev,s);
 }
@@ -1825,6 +1828,7 @@ function _mlSetSizeInputs(sz){
   var set=function(id,v){ var e=document.getElementById(id); if(e) e.value=(v==null?'':v); };
   set('ml_w',sz.w); set('ml_h',sz.h); set('ml_pt',sz.pt); set('ml_pr',sz.pr); set('ml_pb',sz.pb); set('ml_pl',sz.pl); set('ml_qr',sz.qr||0);
   set('ml_gap',sz.gap); set('ml_smargin',sz.sheetMargin);
+  set('ml_sheetW',sz.sheetW||210); set('ml_sheetH',sz.sheetH||297);
   var b=document.getElementById('ml_border'); if(b) b.checked=!!sz.border;
   _mlSetOriUI(sz.orientation||'portrait');
 }
@@ -1837,7 +1841,16 @@ function _mlSetOriUI(ori){
     el.style.background=on?'#eef2ff':'#fff';
   });
 }
-function _mlSetOri(ori){ _mlSetOriUI(ori); _modLabelPreview(); }
+function _mlSetOri(ori){
+  // 용지 가로/세로 치수를 방향에 맞게 정렬 (세로=짧은쪽 가로, 가로=긴쪽 가로)
+  var wEl=document.getElementById('ml_sheetW'), hEl=document.getElementById('ml_sheetH');
+  if(wEl&&hEl){
+    var a=pn(wEl.value)||210, b=pn(hEl.value)||297;
+    var mn=Math.min(a,b), mx=Math.max(a,b);
+    if(ori==='landscape'){ wEl.value=mx; hEl.value=mn; } else { wEl.value=mn; hEl.value=mx; }
+  }
+  _mlSetOriUI(ori); _modLabelPreview();
+}
 // 상태별 체크 (예: 승인된 것만)
 function _mlPickByStatus(status){
   if(status==='') return;
@@ -1912,8 +1925,7 @@ function _modLabelReadOpt(){
 }
 // A4 한 장에 들어가는 칸 수 계산 (세로 210x297, 가로 297x210)
 function _mlA4Grid(opt){
-  var land=(opt.orientation==='landscape');
-  var pw=land?297:210, ph=land?210:297;
+  var pw=opt.sheetW||210, ph=opt.sheetH||297;
   var availW=pw-opt.sheetMargin*2, availH=ph-opt.sheetMargin*2;
   var cols=Math.max(1,Math.floor((availW+opt.gap)/(opt.w+opt.gap)));
   var rowsN=Math.max(1,Math.floor((availH+opt.gap)/(opt.h+opt.gap)));
@@ -1933,7 +1945,7 @@ function _modLabelPreview(){
     var g=_mlA4Grid(opt);
     var sel = _mlPicks().length ? _mlPicks().filter(function(c){return c.checked;}).length : (window.__modLabelAll||[]).length;
     var pages=Math.ceil((sel||1)/g.perPage);
-    info.innerHTML='A4 한 장에 <b>'+g.cols+'×'+g.rows+' = '+g.perPage+'칸</b> · 선택 '+sel+'개 → 약 <b>'+pages+'장</b> 인쇄';
+    info.innerHTML='용지 <b>'+(opt.sheetW||210)+'×'+(opt.sheetH||297)+'mm</b> · 한 장에 <b>'+g.cols+'×'+g.rows+' = '+g.perPage+'칸</b> · 선택 '+sel+'개 → 약 <b>'+pages+'장</b>';
   }
 }
 function modDoPrint(){
@@ -1957,12 +1969,11 @@ function modDoPrint(){
   var css, bodyHtml;
   if(opt.mode==='a4'){
     var bd=opt.border?'.mlabel{border:1px dashed #bbb}':'';
-    var land=(opt.orientation==='landscape');
-    var sheetW=land?'297mm':'210mm';
-    css='@page{size:A4 '+(land?'landscape':'portrait')+';margin:'+opt.sheetMargin+'mm}html,body{margin:0;padding:0}'
+    var pw=opt.sheetW||210, ph=opt.sheetH||297;
+    css='@page{size:'+pw+'mm '+ph+'mm;margin:'+opt.sheetMargin+'mm}html,body{margin:0;padding:0}'
       +'.sheet{display:flex;flex-wrap:wrap;align-content:flex-start;gap:'+opt.gap+'mm}'
       +'.mlabel{box-sizing:border-box;break-inside:avoid;page-break-inside:avoid}'+bd
-      +'@media screen{body{background:#e2e8f0;padding:10px}.sheet{background:#fff;width:'+sheetW+';margin:0 auto;padding:'+opt.sheetMargin+'mm;box-sizing:border-box;box-shadow:0 1px 6px rgba(0,0,0,.2)}}';
+      +'@media screen{body{background:#e2e8f0;padding:10px}.sheet{background:#fff;width:'+pw+'mm;margin:0 auto;padding:'+opt.sheetMargin+'mm;box-sizing:border-box;box-shadow:0 1px 6px rgba(0,0,0,.2)}}';
     bodyHtml='<div class="sheet">'+labels+'</div>';
   } else {
     css='@page{size:'+opt.w+'mm '+opt.h+'mm;margin:0}html,body{margin:0;padding:0}.mlabel{page-break-after:always}'
