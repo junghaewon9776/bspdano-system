@@ -14,6 +14,17 @@ var MOD_DEFS_LOADED=false;
 // ─── 유틸 ───
 function _modId(){return 'm'+Date.now().toString(36)+Math.random().toString(36).slice(2,6)}
 
+// 저장된 Drive 주소(썸네일·view 등 어떤 형식이든)에서 파일ID를 뽑아 정상 보기 링크로 변환
+function _modDriveViewUrl(url){
+  if(!url) return url;
+  // 이미 정상 view 링크면 그대로
+  if(/drive\.google\.com\/file\/d\/[-\w]{20,}\/view/.test(url)) return url;
+  // /d/{id}, id={id}, 또는 첫 20자 이상 영숫자 토큰을 파일ID로 추출
+  var m = url.match(/\/d\/([-\w]{20,})/) || url.match(/[?&]id=([-\w]{20,})/) || url.match(/([-\w]{25,})/);
+  if(m && m[1]) return 'https://drive.google.com/file/d/'+m[1]+'/view';
+  return url;
+}
+
 // ─── 모듈 정의 등록 ───
 function defMod(cfg){
   /* cfg = {
@@ -254,7 +265,7 @@ function _modFmtCell(col,val){
     case 'textarea':
       var s=String(val); return '<span title="'+esc(s)+'">'+esc(s.length>40?s.slice(0,40)+'…':s)+'</span>';
     case 'file':
-      return '<a href="'+esc(String(val))+'" target="_blank" style="color:#2563eb;text-decoration:none">📎 파일</a>';
+      return '<a href="'+esc(_modDriveViewUrl(String(val)))+'" target="_blank" style="color:#2563eb;text-decoration:none">📎 파일</a>';
     case 'consent':
       return val==='동의'?'<span style="color:#16a34a;font-weight:700">✅ 동의</span>':'<span style="color:#cbd5e1">미동의</span>';
     default:
@@ -343,7 +354,7 @@ function _modFormField(col,val){
       return '<input id="'+id+'" type="tel" value="'+ev+'" placeholder="'+esc(col.placeholder||'010-0000-0000')+'" maxlength="13" oninput="var v=this.value.replace(/[^0-9]/g,\'\');if(v.length<=3)this.value=v;else if(v.length<=7)this.value=v.slice(0,3)+\'-\'+v.slice(3);else this.value=v.slice(0,3)+\'-\'+v.slice(3,7)+\'-\'+v.slice(7,11)">';
     case 'file':
       var fh='';
-      if(val) fh+='<div style="font-size:12px;margin-bottom:4px"><a href="'+esc(String(val))+'" target="_blank" style="color:#2563eb">📎 기존 파일</a></div>';
+      if(val) fh+='<div style="font-size:12px;margin-bottom:4px"><a href="'+esc(_modDriveViewUrl(String(val)))+'" target="_blank" style="color:#2563eb">📎 기존 파일</a></div>';
       fh+='<input id="'+id+'" type="file"'+(col.accept?' accept="'+esc(col.accept)+'"':'')+' style="font-size:13px">';
       fh+='<input type="hidden" id="'+id+'_prev" value="'+ev+'">';
       return fh;
