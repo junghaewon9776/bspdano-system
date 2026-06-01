@@ -95,45 +95,15 @@ function dMod(key){
   var def=_modDefs[key];
   if(!def) return '<div class="card"><div class="empty2">모듈 정의 없음</div></div>';
 
-  var data=(_modData[key]||[]).slice();
   var search=_modSearch[key]||"";
   var filter=_modFilter[key]||"";
-  var sort=_modSort[key]||{};
-
-  // 검색
-  if(search){
-    var q=search.toLowerCase();
-    data=data.filter(function(row){
-      return (def.columns||[]).some(function(c){
-        if(!c.search) return false;
-        return String(row[c.key]||"").toLowerCase().indexOf(q)>=0;
-      });
-    });
-  }
-
-  // 필터
-  if(filter){
-    var fc=(def.columns||[]).find(function(c){return c.filter&&(c.type==="select"||c.type==="badge")});
-    if(fc) data=data.filter(function(row){return row[fc.key]===filter});
-  }
-
-  // 정렬
-  if(sort.col){
-    data.sort(function(a,b){
-      var va=a[sort.col]||"",vb=b[sort.col]||"";
-      var na=Number(va),nb=Number(vb);
-      if(!isNaN(na)&&!isNaN(nb)) return sort.asc?na-nb:nb-na;
-      return sort.asc?String(va).localeCompare(String(vb)):String(vb).localeCompare(String(va));
-    });
-  }
-
-  var cols=(def.columns||[]).filter(function(c){return !c.hideTable});
   var feat=def.features||{};
+  var total=(_modData[key]||[]).length;
   var h='<div class="card">';
 
   // 헤더
   h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">';
-  h+='<h3 style="margin:0">'+(def.icon||"📦")+' '+esc(def.label)+' <span style="color:#94a3b8;font-weight:400">('+data.length+')</span></h3>';
+  h+='<h3 style="margin:0">'+(def.icon||"📦")+' '+esc(def.label)+' <span style="color:#94a3b8;font-weight:400">('+total+')</span></h3>';
   var _hasTel=(def.columns||[]).some(function(c){return c.type==='tel'});
   h+='<div style="display:flex;gap:6px;flex-wrap:wrap">';
   if(isA() && feat.applyForm) h+='<button class="btn" style="background:#0ea5e9;color:#fff" onclick="popModFormLink(\''+key+'\')">🔗 신청폼 링크</button>';
@@ -142,10 +112,10 @@ function dMod(key){
   if(feat.excel) h+='<button class="btn" onclick="modExportExcel(\''+key+'\')">📥 엑셀</button>';
   h+='</div></div>';
 
-  // 검색 + 필터
+  // 검색 + 필터 (검색은 목록 영역만 갱신 → 입력 포커스 유지)
   if(feat.search!==false){
     h+='<div style="margin-bottom:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">';
-    h+='<input type="text" placeholder="🔍 검색..." value="'+esc(search)+'" oninput="_modSearch[\''+key+'\']=this.value;draw()" style="flex:1;min-width:150px;padding:8px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:13px">';
+    h+='<input id="_modSearch_'+key+'" type="text" placeholder="🔍 검색..." value="'+esc(search)+'" oninput="_modSearchTyped(\''+key+'\',this.value)" style="flex:1;min-width:150px;padding:8px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:13px">';
     var fc=(def.columns||[]).find(function(c){return c.filter&&(c.type==="select"||c.type==="badge")});
     if(fc){
       var fopts=fc.options||(fc.badgeMap?Object.keys(fc.badgeMap):[]);
@@ -159,56 +129,98 @@ function dMod(key){
     h+='</div>';
   }
 
-  // 테이블
-  if(!data.length){
-    h+='<div class="empty2" style="padding:40px">데이터가 없습니다</div>';
-  } else {
-    h+='<div style="overflow-x:auto;border:1px solid #e5e7eb;border-radius:10px">';
-    h+='<table class="tbl"><thead><tr>';
-    h+='<th style="width:36px">#</th>';
-    cols.forEach(function(c){
-      var arrow=sort.col===c.key?(sort.asc?' ▲':' ▼'):'';
-      h+='<th style="cursor:pointer;white-space:nowrap" onclick="_modToggleSort(\''+key+'\',\''+c.key+'\')">'+esc(c.label)+arrow+'</th>';
-    });
-    // 선정 기능: status 컬럼(badge)이 있으면 선정/탈락 버튼 노출
-    var statusCol=(def.columns||[]).find(function(c){return c.key==='status'&&c.type==='badge'});
-    var hasSelect=feat.applyForm && statusCol;
-    if(isA()) h+='<th style="width:'+(hasSelect?'150':'80')+'px"></th>';
-    h+='</tr></thead><tbody>';
-
-    data.forEach(function(row,idx){
-      var st=row.status||'';
-      h+='<tr'+(st==='탈락'?' style="opacity:.5"':'')+'>';
-      h+='<td class="ctr" style="color:#94a3b8">'+(idx+1)+'</td>';
-      cols.forEach(function(c){ h+='<td>'+_modFmtCell(c,row[c.key])+'</td>'; });
-      if(isA()){
-        h+='<td class="ctr" style="white-space:nowrap">';
-        if(hasSelect){
-          h+='<button class="btn btn-s" onclick="modSetStatus(\''+key+'\',\''+esc(row._id||'')+'\',\'선정\')" style="background:'+(st==='선정'?'#16a34a':'#dcfce7')+';color:'+(st==='선정'?'#fff':'#16a34a')+';font-weight:700" title="선정">✓</button> ';
-          h+='<button class="btn btn-s" onclick="modSetStatus(\''+key+'\',\''+esc(row._id||'')+'\',\'탈락\')" style="background:'+(st==='탈락'?'#dc2626':'#fee2e2')+';color:'+(st==='탈락'?'#fff':'#dc2626')+';font-weight:700" title="탈락">✕</button> ';
-        }
-        h+='<button class="btn btn-s" onclick="popModEdit(\''+key+'\',\''+esc(row._id||'')+'\')">✏️</button> ';
-        h+='<button class="btn btn-s" onclick="modDel(\''+key+'\',\''+esc(row._id||'')+'\')" style="color:#dc2626">🗑</button>';
-        h+='</td>';
-      }
-      h+='</tr>';
-    });
-    h+='</tbody></table></div>';
-
-    // 합계 (number+comma)
-    var sumCols=cols.filter(function(c){return c.type==='number'&&c.comma});
-    if(sumCols.length){
-      h+='<div style="text-align:right;margin-top:8px;font-size:13px;color:#475569">';
-      sumCols.forEach(function(sc){
-        var tot=0; data.forEach(function(r){tot+=pn(r[sc.key])});
-        h+='<span style="margin-left:16px"><b>'+esc(sc.label)+' 합계:</b> '+tot.toLocaleString()+'원</span>';
-      });
-      h+='</div>';
-    }
-  }
-
+  // 목록 영역 (검색/정렬 시 이 안만 갱신)
+  h+='<div id="_modBody_'+key+'">'+_modListHtml(key)+'</div>';
   h+='</div>';
   return h;
+}
+
+// 검색/필터/정렬 적용된 데이터
+function _modFilteredData(key){
+  var def=_modDefs[key]; if(!def) return [];
+  var data=(_modData[key]||[]).slice();
+  var search=_modSearch[key]||"", filter=_modFilter[key]||"", sort=_modSort[key]||{};
+  if(search){
+    var q=search.toLowerCase();
+    data=data.filter(function(row){
+      return (def.columns||[]).some(function(c){
+        if(!c.search) return false;
+        return String(row[c.key]||"").toLowerCase().indexOf(q)>=0;
+      });
+    });
+  }
+  if(filter){
+    var fc=(def.columns||[]).find(function(c){return c.filter&&(c.type==="select"||c.type==="badge")});
+    if(fc) data=data.filter(function(row){return row[fc.key]===filter});
+  }
+  if(sort.col){
+    data.sort(function(a,b){
+      var va=a[sort.col]||"",vb=b[sort.col]||"";
+      var na=Number(va),nb=Number(vb);
+      if(!isNaN(na)&&!isNaN(nb)) return sort.asc?na-nb:nb-na;
+      return sort.asc?String(va).localeCompare(String(vb)):String(vb).localeCompare(String(va));
+    });
+  }
+  return data;
+}
+
+// 목록(테이블+합계) HTML
+function _modListHtml(key){
+  var def=_modDefs[key]; if(!def) return '';
+  var data=_modFilteredData(key);
+  var sort=_modSort[key]||{};
+  var cols=(def.columns||[]).filter(function(c){return !c.hideTable});
+  var feat=def.features||{};
+  if(!data.length) return '<div class="empty2" style="padding:40px">데이터가 없습니다</div>';
+
+  var h='<div style="overflow-x:auto;border:1px solid #e5e7eb;border-radius:10px">';
+  h+='<table class="tbl"><thead><tr>';
+  h+='<th style="width:36px">#</th>';
+  cols.forEach(function(c){
+    var arrow=sort.col===c.key?(sort.asc?' ▲':' ▼'):'';
+    h+='<th style="cursor:pointer;white-space:nowrap" onclick="_modToggleSort(\''+key+'\',\''+c.key+'\')">'+esc(c.label)+arrow+'</th>';
+  });
+  var statusCol=(def.columns||[]).find(function(c){return c.key==='status'&&c.type==='badge'});
+  var hasSelect=feat.applyForm && statusCol;
+  if(isA()) h+='<th style="width:'+(hasSelect?'150':'80')+'px"></th>';
+  h+='</tr></thead><tbody>';
+
+  data.forEach(function(row,idx){
+    var st=row.status||'';
+    h+='<tr'+(st==='탈락'?' style="opacity:.5"':'')+'>';
+    h+='<td class="ctr" style="color:#94a3b8">'+(idx+1)+'</td>';
+    cols.forEach(function(c){ h+='<td>'+_modFmtCell(c,row[c.key])+'</td>'; });
+    if(isA()){
+      h+='<td class="ctr" style="white-space:nowrap">';
+      if(hasSelect){
+        h+='<button class="btn btn-s" onclick="modSetStatus(\''+key+'\',\''+esc(row._id||'')+'\',\'선정\')" style="background:'+(st==='선정'?'#16a34a':'#dcfce7')+';color:'+(st==='선정'?'#fff':'#16a34a')+';font-weight:700" title="선정">✓</button> ';
+        h+='<button class="btn btn-s" onclick="modSetStatus(\''+key+'\',\''+esc(row._id||'')+'\',\'탈락\')" style="background:'+(st==='탈락'?'#dc2626':'#fee2e2')+';color:'+(st==='탈락'?'#fff':'#dc2626')+';font-weight:700" title="탈락">✕</button> ';
+      }
+      h+='<button class="btn btn-s" onclick="popModEdit(\''+key+'\',\''+esc(row._id||'')+'\')">✏️</button> ';
+      h+='<button class="btn btn-s" onclick="modDel(\''+key+'\',\''+esc(row._id||'')+'\')" style="color:#dc2626">🗑</button>';
+      h+='</td>';
+    }
+    h+='</tr>';
+  });
+  h+='</tbody></table></div>';
+
+  var sumCols=cols.filter(function(c){return c.type==='number'&&c.comma});
+  if(sumCols.length){
+    h+='<div style="text-align:right;margin-top:8px;font-size:13px;color:#475569">';
+    sumCols.forEach(function(sc){
+      var tot=0; data.forEach(function(r){tot+=pn(r[sc.key])});
+      h+='<span style="margin-left:16px"><b>'+esc(sc.label)+' 합계:</b> '+tot.toLocaleString()+'원</span>';
+    });
+    h+='</div>';
+  }
+  return h;
+}
+
+// 검색 입력 — 목록 영역만 갱신 (input 재생성 안 함 → 포커스/한글조합 유지)
+function _modSearchTyped(key,val){
+  _modSearch[key]=val;
+  var b=document.getElementById('_modBody_'+key);
+  if(b) b.innerHTML=_modListHtml(key);
 }
 
 // ─── 셀 포맷 ───
@@ -241,7 +253,8 @@ function _modFmtCell(col,val){
 function _modToggleSort(key,col){
   var s=_modSort[key];
   if(s.col===col) s.asc=!s.asc; else {s.col=col;s.asc=true;}
-  draw();
+  var b=document.getElementById('_modBody_'+key);
+  if(b) b.innerHTML=_modListHtml(key); else draw();
 }
 
 // ═══════════════════════════════════════════
