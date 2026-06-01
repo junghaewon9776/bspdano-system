@@ -357,7 +357,7 @@ function modSetStatusSel(key,statusKey){
   var bm=(def.columns.find(function(c){return c.key==='status';})||{}).badgeMap||{};
   var lbl=(bm[statusKey]&&bm[statusKey].label)||statusKey;
   var actor=_modActor();
-  if(!confirm(ids.length+'개 항목을 "'+lbl+'"(으)로 변경할까요?'+(actor?'\n\n처리자: '+actor:''))) return;
+  if(!confirm(ids.length+'개 항목을 '+lbl+' 처리하시겠습니까?'+(actor?'\n\n처리자: '+actor:''))) return;
   var data=(_modData[key]||[]).slice();
   var now=new Date().toISOString();
   data.forEach(function(r){ if(ids.indexOf(r._id)>=0){ r.status=statusKey; r._updatedAt=now; r._statusBy=(typeof CID!=='undefined'?CID:''); r._statusByName=actor; r._statusAt=now; } });
@@ -1159,7 +1159,10 @@ function modSetStatus(key,id,status){
   var lbl=(bm[newStatus]&&bm[newStatus].label)||newStatus;
   var actor=_modActor();
   var nm=_modRowTitle(def,data[idx]);
-  if(!confirm('"'+(nm||'이 항목')+'"을(를) "'+lbl+'"(으)로 변경할까요?'+(actor?'\n\n처리자: '+actor:''))) return;
+  var q;
+  if(newStatus==='대기') q=(nm?'"'+nm+'" ':'')+'대기 상태로 되돌릴까요?';
+  else q=(nm?'"'+nm+'"\n\n':'')+lbl+'하시겠습니까?';
+  if(!confirm(q+(actor?'\n\n처리자: '+actor:''))) return;
   var now=new Date().toISOString();
   var merged={}; for(var k in data[idx])merged[k]=data[idx][k];
   merged.status=newStatus; merged._updatedAt=now;
