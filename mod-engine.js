@@ -1691,7 +1691,7 @@ function _modPlain(c,v){ if(c.type==='number'&&c.comma) return Number(v).toLocal
 // 반환 {css, fs}. labelWmm=라벨 전체 가로(mm)
 function _mlElemFit(p, plain, baseFs, labelWmm){
   p=p||{};
-  var w=(p.w!=null?p.w:(100-(p.x||0)));
+  var w=(p.w>0?p.w:(100-(p.x||0)));
   var mode=p.mode||(p.wrap?'wrap':'line'); // 구버전 wrap 불린 호환
   var fs=baseFs, css;
   var alignCss=p.align?'text-align:'+p.align+';':'';
@@ -2384,7 +2384,7 @@ function _mllRender(){
       html+='<div class="mll_el" data-id="'+it.id+'" style="position:absolute;left:'+left+'px;top:'+top+'px;width:'+qSize+'px;height:'+qSize+'px;border:2px dashed '+it.color+';border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:11px;color:'+it.color+';font-weight:700;cursor:move;background:rgba(51,65,85,.08)">QR</div>';
     } else {
       var fsPx=it.fs*SCALE*0.35;
-      var bw=(it.w!=null?it.w:(100-(it.x||0)));
+      var bw=(it.w>0?it.w:(100-(it.x||0)));
       var bwpx=bw/100*cW;
       var box;
       if(it.mode==='fit'){
@@ -2488,7 +2488,7 @@ function _mllShowCtrl(id){
     h+='<div style="margin-top:10px;border-top:1px solid #e2e8f0;padding-top:8px;font-size:11px;color:#94a3b8;margin-bottom:5px">텍스트 처리</div>';
     h+='<div style="display:flex;gap:4px">'+mb('line','한 줄')+mb('wrap','줄바꿈')+mb('fit','박스맞춤')+'</div>';
     if(mode==='wrap'||mode==='fit'){
-      var bw=(p.w!=null?p.w:(100-(p.x||0)));
+      var bw=(p.w>0?p.w:(100-(p.x||0)));
       h+='<label style="display:block;margin-top:6px;font-size:12px">박스 폭 <b>'+Math.round(bw)+'%</b> '+(mode==='fit'?'<span style="color:#94a3b8;font-size:10px">(좁히면 글자 작아짐)</span>':'<span style="color:#94a3b8;font-size:10px">(좁히면 줄바꿈)</span>')+'</label>';
       h+='<input type="range" min="10" max="100" step="1" value="'+bw+'" style="width:100%" oninput="_mllSetPos(\''+id+'\',\'w\',this.value)">';
     }
@@ -2508,6 +2508,10 @@ function _mllSetMode(id,m){
   var L=window.__mlLayout; if(!L) return;
   if(!L.pos[id]) L.pos[id]={};
   L.pos[id].mode=m; L.pos[id].wrap=(m==='wrap'); // 구버전 호환 필드도 갱신
+  // 줄바꿈/박스맞춤은 박스 폭이 있어야 함 — 없으면 기본값(우측까지, 최대 90%)
+  if((m==='wrap'||m==='fit') && !(L.pos[id].w>0)){
+    L.pos[id].w=Math.max(20, Math.min(90, 100-(L.pos[id].x||0)));
+  }
   _mllRender(); _mllBindEvents(); _mllShowCtrl(id);
 }
 function _mllToggle(id,prop){
