@@ -1393,18 +1393,21 @@ function renderModApplyForm(key,evtId){
 function _renderModApplyUI(def,evtId){
   window.__modApplyDef=def; window.__modApplyEvt=evtId;
   // 탭/공유 제목을 이 신청폼 이름으로 (시스템명 대신)
-  try{ document.title=(def.formTitle||(def.label+' 신청')); }catch(e){}
-  var title=def.formTitle?esc(def.formTitle):((def.icon||'📝')+' '+esc(def.label)+' 신청');
-  var desc=def.formDesc?esc(def.formDesc):'아래 내용을 작성 후 신청해 주세요';
-  var h='<h2 style="text-align:center;color:#2563eb;margin-bottom:4px;font-size:20px">'+title+'</h2>';
-  h+='<p style="text-align:center;color:#94a3b8;font-size:12px;margin-bottom:20px">'+desc+'</p>';
+  try{ document.title=(def.formTitle||(def.label+' 신청하기')); }catch(e){}
+  var title=def.formTitle?esc(def.formTitle):((def.icon||'📝')+' '+esc(def.label)+' 신청하기');
+  var desc=def.formDesc?esc(def.formDesc):'아래 내용을 작성하고 신청 버튼을 눌러주세요';
+  // 상단 제목 영역 (크고 직관적으로)
+  var h='<div style="text-align:center;margin-bottom:22px">';
+  h+='<h2 style="color:#2563eb;margin:0 0 6px;font-size:26px;font-weight:800;line-height:1.25">'+title+'</h2>';
+  h+='<p style="color:#94a3b8;font-size:13px;margin:0">'+desc+'</p>';
+  h+='</div>';
   (def.columns||[]).forEach(function(c){
     if(c.auto||c.adminOnly||c.key==='status') return;
-    h+='<div style="margin-bottom:12px"><label style="display:block;font-size:13px;color:#475569;font-weight:600;margin-bottom:4px">'+esc(c.label)+(c.required?' <span style="color:#ef4444">*</span>':'')+'</label>';
+    h+='<div style="margin-bottom:16px"><label style="display:block;font-size:14px;color:#334155;font-weight:700;margin-bottom:6px">'+esc(c.label)+(c.required?' <span style="color:#ef4444">*</span>':'')+'</label>';
     h+=_modFormField(c,'');
     h+='</div>';
   });
-  h+='<button id="modApplyBtn" onclick="submitModApply()" style="width:100%;padding:14px;border:none;border-radius:10px;background:#2563eb;color:#fff;font-size:15px;font-weight:700;cursor:pointer;margin-top:10px">신청하기</button>';
+  h+='<button id="modApplyBtn" onclick="submitModApply()" style="width:100%;padding:16px;border:none;border-radius:12px;background:#2563eb;color:#fff;font-size:17px;font-weight:800;cursor:pointer;margin-top:14px;box-shadow:0 4px 12px rgba(37,99,235,.3)">✓ '+esc(def.label)+' 신청하기</button>';
   h+='<div id="modApplyMsg" style="text-align:center;margin-top:12px;font-size:13px"></div>';
   document.getElementById('modApplyCard').innerHTML=h;
 }
