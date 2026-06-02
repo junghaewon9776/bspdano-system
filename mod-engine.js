@@ -1219,6 +1219,8 @@ function saveModDef(keyOrNew){
     driveUploadUrl:driveUrl,
     features:{search:true,excel:true,applyForm:applyForm}
   };
+  // 기존 모듈 수정 시 라벨 프리셋 등 부가 데이터 보존 (덮어쓰기 방지)
+  if(!isNew && _modDefs[key] && _modDefs[key].labelPresets) def.labelPresets=_modDefs[key].labelPresets;
 
   showLoading('저장 중...');
   defMod(def);
@@ -1877,7 +1879,7 @@ function popModLabel(key,singleId,idsList){
 
   h+='<div style="font-size:12px;font-weight:700;margin-bottom:4px;color:#475569">미리보기 (QR 스캔 → 정보 조회 페이지)</div>';
   h+='<div id="ml_preview" style="background:#e2e8f0;padding:12px;border-radius:8px;overflow:auto;text-align:center"></div>';
-  h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px"><button class="btn" style="background:#6366f1;color:#fff" onclick="popModLabelLayout(\''+key+'\')">📐 배치 편집</button><div><button class="btn" onclick="closePopup()">취소</button> <button class="btn btn-b" style="background:#475569" onclick="modDoPrint()">🖨 <span id="ml_printcnt">'+rows.length+'</span>장 출력</button></div></div>';
+  h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px"><button class="btn" style="background:#6366f1;color:#fff" onclick="popModLabelLayout(\''+key+'\')">📐 배치 편집</button><div><button class="btn" onclick="closePopup()">취소</button> <button id="ml_printbtn" class="btn btn-b" style="background:#475569" onclick="modDoPrint()">🖨 <span id="ml_printcnt">'+rows.length+'</span>장 출력</button></div></div>';
   h+='</div>';
   openPopup(h,560);
   setTimeout(function(){
@@ -2027,6 +2029,7 @@ function _modLabelPreview(){
   }
 }
 function modDoPrint(){
+  if(window.__mlPrinting){ toast('출력 처리 중입니다… 잠시만 기다려주세요',true); return; } // 연타 방지
   var key=window.__modLabelKey, def=_modDefs[key]; if(!def) return;
   var opt=_modLabelReadOpt();
   _saveModLabelOpt(key,opt);
@@ -2051,7 +2054,13 @@ function modDoPrint(){
   }
   // QZ Tray 연결+프린터선택 시 → 라벨 프린터로 직접 출력 (낱장 모드)
   if(opt.mode==='label' && qzIsReady()){
-    _qzPrintLabels(def, rows, opt).then(function(ok){ if(ok){ modBumpPrint(key, ids); closePopup(); } });
+    window.__mlPrinting=true;
+    var _pb=document.getElementById('ml_printbtn'); if(_pb){ _pb.disabled=true; _pb.style.opacity='0.6'; _pb.innerHTML='🖨 출력 중…'; }
+    _qzPrintLabels(def, rows, opt).then(function(ok){
+      window.__mlPrinting=false;
+      if(ok){ modBumpPrint(key, ids); closePopup(); }
+      else { if(_pb){ _pb.disabled=false; _pb.style.opacity='1'; _pb.innerHTML='🖨 '+rows.length+'장 출력'; } }
+    });
     return;
   }
   var labels=rows.map(function(r){return _modLabelHtml(def,r,opt);}).join('');
@@ -2251,9 +2260,12 @@ function _qzUpdateUI(){
   var curP=_qzPrinterName();
   var h='';
   if(!ready){
+    var hasLib=(typeof qz!=='undefined');
     h+='<span style="font-size:12px;color:#dc2626;font-weight:700">● QZ 미연결</span>';
     h+='<button class="btn btn-s" style="background:#6366f1;color:#fff;font-size:11px" onclick="qzConnect()">QZ Tray 연결</button>';
+    h+='<a href="https://qz.io/download/" target="_blank" class="btn btn-s" style="background:#0ea5e9;color:#fff;font-size:11px;text-decoration:none" title="처음이면 QZ Tray 프로그램을 설치하세요">⬇ QZ Tray 설치</a>';
     h+='<button class="btn btn-s" style="font-size:11px" onclick="_qzDownloadCert()">인증서 다운로드</button>';
+    h+='<div style="flex-basis:100%;font-size:10px;color:#94a3b8;margin-top:4px">① QZ Tray 설치·실행 → ② 인증서 다운로드 후 QZ Tray에 등록 → ③ 「QZ Tray 연결」'+(hasLib?'':' <b style="color:#dc2626">(QZ 라이브러리 로딩 안 됨 — 새로고침 필요)</b>')+'</div>';
   } else {
     h+='<span style="font-size:12px;color:#16a34a;font-weight:700">● QZ 연결됨</span>';
     h+='<select onchange="_qzSetPrinter(this.value)" style="padding:5px 8px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;max-width:200px"><option value="">프린터 선택…</option>';
