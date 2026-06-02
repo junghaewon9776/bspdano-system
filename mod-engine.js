@@ -1853,8 +1853,8 @@ function popModLabel(key,singleId,idsList){
   if(!singleId){
     var statusColL=(def.columns||[]).find(function(c){return c.key==='status'&&c.type==='badge';});
     h+='<div style="font-size:12px;font-weight:700;color:#475569;margin-bottom:4px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">출력 대상 선택';
-    h+='<button class="btn btn-s" style="font-size:11px;padding:2px 8px" onclick="_mlPickAll(true)">전체 선택</button>';
-    h+='<button class="btn btn-s" style="font-size:11px;padding:2px 8px" onclick="_mlPickAll(false)">전체 해제</button>';
+    h+='<button class="btn btn-s" style="font-size:11px;padding:2px 8px;background:#2563eb;color:#fff" onclick="_mlPickAll(true)">전체 선택</button>';
+    h+='<button class="btn btn-s" style="font-size:11px;padding:2px 8px;background:#64748b;color:#fff" onclick="_mlPickAll(false)">전체 해제</button>';
     if(statusColL){
       h+='<select onchange="_mlPickByStatus(this.value)" style="font-size:11px;padding:3px 6px;border:1px solid #cbd5e1;border-radius:6px" title="상태별로 체크">';
       h+='<option value="">상태별 선택…</option>';
@@ -1882,7 +1882,7 @@ function popModLabel(key,singleId,idsList){
 
   h+='<div style="font-size:12px;font-weight:700;margin-bottom:4px;color:#475569">미리보기 (QR 스캔 → 정보 조회 페이지)</div>';
   h+='<div id="ml_preview" style="background:#e2e8f0;padding:12px;border-radius:8px;overflow:auto;text-align:center"></div>';
-  h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px"><button class="btn" style="background:#6366f1;color:#fff" onclick="popModLabelLayout(\''+key+'\')">📐 배치 편집</button><div><button class="btn" onclick="closePopup()">취소</button> <button id="ml_printbtn" class="btn btn-b" style="background:#475569" onclick="modDoPrint()">🖨 <span id="ml_printcnt">'+rows.length+'</span>장 출력</button></div></div>';
+  h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px"><button class="btn" style="background:#6366f1;color:#fff" onclick="popModLabelLayout(\''+key+'\')">📐 배치 편집</button><div><button class="btn" style="background:#e2e8f0;color:#334155" onclick="closePopup()">취소</button> <button id="ml_printbtn" class="btn btn-b" style="background:#2563eb;color:#fff;font-weight:700" onclick="modDoPrint()">🖨 <span id="ml_printcnt">'+rows.length+'</span>장 출력</button></div></div>';
   h+='</div>';
   openPopup(h,560);
   setTimeout(function(){
@@ -2286,15 +2286,15 @@ function _qzUpdateUI(){
     h+='<button class="btn btn-s" style="background:#6366f1;color:#fff;font-size:11px" onclick="qzConnect()">QZ Tray 연결</button>';
     h+='<a href="https://qz.io/download/" target="_blank" class="btn btn-s" style="background:#0ea5e9;color:#fff;font-size:11px;text-decoration:none" title="처음이면 QZ Tray 프로그램을 설치하세요">⬇ QZ Tray 설치</a>';
     h+='<button class="btn btn-s" style="background:#16a34a;color:#fff;font-size:11px" onclick="_qzInstallCert()" title="더블클릭하면 %APPDATA%\\qz에 인증서 자동 설치">⚙ 인증서 자동설치(.bat)</button>';
-    h+='<button class="btn btn-s" style="font-size:11px" onclick="_qzDownloadCert()" title="수동 설치용">인증서 수동(.crt)</button>';
+    h+='<button class="btn btn-s" style="font-size:11px;background:#64748b;color:#fff" onclick="_qzDownloadCert()" title="수동 설치용">인증서 수동(.crt)</button>';
     h+='<div style="flex-basis:100%;font-size:10px;color:#94a3b8;margin-top:4px">① QZ Tray 설치·실행 → ② <b>인증서 자동설치(.bat) 더블클릭</b> → ③ QZ Tray 재시작 → ④ 「QZ Tray 연결」'+(hasLib?'':' <b style="color:#dc2626">(QZ 라이브러리 로딩 안 됨 — 새로고침 필요)</b>')+'</div>';
   } else {
     h+='<span style="font-size:12px;color:#16a34a;font-weight:700">● QZ 연결됨</span>';
     h+='<select onchange="_qzSetPrinter(this.value)" style="padding:5px 8px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;max-width:200px"><option value="">프린터 선택…</option>';
     printers.forEach(function(p){ h+='<option value="'+esc(p)+'"'+(p===curP?' selected':'')+'>'+esc(p)+'</option>'; });
     h+='</select>';
-    h+='<button class="btn btn-s" style="font-size:11px" onclick="_qzScan()">새로고침</button>';
-    h+='<button class="btn btn-s" style="font-size:11px" onclick="qzDisconnect()">해제</button>';
+    h+='<button class="btn btn-s" style="font-size:11px;background:#0ea5e9;color:#fff" onclick="_qzScan()">🔄 새로고침</button>';
+    h+='<button class="btn btn-s" style="font-size:11px;background:#64748b;color:#fff" onclick="qzDisconnect()">해제</button>';
   }
   box.innerHTML=h;
 }
