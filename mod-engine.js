@@ -1593,10 +1593,13 @@ function _mlPresets(key){
   return (def&&def.labelPresets)||[];
 }
 function _mlSavePresets(key,arr){
-  var def=_modDefs[key]; if(def) def.labelPresets=arr;
+  var def=_modDefs[key];
+  if(!def){ toast('⚠ 모듈 정보를 찾을 수 없어 저장 실패',true); return; }
+  def.labelPresets=arr;
   try{ localStorage.setItem('modLabelPresets_'+key, JSON.stringify(arr)); }catch(e){} // 로컬 백업
-  if(def && typeof _saveModDefs==='function'){
-    _saveModDefs().catch(function(e){ toast('프리셋 Firebase 저장 실패: '+(e.message||e),true); });
+  if(typeof _saveModDefs==='function'){
+    _saveModDefs().then(function(){ toast('☁ 프리셋 클라우드 저장 완료 (다른 PC 공유)'); })
+      .catch(function(e){ toast('⚠ 프리셋 클라우드 저장 실패(이 PC에만 저장): '+(e.message||e),true); });
   }
 }
 function _mlPresetOptions(key){
