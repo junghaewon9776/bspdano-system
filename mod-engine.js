@@ -2345,7 +2345,7 @@ function popModLabelLayout(key){
   h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px">';
   h+='<div><button class="btn" style="background:#ef4444;color:#fff;font-size:12px" onclick="_mllReset()">🔄 기본 배치로 초기화</button>';
   h+=' <button class="btn" style="background:#94a3b8;color:#fff;font-size:12px" onclick="_mllClearLayout()">자동 배치로 되돌리기</button></div>';
-  h+='<div><button class="btn" onclick="closePopup()">취소</button> <button class="btn btn-b" style="background:#6366f1" onclick="_mllSave()">💾 저장</button></div>';
+  h+='<div><button class="btn" style="background:#e2e8f0;color:#334155" onclick="closePopup()">취소</button> <button class="btn btn-b" style="background:#6366f1;color:#fff;font-weight:700" onclick="_mllSave()">💾 저장</button></div>';
   h+='</div></div>';
   openPopup(h,Math.max(620,cW+250));
   setTimeout(function(){ _mllRender(); _mllBindEvents(); },50);
@@ -2482,7 +2482,7 @@ function _mllShowCtrl(id){
     h+='<label style="display:block;margin-bottom:6px;margin-top:6px">글자 크기 <b>'+(p.fs||(id==='_title'?14:7.5))+'pt</b></label>';
     h+='<input type="range" min="5" max="24" step="0.5" value="'+(p.fs||(id==='_title'?14:7.5))+'" style="width:100%" oninput="_mllSetPos(\''+id+'\',\'fs\',this.value)">';
     // 텍스트 처리 방식 (한 줄 / 줄바꿈 / 박스맞춤)
-    var bs=function(on){return 'padding:5px 7px;border:1px solid '+(on?'#6366f1':'#cbd5e1')+';border-radius:5px;background:'+(on?'#eef2ff':'#fff')+';color:#334155;font-size:12px;cursor:pointer;font-weight:700';};
+    var bs=function(on){return 'padding:5px 7px;border:1px solid '+(on?'#4338ca':'#94a3b8')+';border-radius:5px;background:'+(on?'#6366f1':'#e2e8f0')+';color:'+(on?'#fff':'#334155')+';font-size:12px;cursor:pointer;font-weight:700';};
     var mode=p.mode||(p.wrap?'wrap':'line');
     var mb=function(m,lbl){return '<button onclick="_mllSetMode(\''+id+'\',\''+m+'\')" style="flex:1;'+bs(mode===m)+'">'+lbl+'</button>';};
     h+='<div style="margin-top:10px;border-top:1px solid #e2e8f0;padding-top:8px;font-size:11px;color:#94a3b8;margin-bottom:5px">텍스트 처리</div>';
