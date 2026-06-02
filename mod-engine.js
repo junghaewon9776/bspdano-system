@@ -1392,6 +1392,8 @@ function renderModApplyForm(key,evtId){
 
 function _renderModApplyUI(def,evtId){
   window.__modApplyDef=def; window.__modApplyEvt=evtId;
+  // 탭/공유 제목을 이 신청폼 이름으로 (시스템명 대신)
+  try{ document.title=(def.formTitle||(def.label+' 신청')); }catch(e){}
   var title=def.formTitle?esc(def.formTitle):((def.icon||'📝')+' '+esc(def.label)+' 신청');
   var desc=def.formDesc?esc(def.formDesc):'아래 내용을 작성 후 신청해 주세요';
   var h='<h2 style="text-align:center;color:#2563eb;margin-bottom:4px;font-size:20px">'+title+'</h2>';
