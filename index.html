@@ -915,7 +915,7 @@ async function uploadAll(files, ar, type){
 
 // ===== 로그인 =====
 var AUTH_KEY="cleanFarm_auth_v1";
-var IDLE_MS=10*60*1000;     // 10분 무활동 → 연장 팝업
+var IDLE_MS=(/Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent))?60*60*1000:10*60*1000; // 모바일 1시간 / PC 10분 무활동 → 연장 팝업
 var WARN_COUNT_MS=60*1000;  // 팝업 뜬 뒤 60초 내 응답 없으면 자동 로그아웃
 // 자동로그인 TTL — 마지막 활동 이후 이 시간이 지나면 자동로그인 X, 수동 로그인 필요
 var AUTO_LOGIN_TTL_MS=1*60*60*1000; // 1시간
