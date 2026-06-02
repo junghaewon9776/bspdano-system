@@ -1298,7 +1298,8 @@ function popModFormLink(key){
   // QR 미리보기 + JPG 저장
   h+='<div style="text-align:center;margin-top:16px;padding-top:14px;border-top:1px dashed #e2e8f0">';
   h+='<img src="'+qrPrev+'" style="width:160px;height:160px;border:1px solid #e2e8f0;border-radius:8px"><div style="font-size:11px;color:#94a3b8;margin-top:4px">스캔하면 신청폼으로 연결</div>';
-  h+='<div style="margin-top:10px"><button class="btn btn-b" style="background:#16a34a" onclick="_saveQrJpg(window.__modFormUrl, window.__modFormName+\'_신청폼QR\')">🖼 QR 이미지 저장 (JPG)</button></div>';
+  h+='<div style="margin-top:10px;display:flex;gap:6px;justify-content:center;flex-wrap:wrap"><button class="btn btn-b" style="background:#16a34a;color:#fff" onclick="_saveQrJpg(window.__modFormUrl, window.__modFormName+\'_신청폼QR\')">🖼 QR 이미지 저장 (JPG)</button>';
+  h+='<button class="btn btn-b" style="background:#2563eb;color:#fff" onclick="_modFormPoster(\''+key+'\')">🖨 A4 신청 안내문 출력</button></div>';
   h+='</div>';
   h+='<div style="margin-top:14px;text-align:right"><button class="btn" onclick="closePopup()">닫기</button></div>';
   h+='</div>';
@@ -1323,6 +1324,49 @@ function _saveQrJpg(url, filename){
   };
   img.onerror=function(){ toast('QR 이미지 로드 실패 — 네트워크 확인',true); };
   img.src=qurl;
+}
+// 신청 QR을 A4 안내문(포스터)으로 — 제목/안내/메모 편집 후 인쇄
+function _modFormPoster(key){
+  var def=_modDefs[key]; if(!def) return;
+  var url=window.__modFormUrl; if(!url) return toast('신청폼 링크를 먼저 여세요',true);
+  window.__mfpUrl=url;
+  var dt=esc(def.label||'행사');
+  var h='<div class="pop-head"><h3>🖨 신청 안내문 (A4) 만들기</h3></div>';
+  h+='<div style="padding:14px">';
+  h+='<label style="font-size:12px;color:#475569;display:block;margin-bottom:8px">큰 제목<input id="mfp_title" value="'+dt+' 신청" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px;font-weight:700"></label>';
+  h+='<label style="font-size:12px;color:#475569;display:block;margin-bottom:8px">안내 문구<textarea id="mfp_guide" rows="2" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;resize:vertical;box-sizing:border-box">휴대폰 카메라로 아래 QR코드를 비추면\n신청 페이지로 이동합니다</textarea></label>';
+  h+='<label style="font-size:12px;color:#475569;display:block;margin-bottom:12px">하단 메모 <span style="font-size:10px;color:#94a3b8">(마감일·문의처 등, 선택)</span><input id="mfp_foot" value="'+esc(def.formDesc||'')+'" placeholder="예: 신청 마감 6/15 · 문의 010-0000-0000" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px"></label>';
+  h+='<div style="text-align:center;margin-bottom:12px"><img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&margin=6&data='+encodeURIComponent(url)+'" style="width:120px;height:120px;border:1px solid #e2e8f0;border-radius:8px"><div style="font-size:11px;color:#94a3b8;margin-top:3px">A4 출력 시 크게 인쇄됩니다</div></div>';
+  h+='<div style="text-align:right"><button class="btn" style="background:#e2e8f0;color:#334155" onclick="closePopup()">취소</button> <button class="btn btn-b" style="background:#2563eb;color:#fff;font-weight:700" onclick="_modFormPosterPrint()">🖨 A4 인쇄</button></div>';
+  h+='</div>';
+  openPopup(h,460);
+}
+function _modFormPosterPrint(){
+  var title=(document.getElementById('mfp_title')||{}).value||'';
+  var guide=(document.getElementById('mfp_guide')||{}).value||'';
+  var foot=(document.getElementById('mfp_foot')||{}).value||'';
+  var url=window.__mfpUrl||'';
+  var qr='https://api.qrserver.com/v1/create-qr-code/?size=800x800&margin=10&data='+encodeURIComponent(url);
+  var win=window.open('','_mfpprint','width=620,height=820');
+  if(!win){ toast('팝업 차단을 해제해 주세요',true); return; }
+  var esc2=function(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
+  var css='@page{size:A4;margin:0}html,body{margin:0;padding:0;font-family:\'Malgun Gothic\',\'맑은 고딕\',sans-serif}'
+    +'.page{width:210mm;height:297mm;box-sizing:border-box;padding:28mm 20mm;display:flex;flex-direction:column;align-items:center;text-align:center}'
+    +'.t{font-size:42pt;font-weight:800;color:#2563eb;line-height:1.2;margin-bottom:12mm}'
+    +'.g{font-size:19pt;color:#475569;line-height:1.5;white-space:pre-line;margin-bottom:16mm}'
+    +'.qr{width:115mm;height:115mm;border:1px solid #e5e7eb}'
+    +'.s{font-size:17pt;font-weight:700;color:#16a34a;margin-top:14mm}'
+    +'.f{font-size:14pt;color:#64748b;margin-top:auto;white-space:pre-line;line-height:1.6}'
+    +'@media screen{body{background:#e2e8f0;padding:10px}.page{background:#fff;margin:0 auto;box-shadow:0 2px 12px rgba(0,0,0,.2)}}';
+  var body='<div class="page">';
+  body+='<div class="t">'+esc2(title)+'</div>';
+  body+='<div class="g">'+esc2(guide)+'</div>';
+  body+='<img class="qr" src="'+qr+'">';
+  body+='<div class="s">📱 QR 스캔 → 바로 신청</div>';
+  if(foot) body+='<div class="f">'+esc2(foot)+'</div>';
+  body+='</div>';
+  win.document.write('<html><head><meta charset="utf-8"><title>신청 안내문</title><style>'+css+'</style></head><body>'+body+'<scr'+'ipt>setTimeout(function(){window.print();},900);</scr'+'ipt></body></html>');
+  win.document.close(); win.focus();
 }
 function _copyModFormLink(){
   var el=document.getElementById('modFormLinkInput'); if(!el) return;
