@@ -2239,6 +2239,23 @@ function _qzDownloadCert(){
   var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='override.crt'; a.click();
   toast('📥 override.crt 다운로드됨 — QZ Tray 설정 폴더(%APPDATA%\\qz)에 복사 후 재시작');
 }
+// 인증서 자동 설치 .bat — 더블클릭하면 %APPDATA%\qz\override.crt 에 자동 설치
+function _qzInstallCert(){
+  var cert=_qzCert().cert;
+  var certB64=btoa(cert);
+  var ps1='$d="$env:APPDATA\\qz";if(!(Test-Path $d)){md $d -Force|Out-Null};'
+    +'[IO.File]::WriteAllText("$d\\override.crt",[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String("'+certB64+'")));'
+    +'if(Test-Path "$d\\override.crt"){Write-Host "[OK] 설치됨: $d\\override.crt" -F Green;Write-Host "QZ Tray를 종료 후 다시 실행하세요." -F Yellow}else{Write-Host "[실패]" -F Red};'
+    +'Read-Host "엔터를 누르면 닫힙니다"';
+  var u16='';
+  for(var i=0;i<ps1.length;i++){ var ch=ps1.charCodeAt(i); u16+=String.fromCharCode(ch&0xff)+String.fromCharCode((ch>>8)&0xff); }
+  var encoded=btoa(u16);
+  var bat='@echo off\r\nchcp 65001>nul\r\npowershell -ExecutionPolicy Bypass -EncodedCommand '+encoded+'\r\n';
+  var blob=new Blob([bat],{type:'application/bat'});
+  var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='install_qz_cert.bat'; a.click();
+  setTimeout(function(){ URL.revokeObjectURL(a.href); },1500);
+  toast('📥 install_qz_cert.bat 다운로드 — 더블클릭하면 %APPDATA%\\qz 에 인증서 자동 설치됩니다 (설치 후 QZ Tray 재시작)');
+}
 function _qzPrintLabels(def, rows, opt){
   var pn=_qzPrinterName();
   if(!qzIsReady()){ toast('QZ 프린터를 먼저 연결·선택하세요',true); return Promise.resolve(false); }
@@ -2267,8 +2284,9 @@ function _qzUpdateUI(){
     h+='<span style="font-size:12px;color:#dc2626;font-weight:700">● QZ 미연결</span>';
     h+='<button class="btn btn-s" style="background:#6366f1;color:#fff;font-size:11px" onclick="qzConnect()">QZ Tray 연결</button>';
     h+='<a href="https://qz.io/download/" target="_blank" class="btn btn-s" style="background:#0ea5e9;color:#fff;font-size:11px;text-decoration:none" title="처음이면 QZ Tray 프로그램을 설치하세요">⬇ QZ Tray 설치</a>';
-    h+='<button class="btn btn-s" style="font-size:11px" onclick="_qzDownloadCert()">인증서 다운로드</button>';
-    h+='<div style="flex-basis:100%;font-size:10px;color:#94a3b8;margin-top:4px">① QZ Tray 설치·실행 → ② 인증서 다운로드 후 QZ Tray에 등록 → ③ 「QZ Tray 연결」'+(hasLib?'':' <b style="color:#dc2626">(QZ 라이브러리 로딩 안 됨 — 새로고침 필요)</b>')+'</div>';
+    h+='<button class="btn btn-s" style="background:#16a34a;color:#fff;font-size:11px" onclick="_qzInstallCert()" title="더블클릭하면 %APPDATA%\\qz에 인증서 자동 설치">⚙ 인증서 자동설치(.bat)</button>';
+    h+='<button class="btn btn-s" style="font-size:11px" onclick="_qzDownloadCert()" title="수동 설치용">인증서 수동(.crt)</button>';
+    h+='<div style="flex-basis:100%;font-size:10px;color:#94a3b8;margin-top:4px">① QZ Tray 설치·실행 → ② <b>인증서 자동설치(.bat) 더블클릭</b> → ③ QZ Tray 재시작 → ④ 「QZ Tray 연결」'+(hasLib?'':' <b style="color:#dc2626">(QZ 라이브러리 로딩 안 됨 — 새로고침 필요)</b>')+'</div>';
   } else {
     h+='<span style="font-size:12px;color:#16a34a;font-weight:700">● QZ 연결됨</span>';
     h+='<select onchange="_qzSetPrinter(this.value)" style="padding:5px 8px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;max-width:200px"><option value="">프린터 선택…</option>';
