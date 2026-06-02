@@ -1753,7 +1753,7 @@ function _mlElemFit(p, plain, baseFs, labelWmm){
 }
 
 function _modLabelHtml(def,row,opt){
-  var allc=(def.columns||[]).filter(function(c){return !c.adminOnly&&c.key!=='status'&&!c.hideTable&&c.type!=='file'&&c.type!=='consent'});
+  var allc=(def.columns||[]).filter(function(c){return c.key!=='status'&&!c.hideTable&&c.type!=='file'&&c.type!=='consent'});
   var hasFields=!!(opt.fields&&opt.fields.length);
   var cols=hasFields ? allc.filter(function(c){return opt.fields.indexOf(c.key)>=0;}) : allc;
   // 표시 여부: 항목 체크가 있으면 그에 따름. 제목/ QR도 동일하게 제어
@@ -1822,7 +1822,7 @@ function popModLabel(key,singleId,idsList){
   window.__mlPickLast = -1;
   window.__mlMode = opt.mode||'label';    // 현재 출력 모드
   window.__mlSizes = JSON.parse(JSON.stringify(opt.sizes||{})); // 모드별 크기 작업 사본
-  var allCols=(def.columns||[]).filter(function(c){return !c.adminOnly&&c.key!=='status'&&!c.hideTable&&c.type!=='file'&&c.type!=='consent'});
+  var allCols=(def.columns||[]).filter(function(c){return c.key!=='status'&&!c.hideTable&&c.type!=='file'&&c.type!=='consent'});
   var fieldOpts=allCols.map(function(c){return '<option value="'+esc(c.key)+'"'+(opt.titleKey===c.key?' selected':'')+'>'+esc(c.label)+'</option>';}).join('');
   var checkedFields=(opt.fields&&opt.fields.length)?opt.fields:allCols.map(function(c){return c.key;}).concat(['_qr']);
   var isA4=(opt.mode==='a4');
@@ -2353,7 +2353,7 @@ function popModLabelLayout(key){
   // 라벨 팝업이 열려있으면 그 모드/입력값을 우선 사용 (모드별 분리)
   var mode=window.__mlMode||opt.mode||'label';
   if(window.__mlMode && window.__mlSizes){ _mlSyncSizeFromInputs(); opt=Object.assign({},opt,window.__mlSizes[mode]||{}); }
-  var allCols=(def.columns||[]).filter(function(c){return !c.adminOnly&&c.key!=='status'&&!c.hideTable&&c.type!=='file'&&c.type!=='consent'});
+  var allCols=(def.columns||[]).filter(function(c){return c.key!=='status'&&!c.hideTable&&c.type!=='file'&&c.type!=='consent'});
   var checkedFields=(opt.fields&&opt.fields.length)?opt.fields:allCols.map(function(c){return c.key;});
   var cols=allCols.filter(function(c){return checkedFields.indexOf(c.key)>=0;});
   var existing=_modLabelLayout(key,mode);
