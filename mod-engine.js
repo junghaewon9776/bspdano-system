@@ -2302,18 +2302,23 @@ function _qzInstallCert(){
   var cert=_qzCert().cert;
   var certB64=btoa(cert);  // cert는 ASCII(PEM)이라 인코딩 안전
   // PowerShell 메시지는 전부 영어 → 콘솔 한글 인코딩 깨짐 원천 차단
-  var ps1='$d="$env:APPDATA\\qz";if(!(Test-Path $d)){md $d -Force|Out-Null};'
-    +'[IO.File]::WriteAllText("$d\\override.crt",[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String("'+certB64+'")));'
-    +'if(Test-Path "$d\\override.crt"){Write-Host "[OK] Certificate installed:" -F Green;Write-Host $d"\\override.crt";Write-Host "Now RESTART QZ Tray." -F Yellow}else{Write-Host "[FAILED] install error" -F Red};'
+  var ps1='$cert=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String("'+certB64+'"));'
+    +'$paths=@("$env:APPDATA\\qz\\override.crt","$env:PROGRAMDATA\\QZ Tray\\override.crt","$env:PROGRAMDATA\\qz\\override.crt","$env:USERPROFILE\\.qz\\override.crt","$env:ProgramFiles\\QZ Tray\\auth\\override.crt","$env:ProgramFiles\\QZ Tray\\override.crt","${env:ProgramFiles(x86)}\\QZ Tray\\auth\\override.crt","${env:ProgramFiles(x86)}\\QZ Tray\\override.crt");'
+    +'$ok=0;foreach($p in $paths){try{$dir=Split-Path $p;if(!(Test-Path $dir)){New-Item -ItemType Directory -Force -Path $dir|Out-Null};[IO.File]::WriteAllText($p,$cert);$ok++;Write-Host ("[OK] "+$p) -F Green}catch{Write-Host ("[skip] "+$p) -F DarkGray}};'
+    +'Write-Host "";Write-Host ("Installed at "+$ok+" location(s). Now RESTART QZ Tray.") -F Yellow;'
     +'Read-Host "Press Enter to close"';
   var u16='';
   for(var i=0;i<ps1.length;i++){ var ch=ps1.charCodeAt(i); u16+=String.fromCharCode(ch&0xff)+String.fromCharCode((ch>>8)&0xff); }
   var encoded=btoa(u16);  // UTF-16LE base64 = PowerShell -EncodedCommand 형식 (한글 없음)
-  var bat='@echo off\r\npowershell -NoProfile -ExecutionPolicy Bypass -EncodedCommand '+encoded+'\r\n';
+  // 관리자 권한 자동 상승(Program Files 쓰기) + 8곳 설치
+  var bat='@echo off\r\n'
+    +'net session >nul 2>&1\r\n'
+    +'if %errorlevel% neq 0 ( powershell -Command "Start-Process -FilePath \'%~f0\' -Verb RunAs" & exit /b )\r\n'
+    +'powershell -NoProfile -ExecutionPolicy Bypass -EncodedCommand '+encoded+'\r\n';
   var blob=new Blob([bat],{type:'application/bat'});
   var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='install_qz_cert.bat'; a.click();
   setTimeout(function(){ URL.revokeObjectURL(a.href); },1500);
-  toast('📥 install_qz_cert.bat 다운로드 — 더블클릭하면 %APPDATA%\\qz 에 인증서 자동 설치됩니다 (설치 후 QZ Tray 재시작)');
+  toast('📥 install_qz_cert.bat 다운로드 → 더블클릭 → "관리자 권한 예" → 8곳 설치 후 QZ Tray 재시작',true);
 }
 function _qzPrintLabels(def, rows, opt){
   var pn=_qzPrinterName();
