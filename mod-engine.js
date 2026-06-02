@@ -1285,9 +1285,13 @@ function modSetStatus(key,id,status){
 // 신청폼 링크 팝업
 function popModFormLink(key){
   var def=_modDefs[key]; if(!def) return;
-  var base=location.href.split('?')[0];
+  var base=location.href.split(/[?#]/)[0];
+  var dir=base.replace(/\/[^\/]*$/,'/'); // 디렉토리(끝 /)
   var evtId=def.global?'':((CUR_EVT&&CUR_EVT.evtId)||'');
-  var url=base+'?modform='+encodeURIComponent(key)+(evtId?'&evtId='+encodeURIComponent(evtId):'');
+  // 공통(global) 모듈은 카톡 미리보기 제목용 공유 전용 페이지(f/{key}.html) 사용
+  var url;
+  if(def.global){ url=dir+'f/'+encodeURIComponent(key)+'.html'; }
+  else { url=base+'?modform='+encodeURIComponent(key)+(evtId?'&evtId='+encodeURIComponent(evtId):''); }
   window.__modFormUrl=url; window.__modFormName=def.label||'신청폼';
   var qrPrev='https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=8&data='+encodeURIComponent(url);
   var h='<div class="pop-head"><h3>🔗 '+esc(def.label)+' 신청폼 공유</h3></div>';
