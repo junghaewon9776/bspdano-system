@@ -2099,6 +2099,11 @@ function modDoPrint(){
       ids=rows.map(function(r){return r._id;});
     }
   }
+  // 출력 건수 최종 확인 (전체가 잘못 출력되는 것 방지)
+  var _cntMsg;
+  if(opt.mode==='a4'){ var _g=_mlA4Grid(opt); var _pg=Math.ceil(rows.length/(_g.perPage||1)); _cntMsg='총 '+rows.length+'건을 A4 약 '+_pg+'장에 출력합니다.\n진행할까요?'; }
+  else _cntMsg='총 '+rows.length+'장(낱장)을 출력합니다.\n진행할까요?';
+  if(!confirm(_cntMsg)) return;
   // QZ Tray 연결+프린터선택 시 → 라벨 프린터로 직접 출력 (낱장 모드)
   if(opt.mode==='label' && qzIsReady()){
     window.__mlPrinting=true;
