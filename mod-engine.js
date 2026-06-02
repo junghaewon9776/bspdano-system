@@ -2242,15 +2242,16 @@ function _qzDownloadCert(){
 // 인증서 자동 설치 .bat — 더블클릭하면 %APPDATA%\qz\override.crt 에 자동 설치
 function _qzInstallCert(){
   var cert=_qzCert().cert;
-  var certB64=btoa(cert);
+  var certB64=btoa(cert);  // cert는 ASCII(PEM)이라 인코딩 안전
+  // PowerShell 메시지는 전부 영어 → 콘솔 한글 인코딩 깨짐 원천 차단
   var ps1='$d="$env:APPDATA\\qz";if(!(Test-Path $d)){md $d -Force|Out-Null};'
     +'[IO.File]::WriteAllText("$d\\override.crt",[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String("'+certB64+'")));'
-    +'if(Test-Path "$d\\override.crt"){Write-Host "[OK] 설치됨: $d\\override.crt" -F Green;Write-Host "QZ Tray를 종료 후 다시 실행하세요." -F Yellow}else{Write-Host "[실패]" -F Red};'
-    +'Read-Host "엔터를 누르면 닫힙니다"';
+    +'if(Test-Path "$d\\override.crt"){Write-Host "[OK] Certificate installed:" -F Green;Write-Host $d"\\override.crt";Write-Host "Now RESTART QZ Tray." -F Yellow}else{Write-Host "[FAILED] install error" -F Red};'
+    +'Read-Host "Press Enter to close"';
   var u16='';
   for(var i=0;i<ps1.length;i++){ var ch=ps1.charCodeAt(i); u16+=String.fromCharCode(ch&0xff)+String.fromCharCode((ch>>8)&0xff); }
-  var encoded=btoa(u16);
-  var bat='@echo off\r\nchcp 65001>nul\r\npowershell -ExecutionPolicy Bypass -EncodedCommand '+encoded+'\r\n';
+  var encoded=btoa(u16);  // UTF-16LE base64 = PowerShell -EncodedCommand 형식 (한글 없음)
+  var bat='@echo off\r\npowershell -NoProfile -ExecutionPolicy Bypass -EncodedCommand '+encoded+'\r\n';
   var blob=new Blob([bat],{type:'application/bat'});
   var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='install_qz_cert.bat'; a.click();
   setTimeout(function(){ URL.revokeObjectURL(a.href); },1500);
