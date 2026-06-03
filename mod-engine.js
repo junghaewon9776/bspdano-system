@@ -293,7 +293,7 @@ function _modListHtml(key){
     h+='<tr'+(st==='탈락'?' style="opacity:.5"':'')+(sel?' class="_modSelRow" style="background:#eff6ff"':'')+'>';
     if(isA()) h+='<td class="ctr"><input type="checkbox" class="_modChk" data-id="'+esc(row._id||'')+'" data-idx="'+idx+'"'+(sel?' checked':'')+' onclick="_modSelToggle(event,\''+key+'\',\''+esc(row._id||'')+'\','+idx+')"></td>';
     h+='<td class="ctr" style="color:#94a3b8">'+(idx+1)+'</td>';
-    cols.forEach(function(c){ h+='<td>'+_modFmtCell(c,row[c.key])+'</td>'; });
+    cols.forEach(function(c){ var raw=esc(String(row[c.key]==null?'':row[c.key])); h+='<td style="white-space:nowrap;max-width:260px;overflow:hidden;text-overflow:ellipsis" title="'+raw+'">'+_modFmtCell(c,row[c.key])+'</td>'; });
     if(isA()){
       h+='<td class="ctr" style="white-space:nowrap">';
       if(hasSelect){
