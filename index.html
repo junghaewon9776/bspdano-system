@@ -451,7 +451,7 @@ label{display:block;font-size:10px;color:#999;margin-bottom:3px}
 <!-- firebase-storage 제거: 구글 드라이브 프록시로 대체 -->
 <script src="firebase-config.js"></script>
 <script src="common.js?v=20260602a"></script>
-<script src="mod-engine.js?v=20260603z2"></script>
+<script src="mod-engine.js?v=20260603z3"></script>
 
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" onerror="console.warn('XLSX CDN load failed')"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js" onerror="console.warn('xlsx-js-style CDN load failed')"></script>
@@ -589,12 +589,7 @@ document.addEventListener("DOMContentLoaded", function(){
     }
     // ===== QR 조회 페이지 =====
     if (IS_MODVIEW_MODE) {
-      // 관리자 전용: 로그인 토큰(우리 기기)이 있을 때만 조회 허용
-      var _mvAu = loadAuth();
-      if (!_mvAu || !_mvAu.id) {
-        document.body.innerHTML = '<div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;background:linear-gradient(135deg,#1e293b,#0f172a);color:#fff;padding:28px;text-align:center;font-family:\'Malgun Gothic\',sans-serif"><div style="font-size:54px">🔒</div><h2 style="margin:14px 0 8px;font-size:22px">관리자 전용 정보</h2><p style="color:#94a3b8;line-height:1.7;font-size:14px">이 QR 정보는 등록된 관리자 기기에서만<br>조회할 수 있습니다.</p><a href="' + location.pathname + '" style="margin-top:22px;background:#2563eb;color:#fff;padding:13px 26px;border-radius:10px;text-decoration:none;font-weight:700;font-size:15px">관리자 로그인</a><p style="color:#64748b;font-size:11px;margin-top:14px">로그인 시 「자동 로그인 유지」를 체크하면<br>이 기기에서 계속 조회할 수 있습니다.</p></div>';
-        return;
-      }
+      // 일반인도 기본 정보는 조회 가능 / 관리자(로그인 토큰 있는 우리 기기)는 관리자전용까지 표시
       if (typeof renderModView === 'function') renderModView(MODVIEW_KEY, MODVIEW_ID, MODVIEW_EVT);
       return; // 로그인 로직 스킵
     }

@@ -1055,6 +1055,8 @@ function _renderModDefCols(){
     if(['text','tel','textarea','number','select'].indexOf(c.type)>=0) h+='<label style="font-size:11px;display:flex;align-items:center;gap:3px"><input type="checkbox"'+(c.search?' checked':'')+' onchange="_modDefEditCols['+i+'].search=this.checked">검색</label>';
     // 관리자전용
     h+='<label style="font-size:11px;display:flex;align-items:center;gap:3px" title="체크 시 공개 신청폼엔 안 보이고 관리자만 입력/조회"><input type="checkbox"'+(c.adminOnly?' checked':'')+' onchange="_modDefEditCols['+i+'].adminOnly=this.checked">관리자전용</label>';
+    // QR 조회에서만 관리자만 (신청폼엔 보임 — 예: 소속은 신청자가 적되 QR엔 일반인 숨김)
+    h+='<label style="font-size:11px;display:flex;align-items:center;gap:3px;color:#7c3aed" title="신청폼엔 보이지만, QR 조회 때 일반인에겐 숨기고 관리자(우리 기기)만 보임"><input type="checkbox"'+(c.qrAdmin?' checked':'')+' onchange="_modDefEditCols['+i+'].qrAdmin=this.checked">🔑 QR관리자만</label>';
     // 순서 / 삭제
     if(i>0) h+='<button onclick="_modDefMoveCol('+i+',-1)" style="border:none;background:none;cursor:pointer;font-size:13px">▲</button>';
     if(i<_modDefEditCols.length-1) h+='<button onclick="_modDefMoveCol('+i+',1)" style="border:none;background:none;cursor:pointer;font-size:13px">▼</button>';
@@ -2665,7 +2667,10 @@ function renderModView(key,id,evtId){
   }).catch(function(e){ document.getElementById('modViewCard').innerHTML='<div style="text-align:center;color:#ef4444">오류: '+esc(e.message)+'</div>'; });
 }
 function _renderModViewUI(def,row){
-  var h='<div style="text-align:center;margin-bottom:14px"><div style="font-size:40px">'+(def.icon||'📋')+'</div><h2 style="color:#0f172a;margin:6px 0;font-size:19px">'+esc(def.label)+'</h2></div>';
+  // 로그인 토큰 있는 우리 기기면 관리자 모드(관리자전용 컬럼·처리자 정보까지 표시)
+  var _au=(typeof loadAuth==='function')?loadAuth():null;
+  var _isAdminView=!!(_au && _au.id);
+  var h='<div style="text-align:center;margin-bottom:14px"><div style="font-size:40px">'+(def.icon||'📋')+'</div><h2 style="color:#0f172a;margin:6px 0;font-size:19px">'+esc(def.label)+'</h2>'+(_isAdminView?'<div style="font-size:11px;color:#2563eb;font-weight:700;margin-top:2px">🔑 관리자 조회</div>':'')+'</div>';
 
   // 기간 정상 판정 (날짜 컬럼 2개 = 시작/종료) → 오늘이 기간 안이면 정상
   var dateCols=(def.columns||[]).filter(function(c){return c.type==='date'});
@@ -2692,15 +2697,18 @@ function _renderModViewUI(def,row){
     var bm=statusCol.badgeMap[row.status];
     h+='<div style="text-align:center;margin-bottom:8px"><span style="padding:6px 18px;border-radius:20px;font-size:15px;font-weight:800;background:'+(bm.bg||'#e2e8f0')+';color:'+(bm.color||'#475569')+'">'+esc(bm.label||row.status)+'</span></div>';
   }
-  // 처리자 / 발행자 (회색)
-  var meta='';
-  if(row._statusByName) meta+='<div>승인처리자: <b style="color:#475569">'+esc(row._statusByName)+'</b>'+(row._statusAt?' · '+esc(_modFmtDateTime(row._statusAt)):'')+'</div>';
-  if(row._printByName) meta+='<div>라벨발행자: <b style="color:#475569">'+esc(row._printByName)+'</b>'+(row._printedAt?' · '+esc(_modFmtDateTime(row._printedAt)):'')+'</div>';
-  if(meta) h+='<div style="text-align:center;font-size:11px;color:#94a3b8;margin-bottom:14px;line-height:1.7">'+meta+'</div>';
+  // 처리자 / 발행자 (회색) — 관리자(우리 기기)만 표시
+  if(_isAdminView){
+    var meta='';
+    if(row._statusByName) meta+='<div>승인처리자: <b style="color:#475569">'+esc(row._statusByName)+'</b>'+(row._statusAt?' · '+esc(_modFmtDateTime(row._statusAt)):'')+'</div>';
+    if(row._printByName) meta+='<div>라벨발행자: <b style="color:#475569">'+esc(row._printByName)+'</b>'+(row._printedAt?' · '+esc(_modFmtDateTime(row._printedAt)):'')+'</div>';
+    if(meta) h+='<div style="text-align:center;font-size:11px;color:#94a3b8;margin-bottom:14px;line-height:1.7">'+meta+'</div>';
+  }
 
   h+='<table style="width:100%;border-collapse:collapse;font-size:14px">';
   (def.columns||[]).forEach(function(c){
     if(c.key==='status'||c.type==='consent'||c.hideTable) return;
+    if((c.adminOnly||c.qrAdmin) && !_isAdminView) return; // 관리자전용 또는 'QR 관리자만' 컬럼은 우리 기기에서만
     var v=row[c.key]; if(v==null||v==='') return;
     var valHtml;
     if(c.type==='tel'){
