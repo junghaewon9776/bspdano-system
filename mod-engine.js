@@ -2756,12 +2756,14 @@ function _mvDoLogin(){
   var pw=(document.getElementById('mvPw').value||'').trim();
   var errEl=document.getElementById('mvErr');
   if(!id||!pw){ if(errEl){errEl.textContent='아이디와 비밀번호를 입력하세요';errEl.style.display='block';} return; }
-  if(typeof api!=='function') return;
-  api("login",{id:id,pw:pw}).then(function(r){
-    if(!r.ok){
-      if(errEl){errEl.textContent=r.err||'로그인 실패';errEl.style.display='block';}
-      return;
-    }
+  if(typeof fbDb==='undefined') return;
+  fbDb.ref('/main/Users').once('value').then(function(s){
+    var users=s.val()||[];
+    if(!Array.isArray(users)) users=Object.values(users);
+    var user=null;
+    for(var i=0;i<users.length;i++){if(users[i]&&users[i].id===id){user=users[i];break;}}
+    if(!user){ if(errEl){errEl.textContent='아이디가 존재하지 않습니다';errEl.style.display='block';} return; }
+    if(user.pw!==pw){ if(errEl){errEl.textContent='비밀번호가 일치하지 않습니다';errEl.style.display='block';} return; }
     if(typeof saveAuth==='function') saveAuth(id,pw);
     var p=new URLSearchParams(location.search);
     renderModView(p.get('modview'),p.get('id'),p.get('evtId'));
