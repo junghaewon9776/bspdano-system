@@ -1054,9 +1054,13 @@ function _renderModDefCols(){
     // 검색 (텍스트류만)
     if(['text','tel','textarea','number','select'].indexOf(c.type)>=0) h+='<label style="font-size:11px;display:flex;align-items:center;gap:3px"><input type="checkbox"'+(c.search?' checked':'')+' onchange="_modDefEditCols['+i+'].search=this.checked">검색</label>';
     // 관리자전용
-    h+='<label style="font-size:11px;display:flex;align-items:center;gap:3px" title="체크 시 공개 신청폼엔 안 보이고 관리자만 입력/조회"><input type="checkbox"'+(c.adminOnly?' checked':'')+' onchange="_modDefEditCols['+i+'].adminOnly=this.checked">관리자전용</label>';
-    // QR 조회에서만 관리자만 (신청폼엔 보임 — 예: 소속은 신청자가 적되 QR엔 일반인 숨김)
-    h+='<label style="font-size:11px;display:flex;align-items:center;gap:3px;color:#7c3aed" title="신청폼엔 보이지만, QR 조회 때 일반인에겐 숨기고 관리자(우리 기기)만 보임"><input type="checkbox"'+(c.qrAdmin?' checked':'')+' onchange="_modDefEditCols['+i+'].qrAdmin=this.checked">🔑 QR관리자만</label>';
+    var _vis=c.sysOnly?'sys':c.adminOnly?'admin':c.qrAdmin?'qrAdmin':'';
+    h+='<select style="font-size:11px;padding:2px 4px;border:1px solid #cbd5e1;border-radius:4px" onchange="_modDefColVis('+i+',this.value)">'
+      +'<option value=""'+(!_vis?' selected':'')+'>공개</option>'
+      +'<option value="qrAdmin"'+(_vis==='qrAdmin'?' selected':'')+'>🔑 QR관리자만</option>'
+      +'<option value="admin"'+(_vis==='admin'?' selected':'')+'>관리자전용</option>'
+      +'<option value="sys"'+(_vis==='sys'?' selected':'')+'>🖥 시스템전용</option>'
+      +'</select>';
     // 순서 / 삭제
     if(i>0) h+='<button onclick="_modDefMoveCol('+i+',-1)" style="border:none;background:none;cursor:pointer;font-size:13px">▲</button>';
     if(i<_modDefEditCols.length-1) h+='<button onclick="_modDefMoveCol('+i+',1)" style="border:none;background:none;cursor:pointer;font-size:13px">▼</button>';
@@ -1172,6 +1176,12 @@ function _modDefAddCol(){
 function _modDefRemoveCol(i){
   _modDefEditCols.splice(i,1);
   _modDefRefreshCols();
+}
+function _modDefColVis(i,v){
+  var c=_modDefEditCols[i]; c.adminOnly=false; c.qrAdmin=false; c.sysOnly=false;
+  if(v==='admin') c.adminOnly=true;
+  else if(v==='qrAdmin') c.qrAdmin=true;
+  else if(v==='sys') c.sysOnly=true;
 }
 function _modDefMoveCol(i,dir){
   var j=i+dir;if(j<0||j>=_modDefEditCols.length) return;
@@ -1415,7 +1425,7 @@ function _renderModApplyUI(def,evtId){
   h+='<p style="color:#94a3b8;font-size:13px;margin:0">'+desc+'</p>';
   h+='</div>';
   (def.columns||[]).forEach(function(c){
-    if(c.auto||c.adminOnly||c.key==='status') return;
+    if(c.auto||c.adminOnly||c.sysOnly||c.key==='status') return;
     h+='<div style="margin-bottom:16px"><label style="display:block;font-size:14px;color:#334155;font-weight:700;margin-bottom:6px">'+esc(c.label)+(c.required?' <span style="color:#ef4444">*</span>':'')+'</label>';
     h+=_modFormField(c,'');
     h+='</div>';
@@ -1430,7 +1440,7 @@ function submitModApply(){
   if(!def) return;
   var obj={}, valid=true, firstBad=null, fileTasks=[];
   (def.columns||[]).forEach(function(c){
-    if(c.auto||c.adminOnly||c.key==='status') return;
+    if(c.auto||c.adminOnly||c.sysOnly||c.key==='status') return;
     var el=document.getElementById('mod_f_'+c.key); if(!el) return;
     if(c.type==='consent'){
       if(c.required&&!el.checked){ valid=false; if(!firstBad)firstBad=c.label+'에 동의해 주세요'; }
@@ -2670,7 +2680,9 @@ function _renderModViewUI(def,row){
   // 로그인 토큰 있는 우리 기기면 관리자 모드(관리자전용 컬럼·처리자 정보까지 표시)
   var _au=(typeof loadAuth==='function')?loadAuth():null;
   var _isAdminView=!!(_au && _au.id);
-  var h='<div style="text-align:center;margin-bottom:14px"><div style="font-size:40px">'+(def.icon||'📋')+'</div><h2 style="color:#0f172a;margin:6px 0;font-size:19px">'+esc(def.label)+'</h2>'+(_isAdminView?'<div style="font-size:11px;color:#2563eb;font-weight:700;margin-top:2px">🔑 관리자 조회</div>':'')+'</div>';
+  var h='<div style="text-align:center;margin-bottom:14px"><div style="font-size:40px">'+(def.icon||'📋')+'</div><h2 style="color:#0f172a;margin:6px 0;font-size:19px">'+esc(def.label)+'</h2>'
+    +(_isAdminView?'<div style="font-size:11px;color:#2563eb;font-weight:700;margin-top:2px">🔑 관리자 조회</div>':'<div style="margin-top:4px"><a href="javascript:void(0)" onclick="document.getElementById(\'mvLoginBox\').style.display=\'block\';this.style.display=\'none\'" style="font-size:10px;color:#cbd5e1;text-decoration:none">🔑</a></div>')
+    +'</div>';
 
   // 기간 정상 판정 (날짜 컬럼 2개 = 시작/종료) → 오늘이 기간 안이면 정상
   var dateCols=(def.columns||[]).filter(function(c){return c.type==='date'});
@@ -2708,6 +2720,7 @@ function _renderModViewUI(def,row){
   h+='<table style="width:100%;border-collapse:collapse;font-size:14px">';
   (def.columns||[]).forEach(function(c){
     if(c.key==='status'||c.type==='consent'||c.hideTable) return;
+    if(c.sysOnly) return; // 시스템전용 — QR 조회에 아예 안 보임
     if((c.adminOnly||c.qrAdmin) && !_isAdminView) return; // 관리자전용 또는 'QR 관리자만' 컬럼은 우리 기기에서만
     var v=row[c.key]; if(v==null||v==='') return;
     var valHtml;
@@ -2720,5 +2733,37 @@ function _renderModViewUI(def,row){
     h+='<tr style="border-bottom:1px solid #f1f5f9"><td style="padding:9px 4px;color:#64748b;width:36%;vertical-align:middle">'+esc(c.label)+'</td><td style="padding:9px 4px;font-weight:600;color:#0f172a">'+valHtml+'</td></tr>';
   });
   h+='</table>';
+
+  if(!_isAdminView){
+    h+='<div id="mvLoginBox" style="display:none;margin-top:16px;background:#f8fafc;border-radius:12px;padding:16px">'
+      +'<div style="font-size:13px;font-weight:700;color:#334155;margin-bottom:8px">관리자 로그인</div>'
+      +'<input id="mvId" placeholder="아이디" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px;margin-bottom:6px">'
+      +'<input id="mvPw" type="password" placeholder="비밀번호" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px;margin-bottom:8px">'
+      +'<div id="mvErr" style="color:#ef4444;font-size:12px;margin-bottom:6px;display:none"></div>'
+      +'<button onclick="_mvDoLogin()" style="width:100%;background:#1e40af;color:#fff;border:none;border-radius:8px;padding:10px;font-size:14px;font-weight:700;cursor:pointer">로그인</button>'
+      +'</div>';
+  }
+
   document.getElementById('modViewCard').innerHTML=h;
+  if(!_isAdminView){
+    var pwEl=document.getElementById('mvPw');
+    if(pwEl) pwEl.addEventListener('keydown',function(e){if(e.key==='Enter')_mvDoLogin();});
+  }
+}
+
+function _mvDoLogin(){
+  var id=(document.getElementById('mvId').value||'').trim();
+  var pw=(document.getElementById('mvPw').value||'').trim();
+  var errEl=document.getElementById('mvErr');
+  if(!id||!pw){ if(errEl){errEl.textContent='아이디와 비밀번호를 입력하세요';errEl.style.display='block';} return; }
+  if(typeof doLogin==='function'){
+    doLogin(id,pw,true,true).then(function(ok){
+      if(ok){
+        var p=new URLSearchParams(location.search);
+        renderModView(p.get('modview'),p.get('id'),p.get('evtId'));
+      } else {
+        if(errEl){errEl.textContent='로그인 실패 — 아이디/비밀번호를 확인하세요';errEl.style.display='block';}
+      }
+    });
+  }
 }
