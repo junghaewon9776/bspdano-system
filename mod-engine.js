@@ -1073,6 +1073,13 @@ function _renderModDefCols(){
     if(c.type==='file'){
       h+='<div style="margin-top:6px;font-size:11px;color:#94a3b8">📎 파일첨부는 자료실의 Drive 업로드 설정이 필요합니다. 신청자가 파일을 올리면 링크로 저장됩니다.</div>';
     }
+    // 날짜 컬럼: QR 조회 기간 판정 역할 지정
+    if(c.type==='date'){
+      var _pr=c.periodRole||'';
+      h+='<div style="margin-top:6px;display:flex;gap:6px;align-items:center"><span style="font-size:11px;color:#94a3b8">📅 QR 기간판정</span>';
+      h+='<select style="font-size:12px;padding:5px 8px;border:1px solid #cbd5e1;border-radius:6px" onchange="_modDefEditCols['+i+'].periodRole=this.value"><option value=""'+(_pr===''?' selected':'')+'>사용 안 함</option><option value="start"'+(_pr==='start'?' selected':'')+'>사용 시작일</option><option value="end"'+(_pr==='end'?' selected':'')+'>사용 종료일</option></select>';
+      h+='<span style="font-size:10px;color:#94a3b8">(시작·종료 지정 시 QR에 정상/만료 표시)</span></div>';
+    }
     // 예시 문구(placeholder) — 텍스트 입력류만
     if(['text','tel','number','textarea'].indexOf(c.type)>=0){
       h+='<div style="margin-top:6px"><input placeholder="입력칸 예시 문구 (회색 글씨, 예: 12가 3456)" value="'+esc(c.placeholder||'')+'" style="width:100%;font-size:12px;padding:5px 8px;border:1px solid #cbd5e1;border-radius:6px;color:#64748b" onchange="_modDefEditCols['+i+'].placeholder=this.value"></div>';
@@ -2662,8 +2669,12 @@ function _renderModViewUI(def,row){
 
   // 기간 정상 판정 (날짜 컬럼 2개 = 시작/종료) → 오늘이 기간 안이면 정상
   var dateCols=(def.columns||[]).filter(function(c){return c.type==='date'});
-  if(dateCols.length>=2){
-    var from=row[dateCols[0].key], to=row[dateCols[1].key];
+  // 컬럼에 지정된 기간 역할(periodRole) 우선, 없으면 날짜 앞 2개
+  var _sc=(def.columns||[]).filter(function(c){return c.periodRole==='start';})[0];
+  var _ec=(def.columns||[]).filter(function(c){return c.periodRole==='end';})[0];
+  var _fromCol=_sc||dateCols[0], _toCol=_ec||dateCols[1];
+  if(_fromCol&&_toCol){
+    var from=row[_fromCol.key], to=row[_toCol.key];
     if(from&&to){
       var _d=new Date(), _m=_d.getMonth()+1, _dd=_d.getDate();
       var today=_d.getFullYear()+'-'+(_m<10?'0'+_m:_m)+'-'+(_dd<10?'0'+_dd:_dd); // 로컬(KST) 기준
