@@ -2756,14 +2756,14 @@ function _mvDoLogin(){
   var pw=(document.getElementById('mvPw').value||'').trim();
   var errEl=document.getElementById('mvErr');
   if(!id||!pw){ if(errEl){errEl.textContent='아이디와 비밀번호를 입력하세요';errEl.style.display='block';} return; }
-  if(typeof doLogin==='function'){
-    doLogin(id,pw,true,true).then(function(ok){
-      if(ok){
-        var p=new URLSearchParams(location.search);
-        renderModView(p.get('modview'),p.get('id'),p.get('evtId'));
-      } else {
-        if(errEl){errEl.textContent='로그인 실패 — 아이디/비밀번호를 확인하세요';errEl.style.display='block';}
-      }
-    });
-  }
+  if(typeof api!=='function') return;
+  api("login",{id:id,pw:pw}).then(function(r){
+    if(!r.ok){
+      if(errEl){errEl.textContent=r.err||'로그인 실패';errEl.style.display='block';}
+      return;
+    }
+    if(typeof saveAuth==='function') saveAuth(id,pw);
+    var p=new URLSearchParams(location.search);
+    renderModView(p.get('modview'),p.get('id'),p.get('evtId'));
+  });
 }
