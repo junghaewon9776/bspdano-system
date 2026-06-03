@@ -2755,17 +2755,23 @@ function _mvDoLogin(){
   var id=(document.getElementById('mvId').value||'').trim();
   var pw=(document.getElementById('mvPw').value||'').trim();
   var errEl=document.getElementById('mvErr');
+  var btn=document.querySelector('#mvLoginBox button');
   if(!id||!pw){ if(errEl){errEl.textContent='아이디와 비밀번호를 입력하세요';errEl.style.display='block';} return; }
-  if(typeof fbDb==='undefined') return;
+  if(typeof fbDb==='undefined'){ if(errEl){errEl.textContent='시스템 연결 오류';errEl.style.display='block';} return; }
+  if(btn){btn.disabled=true;btn.textContent='로그인 중...';}
+  if(errEl) errEl.style.display='none';
   fbDb.ref('/main/Users').once('value').then(function(s){
     var users=s.val()||[];
     if(!Array.isArray(users)) users=Object.values(users);
     var user=null;
     for(var i=0;i<users.length;i++){if(users[i]&&users[i].id===id){user=users[i];break;}}
-    if(!user){ if(errEl){errEl.textContent='아이디가 존재하지 않습니다';errEl.style.display='block';} return; }
-    if(user.pw!==pw){ if(errEl){errEl.textContent='비밀번호가 일치하지 않습니다';errEl.style.display='block';} return; }
+    if(!user){ if(btn){btn.disabled=false;btn.textContent='로그인';} if(errEl){errEl.textContent='아이디가 존재하지 않습니다';errEl.style.display='block';} return; }
+    if(user.pw!==pw){ if(btn){btn.disabled=false;btn.textContent='로그인';} if(errEl){errEl.textContent='비밀번호가 일치하지 않습니다';errEl.style.display='block';} return; }
     if(typeof saveAuth==='function') saveAuth(id,pw);
     var p=new URLSearchParams(location.search);
     renderModView(p.get('modview'),p.get('id'),p.get('evtId'));
+  }).catch(function(e){
+    if(btn){btn.disabled=false;btn.textContent='로그인';}
+    if(errEl){errEl.textContent='연결 오류: '+e.message;errEl.style.display='block';}
   });
 }
