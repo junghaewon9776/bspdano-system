@@ -682,9 +682,9 @@ function modExportExcel(key){
 // 시트 편집 (인라인 표 + 엑셀 붙여넣기)
 // ═══════════════════════════════════════════
 
-// 시트에서 편집 가능한 컬럼 (파일/동의 제외)
+// 시트에서 편집 가능한 컬럼 (파일 제외)
 function _mshCols(def){
-  return (def.columns||[]).filter(function(c){return !c.hideTable&&c.type!=='file'&&c.type!=='consent';});
+  return (def.columns||[]).filter(function(c){return !c.hideTable&&c.type!=='file';});
 }
 // badge 라벨↔키 역매핑 (저장 시 입력값이 라벨이면 키로)
 function _mshBadgeToKey(col,val){
