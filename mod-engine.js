@@ -2681,7 +2681,7 @@ function _renderModViewUI(def,row){
   var _au=(typeof loadAuth==='function')?loadAuth():null;
   var _isAdminView=!!(_au && _au.id);
   var h='<div style="text-align:center;margin-bottom:14px"><div style="font-size:40px">'+(def.icon||'📋')+'</div><h2 style="color:#0f172a;margin:6px 0;font-size:19px">'+esc(def.label)+'</h2>'
-    +(_isAdminView?'<div style="font-size:11px;color:#2563eb;font-weight:700;margin-top:2px">🔑 관리자 조회</div>':'<div style="margin-top:4px"><a href="javascript:void(0)" onclick="document.getElementById(\'mvLoginBox\').style.display=\'block\';this.style.display=\'none\'" style="font-size:10px;color:#cbd5e1;text-decoration:none">🔑</a></div>')
+    +(_isAdminView?'<div style="font-size:11px;color:#2563eb;font-weight:700;margin-top:2px">🔑 관리자 조회</div>':'<div style="margin-top:4px"><a href="javascript:void(0)" onclick="document.getElementById(\'mvLoginBox\').style.display=\'block\';this.parentElement.style.display=\'none\'" style="display:inline-block;padding:8px 16px;font-size:13px;color:#cbd5e1;text-decoration:none">🔑</a></div>')
     +'</div>';
 
   // 기간 정상 판정 (날짜 컬럼 2개 = 시작/종료) → 오늘이 기간 안이면 정상
