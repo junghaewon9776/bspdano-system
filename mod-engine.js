@@ -2886,6 +2886,7 @@ function _mvDoLogin(){
 
 function popModStat(key){
   var def=_modDefs[key]; if(!def) return;
+  _modStatKey=key;
   var data=(_modData[key]||[]).slice();
   var cols=(def.columns||[]);
   var total=data.length;
@@ -2897,7 +2898,7 @@ function popModStat(key){
 
   cols.forEach(function(c){
     if(c.sysOnly) return;
-    var st=_modStatCol(c, data);
+    var st=_modStatCol(c, data, key);
     if(!st) return;
     h+=st;
   });
@@ -2906,16 +2907,43 @@ function popModStat(key){
   openPopup(h,700);
 }
 
-function _modStatCol(c, data){
+var _modStatKey='';
+function _modStatCol(c, data, key){
   var tp=c.type||'text';
 
-  if(tp==='file') return _modStatFile(c, data);
-  if(tp==='consent') return _modStatConsent(c, data);
+  if(tp==='file') return _modStatFile(c, data, key);
+  if(tp==='consent') return _modStatConsent(c, data, key);
   if(tp==='number') return _modStatNumber(c, data);
   if(tp==='date') return _modStatDate(c, data);
 
   // text, select, badge, tel, textarea — 값 분포
   return _modStatDist(c, data);
+}
+function _modStatNameCol(key){
+  var def=_modDefs[key]; if(!def) return null;
+  return (def.columns||[]).find(function(c){return c.type!=='badge'&&c.type!=='consent'&&c.type!=='file'&&!c.auto;})||null;
+}
+function _modStatNameOf(row,key){
+  var nc=_modStatNameCol(key);
+  return nc?String(row[nc.key]||'(이름없음)'):'';
+}
+function _modStatSearch(name){
+  closePopup();
+  var key=_modStatKey; if(!key) return;
+  _modSearch[key]=name;
+  var el=document.getElementById('_modSearch_'+key);
+  if(el) el.value=name;
+  _modRefreshList(key);
+}
+function _modStatNames(rows,key){
+  if(!rows.length) return '';
+  var h='<div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:4px">';
+  rows.forEach(function(r){
+    var n=_modStatNameOf(r,key);
+    h+='<span onclick="_modStatSearch(\''+esc(n.replace(/'/g,"\\'"))+'\')" style="cursor:pointer;padding:3px 10px;background:#fef2f2;color:#dc2626;border-radius:12px;font-size:12px;font-weight:600;border:1px solid #fecaca;transition:background .2s" onmouseover="this.style.background=\'#fee2e2\'" onmouseout="this.style.background=\'#fef2f2\'">'+esc(n)+'</span>';
+  });
+  h+='</div>';
+  return h;
 }
 
 function _modStatCard(label, body){
@@ -2964,27 +2992,30 @@ function _modStatDist(c, data){
 }
 
 // 파일 제출 현황
-function _modStatFile(c, data){
-  var yes=0, no=0;
+function _modStatFile(c, data, key){
+  var yes=0, no=0, noRows=[];
   data.forEach(function(r){
     var v=r[c.key];
-    if(v && ((typeof v==='string' && v.trim()) || (typeof v==='object'))) yes++; else no++;
+    if(v && ((typeof v==='string' && v.trim()) || (typeof v==='object'))) yes++;
+    else { no++; noRows.push(r); }
   });
   var body=_modStatBar('✅ 제출', yes, data.length, '#10b981');
   body+=_modStatBar('❌ 미제출', no, data.length, '#ef4444');
   body+='<div style="font-size:11px;color:#94a3b8;margin-top:4px">제출률 '+(data.length?Math.round(yes/data.length*100):0)+'%</div>';
+  if(noRows.length) body+=_modStatNames(noRows, key);
   return _modStatCard(c.label+' (파일)', body);
 }
 
 // 개인정보동의 현황
-function _modStatConsent(c, data){
-  var yes=0, no=0;
+function _modStatConsent(c, data, key){
+  var yes=0, no=0, noRows=[];
   data.forEach(function(r){
     var v=r[c.key];
-    if(v==='Y'||v===true||v==='true') yes++; else no++;
+    if(v==='Y'||v===true||v==='true') yes++; else { no++; noRows.push(r); }
   });
   var body=_modStatBar('✅ 동의', yes, data.length, '#10b981');
   body+=_modStatBar('⬜ 미동의', no, data.length, '#ef4444');
+  if(noRows.length) body+=_modStatNames(noRows, key);
   return _modStatCard(c.label, body);
 }
 
