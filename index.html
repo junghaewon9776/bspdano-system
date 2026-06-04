@@ -4581,7 +4581,7 @@ function applyColorCtx(evt, seq){
   h+='</div>';
   h+='<div style="margin-top:10px;padding:0 14px;display:flex;gap:6px">';
   h+='<button class="btn" style="background:#ef4444;color:#fff" onclick="applyColorSet(\''+esc(seq)+'\',-1)">🚫 색상 제거</button>';
-  h+='<button class="btn" onclick="closePopup()">닫기</button>';
+  h+='<button class="btn" style="background:#64748b;color:#fff" onclick="closePopup()">닫기</button>';
   h+='</div></div>';
   openPopup(h, 340);
 }
@@ -17370,7 +17370,7 @@ function _evtMgrHtml(){
     + (isSuper ? '' : '  • 부관리자는 슈퍼관리자 계정은 수정할 수 없습니다.');
   var saveBar = '<div class="exbar" style="margin-top:8px;display:flex;justify-content:flex-end;gap:6px;align-items:center">'
     +'<span id="matrixPendMsg" style="color:#b45309;font-weight:600;font-size:12px;margin-right:8px"></span>'
-    +'<button class="btn" onclick="matrixCancel()">취소</button>'
+    +'<button class="btn" style="background:#64748b;color:#fff" onclick="matrixCancel()">취소</button>'
     +'<button class="btn btn-b" id="matrixSaveBtn" onclick="matrixSave()" disabled>저장</button>'
     +'</div>';
   var matrix = '<div class="card"><h3>👥 계정 × 행사 권한 매트릭스</h3>'
@@ -17548,7 +17548,7 @@ function popLinkCat(idx){
   h+='<div class="fr"><label>아이콘</label>'+_emojiSelect("lc_icon",cat.icon||"🔗")+'</div>';
   h+='<div class="fr"><label>이름</label><input id="lc_label" value="'+esc(cat.label||"")+'" placeholder="예: 방역"></div>';
   h+='<div class="fr"><label>노출</label><label style="font-weight:400;font-size:13px;display:flex;align-items:center;gap:6px"><input type="checkbox" id="lc_admin"'+(cat.admin?' checked':'')+'> 관리자(SUBADMIN 이상)만 보기 <span style="color:#94a3b8;font-size:11px">(미체크: 모든 사용자)</span></label></div>';
-  h+='<div style="text-align:right;margin-top:12px"><button class="btn" onclick="closePopup()">취소</button> <button class="btn btn-b" onclick="saveLinkCat('+idx+')">저장</button></div>';
+  h+='<div style="text-align:right;margin-top:12px"><button class="btn" style="background:#64748b;color:#fff" onclick="closePopup()">취소</button> <button class="btn btn-b" onclick="saveLinkCat('+idx+')">저장</button></div>';
   h+='</div>';
   openPopup(h,400);
 }
@@ -17608,7 +17608,7 @@ function popLinkItem(catIdx, itemIdx){
   h+='<div class="fr"><label>이름</label><input id="li_label" value="'+esc(it.label||"")+'" placeholder="예: 오늘의 운영"></div>';
   h+='<div class="fr"><label>URL</label><input id="li_url" value="'+esc(it.url||"")+'" placeholder="https://example.com/page.html" style="font-size:12px"></div>';
   h+='<div class="mut" style="font-size:11px;margin-top:-6px;color:#6366f1">💡 구글 드라이브 폴더/사이트/외부 시스템 URL을 입력하세요</div>';
-  h+='<div style="text-align:right;margin-top:12px"><button class="btn" onclick="closePopup()">취소</button> <button class="btn btn-b" onclick="saveLinkItem('+catIdx+','+itemIdx+')">저장</button></div>';
+  h+='<div style="text-align:right;margin-top:12px"><button class="btn" style="background:#64748b;color:#fff" onclick="closePopup()">취소</button> <button class="btn btn-b" onclick="saveLinkItem('+catIdx+','+itemIdx+')">저장</button></div>';
   h+='</div>';
   openPopup(h,460);
 }
@@ -17688,7 +17688,7 @@ function popEvtEdit(evtId){
     +'  <div class="fr"><label>인원공유</label><label><input type="checkbox" id="evShareMems" '+(e.shareMems?"checked":"")+'> 메인 인원관리 공유 <span style="color:#888;font-size:11px">(체크 시 메인 행사의 회원 명단을 그대로 사용)</span></label></div>'
     +'  '+ssHint
     +'  <div class="fr"><label>비고</label><input id="evNote" value="'+esc(e.note||"")+'"></div>'
-    +'  <div style="text-align:right;margin-top:12px"><button class="btn" onclick="closePopup()">취소</button> <button class="btn btn-b" onclick="doEvtSave('+(isNew?"true":"false")+',\''+esc(e.evtId)+'\')">저장</button></div>'
+    +'  <div style="text-align:right;margin-top:12px"><button class="btn" style="background:#64748b;color:#fff" onclick="closePopup()">취소</button> <button class="btn btn-b" onclick="doEvtSave('+(isNew?"true":"false")+',\''+esc(e.evtId)+'\')">저장</button></div>'
     +'</div>';
   openPopup(h, 560);
 }
@@ -17869,7 +17869,7 @@ function popEvtAcctCreate(){
     +'  <div class="fr"><label>이름</label><input id="nuNm" placeholder="홍길동"></div>'
     +'  <div class="fr"><label>전화</label><input id="nuTel" placeholder="010-0000-0000"></div>'
     +'  <div class="fr"><label>전역 권한</label>'+globalRoleHtml+'</div>'
-    +'  <div style="text-align:right;margin-top:12px"><button class="btn" onclick="closePopup()">취소</button> <button class="btn btn-b" onclick="doEvtAcctCreate()">저장</button></div>'
+    +'  <div style="text-align:right;margin-top:12px"><button class="btn" style="background:#64748b;color:#fff" onclick="closePopup()">취소</button> <button class="btn btn-b" onclick="doEvtAcctCreate()">저장</button></div>'
     +'</div>';
   openPopup(h, 520);
 }

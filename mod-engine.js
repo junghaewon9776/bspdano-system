@@ -469,7 +469,7 @@ function popModAdd(key){
     h+='</div>';
   });
   h+='<div style="text-align:right;margin-top:14px">';
-  h+='<button class="btn" onclick="closePopup()">취소</button> ';
+  h+='<button class="btn" style="background:#64748b;color:#fff" onclick="closePopup()">취소</button> ';
   h+='<button class="btn btn-b" onclick="modSave(\''+key+'\')">저장</button>';
   h+='</div></div>';
   openPopup(h,460);
@@ -490,7 +490,7 @@ function popModEdit(key,id){
     h+='</div>';
   });
   h+='<div style="text-align:right;margin-top:14px">';
-  h+='<button class="btn" onclick="closePopup()">취소</button> ';
+  h+='<button class="btn" style="background:#64748b;color:#fff" onclick="closePopup()">취소</button> ';
   h+='<button class="btn btn-b" onclick="modSave(\''+key+'\',\''+esc(id)+'\')">저장</button>';
   h+='</div></div>';
   openPopup(h,460);
@@ -726,7 +726,7 @@ function popModSheet(key){
   h+='</div>';
   h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;flex-wrap:wrap;gap:8px">';
   h+='<div><button class="btn btn-s" style="background:#475569;color:#fff" onclick="_mshAddRow()">➕ 행 추가</button> <span id="msh_cnt" style="font-size:12px;color:#94a3b8;margin-left:6px"></span></div>';
-  h+='<div><button class="btn" onclick="closePopup()">취소</button> <button class="btn btn-b" style="background:#16a34a" onclick="_mshSave()">💾 저장</button></div>';
+  h+='<div><button class="btn" style="background:#64748b;color:#fff" onclick="closePopup()">취소</button> <button class="btn btn-b" style="background:#16a34a" onclick="_mshSave()">💾 저장</button></div>';
   h+='</div></div>';
   openPopup(h, Math.min(960, 320+cols.length*130));
   setTimeout(function(){ _mshBindPaste(); _mshUpdateCnt(); },50);
@@ -1025,7 +1025,7 @@ function popModDef(keyOrIdx){
   h+='</div></div>';
 
   h+='<div style="text-align:right;margin-top:14px;border-top:1px solid #e5e7eb;padding-top:12px">';
-  h+='<button class="btn" onclick="closePopup()">취소</button> ';
+  h+='<button class="btn" style="background:#64748b;color:#fff" onclick="closePopup()">취소</button> ';
   h+='<button class="btn btn-b" onclick="saveModDef('+(isNew?'-1':('\''+esc(def.key)+'\''))+')">💾 저장</button>';
   h+='</div></div>';
   openPopup(h,600);
@@ -1325,7 +1325,7 @@ function popModFormLink(key){
   h+='<div style="margin-top:10px;display:flex;gap:6px;justify-content:center;flex-wrap:wrap"><button class="btn btn-b" style="background:#16a34a;color:#fff" onclick="_saveQrJpg(window.__modFormUrl, window.__modFormName+\'_신청폼QR\')">🖼 QR 이미지 저장 (JPG)</button>';
   h+='<button class="btn btn-b" style="background:#2563eb;color:#fff" onclick="_modFormPoster(\''+key+'\')">🖨 A4 신청 안내문 출력</button></div>';
   h+='</div>';
-  h+='<div style="margin-top:14px;text-align:right"><button class="btn" onclick="closePopup()">닫기</button></div>';
+  h+='<div style="margin-top:14px;text-align:right"><button class="btn" style="background:#64748b;color:#fff" onclick="closePopup()">닫기</button></div>';
   h+='</div>';
   openPopup(h,520);
 }
@@ -1361,7 +1361,7 @@ function _modFormPoster(key){
   h+='<label style="font-size:12px;color:#475569;display:block;margin-bottom:8px">안내 문구<textarea id="mfp_guide" rows="2" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;resize:vertical;box-sizing:border-box">휴대폰 카메라로 아래 QR코드를 비추면\n신청 페이지로 이동합니다</textarea></label>';
   h+='<label style="font-size:12px;color:#475569;display:block;margin-bottom:12px">하단 메모 <span style="font-size:10px;color:#94a3b8">(마감일·문의처 등, 선택)</span><input id="mfp_foot" value="'+esc(def.formDesc||'')+'" placeholder="예: 신청 마감 6/15 · 문의 010-0000-0000" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px"></label>';
   h+='<div style="text-align:center;margin-bottom:12px"><img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&margin=6&data='+encodeURIComponent(url)+'" style="width:120px;height:120px;border:1px solid #e2e8f0;border-radius:8px"><div style="font-size:11px;color:#94a3b8;margin-top:3px">A4 출력 시 크게 인쇄됩니다</div></div>';
-  h+='<div style="text-align:right"><button class="btn" style="background:#e2e8f0;color:#334155" onclick="closePopup()">취소</button> <button class="btn btn-b" style="background:#2563eb;color:#fff;font-weight:700" onclick="_modFormPosterPrint()">🖨 A4 인쇄</button></div>';
+  h+='<div style="text-align:right"><button class="btn" style="background:#64748b;color:#fff" onclick="closePopup()">취소</button> <button class="btn btn-b" style="background:#2563eb;color:#fff;font-weight:700" onclick="_modFormPosterPrint()">🖨 A4 인쇄</button></div>';
   h+='</div>';
   openPopup(h,460);
 }
@@ -1569,7 +1569,7 @@ function popModSms(key, preSelIds){
   // 하단 버튼
   h+='<div style="display:flex;margin-top:14px;gap:6px;align-items:center;flex-wrap:wrap">';
   h+='<span style="flex:1"></span>';
-  h+='<button class="btn" onclick="closePopup()">취소</button> ';
+  h+='<button class="btn" style="background:#64748b;color:#fff" onclick="closePopup()">취소</button> ';
   h+='<button class="btn btn-b" style="background:#8b5cf6" onclick="modSmsSend()">💬 발송</button>';
   h+='</div></div>';
   openPopup(h,520);
@@ -2058,7 +2058,7 @@ function popModLabel(key,singleId,idsList){
 
   h+='<div style="font-size:12px;font-weight:700;margin-bottom:4px;color:#475569">미리보기 (QR 스캔 → 정보 조회 페이지)</div>';
   h+='<div id="ml_preview" style="background:#e2e8f0;padding:12px;border-radius:8px;overflow:auto;text-align:center"></div>';
-  h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px"><button class="btn" style="background:#6366f1;color:#fff" onclick="popModLabelLayout(\''+key+'\')">📐 배치 편집</button><div><button class="btn" style="background:#e2e8f0;color:#334155" onclick="closePopup()">취소</button> <button id="ml_printbtn" class="btn btn-b" style="background:#2563eb;color:#fff;font-weight:700" onclick="modDoPrint()">🖨 <span id="ml_printcnt">'+rows.length+'</span>장 출력</button></div></div>';
+  h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px"><button class="btn" style="background:#6366f1;color:#fff" onclick="popModLabelLayout(\''+key+'\')">📐 배치 편집</button><div><button class="btn" style="background:#64748b;color:#fff" onclick="closePopup()">취소</button> <button id="ml_printbtn" class="btn btn-b" style="background:#2563eb;color:#fff;font-weight:700" onclick="modDoPrint()">🖨 <span id="ml_printcnt">'+rows.length+'</span>장 출력</button></div></div>';
   h+='</div>';
   openPopup(h,560);
   setTimeout(function(){
@@ -2311,7 +2311,7 @@ function popModLog(key, rowId){
       });
       h+='</tbody></table></div>';
     }
-    h+='<div style="text-align:right;margin-top:12px"><button class="btn" onclick="closePopup()">닫기</button></div></div>';
+    h+='<div style="text-align:right;margin-top:12px"><button class="btn" style="background:#64748b;color:#fff" onclick="closePopup()">닫기</button></div></div>';
     openPopup(h,820);
   }).catch(function(e){ hideLoading(); toast('로그 조회 실패: '+(e.message||e),true); });
 }
@@ -2531,7 +2531,7 @@ function popModLabelLayout(key){
   h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px">';
   h+='<div><button class="btn" style="background:#ef4444;color:#fff;font-size:12px" onclick="_mllReset()">🔄 기본 배치로 초기화</button>';
   h+=' <button class="btn" style="background:#94a3b8;color:#fff;font-size:12px" onclick="_mllClearLayout()">자동 배치로 되돌리기</button></div>';
-  h+='<div><button class="btn" style="background:#e2e8f0;color:#334155" onclick="closePopup()">취소</button> <button class="btn btn-b" style="background:#6366f1;color:#fff;font-weight:700" onclick="_mllSave()">💾 저장</button></div>';
+  h+='<div><button class="btn" style="background:#64748b;color:#fff" onclick="closePopup()">취소</button> <button class="btn btn-b" style="background:#6366f1;color:#fff;font-weight:700" onclick="_mllSave()">💾 저장</button></div>';
   h+='</div></div>';
   openPopup(h,Math.max(620,cW+250));
   setTimeout(function(){ _mllRender(); _mllBindEvents(); },50);
