@@ -1240,10 +1240,13 @@ function _apiCheckSmsConfig(p) {
   return _getSmsCfgAuto(evtId).then(function(info) {
     if (info.provider === "naver") {
       return _getSensCfg(evtId).then(function(c) {
-        if (!c.serviceId) return {ok:false, err:"네이버 SENS 서비스 ID 미설정"};
-        if (!c.accessKey || !c.secretKey) return {ok:false, err:"네이버 SENS Access/Secret Key 미설정"};
-        if (!c.sender) return {ok:false, err:"네이버 SENS 발신번호 미설정"};
-        return {ok:true};
+        return _getAligoCfg(evtId).then(function(ac) {
+          if (!ac.proxyUrl) return {ok:false, err:"SMS 프록시 URL 미설정 — GAS 웹앱 URL을 등록하세요"};
+          if (!c.serviceId) return {ok:false, err:"네이버 SENS 서비스 ID 미설정"};
+          if (!c.accessKey || !c.secretKey) return {ok:false, err:"네이버 SENS Access/Secret Key 미설정"};
+          if (!c.sender) return {ok:false, err:"네이버 SENS 발신번호 미설정"};
+          return {ok:true};
+        });
       });
     }
     return _getAligoCfg(evtId).then(function(c) {
@@ -1261,56 +1264,42 @@ function _apiSendSmsAligo(p) {
     return _apiSendSmsAligoReal(p, evtId);
   });
 }
-// 네이버 SENS 직접 발송
+// 네이버 SENS 발송 (GAS 프록시 경유)
 function _apiSendSmsNaver(p, evtId) {
   return _getSensCfg(evtId).then(function(c) {
     if (!c.serviceId || !c.accessKey || !c.secretKey || !c.sender)
       return {ok:false, err:"네이버 SENS 설정 미완료"};
-    var tels = p.tels || [];
-    if (!tels.length) return {ok:false, err:"수신번호 없음"};
-    var msg = p.msg || "";
-    var byteLen = 0;
-    for (var bi=0; bi<msg.length; bi++) byteLen += msg.charCodeAt(bi)>127?2:1;
-    var msgType = byteLen > 80 ? "LMS" : "SMS";
-    var ts = String(Date.now());
-    var uri = "/sms/v2/services/" + encodeURIComponent(c.serviceId) + "/messages";
-    var messages = tels.map(function(t){ return {to: t.replace(/[^0-9]/g,"")}; });
-    var reqBody = {type: msgType, from: c.sender, content: msg, messages: messages};
-    // HMAC-SHA256 서명
-    return _sensSign("POST", uri, ts, c.accessKey, c.secretKey).then(function(sig) {
-      return fetch("https://sens.apigw.ntruss.com" + uri, {
+    // 프록시 URL 확인 (알리고와 동일 키 SMS_PROXY_URL 사용)
+    return _getAligoCfg(evtId).then(function(ac) {
+      var proxyUrl = ac.proxyUrl;
+      if (!proxyUrl) return {ok:false, err:"SMS 프록시 URL 미설정 — 시스템설정에서 GAS 프록시 URL을 등록하세요"};
+      var tels = p.tels || [];
+      if (!tels.length) return {ok:false, err:"수신번호 없음"};
+      var body = {
+        action:    "send",
+        serviceId: c.serviceId,
+        accessKey: c.accessKey,
+        secretKey: c.secretKey,
+        sender:    c.sender,
+        tels:      tels,
+        msg:       p.msg || ""
+      };
+      if (p.rdate) { body.rdate = p.rdate; body.rtime = p.rtime || ""; }
+      return fetch(proxyUrl, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json; charset=utf-8",
-          "x-ncp-apigw-timestamp": ts,
-          "x-ncp-iam-access-key": c.accessKey,
-          "x-ncp-apigw-signature-v2": sig
-        },
-        body: JSON.stringify(reqBody)
+        headers: {"Content-Type":"application/json"},
+        body: JSON.stringify(body)
+      }).then(function(resp) { return resp.json(); }).then(function(r) {
+        if (r && r.ok) {
+          _apiSmsLogAdd({evtId:evtId, by:(typeof CID!=='undefined'?CID:""), tels:tels, msg:p.msg||"",
+            sent:r.sent||tels.length, failed:r.failed||0, type:r.msgType||"SMS", rdate:p.rdate||""});
+        }
+        return r;
+      }).catch(function(e) {
+        return {ok:false, err:"SENS 프록시 통신 오류: "+(e.message||e)};
       });
-    }).then(function(resp) {
-      return resp.json().then(function(data){ return {status: resp.status, data: data}; });
-    }).then(function(r) {
-      var ok = r.status >= 200 && r.status < 300;
-      if (ok) {
-        _apiSmsLogAdd({evtId:evtId, by:(typeof CID!=='undefined'?CID:""), tels:tels, msg:msg,
-          sent:tels.length, failed:0, type:msgType, rdate:p.rdate||""});
-      }
-      return {ok:ok, sent:ok?tels.length:0, failed:ok?0:tels.length, msgType:msgType,
-        raw:r.data, err:ok?"":(r.data&&r.data.error&&r.data.error.message||"SENS 발송 실패 ("+r.status+")")};
-    }).catch(function(e) {
-      return {ok:false, err:"SENS 통신 오류: "+(e.message||e)};
     });
   });
-}
-// HMAC-SHA256 서명 (네이버 SENS 인증)
-function _sensSign(method, uri, timestamp, accessKey, secretKey) {
-  var space = " ", newline = "\n";
-  var message = method + space + uri + newline + timestamp + newline + accessKey;
-  var enc = new TextEncoder();
-  return crypto.subtle.importKey("raw", enc.encode(secretKey), {name:"HMAC",hash:"SHA-256"}, false, ["sign"])
-    .then(function(key){ return crypto.subtle.sign("HMAC", key, enc.encode(message)); })
-    .then(function(sig){ return btoa(String.fromCharCode.apply(null, new Uint8Array(sig))); });
 }
 // 알리고 프록시 발송 (기존)
 function _apiSendSmsAligoReal(p, evtId) {
