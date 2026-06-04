@@ -1527,20 +1527,15 @@ function popModSms(key, preSelIds){
   var h='<div class="pop-head"><h3>💬 '+esc(def.label)+' 문자 발송</h3></div>';
   h+='<div style="padding:14px;max-height:75vh;overflow-y:auto">';
 
-  // 대상 모드
+  // 필터
   h+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center">';
-  h+='<select id="modSmsMode" onchange="_modSmsModeChange()" style="padding:7px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px">';
-  h+='<option value="filter">📋 필터 적용</option>';
-  h+='<option value="selected"'+(preSelIds?' selected':'')+'>🎯 개별 선택</option>';
-  h+='</select>';
   if(statusCol){
     var bmKeys=Object.keys(statusCol.badgeMap||{});
-    h+='<select id="modSmsStatus" onchange="_modSmsPrev()" style="padding:7px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px">';
+    h+='<select id="modSmsStatus" onchange="_modSmsFilterChanged()" style="padding:7px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px">';
     h+='<option value="all">상태 전체</option>';
     bmKeys.forEach(function(sk){ var bm=statusCol.badgeMap[sk]; h+='<option value="'+esc(sk)+'">'+esc(bm.label||sk)+'</option>'; });
     h+='</select>';
   }
-  // 필터 컬럼 드롭다운
   (def.columns||[]).filter(function(c){return c.filter && c.key!=='status';}).forEach(function(fc){
     var fopts=_modFilterOpts(key,fc); if(!fopts.length) return;
     h+='<select onchange="_modSmsSetFilter(\''+esc(fc.key)+'\',this.value)" style="padding:7px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px">';
@@ -1550,20 +1545,17 @@ function popModSms(key, preSelIds){
   });
   h+='</div>';
 
-  // 개별 선택 리스트
-  h+='<div id="modSmsList" style="display:'+(preSelIds?'block':'none')+';margin-bottom:10px;border:1px solid #e5e7eb;border-radius:8px;padding:10px;max-height:250px;overflow:auto;background:#f8fafc">';
+  // 수신자 목록 (항상 표시)
+  h+='<div style="margin-bottom:10px;border:1px solid #e5e7eb;border-radius:8px;padding:10px;max-height:250px;overflow:auto;background:#f8fafc">';
   h+='<div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;align-items:center">';
-  h+='<b style="font-size:13px">수신자 선택</b>';
+  h+='<b style="font-size:13px">수신자</b>';
   h+='<button class="btn btn-s" style="background:#64748b;color:#fff;font-size:12px" onclick="_modSmsSelAll(true)">전체선택</button>';
   h+='<button class="btn btn-s" style="background:#fff;color:#64748b;border:1px solid #64748b;font-size:12px" onclick="_modSmsSelAll(false)">해제</button>';
-  h+='<span id="modSmsSelCnt" style="font-size:12px;color:#666;margin-left:auto"></span>';
+  h+='<span id="modSmsSelCnt" style="font-size:12px;color:#2563eb;font-weight:700;margin-left:auto"></span>';
   h+='</div>';
   h+='<input type="search" id="modSmsSearch" oninput="_modSmsRenderList()" placeholder="🔍 이름/연락처 검색" style="width:100%;padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;margin-bottom:8px;box-sizing:border-box">';
   h+='<div id="modSmsListBody"></div>';
   h+='</div>';
-
-  // 대상 미리보기
-  h+='<div id="modSmsPrev" style="padding:8px 10px;background:#f8fafc;border-radius:6px;font-size:12px;color:#475569;margin-bottom:10px"></div>';
 
   // 메시지 본문
   h+='<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;margin-bottom:4px;flex-wrap:wrap">';
@@ -1584,47 +1576,61 @@ function popModSms(key, preSelIds){
   h+='</div></div>';
   openPopup(h,520);
   setTimeout(function(){
+    if(!preSelIds) _modSmsSelAll(true); // 처음 열면 전체선택
+    _modSmsRenderList();
     _modSmsPrev();
-    if(preSelIds) _modSmsRenderList();
   },50);
 }
 function _modTitleCol(def){
   var c=(def.columns||[]).filter(function(x){return !x.adminOnly&&x.key!=='status'&&!x.hideTable&&x.type!=='file'&&x.type!=='consent'})[0];
   return c?c.key:'';
 }
-function _modSmsModeChange(){
-  var mode=(document.getElementById('modSmsMode')||{}).value||'filter';
-  var list=document.getElementById('modSmsList');
-  if(list) list.style.display=(mode==='selected')?'block':'none';
-  if(mode==='selected') _modSmsRenderList();
-  _modSmsPrev();
+function _modSmsFilterChanged(){
+  // 필터 바뀌면 → 전체선택 + 목록 갱신
+  _modSmsSelIds={};
+  _modSmsSelAll(true);
 }
 function _modSmsSetFilter(colKey,val){
   if(!window.__modSmsFilter) window.__modSmsFilter={};
   if(val==='') delete window.__modSmsFilter[colKey]; else window.__modSmsFilter[colKey]=val;
-  _modSmsPrev();
+  _modSmsFilterChanged();
+}
+// 상태+컬럼 필터 적용된 데이터
+function _modSmsFilteredRows(){
+  var key=window.__modSmsKey; var telKey=window.__modSmsTelKey;
+  var rows=(_modData[key]||[]).slice();
+  // 상태 필터
+  var st=(document.getElementById('modSmsStatus')||{}).value||'all';
+  if(st!=='all') rows=rows.filter(function(r){return r.status===st});
+  // 컬럼 필터
+  var f=window.__modSmsFilter||{};
+  Object.keys(f).forEach(function(ck){
+    if(f[ck]==='') return;
+    rows=rows.filter(function(r){return String(r[ck]||'')===String(f[ck]);});
+  });
+  // 연락처 있는 것만
+  rows=rows.filter(function(r){return (r[telKey]||'').replace(/[^0-9]/g,'').match(/\d{10,11}/)});
+  return rows;
 }
 function _modSmsRenderList(){
   var key=window.__modSmsKey; var def=_modDefs[key]; if(!def) return;
   var telKey=window.__modSmsTelKey;
-  // 표시할 컬럼: tel·status·file·consent·hideTable 제외, 최대 3개
   var showCols=(def.columns||[]).filter(function(c){
     return c.key!=='status'&&c.type!=='tel'&&c.type!=='file'&&c.type!=='consent'&&!c.hideTable&&!c.adminOnly;
   }).slice(0,3);
   var q=((document.getElementById('modSmsSearch')||{}).value||'').trim().toLowerCase();
-  var rows=(_modData[key]||[]).filter(function(r){
-    if(!(r[telKey]||'').replace(/[^0-9]/g,'').match(/\d{10,11}/)) return false;
-    if(q){
+  // 필터 적용된 목록에서 검색
+  var rows=_modSmsFilteredRows();
+  if(q){
+    rows=rows.filter(function(r){
       var hay=Object.keys(r).map(function(k){return String(r[k]||'')}).join('|').toLowerCase();
-      if(hay.indexOf(q)<0) return false;
-    }
-    return true;
-  });
+      return hay.indexOf(q)>=0;
+    });
+  }
   var html='';
   rows.forEach(function(r){
     var checked=_modSmsSelIds[r._id]?'checked':'';
     var tel=(r[telKey]||'');
-    // 첫 컬럼=굵게(이름 역할), 나머지=회색 보조
     var main=showCols[0]?esc(String(r[showCols[0].key]||'-')):'';
     var sub=showCols.slice(1).map(function(c){return esc(String(r[c.key]||''))}).filter(Boolean).join(' · ');
     html+='<label style="display:flex;align-items:center;gap:8px;padding:5px 4px;border-bottom:1px solid #e5e7eb;cursor:pointer;font-size:13px">';
@@ -1643,13 +1649,18 @@ function _modSmsSelToggle(id,on){
 }
 function _modSmsSelAll(on){
   var q=((document.getElementById('modSmsSearch')||{}).value||'').trim().toLowerCase();
-  var key=window.__modSmsKey; var telKey=window.__modSmsTelKey;
-  (_modData[key]||[]).forEach(function(r){
-    if(!(r[telKey]||'').replace(/[^0-9]/g,'').match(/\d{10,11}/)) return;
-    if(q){ var hay=Object.keys(r).map(function(k){return String(r[k]||'')}).join('|').toLowerCase(); if(hay.indexOf(q)<0) return; }
+  var rows=_modSmsFilteredRows();
+  if(q){
+    rows=rows.filter(function(r){
+      var hay=Object.keys(r).map(function(k){return String(r[k]||'')}).join('|').toLowerCase();
+      return hay.indexOf(q)>=0;
+    });
+  }
+  rows.forEach(function(r){
     if(on) _modSmsSelIds[r._id]=true; else delete _modSmsSelIds[r._id];
   });
   _modSmsRenderList();
+  _modSmsPrev();
 }
 function _modSmsSelCount(){
   var n=Object.keys(_modSmsSelIds).length;
@@ -1657,30 +1668,13 @@ function _modSmsSelCount(){
   if(el) el.textContent=n?'✓ '+n+'명 선택됨':'선택 없음';
 }
 function _modSmsTargetRows(){
-  var key=window.__modSmsKey; var telKey=window.__modSmsTelKey;
-  var mode=(document.getElementById('modSmsMode')||{}).value||'filter';
-  var rows=(_modData[key]||[]).slice();
-  if(mode==='selected'){
-    return rows.filter(function(r){return _modSmsSelIds[r._id]});
-  }
-  // 상태 필터
-  var st=(document.getElementById('modSmsStatus')||{}).value||'all';
-  if(st!=='all') rows=rows.filter(function(r){return r.status===st});
-  // 컬럼 필터
-  var f=window.__modSmsFilter||{};
-  Object.keys(f).forEach(function(ck){
-    if(f[ck]==='') return;
-    rows=rows.filter(function(r){return String(r[ck]||'')===String(f[ck]);});
-  });
-  return rows;
+  return _modSmsFilteredRows().filter(function(r){return _modSmsSelIds[r._id]});
 }
 function _modSmsPrev(){
-  var telKey=window.__modSmsTelKey;
-  var rows=_modSmsTargetRows().filter(function(r){return (r[telKey]||'').replace(/[^0-9]/g,'').length>=10});
-  var mode=(document.getElementById('modSmsMode')||{}).value||'filter';
-  var label=mode==='selected'?'🎯 개별선택':'📋 필터';
+  var total=_modSmsFilteredRows().length;
+  var selected=_modSmsTargetRows().length;
   var el=document.getElementById('modSmsPrev');
-  if(el) el.innerHTML='<b>'+rows.length+'명</b>에게 발송됩니다 '+label;
+  if(el) el.innerHTML='📨 <b>'+selected+'명</b> 발송 (전체 '+total+'명 중 선택)';
 }
 function _modSmsByteCount(){
   var msg=(document.getElementById('modSmsBody')||{}).value||'';
