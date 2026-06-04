@@ -2893,7 +2893,7 @@ function popModStat(key){
   var h='<div class="pop-head"><h3>📊 '+esc(def.label)+' 통계 <span style="color:#94a3b8;font-weight:400">('+total+'건)</span></h3></div>';
   h+='<div style="padding:14px;max-height:75vh;overflow:auto">';
 
-  if(!total){ h+='<div style="text-align:center;color:#94a3b8;padding:40px">데이터가 없습니다.</div></div>'; pop(h,'700px'); return; }
+  if(!total){ h+='<div style="text-align:center;color:#94a3b8;padding:40px">데이터가 없습니다.</div></div>'; openPopup(h,700); return; }
 
   cols.forEach(function(c){
     if(c.sysOnly) return;
@@ -2903,7 +2903,7 @@ function popModStat(key){
   });
 
   h+='</div>';
-  pop(h,'700px');
+  openPopup(h,700);
 }
 
 function _modStatCol(c, data){
