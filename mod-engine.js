@@ -2921,7 +2921,15 @@ function _modStatCol(c, data, key){
 }
 function _modStatNameCol(key){
   var def=_modDefs[key]; if(!def) return null;
-  return (def.columns||[]).find(function(c){return c.type!=='badge'&&c.type!=='consent'&&c.type!=='file'&&!c.auto;})||null;
+  var cols=(def.columns||[]).filter(function(c){return c.type!=='badge'&&c.type!=='consent'&&c.type!=='file'&&!c.auto&&!c.sysOnly;});
+  // 이름/업체/성명/대표자 같은 컬럼 우선
+  var nameHints=/이름|성명|업체|대표|name/i;
+  var hit=cols.find(function(c){return nameHints.test(c.label);});
+  if(hit) return hit;
+  // select/filter 아닌 text 컬럼 우선 (구분 같은 카테고리 회피)
+  var text=cols.find(function(c){return c.type!=='select'&&!c.filter;});
+  if(text) return text;
+  return cols[0]||null;
 }
 function _modStatNameOf(row,key){
   var nc=_modStatNameCol(key);
@@ -2931,9 +2939,7 @@ function _modStatSearch(name){
   closePopup();
   var key=_modStatKey; if(!key) return;
   _modSearch[key]=name;
-  var el=document.getElementById('_modSearch_'+key);
-  if(el) el.value=name;
-  _modRefreshList(key);
+  if(typeof draw==='function') draw();
 }
 function _modStatNames(rows,key){
   if(!rows.length) return '';
