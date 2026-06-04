@@ -166,7 +166,8 @@ function dMod(key){
   if(isA() && _hasTel) h+='<button class="btn" style="background:#8b5cf6;color:#fff" onclick="popModSms(\''+key+'\')">💬 문자 발송</button>';
   if(isA()) h+='<button class="btn" style="background:#475569;color:#fff" onclick="popModLabel(\''+key+'\')">🖨 라벨 출력</button>';
   if(isA()) h+='<button class="btn btn-b" onclick="popModAdd(\''+key+'\')">➕ 추가</button>';
-  if(isA()) h+='<button class="btn" style="background:#16a34a;color:#fff" onclick="popModSheet(\''+key+'\')">📊 시트 편집</button>';
+  if(isA()) h+='<button class="btn" style="background:#e67e22;color:#fff" onclick="popModStat(\''+key+'\')">📊 통계</button>';
+  if(isA()) h+='<button class="btn" style="background:#16a34a;color:#fff" onclick="popModSheet(\''+key+'\')">📝 시트 편집</button>';
   if(isA()) h+='<button class="btn" style="background:#0d9488;color:#fff" onclick="modImportExcel(\''+key+'\')">📤 가져오기</button>';
   if(feat.excel!==false) h+='<button class="btn" onclick="modExportExcel(\''+key+'\')">📥 내보내기</button>';
   if(typeof isSuper==='function'&&isSuper()) h+='<button class="btn" style="background:#7c3aed;color:#fff" onclick="popModLog(\''+key+'\')">📋 로그</button>';
@@ -2877,4 +2878,176 @@ function _mvDoLogin(){
     if(btn){btn.disabled=false;btn.textContent='로그인';}
     if(errEl){errEl.textContent='연결 오류: '+e.message;errEl.style.display='block';}
   });
+}
+
+// ═══════════════════════════════════════════
+// 📊 범용 통계
+// ═══════════════════════════════════════════
+
+function popModStat(key){
+  var def=_modDefs[key]; if(!def) return;
+  var data=(_modData[key]||[]).slice();
+  var cols=(def.columns||[]);
+  var total=data.length;
+
+  var h='<div class="pop-head"><h3>📊 '+esc(def.label)+' 통계 <span style="color:#94a3b8;font-weight:400">('+total+'건)</span></h3></div>';
+  h+='<div style="padding:14px;max-height:75vh;overflow:auto">';
+
+  if(!total){ h+='<div style="text-align:center;color:#94a3b8;padding:40px">데이터가 없습니다.</div></div>'; pop(h,'700px'); return; }
+
+  cols.forEach(function(c){
+    if(c.sysOnly) return;
+    var st=_modStatCol(c, data);
+    if(!st) return;
+    h+=st;
+  });
+
+  h+='</div>';
+  pop(h,'700px');
+}
+
+function _modStatCol(c, data){
+  var tp=c.type||'text';
+
+  if(tp==='file') return _modStatFile(c, data);
+  if(tp==='consent') return _modStatConsent(c, data);
+  if(tp==='number') return _modStatNumber(c, data);
+  if(tp==='date') return _modStatDate(c, data);
+
+  // text, select, badge, tel, textarea — 값 분포
+  return _modStatDist(c, data);
+}
+
+function _modStatCard(label, body){
+  return '<div style="margin-bottom:16px;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden">'
+    +'<div style="background:#f8fafc;padding:10px 14px;font-weight:700;font-size:14px;border-bottom:1px solid #e2e8f0">'+esc(label)+'</div>'
+    +'<div style="padding:12px 14px">'+body+'</div></div>';
+}
+
+function _modStatBar(label, count, total, color){
+  var pct=total?Math.round(count/total*100):0;
+  var w=total?Math.max(2, count/total*100):0;
+  return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">'
+    +'<div style="min-width:90px;font-size:13px;color:#334155;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+esc(label)+'">'+esc(label)+'</div>'
+    +'<div style="flex:1;background:#f1f5f9;border-radius:4px;height:20px;overflow:hidden">'
+    +'<div style="width:'+w.toFixed(1)+'%;height:100%;background:'+(color||'#3b82f6')+';border-radius:4px;transition:width .3s"></div></div>'
+    +'<div style="min-width:70px;text-align:right;font-size:12px;color:#64748b;font-weight:600">'+count+' <span style="color:#94a3b8">('+pct+'%)</span></div></div>';
+}
+
+// 값 분포 (text/select/badge/tel/textarea)
+function _modStatDist(c, data){
+  var counts={}, filled=0, empty=0;
+  data.forEach(function(r){
+    var v=String(r[c.key]||'').trim();
+    if(!v){ empty++; return; }
+    filled++;
+    counts[v]=(counts[v]||0)+1;
+  });
+  var keys=Object.keys(counts);
+  if(!keys.length) return '';
+  // 너무 많은 고유값(20개 초과)이면 상위 15개만 + 기타
+  keys.sort(function(a,b){ return counts[b]-counts[a]; });
+  var palette=['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#06b6d4','#84cc16','#f97316','#6366f1'];
+  var body='';
+  var showKeys=keys.length>20?keys.slice(0,15):keys;
+  var otherCount=0;
+  if(keys.length>20){
+    for(var i=15;i<keys.length;i++) otherCount+=counts[keys[i]];
+  }
+  showKeys.forEach(function(k,i){
+    body+=_modStatBar(k, counts[k], data.length, palette[i%palette.length]);
+  });
+  if(otherCount>0) body+=_modStatBar('기타 ('+(keys.length-15)+'종)', otherCount, data.length, '#94a3b8');
+  if(empty>0) body+=_modStatBar('(미입력)', empty, data.length, '#cbd5e1');
+  body+='<div style="font-size:11px;color:#94a3b8;margin-top:4px">고유값 '+keys.length+'종 · 입력 '+filled+' · 미입력 '+empty+'</div>';
+  return _modStatCard(c.label, body);
+}
+
+// 파일 제출 현황
+function _modStatFile(c, data){
+  var yes=0, no=0;
+  data.forEach(function(r){
+    var v=r[c.key];
+    if(v && ((typeof v==='string' && v.trim()) || (typeof v==='object'))) yes++; else no++;
+  });
+  var body=_modStatBar('✅ 제출', yes, data.length, '#10b981');
+  body+=_modStatBar('❌ 미제출', no, data.length, '#ef4444');
+  body+='<div style="font-size:11px;color:#94a3b8;margin-top:4px">제출률 '+(data.length?Math.round(yes/data.length*100):0)+'%</div>';
+  return _modStatCard(c.label+' (파일)', body);
+}
+
+// 개인정보동의 현황
+function _modStatConsent(c, data){
+  var yes=0, no=0;
+  data.forEach(function(r){
+    var v=r[c.key];
+    if(v==='Y'||v===true||v==='true') yes++; else no++;
+  });
+  var body=_modStatBar('✅ 동의', yes, data.length, '#10b981');
+  body+=_modStatBar('⬜ 미동의', no, data.length, '#ef4444');
+  return _modStatCard(c.label, body);
+}
+
+// 숫자 통계
+function _modStatNumber(c, data){
+  var vals=[];
+  data.forEach(function(r){
+    var v=r[c.key]; if(v==null||v==='') return;
+    var n=Number(String(v).replace(/,/g,''));
+    if(!isNaN(n)) vals.push(n);
+  });
+  if(!vals.length) return '';
+  var sum=0, min=vals[0], max=vals[0];
+  vals.forEach(function(n){ sum+=n; if(n<min)min=n; if(n>max)max=n; });
+  var avg=sum/vals.length;
+  var fmt=c.comma?function(n){return Number(n.toFixed(1)).toLocaleString();}:function(n){return n.toFixed(1);};
+  var body='<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px">';
+  var cards=[
+    {l:'합계',v:fmt(sum),bg:'#eff6ff',c:'#1e40af'},
+    {l:'평균',v:fmt(avg),bg:'#f0fdf4',c:'#166534'},
+    {l:'최솟값',v:fmt(min),bg:'#fefce8',c:'#854d0e'},
+    {l:'최댓값',v:fmt(max),bg:'#fef2f2',c:'#991b1b'}
+  ];
+  cards.forEach(function(cd){
+    body+='<div style="flex:1;min-width:70px;background:'+cd.bg+';padding:8px 12px;border-radius:8px;text-align:center">'
+      +'<div style="font-size:11px;color:'+cd.c+'">'+cd.l+'</div>'
+      +'<div style="font-size:16px;font-weight:700;color:'+cd.c+'">'+cd.v+'</div></div>';
+  });
+  body+='</div>';
+  body+='<div style="font-size:11px;color:#94a3b8">입력 '+vals.length+' / 미입력 '+(data.length-vals.length)+'</div>';
+  return _modStatCard(c.label, body);
+}
+
+// 날짜 분포
+function _modStatDate(c, data){
+  var counts={}, filled=0;
+  data.forEach(function(r){
+    var v=String(r[c.key]||'').trim();
+    if(!v) return;
+    filled++;
+    var d=v.substring(0,10);
+    counts[d]=(counts[d]||0)+1;
+  });
+  var keys=Object.keys(counts).sort();
+  if(!keys.length) return '';
+  var maxCnt=1;
+  keys.forEach(function(k){if(counts[k]>maxCnt) maxCnt=counts[k];});
+  var body='';
+  if(keys.length<=30){
+    keys.forEach(function(k){
+      body+=_modStatBar(k, counts[k], data.length, '#6366f1');
+    });
+  } else {
+    // 월별로 묶기
+    var monthly={};
+    keys.forEach(function(k){
+      var m=k.substring(0,7);
+      monthly[m]=(monthly[m]||0)+counts[k];
+    });
+    Object.keys(monthly).sort().forEach(function(m){
+      body+=_modStatBar(m, monthly[m], data.length, '#6366f1');
+    });
+  }
+  body+='<div style="font-size:11px;color:#94a3b8;margin-top:4px">입력 '+filled+' · 미입력 '+(data.length-filled)+' · 기간 '+(keys[0]||'')+' ~ '+(keys[keys.length-1]||'')+'</div>';
+  return _modStatCard(c.label, body);
 }
