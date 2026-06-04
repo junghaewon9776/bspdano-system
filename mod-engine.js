@@ -3011,7 +3011,7 @@ function _modStatConsent(c, data, key){
   var yes=0, no=0, noRows=[];
   data.forEach(function(r){
     var v=r[c.key];
-    if(v==='Y'||v===true||v==='true') yes++; else { no++; noRows.push(r); }
+    if(v==='동의'||v==='Y'||v===true||v==='true') yes++; else { no++; noRows.push(r); }
   });
   var body=_modStatBar('✅ 동의', yes, data.length, '#10b981');
   body+=_modStatBar('⬜ 미동의', no, data.length, '#ef4444');
