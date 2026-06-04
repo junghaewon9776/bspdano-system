@@ -1607,7 +1607,10 @@ function _modSmsSetFilter(colKey,val){
 function _modSmsRenderList(){
   var key=window.__modSmsKey; var def=_modDefs[key]; if(!def) return;
   var telKey=window.__modSmsTelKey;
-  var titleKey=_modTitleCol(def);
+  // 표시할 컬럼: tel·status·file·consent·hideTable 제외, 최대 3개
+  var showCols=(def.columns||[]).filter(function(c){
+    return c.key!=='status'&&c.type!=='tel'&&c.type!=='file'&&c.type!=='consent'&&!c.hideTable&&!c.adminOnly;
+  }).slice(0,3);
   var q=((document.getElementById('modSmsSearch')||{}).value||'').trim().toLowerCase();
   var rows=(_modData[key]||[]).filter(function(r){
     if(!(r[telKey]||'').replace(/[^0-9]/g,'').match(/\d{10,11}/)) return false;
@@ -1620,11 +1623,13 @@ function _modSmsRenderList(){
   var html='';
   rows.forEach(function(r){
     var checked=_modSmsSelIds[r._id]?'checked':'';
-    var name=r[titleKey]||r._id||'';
     var tel=(r[telKey]||'');
+    // 첫 컬럼=굵게(이름 역할), 나머지=회색 보조
+    var main=showCols[0]?esc(String(r[showCols[0].key]||'-')):'';
+    var sub=showCols.slice(1).map(function(c){return esc(String(r[c.key]||''))}).filter(Boolean).join(' · ');
     html+='<label style="display:flex;align-items:center;gap:8px;padding:5px 4px;border-bottom:1px solid #e5e7eb;cursor:pointer;font-size:13px">';
     html+='<input type="checkbox" '+checked+' onchange="_modSmsSelToggle(\''+esc(r._id)+'\',this.checked)" style="width:16px;height:16px">';
-    html+='<span style="flex:1"><b>'+esc(name)+'</b> <span style="color:#94a3b8;font-size:11px">'+esc(tel)+'</span></span>';
+    html+='<span style="flex:1"><b>'+main+'</b>'+(sub?' <span style="color:#94a3b8;font-size:11px">'+sub+'</span>':'')+' <span style="color:#64748b;font-size:11px">'+esc(tel)+'</span></span>';
     html+='</label>';
   });
   if(!rows.length) html='<div style="text-align:center;padding:20px;font-size:12px;color:#94a3b8">검색 결과 없음</div>';
