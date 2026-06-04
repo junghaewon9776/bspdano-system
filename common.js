@@ -1287,7 +1287,7 @@ function _apiSendSmsNaver(p, evtId) {
       if (p.rdate) { body.rdate = p.rdate; body.rtime = p.rtime || ""; }
       return fetch(proxyUrl, {
         method: "POST",
-        headers: {"Content-Type":"application/json"},
+        redirect: "follow",
         body: JSON.stringify(body)
       }).then(function(resp) { return resp.json(); }).then(function(r) {
         if (r && r.ok) {
@@ -1321,7 +1321,7 @@ function _apiSendSmsAligoReal(p, evtId) {
     if (p.rdate) { body.rdate = p.rdate; body.rtime = p.rtime || ""; }
     return fetch(c.proxyUrl, {
       method: "POST",
-      headers: {"Content-Type":"application/json"},
+      redirect: "follow",
       body: JSON.stringify(body)
     }).then(function(resp) { return resp.json(); }).then(function(r) {
       if (r && r.ok) {
