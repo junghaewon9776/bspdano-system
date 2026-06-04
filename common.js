@@ -1186,37 +1186,134 @@ function _getAligoCfg(evtId) {
     };
   });
 }
+function _getSensCfg(evtId) {
+  return loadEvtData(evtId).then(function(data) {
+    var cfg = {};
+    (data.Config || []).forEach(function(c) { if(c && c.k) cfg[c.k] = c.v; });
+    return {
+      provider:   cfg.SMS_PROVIDER || "",
+      serviceId:  cfg.NAVER_SENS_SERVICE_ID || "",
+      sender:     cfg.NAVER_SENS_SENDER || "",
+      accessKey:  cfg.NAVER_SENS_ACCESS_KEY || "",
+      secretKey:  cfg.NAVER_SENS_SECRET_KEY || "",
+      smsSignature: cfg.SMS_SIGNATURE || "",
+      tplCode:    cfg.ALIGO_TPL_CODE || "",
+      kakaoOn:    cfg.ALIGO_KAKAO_ON === "1"
+    };
+  });
+}
+function _getSmsCfgAuto(evtId) {
+  return loadEvtData(evtId).then(function(data) {
+    var cfg = {};
+    (data.Config || []).forEach(function(c) { if(c && c.k) cfg[c.k] = c.v; });
+    return { provider: cfg.SMS_PROVIDER || "" };
+  });
+}
 function _apiGetAligoCfg(p) {
+  // 이름은 유지(호환) — getSmsCfg 액션에서 호출됨
   var evtId = _getEvtId(p);
   if (!evtId) return Promise.resolve({ok:false, err:"행사 미선택"});
-  return _getAligoCfg(evtId).then(function(c) {
-    return {
-      ok: true,
-      hasKey: !!c.apiKey,
-      aligoKeyMask: c.apiKey ? ("***" + c.apiKey.slice(-4)) : "",
-      aligoUser: c.userId,
-      aligoSender: c.sender,
-      proxyUrl: c.proxyUrl ? "설정됨" : "",
-      sensServiceId: "", sensSender: "", hasSensAccess:false, hasSensSecret:false,
-      sensAccessMask:"", sensSecretMask:"",
-      smsSignature: c.smsSignature,
-      tplCode: c.tplCode,
-      kakaoOn: c.kakaoOn
-    };
+  return _getAligoCfg(evtId).then(function(ac) {
+    return _getSensCfg(evtId).then(function(nc) {
+      return {
+        ok: true,
+        provider: nc.provider,
+        hasKey: !!ac.apiKey,
+        aligoKeyMask: ac.apiKey ? ("***" + ac.apiKey.slice(-4)) : "",
+        aligoUser: ac.userId,
+        aligoSender: ac.sender,
+        proxyUrl: ac.proxyUrl ? "설정됨" : "",
+        sensServiceId: nc.serviceId, sensSender: nc.sender,
+        hasSensAccess: !!nc.accessKey, hasSensSecret: !!nc.secretKey,
+        sensAccessMask: nc.accessKey ? ("***" + nc.accessKey.slice(-4)) : "",
+        sensSecretMask: nc.secretKey ? ("***" + nc.secretKey.slice(-4)) : "",
+        smsSignature: nc.smsSignature || ac.smsSignature,
+        tplCode: nc.tplCode || ac.tplCode,
+        kakaoOn: nc.kakaoOn || ac.kakaoOn
+      };
+    });
   });
 }
 function _apiCheckSmsConfig(p) {
   var evtId = _getEvtId(p);
   if (!evtId) return Promise.resolve({ok:false, err:"행사 미선택"});
-  return _getAligoCfg(evtId).then(function(c) {
-    if (!c.proxyUrl) return {ok:false, err:"SMS 프록시 URL이 설정되지 않았습니다. 시스템설정 → SMS 설정에서 '알리고 프록시 URL'을 입력하세요."};
-    if (!c.apiKey || !c.userId || !c.sender) return {ok:false, err:"알리고 API Key / User ID / 발신번호를 설정하세요."};
-    return {ok:true};
+  return _getSmsCfgAuto(evtId).then(function(info) {
+    if (info.provider === "naver") {
+      return _getSensCfg(evtId).then(function(c) {
+        if (!c.serviceId) return {ok:false, err:"네이버 SENS 서비스 ID 미설정"};
+        if (!c.accessKey || !c.secretKey) return {ok:false, err:"네이버 SENS Access/Secret Key 미설정"};
+        if (!c.sender) return {ok:false, err:"네이버 SENS 발신번호 미설정"};
+        return {ok:true};
+      });
+    }
+    return _getAligoCfg(evtId).then(function(c) {
+      if (!c.proxyUrl) return {ok:false, err:"SMS 프록시 URL 미설정 — 시스템설정 → SMS 설정"};
+      if (!c.apiKey || !c.userId || !c.sender) return {ok:false, err:"알리고 API Key / User ID / 발신번호를 설정하세요."};
+      return {ok:true};
+    });
   });
 }
 function _apiSendSmsAligo(p) {
   var evtId = _getEvtId(p);
   if (!evtId) return Promise.resolve({ok:false, err:"행사 미선택"});
+  return _getSmsCfgAuto(evtId).then(function(info) {
+    if (info.provider === "naver") return _apiSendSmsNaver(p, evtId);
+    return _apiSendSmsAligoReal(p, evtId);
+  });
+}
+// 네이버 SENS 직접 발송
+function _apiSendSmsNaver(p, evtId) {
+  return _getSensCfg(evtId).then(function(c) {
+    if (!c.serviceId || !c.accessKey || !c.secretKey || !c.sender)
+      return {ok:false, err:"네이버 SENS 설정 미완료"};
+    var tels = p.tels || [];
+    if (!tels.length) return {ok:false, err:"수신번호 없음"};
+    var msg = p.msg || "";
+    var byteLen = 0;
+    for (var bi=0; bi<msg.length; bi++) byteLen += msg.charCodeAt(bi)>127?2:1;
+    var msgType = byteLen > 80 ? "LMS" : "SMS";
+    var ts = String(Date.now());
+    var uri = "/sms/v2/services/" + encodeURIComponent(c.serviceId) + "/messages";
+    var messages = tels.map(function(t){ return {to: t.replace(/[^0-9]/g,"")}; });
+    var reqBody = {type: msgType, from: c.sender, content: msg, messages: messages};
+    // HMAC-SHA256 서명
+    return _sensSign("POST", uri, ts, c.accessKey, c.secretKey).then(function(sig) {
+      return fetch("https://sens.apigw.ntruss.com" + uri, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json; charset=utf-8",
+          "x-ncp-apigw-timestamp": ts,
+          "x-ncp-iam-access-key": c.accessKey,
+          "x-ncp-apigw-signature-v2": sig
+        },
+        body: JSON.stringify(reqBody)
+      });
+    }).then(function(resp) {
+      return resp.json().then(function(data){ return {status: resp.status, data: data}; });
+    }).then(function(r) {
+      var ok = r.status >= 200 && r.status < 300;
+      if (ok) {
+        _apiSmsLogAdd({evtId:evtId, by:(typeof CID!=='undefined'?CID:""), tels:tels, msg:msg,
+          sent:tels.length, failed:0, type:msgType, rdate:p.rdate||""});
+      }
+      return {ok:ok, sent:ok?tels.length:0, failed:ok?0:tels.length, msgType:msgType,
+        raw:r.data, err:ok?"":(r.data&&r.data.error&&r.data.error.message||"SENS 발송 실패 ("+r.status+")")};
+    }).catch(function(e) {
+      return {ok:false, err:"SENS 통신 오류: "+(e.message||e)};
+    });
+  });
+}
+// HMAC-SHA256 서명 (네이버 SENS 인증)
+function _sensSign(method, uri, timestamp, accessKey, secretKey) {
+  var space = " ", newline = "\n";
+  var message = method + space + uri + newline + timestamp + newline + accessKey;
+  var enc = new TextEncoder();
+  return crypto.subtle.importKey("raw", enc.encode(secretKey), {name:"HMAC",hash:"SHA-256"}, false, ["sign"])
+    .then(function(key){ return crypto.subtle.sign("HMAC", key, enc.encode(message)); })
+    .then(function(sig){ return btoa(String.fromCharCode.apply(null, new Uint8Array(sig))); });
+}
+// 알리고 프록시 발송 (기존)
+function _apiSendSmsAligoReal(p, evtId) {
   return _getAligoCfg(evtId).then(function(c) {
     if (!c.proxyUrl) return {ok:false, err:"SMS 프록시 URL 미설정 — 시스템설정 → SMS 설정"};
     if (!c.apiKey || !c.userId || !c.sender) return {ok:false, err:"알리고 설정 미완료 (API Key/User ID/발신번호)"};
