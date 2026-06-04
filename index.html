@@ -451,7 +451,7 @@ label{display:block;font-size:10px;color:#999;margin-bottom:3px}
 <!-- firebase-storage 제거: 구글 드라이브 프록시로 대체 -->
 <script src="firebase-config.js"></script>
 <script src="common.js?v=20260604c"></script>
-<script src="mod-engine.js?v=20260604j"></script>
+<script src="mod-engine.js?v=20260604k"></script>
 
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" onerror="console.warn('XLSX CDN load failed')"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js" onerror="console.warn('xlsx-js-style CDN load failed')"></script>
@@ -1388,7 +1388,6 @@ function mkTabs(){
       {k:"field_monitor",l:"본부 모니터링",frame:"방역코스/monitor.html"}
     ];
     fieldItems.push({k:"field_admin",l:"코스 관리",frame:"방역코스/admin.html"});
-    fieldItems.push({k:"field_vehicle",l:"행사차량 관리",frame:"방역코스/vehicle.html"});
     fieldItems.push({k:"field_today",l:"오늘의 운영",frame:"방역코스/today.html"});
     cats.push({id:"field",label:"📍 현장",items:fieldItems});
   }
@@ -17676,7 +17675,7 @@ function popEvtEdit(evtId){
   var modSection = grpBox("📋 행사 운영",        cb("apply","참가자")    +cb("budget","세입세출")+cb("purchase","구매")+cb("act","활동"))
                  + grpBox("👥 회원 관리",        cb("mem","인원관리")    +cb("fee","💵 회비"))
                  + grpBox("📦 조직 공용",        cb("rental","📦 대여자산")+cb("files","📁 자료실"))
-                 + grpBox("📍 현장 운영",        cb("groups","🏷 조 편성")+cb("vehicle","🚗 행사차량"));
+                 + grpBox("📍 현장 운영",        cb("groups","🏷 조 편성"));
   var ssHint = isNew ? '' : '<div class="fr"><label>데이터</label><button type="button" class="btn btn-s" style="background:#10b981;color:#fff" onclick="closePopup();openSheet(\'Mems\')">📊 시트 보기</button></div>';
   var h='<div class="pop-head"><h3>'+(isNew?"➕ 새 행사 추가":"✏️ 행사 수정 — "+esc(e.evtId))+'</h3></div>'
     +'<div style="padding:14px">'

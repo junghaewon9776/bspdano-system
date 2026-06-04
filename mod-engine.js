@@ -285,18 +285,18 @@ function _modListHtml(key){
     var arrow=sort.col===c.key?(sort.asc?' ▲':' ▼'):'';
     h+='<th style="cursor:pointer;white-space:nowrap" onclick="_modToggleSort(\''+key+'\',\''+c.key+'\')">'+esc(c.label)+arrow+'</th>';
   });
-  if(isA()) h+='<th style="width:'+(hasSelect?'150':'80')+'px"></th>';
+  if(isA()) h+='<th style="min-width:'+(hasSelect?'150':'80')+'px;position:sticky;right:0;background:#f8fafc;z-index:1"></th>';
   h+='</tr></thead><tbody>';
 
   data.forEach(function(row,idx){
     var st=row.status||'';
     var sel=!!selMap[row._id];
-    h+='<tr'+(st==='탈락'?' style="opacity:.5"':'')+(sel?' class="_modSelRow" style="background:#eff6ff"':'')+'>';
+    h+='<tr'+(st==='탈락'?' style="opacity:.5"':'')+(sel?' class="_modSelRow" style="background:#eff6ff"':'')+' ondblclick="popModEdit(\''+key+'\',\''+esc(row._id||'')+'\');event.stopPropagation()" style="cursor:pointer'+(st==='탈락'?';opacity:.5':'')+(sel?';background:#eff6ff':'')+'">';
     if(isA()) h+='<td class="ctr"><input type="checkbox" class="_modChk" data-id="'+esc(row._id||'')+'" data-idx="'+idx+'"'+(sel?' checked':'')+' onclick="_modSelToggle(event,\''+key+'\',\''+esc(row._id||'')+'\','+idx+')"></td>';
     h+='<td class="ctr" style="color:#94a3b8">'+(idx+1)+'</td>';
     cols.forEach(function(c){ var raw=esc(String(row[c.key]==null?'':row[c.key])); h+='<td style="white-space:nowrap;max-width:260px;overflow:hidden;text-overflow:ellipsis" title="'+raw+'">'+_modFmtCell(c,row[c.key])+'</td>'; });
     if(isA()){
-      h+='<td class="ctr" style="white-space:nowrap">';
+      h+='<td class="ctr" style="white-space:nowrap;position:sticky;right:0;background:#fff;z-index:1;box-shadow:-4px 0 8px rgba(0,0,0,.04)">';
       if(hasSelect){
         // status 배지에 정의된 상태값(대기 제외)을 각각 버튼으로 (모듈마다 다른 라벨 지원: 선정/탈락 또는 승인/거부 등)
         Object.keys(statusCol.badgeMap||{}).forEach(function(sk){
@@ -461,17 +461,18 @@ function _modToggleSort(key,col){
 function popModAdd(key){
   var def=_modDefs[key]; if(!def) return;
   var h='<div class="pop-head"><h3>➕ '+esc(def.label)+' 추가</h3></div>';
-  h+='<div style="padding:14px">';
+  h+='<div style="padding:14px;max-height:65vh;overflow-y:auto">';
   (def.columns||[]).forEach(function(c){
     if(c.auto) return;
     h+='<div class="fr"><label>'+esc(c.label)+(c.required?' <span style="color:#ef4444">*</span>':'')+'</label>';
     h+=_modFormField(c,'');
     h+='</div>';
   });
-  h+='<div style="text-align:right;margin-top:14px">';
+  h+='</div>';
+  h+='<div style="padding:10px 14px;border-top:1px solid #e2e8f0;text-align:right;background:#f8fafc;border-radius:0 0 12px 12px">';
   h+='<button class="btn" style="background:#64748b;color:#fff" onclick="closePopup()">취소</button> ';
   h+='<button class="btn btn-b" onclick="modSave(\''+key+'\')">저장</button>';
-  h+='</div></div>';
+  h+='</div>';
   openPopup(h,460);
 }
 
@@ -481,7 +482,7 @@ function popModEdit(key,id){
   if(!row) return toast("데이터를 찾을 수 없습니다",true);
 
   var h='<div class="pop-head"><h3>✏️ '+esc(def.label)+' 수정</h3></div>';
-  h+='<div style="padding:14px">';
+  h+='<div style="padding:14px;max-height:65vh;overflow-y:auto">';
   h+='<input type="hidden" id="mod_edit_id" value="'+esc(id)+'">';
   (def.columns||[]).forEach(function(c){
     if(c.auto) return;
@@ -489,10 +490,11 @@ function popModEdit(key,id){
     h+=_modFormField(c,row[c.key]||'');
     h+='</div>';
   });
-  h+='<div style="text-align:right;margin-top:14px">';
+  h+='</div>';
+  h+='<div style="padding:10px 14px;border-top:1px solid #e2e8f0;text-align:right;background:#f8fafc;border-radius:0 0 12px 12px">';
   h+='<button class="btn" style="background:#64748b;color:#fff" onclick="closePopup()">취소</button> ';
   h+='<button class="btn btn-b" onclick="modSave(\''+key+'\',\''+esc(id)+'\')">저장</button>';
-  h+='</div></div>';
+  h+='</div>';
   openPopup(h,460);
 }
 
