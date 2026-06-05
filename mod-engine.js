@@ -281,10 +281,12 @@ function _modListHtml(key){
     h+='<th style="width:32px"><input type="checkbox" id="_modSelAll_'+key+'"'+(allOn?' checked':'')+' onclick="_modSelAll(\''+key+'\',this.checked)" title="전체 선택/해제"></th>';
   }
   h+='<th style="width:36px">#</th>';
+  if(isA()) h+='<th style="white-space:nowrap;font-size:11px;color:#64748b">접수일</th>';
   cols.forEach(function(c){
     var arrow=sort.col===c.key?(sort.asc?' ▲':' ▼'):'';
     h+='<th style="cursor:pointer;white-space:nowrap" onclick="_modToggleSort(\''+key+'\',\''+c.key+'\')">'+esc(c.label)+arrow+'</th>';
   });
+  if(hasSelect && isA()) h+='<th style="white-space:nowrap;font-size:11px;color:#64748b">상태일시</th>';
   if(isA()) h+='<th style="min-width:'+(hasSelect?'150':'80')+'px;position:sticky;right:0;background:#f8fafc;z-index:1"></th>';
   h+='</tr></thead><tbody>';
 
@@ -294,7 +296,18 @@ function _modListHtml(key){
     h+='<tr'+(st==='탈락'?' style="opacity:.5"':'')+(sel?' class="_modSelRow" style="background:#eff6ff"':'')+' ondblclick="popModEdit(\''+key+'\',\''+esc(row._id||'')+'\');event.stopPropagation()" style="cursor:pointer'+(st==='탈락'?';opacity:.5':'')+(sel?';background:#eff6ff':'')+'">';
     if(isA()) h+='<td class="ctr"><input type="checkbox" class="_modChk" data-id="'+esc(row._id||'')+'" data-idx="'+idx+'"'+(sel?' checked':'')+' onclick="_modSelToggle(event,\''+key+'\',\''+esc(row._id||'')+'\','+idx+')"></td>';
     h+='<td class="ctr" style="color:#94a3b8">'+(idx+1)+'</td>';
+    // 접수일
+    if(isA()){
+      var _ca=row._createdAt?_modFmtDateTime(row._createdAt):'';
+      h+='<td style="white-space:nowrap;font-size:11px;color:#94a3b8" title="ID: '+esc(row._id||'')+'">'+esc(_ca)+'</td>';
+    }
     cols.forEach(function(c){ var raw=esc(String(row[c.key]==null?'':row[c.key])); h+='<td style="white-space:nowrap;max-width:260px;overflow:hidden;text-overflow:ellipsis" title="'+raw+'">'+_modFmtCell(c,row[c.key])+'</td>'; });
+    // 상태일시
+    if(hasSelect && isA()){
+      var _sa=row._statusAt?_modFmtDateTime(row._statusAt):'';
+      var _sb=row._statusByName||'';
+      h+='<td style="white-space:nowrap;font-size:11px;color:#94a3b8" title="처리자: '+esc(_sb)+'">'+esc(_sa)+(_sb?' <span style="color:#64748b">'+esc(_sb)+'</span>':'')+'</td>';
+    }
     if(isA()){
       h+='<td class="ctr" style="white-space:nowrap;position:sticky;right:0;background:#fff;z-index:1;box-shadow:-4px 0 8px rgba(0,0,0,.04)">';
       if(hasSelect){
@@ -1177,6 +1190,9 @@ function _modDefAddCol(){
   _modDefRefreshCols();
 }
 function _modDefRemoveCol(i){
+  var c=_modDefEditCols[i];
+  var name=c?c.label||'이 컬럼':'이 컬럼';
+  if(!confirm('⚠ "'+name+'" 컬럼을 삭제하시겠습니까?\n\n삭제하면 이 컬럼의 기존 데이터도 더 이상 표시되지 않습니다.')) return;
   _modDefEditCols.splice(i,1);
   _modDefRefreshCols();
 }
