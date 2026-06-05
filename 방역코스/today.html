@@ -941,7 +941,7 @@ function renderAnchorRows() {
     return `
       <div class="anchor-row ${isDone ? 'done' : ''}">
         <div class="num">${i+1}</div>
-        <div style="flex:1;min-width:0;">
+        <div style="flex:1;min-width:0;cursor:pointer;" onclick="focusAnchor(${i})">
           <div class="name">${a.name}</div>
           ${a.memo ? `<div class="sub">${a.memo}</div>` : ''}
         </div>
@@ -1151,6 +1151,17 @@ function renderMapForSession() {
       strokeOpacity: 0.8, strokeStyle: 'shortdash', map
     });
   }
+}
+
+function focusAnchor(idx) {
+  if (!map || !anchorMarkers[idx]) return;
+  const marker = anchorMarkers[idx];
+  map.setLevel(3);
+  map.panTo(marker.getPosition());
+  setTimeout(() => map.panBy(0, -100), 250);
+  kakao.maps.event.trigger(marker, 'click');
+  const mapEl = document.getElementById('map');
+  if (mapEl) mapEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
 function navTo(anchorId) {
