@@ -156,19 +156,12 @@
 <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
 <script src="firebase-config.js?v=20260513s"></script>
 <script src="common.js?v=20260529e"></script>
-<script src="dano-auth.js"></script>
-
 <script>
 let map, logMarkers = [], logTrack, selectedLogIdx = null;
 
 window.onAuthSuccess = () => onDataReady(loadKakaoMap);
 window.onDataChanged = () => { if (map) { render(); renderCourseQuickList(); renderPubMonConfig(); renderAllAnchorsAlwaysOn(); renderComplaintsAndNoSpray(); } };
-
-// 단오시스템 로그인 게이트 → 통과하면 바로 데이터 로드 (Firebase Auth 이메일 로그인 불필요)
-danoAuthGate(function() {
-  initFirebaseSync();
-  onDataReady(loadKakaoMap);
-});
+checkAdminAuth().then(ok => { if (ok) onDataReady(loadKakaoMap); });
 
 let __kakaoLoadAttempt = 0;
 function loadKakaoMap() {
@@ -215,160 +208,21 @@ function initMonitorMap() {
   updateAllCoursesBtn();
   const cb2 = document.getElementById('cnsAlwaysOn');
   if (cb2) cb2.checked = localStorage.getItem('hideComplaintNoSpray') !== '1';
-  // 사용자가 지도 직접 만지면 따라가기 자동 해제
-  kakao.maps.event.addListener(map, 'dragstart', () => stopFollow('manual-drag'));
-  kakao.maps.event.addListener(map, 'zoom_start', () => stopFollow('manual-zoom'));
-
-  // ── 배치도 시설물 로드 ──
-  loadLayoutFacilities();
-  kakao.maps.event.addListener(map, 'zoom_changed', updateFacilityLabelsVisibility);
-}
-
-// ══ 배치도 시설물 on 모니터링 ══
-var _facPolys = [], _facLabels = [], _facInfoWin = null;
-var _facCategories = [], _facItems = [];
-var M_LAT = 111320;
-function _mLng(lat) { return 111320 * Math.cos(lat * Math.PI / 180); }
-
-function loadLayoutFacilities() {
-  fbDb.ref('/layout').once('value').then(function(snap) {
-    var d = snap.val();
-    if (!d) return;
-    _facCategories = d.categories || [];
-    _facItems = d.items || [];
-    renderFacilities();
-  });
-  // 실시간 변경 감지
-  fbDb.ref('/layout/items').on('value', function(snap) {
-    _facItems = snap.val() || [];
-    renderFacilities();
-  });
-  fbDb.ref('/layout/categories').on('value', function(snap) {
-    _facCategories = snap.val() || [];
-    renderFacilities();
-  });
-}
-
-function renderFacilities() {
-  // 기존 제거
-  _facPolys.forEach(function(p) { p.setMap(null); });
-  _facLabels.forEach(function(l) { l.setMap(null); });
-  _facPolys = []; _facLabels = [];
-
-  _facItems.forEach(function(it) {
-    var cat = _facCategories.find(function(c) { return c.id === it.catId; });
-    if (!cat) return;
-    var color = cat.color || '#6b7280';
-    var poly;
-
-    if (it.shape === 'line') {
-      if (!it.path || it.path.length < 2) return;
-      var lpts = it.path.map(function(p) { return new kakao.maps.LatLng(p.lat, p.lng); });
-      poly = new kakao.maps.Polyline({
-        path: lpts, strokeWeight: cat.strokeWeight || 4, strokeColor: color, strokeOpacity: 0.9, strokeStyle: 'solid'
-      });
-      poly.setMap(map);
-      _facPolys.push(poly);
-      // 방향 화살표
-      if (cat.direction === 'oneway' && lpts.length >= 2) _addFacArrow(lpts[lpts.length-2], lpts[lpts.length-1], color);
-      else if (cat.direction === 'twoway' && lpts.length >= 2) { _addFacArrow(lpts[lpts.length-2], lpts[lpts.length-1], color); _addFacArrow(lpts[1], lpts[0], color); }
-    } else if (it.shape === 'polygon') {
-      if (!it.path || it.path.length < 3) return;
-      var pgpts = it.path.map(function(p) { return new kakao.maps.LatLng(p.lat, p.lng); });
-      poly = new kakao.maps.Polygon({
-        path: pgpts, strokeWeight: 2, strokeColor: color, strokeOpacity: 0.9,
-        fillColor: color, fillOpacity: 0.35
-      });
-      poly.setMap(map);
-      _facPolys.push(poly);
-    } else {
-      var pts;
-      if (it.shape === 'circle') pts = _circPts(it.lat, it.lng, (it.diameter || 5) / 2);
-      else pts = _rectPts(it.lat, it.lng, it.w, it.h);
-      poly = new kakao.maps.Polygon({
-        path: pts, strokeWeight: 2, strokeColor: color, strokeOpacity: 0.9,
-        fillColor: color, fillOpacity: 0.35
-      });
-      poly.setMap(map);
-      _facPolys.push(poly);
+  // 사용자가 지도 직접 만지면 따라가기 일시 중지 (5초 후 자동 복귀)
+  kakao.maps.event.addListener(map, 'dragstart', () => {
+    if (__followKey) {
+      __followPaused = true;
+      clearTimeout(__followResumeTimer);
+      __followResumeTimer = setTimeout(() => { __followPaused = false; }, 5000);
     }
-
-    // 라벨
-    var txt = it.num + (it.name ? ' ' + it.name : '');
-    var label = new kakao.maps.CustomOverlay({
-      position: new kakao.maps.LatLng(it.lat, it.lng),
-      content: '<div style="padding:1px 5px;border-radius:3px;font-size:10px;font-weight:700;white-space:nowrap;pointer-events:none;color:#fff;background:' + color + 'cc;text-shadow:0 1px 2px rgba(0,0,0,0.5)">' + _esc(txt) + '</div>',
-      yAnchor: 0.5
-    });
-    label.setMap(map);
-    _facLabels.push(label);
-
-    // 클릭 → 정보 팝업
-    kakao.maps.event.addListener(poly, 'click', function(e) {
-      showFacilityInfo(it, cat, e.latLng);
-    });
   });
-
-  updateFacilityLabelsVisibility();
-}
-
-function showFacilityInfo(it, cat, latLng) {
-  if (_facInfoWin) _facInfoWin.setMap(null);
-  var size = it.shape === 'circle' ? '⌀' + (it.diameter || 5) + 'm' : it.shape === 'line' ? '선' + (cat.direction === 'oneway' ? ' 일방→' : cat.direction === 'twoway' ? ' 양방↔' : '') : it.shape === 'polygon' ? '다각형' : (it.w || 3) + '×' + (it.h || 6) + 'm';
-  var html = '<div style="background:#1e293b;color:#e2e8f0;padding:14px;border-radius:10px;min-width:200px;box-shadow:0 4px 20px rgba(0,0,0,0.5);font-size:12px;line-height:1.6;position:relative">';
-  html += '<div style="position:absolute;top:6px;right:8px;cursor:pointer;color:#94a3b8;font-size:14px" onclick="this.parentElement.parentElement.remove()">✕</div>';
-  html += '<div style="font-size:14px;font-weight:700;margin-bottom:6px;color:' + (cat.color || '#fff') + '">' + _esc(it.num || '') + ' ' + _esc(it.name || cat.name) + '</div>';
-  html += '<div style="color:#94a3b8;font-size:10px;margin-bottom:8px">' + _esc(cat.name) + ' · ' + size + '</div>';
-  if (it.duty) html += '<div>👤 <b>' + _esc(it.duty) + '</b></div>';
-  if (it.phone) html += '<div>📞 <a href="tel:' + it.phone + '" style="color:#60a5fa;text-decoration:none">' + _esc(it.phone) + '</a></div>';
-  if (it.memo) html += '<div style="margin-top:4px;color:#94a3b8;font-size:11px">📝 ' + _esc(it.memo) + '</div>';
-  html += '</div>';
-
-  _facInfoWin = new kakao.maps.CustomOverlay({
-    position: latLng || new kakao.maps.LatLng(it.lat, it.lng),
-    content: html,
-    yAnchor: 1.2
+  kakao.maps.event.addListener(map, 'zoom_start', () => {
+    if (__followKey) {
+      __followPaused = true;
+      clearTimeout(__followResumeTimer);
+      __followResumeTimer = setTimeout(() => { __followPaused = false; }, 5000);
+    }
   });
-  _facInfoWin.setMap(map);
-}
-
-function updateFacilityLabelsVisibility() {
-  if (!map) return;
-  var level = map.getLevel();
-  var show = level <= 4;
-  _facLabels.forEach(function(l) { l.setMap(show ? map : null); });
-}
-
-function _rectPts(lat, lng, w, h) {
-  var dLat = (h || 6) / M_LAT, dLng = (w || 3) / _mLng(lat);
-  var hw = dLng / 2, hh = dLat / 2;
-  return [
-    new kakao.maps.LatLng(lat + hh, lng - hw), new kakao.maps.LatLng(lat + hh, lng + hw),
-    new kakao.maps.LatLng(lat - hh, lng + hw), new kakao.maps.LatLng(lat - hh, lng - hw)
-  ];
-}
-function _circPts(lat, lng, r, n) {
-  n = n || 36; var pts = [];
-  for (var i = 0; i < n; i++) {
-    var a = 2 * Math.PI * i / n;
-    pts.push(new kakao.maps.LatLng(lat + r * Math.cos(a) / M_LAT, lng + r * Math.sin(a) / _mLng(lat)));
-  }
-  return pts;
-}
-function _esc(s) { return String(s || '').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
-
-function _addFacArrow(from, to, color) {
-  var dLat = to.getLat() - from.getLat(), dLng = to.getLng() - from.getLng();
-  var deg = Math.atan2(dLng, dLat) * 180 / Math.PI - 90;
-  var midLat = from.getLat() * 0.2 + to.getLat() * 0.8;
-  var midLng = from.getLng() * 0.2 + to.getLng() * 0.8;
-  var arrow = new kakao.maps.CustomOverlay({
-    position: new kakao.maps.LatLng(midLat, midLng),
-    content: '<div style="font-size:18px;font-weight:900;color:' + color + ';transform:rotate(' + deg + 'deg);text-shadow:0 1px 4px rgba(0,0,0,0.6);pointer-events:none">▶</div>',
-    yAnchor: 0.5, xAnchor: 0.5
-  });
-  arrow.setMap(map);
-  _facLabels.push(arrow);
 }
 
 // 라이브 세션에서 courseId로 운영중인 호차 찾기
@@ -951,10 +805,14 @@ function showCourseOnMap(courseId) {
 
 // ─── 따라가기 모드 (특정 차량을 자동 추적) ───
 let __followKey = null;
+let __followPaused = false;
+let __followResumeTimer = null;
 function stopFollow(reason) {
   if (!__followKey) return;
   __followKey = null;
-  const data = loadData();
+  __followPaused = false;
+  clearTimeout(__followResumeTimer);
+  __followResumeTimer = null;
   // 버튼 라벨 갱신
   if (window.__liveCache) renderLive(window.__liveCache);
 }
@@ -1231,7 +1089,7 @@ function renderLive(live) {
           <div onclick="focusLiveMarker('${safeKey}')" style="cursor:pointer;display:flex;align-items:center;gap:10px;flex:1;min-width:0;">
             ${leftBadge}
             <div style="flex:1;min-width:0;">
-              <div class="name" style="font-weight:600;color:#2c3e50;">${escapeHtml(it.event?.name || '?')} · ${escapeHtml(it.course?.name || '?')} · ${escapeHtml(it.driver)}</div>
+              <div class="name" style="font-weight:600;color:#2c3e50;">${(it.event && it.course) ? escapeHtml(it.event.name) + ' · ' + escapeHtml(it.course.name) + ' · ' + escapeHtml(it.driver) : escapeHtml(it.driver)}</div>
               <div class="sub" style="font-size:12px;color:#7f8c8d;">진행 ${progress} · ${elapsed}분${nextLabel}${nextEta}${remainEta}${veh ? ' · 🚐 ' + escapeHtml(veh) : ''}${it.sess.crew?.assist ? ' · 보조: ' + escapeHtml(it.sess.crew.assist) : ''}</div>
             </div>
           </div>
@@ -1243,8 +1101,8 @@ function renderLive(live) {
       `;
     }).join('');
   }
-  // 따라가기 중이면 그 차량으로 지도 자동 이동
-  if (__followKey && liveMarkers[__followKey]) {
+  // 따라가기 중이면 그 차량으로 지도 자동 이동 (일시중지 상태면 스킵)
+  if (__followKey && liveMarkers[__followKey] && !__followPaused) {
     map.setCenter(liveMarkers[__followKey].getPosition());
   }
 }
@@ -1400,6 +1258,7 @@ function renderEventFilterOptions() {
 }
 
 function render() {
+  // 권한별 UI 표시
   const role = getMyRole();
   const isAdmin = role === 'admin' || role === 'super';
   document.querySelectorAll('.admin-only').forEach(el => el.style.display = isAdmin ? '' : 'none');
@@ -1618,9 +1477,12 @@ function toggleMonitorGPS() {
         __monMarker.setPosition(p);
       }
       // Firebase에도 본부 위치 publish → 운영 중인 사람들 지도에도 표시
+      const __u = fbAuth.currentUser;
+      const __uInfo = (loadData().users || {})[__u?.uid];
+      const __myName = __uInfo?.name || __u?.email || '본부';
       publishLiveSession(__monLiveKey, {
         lat, lng, heading: pos.coords.heading,
-        crew: { driver: '📊 본부', vehicleName: '본부' },
+        crew: { driver: '📊 ' + __myName, vehicleName: '본부' },
         completedCount: 0, totalCount: 0,
         startedAt: Date.now()
       });
