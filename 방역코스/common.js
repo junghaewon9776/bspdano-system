@@ -341,8 +341,8 @@ function setDeviceName(name) { localStorage.setItem(__deviceNameKey, name); }
 
 // 새 기기 감지 바 표시
 function showDeviceNameBar() {
-  if (getDeviceName()) return;
-  if (document.getElementById('deviceNameBar')) return;
+  if (getDeviceName()) return; // 이미 등록됨
+  if (document.getElementById('deviceNameBar')) return; // 이미 떠있음
   const bar = document.createElement('div');
   bar.id = 'deviceNameBar';
   bar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#fff3cd;border-bottom:2px solid #ffc107;padding:10px 16px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:14px;box-shadow:0 2px 8px rgba(0,0,0,.15);';
@@ -668,14 +668,17 @@ function getCurrentMember() {
 }
 
 // ───────── 회원/관리자 구분 + 접근 제어 ─────────
+// 현재 로그인 사용자가 일반 회원인지 (전화번호+PIN 로그인)
 function isMemberUser() {
   const u = fbAuth.currentUser;
   if (!u || !u.email) return false;
   return /@bsp\.local$/i.test(u.email);
 }
 
+// 회원이 접근 가능한 페이지 (파일명)
 const MEMBER_ALLOWED_PAGES = ['index.html', 'today.html', 'monitor.html', 'monitor-public.html', 'stats.html', 'print.html'];
 
+// 네비게이션 접근 제어
 function applyMemberNav() {
   const u = fbAuth.currentUser;
   const isMember = isMemberUser();
@@ -684,14 +687,17 @@ function applyMemberNav() {
 
   document.querySelectorAll('nav a').forEach(a => {
     const href = (a.getAttribute('href') || '').split('?')[0];
+    // 회원: 관리/인원/계정 숨김
     if (isMember && ['admin.html', 'members.html', 'accounts.html'].includes(href)) {
       a.style.display = 'none';
     }
+    // 계정관리: super만
     if (!isMember && href === 'accounts.html' && myRole !== 'super') {
       a.style.display = 'none';
     }
   });
 
+  // 인쇄 링크 추가 (없으면)
   const nav = document.querySelector('nav');
   if (nav && !nav.querySelector('a[href="print.html"]')) {
     const logoutLink = nav.querySelector('a[onclick*="Logout"]');
@@ -705,13 +711,16 @@ function applyMemberNav() {
   showDeviceNameBar();
 }
 
+// 관리자 전용 페이지에서 회원 차단
 function blockMemberAccess() {
   const page = location.pathname.split('/').pop() || 'index.html';
+  // 회원 → 허용 페이지만
   if (isMemberUser() && !MEMBER_ALLOWED_PAGES.includes(page)) {
     alert('관리자만 접근 가능한 페이지입니다.');
     location.href = 'index.html';
     return true;
   }
+  // 계정관리 → super만
   if (page === 'accounts.html' && !isMemberUser()) {
     const data = loadData();
     const u = fbAuth.currentUser;
@@ -859,6 +868,7 @@ async function doLogin() {
         try {
           await adminSignIn(email, tryPw);
           loggedIn = true;
+          // 비번이 입력한 것과 다르면 업데이트
           if (tryPw !== password) {
             try { await fbAuth.currentUser.updatePassword(password); } catch(ue){}
           }
@@ -873,11 +883,13 @@ async function doLogin() {
     localStorage.setItem('lastAdminId', id);
     document.getElementById('loginGate').remove();
     initFirebaseSync();
+    // 회원 접근 제어
     onDataReady(() => {
       if (blockMemberAccess()) return;
       applyMemberNav();
     });
     if (window.onAuthSuccess) window.onAuthSuccess();
+    // 텔레그램: 로그인 알림 (Firebase 데이터 도착 후, 기기+IP 포함)
     onDataReady(() => {
       const u = (loadData().users || {})[fbAuth.currentUser?.uid] || {};
       getClientIP().then(ip => {
@@ -885,6 +897,7 @@ async function doLogin() {
         sendTelegram(`🔐 <b>로그인</b>\nID: ${id}\n이름: ${u.name || '-'}\n시각: ${new Date().toLocaleString('ko-KR')}\n접속: ${dev} · IP ${ip}`);
       });
     });
+    // 초기비번 123456면 변경 강제
     if (!isPhone && pw === '123456') setTimeout(promptPasswordChange, 600);
   } catch (e) {
     err.textContent = '로그인 실패: ID/비번 확인';
@@ -998,17 +1011,70 @@ function formatEtaMin(min) {
 }
 
 // ───────── 마커/화살표 ─────────
-function numberedMarkerImage(num, color, dim) {
+// 줌 레벨별 마커 스케일 (1=가까움, 14=멀리)
+function getMarkerScale(level) {
+  if (level <= 3) return 1.0;
+  if (level <= 5) return 0.8;
+  if (level <= 7) return 0.6;
+  return 0.45;
+}
+
+function numberedMarkerImage(num, color, dim, scale) {
+  const s = scale || 1.0;
+  const w = Math.round(22 * s), h = Math.round(28 * s);
   const fill = dim ? '#ccc' : color;
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="28" viewBox="0 0 22 28">
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 22 28">
     <path d="M11 0 C5 0 0 5 0 11 C0 18 11 28 11 28 C11 28 22 18 22 11 C22 5 17 0 11 0 Z" fill="${fill}" stroke="white" stroke-width="1.5"/>
     <text x="11" y="15" font-family="Arial,sans-serif" font-size="10" font-weight="bold" fill="white" text-anchor="middle">${num}</text>
   </svg>`;
   return new kakao.maps.MarkerImage(
     'data:image/svg+xml;utf8,' + encodeURIComponent(svg),
-    new kakao.maps.Size(22, 28),
-    { offset: new kakao.maps.Point(11, 28) }
+    new kakao.maps.Size(w, h),
+    { offset: new kakao.maps.Point(Math.round(w/2), h) }
   );
+}
+
+function scaledCircleMarkerImage(svgContent, scale) {
+  const s = scale || 1.0;
+  const sz = Math.round(28 * s);
+  // svgContent의 width/height를 교체
+  const scaled = svgContent.replace(/width="\d+"/, `width="${sz}"`).replace(/height="\d+"/, `height="${sz}"`);
+  return new kakao.maps.MarkerImage(
+    'data:image/svg+xml;utf8,' + encodeURIComponent(scaled),
+    new kakao.maps.Size(sz, sz),
+    { offset: new kakao.maps.Point(Math.round(sz/2), Math.round(sz/2)) }
+  );
+}
+
+// 마커에 메타 저장 후 줌 변경 시 자동 리스케일
+// marker.__markerMeta = { type:'numbered', num, color, dim }
+//                     | { type:'circle', svg }
+//                     | { type:'pin', svg, baseW, baseH }
+function setupMarkerZoomScale(map, getMarkers) {
+  let lastScale = getMarkerScale(map.getLevel());
+  kakao.maps.event.addListener(map, 'zoom_changed', () => {
+    const scale = getMarkerScale(map.getLevel());
+    if (scale === lastScale) return;
+    lastScale = scale;
+    const markers = getMarkers();
+    markers.forEach(m => {
+      if (!m || !m.__markerMeta) return;
+      const meta = m.__markerMeta;
+      if (meta.type === 'numbered') {
+        m.setImage(numberedMarkerImage(meta.num, meta.color, meta.dim, scale));
+      } else if (meta.type === 'circle') {
+        m.setImage(scaledCircleMarkerImage(meta.svg, scale));
+      } else if (meta.type === 'pin') {
+        const w = Math.round(meta.baseW * scale), h = Math.round(meta.baseH * scale);
+        const svg = meta.svg.replace(/width="\d+"/, `width="${w}"`).replace(/height="\d+"/, `height="${h}"`);
+        m.setImage(new kakao.maps.MarkerImage(
+          'data:image/svg+xml;utf8,' + encodeURIComponent(svg),
+          new kakao.maps.Size(w, h),
+          { offset: new kakao.maps.Point(Math.round(w/2), h) }
+        ));
+      }
+    });
+  });
 }
 
 function arrowMarker(map, fromPos, toPos, color) {
