@@ -1,0 +1,50 @@
+{
+  "rules": {
+    "main": {
+      "Users": {
+        ".read": true,
+        ".write": "auth != null"
+      },
+      "ModDefs": {
+        ".read": true,
+        ".write": "auth != null"
+      },
+      "Mod_foodtruck": {
+        ".read": true,
+        ".write": true
+      },
+      "Mod_evcar": {
+        ".read": true,
+        ".write": true
+      },
+      "ModLogs": {
+        ".read": "auth != null",
+        ".write": true
+      },
+      "$other": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      }
+    },
+    "evtData": {
+      "$evtId": {
+        "Config": {
+          ".read": true,
+          ".write": "auth != null"
+        },
+        "Apply": {
+          ".read": true,
+          ".write": true
+        },
+        "$node": {
+          ".read": true,
+          ".write": true
+        }
+      }
+    },
+    "$other": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    }
+  }
+}

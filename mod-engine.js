@@ -287,7 +287,7 @@ function _modListHtml(key){
     h+='<th style="cursor:pointer;white-space:nowrap" onclick="_modToggleSort(\''+key+'\',\''+c.key+'\')">'+esc(c.label)+arrow+'</th>';
   });
   if(hasSelect && isA()) h+='<th style="white-space:nowrap;font-size:11px;color:#64748b">상태일시</th>';
-  if(isA()) h+='<th style="min-width:'+(hasSelect?'150':'80')+'px;position:sticky;right:0;background:#f8fafc;z-index:1"></th>';
+  if(isA()) h+='<th style="min-width:'+(hasSelect?'180':'100')+'px;position:sticky;right:0;background:#f8fafc;z-index:1"></th>';
   h+='</tr></thead><tbody>';
 
   data.forEach(function(row,idx){
@@ -309,20 +309,24 @@ function _modListHtml(key){
       h+='<td style="white-space:nowrap;font-size:11px;color:#94a3b8" title="처리자: '+esc(_sb)+'">'+esc(_sa)+(_sb?' <span style="color:#64748b">'+esc(_sb)+'</span>':'')+'</td>';
     }
     if(isA()){
-      h+='<td class="ctr" style="white-space:nowrap;position:sticky;right:0;background:#fff;z-index:1;box-shadow:-4px 0 8px rgba(0,0,0,.04)">';
+      h+='<td class="ctr" style="white-space:nowrap;position:sticky;right:0;background:#fff;z-index:1;box-shadow:-4px 0 8px rgba(0,0,0,.04);padding:4px 6px">';
       if(hasSelect){
         // status 배지에 정의된 상태값(대기 제외)을 각각 버튼으로 (모듈마다 다른 라벨 지원: 선정/탈락 또는 승인/거부 등)
+        h+='<div style="margin-bottom:3px">';
         Object.keys(statusCol.badgeMap||{}).forEach(function(sk){
           if(sk==='대기') return;
           var on=(st===sk), bm=statusCol.badgeMap[sk]||{};
           h+='<button class="btn btn-s" onclick="modSetStatus(\''+key+'\',\''+esc(row._id||'')+'\',\''+esc(sk)+'\')" style="background:'+(on?(bm.bg||'#16a34a'):'#f1f5f9')+';color:'+(on?(bm.color||'#16a34a'):'#475569')+';font-weight:700;border:1px solid '+(bm.bg||'#cbd5e1')+'" title="'+esc(sk)+'">'+esc(bm.label||sk)+'</button> ';
         });
+        h+='</div>';
       }
+      h+='<div>';
       var _pc=pn(row._printCount);
       h+='<button class="btn btn-s" onclick="modPrintOne(\''+key+'\',\''+esc(row._id||'')+'\')" title="'+(_pc?'재출력 ('+_pc+'회 출력됨)':'라벨 출력')+'" style="'+(_pc?'background:#475569;color:#fff':'')+'">🖨'+(_pc?_pc:'')+'</button> ';
       if(typeof isSuper==='function'&&isSuper()) h+='<button class="btn btn-s" onclick="popModLog(\''+key+'\',\''+esc(row._id||'')+'\')" title="이 항목 처리 로그">📋</button> ';
       h+='<button class="btn btn-s" onclick="popModEdit(\''+key+'\',\''+esc(row._id||'')+'\')">✏️</button> ';
       h+='<button class="btn btn-s" onclick="modDel(\''+key+'\',\''+esc(row._id||'')+'\')" style="color:#dc2626">🗑</button>';
+      h+='</div>';
       h+='</td>';
     }
     h+='</tr>';
