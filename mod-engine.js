@@ -287,7 +287,7 @@ function _modListHtml(key){
     h+='<th style="cursor:pointer;white-space:nowrap" onclick="_modToggleSort(\''+key+'\',\''+c.key+'\')">'+esc(c.label)+arrow+'</th>';
   });
   if(hasSelect && isA()) h+='<th style="white-space:nowrap;font-size:11px;color:#64748b">상태일시</th>';
-  if(isA()) h+='<th style="min-width:'+(hasSelect?'160':'130')+'px;position:sticky;right:0;background:#f8fafc;z-index:1;text-align:center;font-size:11px;color:#94a3b8">관리</th>';
+  if(isA()) h+='<th style="min-width:'+(hasSelect?'120':'100')+'px;position:sticky;right:0;background:#f8fafc;z-index:1;text-align:center;font-size:10px;color:#94a3b8">관리</th>';
   h+='</tr></thead><tbody>';
 
   data.forEach(function(row,idx){
@@ -309,22 +309,22 @@ function _modListHtml(key){
       h+='<td style="white-space:nowrap;font-size:11px;color:#94a3b8" title="처리자: '+esc(_sb)+'">'+esc(_sa)+(_sb?' <span style="color:#64748b">'+esc(_sb)+'</span>':'')+'</td>';
     }
     if(isA()){
-      h+='<td style="position:sticky;right:0;background:#fff;z-index:1;box-shadow:-4px 0 8px rgba(0,0,0,.04);padding:4px 6px;vertical-align:middle">';
+      h+='<td style="position:sticky;right:0;background:#fff;z-index:1;box-shadow:-4px 0 8px rgba(0,0,0,.04);padding:2px 4px;vertical-align:middle">';
       if(hasSelect){
-        h+='<div style="display:flex;gap:3px;margin-bottom:4px;flex-wrap:nowrap">';
+        h+='<div style="display:flex;gap:2px;margin-bottom:2px">';
         Object.keys(statusCol.badgeMap||{}).forEach(function(sk){
           if(sk==='대기') return;
           var on=(st===sk), bm=statusCol.badgeMap[sk]||{};
-          h+='<button onclick="modSetStatus(\''+key+'\',\''+esc(row._id||'')+'\',\''+esc(sk)+'\')" style="padding:2px 10px;border-radius:20px;font-size:12px;font-weight:700;cursor:pointer;border:1.5px solid '+(bm.bg||'#cbd5e1')+';background:'+(on?(bm.bg||'#16a34a'):'#fff')+';color:'+(on?(bm.color||'#fff'):(bm.bg||'#475569'))+'" title="'+esc(sk)+'">'+esc(bm.label||sk)+'</button>';
+          h+='<button onclick="modSetStatus(\''+key+'\',\''+esc(row._id||'')+'\',\''+esc(sk)+'\')" style="padding:1px 7px;border-radius:10px;font-size:11px;font-weight:700;cursor:pointer;border:1px solid '+(bm.bg||'#cbd5e1')+';background:'+(on?(bm.bg||'#16a34a'):'#fff')+';color:'+(on?(bm.color||'#fff'):(bm.bg||'#475569'))+';line-height:1.4" title="'+esc(sk)+'">'+esc(bm.label||sk)+'</button>';
         });
         h+='</div>';
       }
-      h+='<div style="display:flex;gap:2px;flex-wrap:nowrap">';
+      h+='<div style="display:flex;gap:1px">';
       var _pc=pn(row._printCount);
-      h+='<button onclick="modPrintOne(\''+key+'\',\''+esc(row._id||'')+'\')" title="'+(_pc?'재출력 ('+_pc+'회)':'라벨 출력')+'" style="width:30px;height:26px;border-radius:6px;border:1px solid #e2e8f0;cursor:pointer;font-size:13px;background:'+(_pc?'#475569':'#f8fafc')+';color:'+(_pc?'#fff':'#334155')+'">🖨</button>';
-      if(typeof isSuper==='function'&&isSuper()) h+='<button onclick="popModLog(\''+key+'\',\''+esc(row._id||'')+'\')" title="처리 로그" style="width:30px;height:26px;border-radius:6px;border:1px solid #e2e8f0;cursor:pointer;font-size:13px;background:#f8fafc;color:#334155">📋</button>';
-      h+='<button onclick="popModEdit(\''+key+'\',\''+esc(row._id||'')+'\')" title="수정" style="width:30px;height:26px;border-radius:6px;border:1px solid #e2e8f0;cursor:pointer;font-size:13px;background:#f8fafc;color:#334155">✏️</button>';
-      h+='<button onclick="modDel(\''+key+'\',\''+esc(row._id||'')+'\')" title="삭제" style="width:30px;height:26px;border-radius:6px;border:1px solid #fecaca;cursor:pointer;font-size:13px;background:#fef2f2;color:#dc2626">🗑</button>';
+      h+='<button onclick="modPrintOne(\''+key+'\',\''+esc(row._id||'')+'\')" title="'+(_pc?'재출력('+_pc+')':'출력')+'" style="width:24px;height:22px;border-radius:4px;border:1px solid #e2e8f0;cursor:pointer;font-size:11px;background:'+(_pc?'#475569':'#f8fafc')+';color:'+(_pc?'#fff':'#334155')+';padding:0;line-height:1">🖨</button>';
+      if(typeof isSuper==='function'&&isSuper()) h+='<button onclick="popModLog(\''+key+'\',\''+esc(row._id||'')+'\')" title="로그" style="width:24px;height:22px;border-radius:4px;border:1px solid #e2e8f0;cursor:pointer;font-size:11px;background:#f8fafc;color:#334155;padding:0;line-height:1">📋</button>';
+      h+='<button onclick="popModEdit(\''+key+'\',\''+esc(row._id||'')+'\')" title="수정" style="width:24px;height:22px;border-radius:4px;border:1px solid #e2e8f0;cursor:pointer;font-size:11px;background:#f8fafc;color:#334155;padding:0;line-height:1">✏️</button>';
+      h+='<button onclick="modDel(\''+key+'\',\''+esc(row._id||'')+'\')" title="삭제" style="width:24px;height:22px;border-radius:4px;border:1px solid #fecaca;cursor:pointer;font-size:11px;background:#fef2f2;color:#dc2626;padding:0;line-height:1">🗑</button>';
       h+='</div>';
       h+='</td>';
     }
