@@ -315,9 +315,9 @@ function _modListHtml(key){
         Object.keys(statusCol.badgeMap||{}).forEach(function(sk){
           if(sk==='대기') return;
           var on=(st===sk), bm=statusCol.badgeMap[sk]||{};
-          // 항상 진한 배경+흰 글자 — 선택시 눌린 모양(inset shadow + 어둡게)
+          // 미선택=연하게(opacity .5) 선택=찐하게
           var bg=bm.bg||'#16a34a';
-          h+='<button onclick="modSetStatus(\''+key+'\',\''+esc(row._id||'')+'\',\''+esc(sk)+'\')" style="padding:1px 7px;border-radius:10px;font-size:11px;font-weight:700;cursor:pointer;background:'+bg+';color:#fff;line-height:1.4;border:2px solid '+bg+';'+(on?'box-shadow:inset 0 2px 4px rgba(0,0,0,.4);filter:brightness(0.75);':'')+'" title="'+esc(sk)+'">'+esc(bm.label||sk)+'</button>';
+          h+='<button onclick="modSetStatus(\''+key+'\',\''+esc(row._id||'')+'\',\''+esc(sk)+'\')" style="padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;cursor:pointer;background:'+bg+';color:'+(bm.color||'#fff')+';line-height:1.4;border:none;opacity:'+(on?'1':'0.45')+'" title="'+esc(sk)+'">'+esc(bm.label||sk)+'</button>';
         });
         h+='</div>';
       }
