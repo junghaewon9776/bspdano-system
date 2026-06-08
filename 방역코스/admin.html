@@ -88,6 +88,7 @@
         <div style="display:flex;gap:6px;margin-bottom:8px;">
           <input id="searchInput" type="text" placeholder="주소 또는 장소 검색 (예: 영광읍사무소, 영광로 123)" onkeydown="if(event.key==='Enter')searchPlace()">
           <button onclick="searchPlace()" style="white-space:nowrap;">🔍 검색</button>
+          <button onclick="fitAllAnchors()" style="white-space:nowrap;background:#2c3e50;color:#fff;">🗺 전체보기</button>
         </div>
         <div id="searchResults" style="display:none;max-height:160px;overflow-y:auto;border:1px solid #ddd;border-radius:5px;margin-bottom:8px;background:#fff;"></div>
         <div style="position:relative;">
@@ -397,15 +398,13 @@ function setMode(mode) {
   const banner = document.getElementById('mapModeBanner');
   if (banner) {
     const modeLabel = mode === 'complaint' ? '민원' : mode === 'noSpray' ? '방역불가' : '';
+    const colorMap = { complaint: 'background:#fcf3cf;color:#7d6608;border:2px solid #f1c40f;', noSpray: 'background:#fadbd8;color:#922b21;border:2px solid #e74c3c;' };
+    const borderMap = { complaint: '#f1c40f', noSpray: '#e74c3c' };
     if (modeLabel) {
       banner.innerHTML = `🔍 위 검색창에 <b>주소 입력</b> 또는 <b>지도 클릭</b>으로 ${modeLabel} 위치를 선택하세요`;
-      const colors = mode === 'complaint'
-        ? 'background:#fcf3cf;color:#7d6608;border:2px solid #f1c40f;'
-        : 'background:#fadbd8;color:#922b21;border:2px solid #e74c3c;';
-      banner.style.cssText = 'display:block;position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:10;padding:10px 20px;border-radius:8px;font-weight:bold;font-size:14px;box-shadow:0 2px 8px rgba(0,0,0,0.3);pointer-events:none;text-align:center;' + colors;
-      // 검색창 포커스 + 강조
+      banner.style.cssText = 'display:block;position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:10;padding:10px 20px;border-radius:8px;font-weight:bold;font-size:14px;box-shadow:0 2px 8px rgba(0,0,0,0.3);pointer-events:none;text-align:center;' + colorMap[mode];
       const si = document.getElementById('searchInput');
-      if (si) { si.focus(); si.placeholder = `${modeLabel} 위치 주소 검색 (예: 영광읍사무소)`; si.style.border = '2px solid ' + (mode === 'complaint' ? '#f1c40f' : '#e74c3c'); }
+      if (si) { si.focus(); si.placeholder = `${modeLabel} 위치 주소 검색 (예: 영광읍사무소)`; si.style.border = '2px solid ' + borderMap[mode]; }
     } else {
       banner.style.display = 'none';
       const si = document.getElementById('searchInput');
@@ -441,8 +440,10 @@ function openFormModal(title, fields, onSave) {
   </div>`;
   document.body.appendChild(ov);
   ov.addEventListener('click', e => { if (e.target === ov) ov.remove(); });
+  // 첫 필드 포커스
   const first = ov.querySelector('.fm-body input, .fm-body textarea');
   if (first) setTimeout(() => first.focus(), 50);
+  // 저장
   ov.querySelector('#fmSaveBtn').onclick = () => {
     const result = {};
     fields.forEach(f => {
@@ -452,6 +453,7 @@ function openFormModal(title, fields, onSave) {
     ov.remove();
     onSave(result);
   };
+  // Enter 키로 저장 (textarea 제외)
   ov.querySelectorAll('.fm-body input').forEach(inp => {
     inp.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); ov.querySelector('#fmSaveBtn').click(); } });
   });
@@ -620,54 +622,30 @@ function resetToDefaults() {
   location.reload();
 }
 
-// ────── 거점 CSV 다운로드 (거점 + 민원 + 방역금지 통합) ──────
+// ────── 거점 CSV 다운로드 ──────
 function exportAnchorsCSV() {
   const data = loadData();
-  const hasAnchors = (data.anchors || []).length > 0;
-  const hasComplaints = (data.complaints || []).length > 0;
-  const hasNoSpray = (data.noSprayZones || []).length > 0;
-  if (!hasAnchors && !hasComplaints && !hasNoSpray) { alert('데이터가 없습니다'); return; }
+  if (!data.anchors.length) { alert('거점이 없습니다'); return; }
 
-  const lines = ['﻿유형,행사,코스,거점명,주소,위도,경도,메모,순서,상태'];
-  let total = 0;
-
-  // 거점
+  const lines = ['﻿행사,코스,거점명,주소,위도,경도,메모,순서'];
   for (const event of (data.events || [])) {
     for (const course of (event.courses || [])) {
       const anchors = getCourseAnchors(data, course.id);
       for (const a of anchors) {
-        lines.push([
-          '거점', csvEscape(event.name), csvEscape(course.name),
-          csvEscape(a.name), '', a.lat, a.lng,
-          csvEscape(a.memo || ''), a.order, ''
-        ].join(','));
-        total++;
+        const row = [
+          csvEscape(event.name),
+          csvEscape(course.name),
+          csvEscape(a.name),
+          '', // 주소 비워둠 (좌표 우선)
+          a.lat,
+          a.lng,
+          csvEscape(a.memo || ''),
+          a.order
+        ].join(',');
+        lines.push(row);
       }
     }
   }
-
-  // 민원
-  for (const c of (data.complaints || [])) {
-    const ev = (data.events || []).find(e => e.id === c.eventId);
-    lines.push([
-      '민원', csvEscape(ev?.name || ''), '',
-      csvEscape(c.phone || ''), '', c.lat, c.lng,
-      csvEscape(c.content || ''), '',
-      c.status === 'resolved' ? '처리완료' : '대기'
-    ].join(','));
-    total++;
-  }
-
-  // 방역금지구역
-  for (const z of (data.noSprayZones || [])) {
-    lines.push([
-      '방역금지', '', '',
-      csvEscape(z.name || ''), '', z.lat, z.lng,
-      csvEscape(z.reason || ''), '', ''
-    ].join(','));
-    total++;
-  }
-
   const blob = new Blob([lines.join('\n')], {type:'text/csv;charset=utf-8'});
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -675,7 +653,7 @@ function exportAnchorsCSV() {
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
-  setTimeout(() => alert(`다운로드 완료 (총 ${total}건: 거점 ${(data.anchors||[]).length} · 민원 ${(data.complaints||[]).length} · 방역금지 ${(data.noSprayZones||[]).length})`), 200);
+  setTimeout(() => alert(`다운로드 완료 (${data.anchors.length}개 거점)`), 200);
 }
 
 function csvEscape(s) {
@@ -905,6 +883,22 @@ function pickSearchResult(r) {
   });
 }
 
+function fitAllAnchors() {
+  if (!map) return;
+  const data = loadData();
+  const anchors = data.anchors || [];
+  if (!anchors.length) { alert('거점이 없습니다'); return; }
+  const bounds = new kakao.maps.LatLngBounds();
+  anchors.forEach(a => {
+    if (typeof a.lat === 'number') bounds.extend(new kakao.maps.LatLng(a.lat, a.lng));
+  });
+  // 민원도 포함
+  (data.complaints || []).forEach(c => {
+    if (typeof c.lat === 'number') bounds.extend(new kakao.maps.LatLng(c.lat, c.lng));
+  });
+  map.setBounds(bounds, 50);
+}
+
 function refreshAll() {
   // super 전용 카드 표시
   const myRole = getMyRole();
@@ -1048,7 +1042,7 @@ function showDriveGasHelp() {
     + "  var folder = getPhotoFolder(p.appName);\n"
     + "  var subName = (p.type === 'receipt') ? '영수증' : '현장사진';\n"
     + "  var subFolder = getOrCreateFolder(folder, subName);\n\n"
-    + "  var m = (p.dataUrl||'').match(/^data:(image\\/[^;]+);base64,(.+)$/);\n"
+    + "  var m = (p.dataUrl||'').match(/^data:(image\\\\/[^;]+);base64,(.+)$/);\n"
     + "  if (!m) return _ok({error:'이미지 데이터 없음'});\n\n"
     + "  var fileName = (p.type||'photo') + '_' + new Date(p.takenAt||Date.now()).toISOString().replace(/[:.]/g,'-') + '.jpg';\n"
     + "  var blob = Utilities.newBlob(Utilities.base64Decode(m[2]), m[1], fileName);\n"
@@ -1722,23 +1716,24 @@ function renderComplaints() {
   }).join('');
 }
 
-function scrollToMap() {
-  const el = document.getElementById('map');
-  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-}
-
 function focusAnchorOnMap(id) {
   const data = loadData();
   const a = (data.anchors || []).find(x => x.id === id);
   if (!a || !map) return;
   map.setCenter(new kakao.maps.LatLng(a.lat, a.lng));
   map.setLevel(3);
+  // 해당 마커의 InfoWindow 열기
   const marker = kakaoMarkers.find(m => {
     const p = m.getPosition();
     return Math.abs(p.getLat() - a.lat) < 0.0001 && Math.abs(p.getLng() - a.lng) < 0.0001;
   });
   if (marker) kakao.maps.event.trigger(marker, 'click');
   scrollToMap();
+}
+
+function scrollToMap() {
+  const el = document.getElementById('map');
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
 function centerOnComplaint(id) {
@@ -1875,118 +1870,6 @@ document.addEventListener('DOMContentLoaded', () => {
     alert(`민원 ${added}건 추가됨${skipped ? ' (' + skipped + '건 건너뜀: 행사명 매칭 안됨/좌표 누락)' : ''}`);
   });
 });
-
-// ────── 행사별 조/차량 선택 ──────
-// _cache(전체 DB)에 이미 포함되므로 별도 리스너 불필요
-function _getEvtCfg(eventId) {
-  const all = (_cache || {}).eventConfig || {};
-  const c = all[eventId] || {};
-  return { teams: Array.isArray(c.teams) ? c.teams : [], vehicles: Array.isArray(c.vehicles) ? c.vehicles : [] };
-}
-function _saveEvtCfg(eventId, cfg) {
-  fbDb.ref('/eventConfig/' + eventId).set(cfg);
-}
-
-function toggleEvtTeam(eventId, teamId) {
-  const cfg = _getEvtCfg(eventId);
-  const idx = cfg.teams.indexOf(teamId);
-  if (idx >= 0) cfg.teams.splice(idx, 1); else cfg.teams.push(teamId);
-  _saveEvtCfg(eventId, cfg);
-}
-function toggleEvtVehicle(eventId, vehId) {
-  const cfg = _getEvtCfg(eventId);
-  const idx = cfg.vehicles.indexOf(vehId);
-  if (idx >= 0) cfg.vehicles.splice(idx, 1); else cfg.vehicles.push(vehId);
-  _saveEvtCfg(eventId, cfg);
-}
-function toggleVehActive(vehId) {
-  const data = loadData();
-  const v = (data.vehicles || []).find(x => x.id === vehId);
-  if (!v) return;
-  v.active = v.active === false ? true : false;
-  saveData(data); refreshAll();
-}
-
-function renderEvtAssign() {
-  const el = document.getElementById('evtAssignArea');
-  if (!el) return;
-  const data = loadData();
-  const eventId = document.getElementById('evtAssignSel')?.value;
-  const event = (data.events || []).find(e => e.id === eventId);
-  if (!event) { el.innerHTML = '<div class="empty">행사를 선택하세요</div>'; return; }
-  const cfg = _getEvtCfg(eventId);
-  const teams = data.teams || [];
-  const vehs = data.vehicles || [];
-
-  let h = '<div style="margin-bottom:12px;">';
-  h += '<div style="font-weight:700;margin-bottom:6px;">🏷 조 선택 <span style="font-weight:400;color:#888;font-size:12px;">(' + cfg.teams.length + '/' + teams.length + ')</span></div>';
-  if (!teams.length) {
-    h += '<div class="empty" style="font-size:12px;">조가 없습니다. 아래에서 추가하세요</div>';
-  } else {
-    const mems = data.members || [];
-    h += teams.map(t => {
-      const on = cfg.teams.indexOf(t.id) >= 0;
-      const ids = t.memberIds || [];
-      const leadMem = mems.find(m => m.id === t.leaderId);
-      const memNames = ids.map(mid => { const m = mems.find(x => x.id === mid); return m ? m.name : ''; }).filter(Boolean);
-      const leaderName = leadMem ? leadMem.name : (t.leader || '');
-      return `<div style="padding:6px 8px;margin:3px 0;border:1.5px solid ${on ? '#7c3aed' : '#e5e7eb'};border-radius:8px;background:${on ? '#f5f3ff' : '#fff'};">
-        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;">
-          <input type="checkbox" ${on ? 'checked' : ''} onchange="toggleEvtTeam('${eventId}','${t.id}')">
-          <span style="font-weight:600;">${t.name}</span>
-          <span style="color:#888;font-size:11px;">${t.vehicle ? '🚗' + t.vehicle : ''} ${leaderName ? '👑' + leaderName : ''} ${ids.length}명</span>
-        </label>
-        ${ids.length ? '<div style="margin:4px 0 0 28px;font-size:11px;color:#666;">' + memNames.join(', ') + '</div>' : ''}
-      </div>`;
-    }).join('');
-  }
-  h += '</div>';
-
-  h += '<div>';
-  h += '<div style="font-weight:700;margin-bottom:6px;">🚗 차량 선택 <span style="font-weight:400;color:#888;font-size:12px;">(' + cfg.vehicles.length + '/' + vehs.length + ')</span></div>';
-  if (!vehs.length) {
-    h += '<div class="empty" style="font-size:12px;">차량이 없습니다. 아래에서 추가하세요</div>';
-  } else {
-    h += vehs.map(v => {
-      const on = cfg.vehicles.indexOf(v.id) >= 0;
-      return `<label style="display:flex;align-items:center;gap:8px;padding:6px 8px;margin:3px 0;border:1.5px solid ${on ? '#0ea5e9' : '#e5e7eb'};border-radius:8px;background:${on ? '#f0f9ff' : '#fff'};cursor:pointer;font-size:13px;">
-        <input type="checkbox" ${on ? 'checked' : ''} onchange="toggleEvtVehicle('${eventId}','${v.id}')">
-        <span style="font-weight:600;">${v.plate || v.name || v.id}</span>
-        <span style="color:#888;font-size:11px;">${v.driver || ''}</span>
-      </label>`;
-    }).join('');
-  }
-  h += '</div>';
-
-  // 차량 추가 간편 UI
-  h += `<div style="margin-top:10px;padding-top:10px;border-top:1px solid #eee;">
-    <div style="display:flex;gap:4px;">
-      <input id="_quickVehName" type="text" placeholder="차량 이름/번호" style="flex:1;padding:5px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px;">
-      <input id="_quickVehDriver" type="text" placeholder="운전자" style="flex:1;padding:5px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px;">
-      <button class="small" onclick="quickAddVehicle('${eventId}')">+ 차량</button>
-    </div>
-  </div>`;
-
-  el.innerHTML = h;
-}
-
-function quickAddVehicle(eventId) {
-  const name = document.getElementById('_quickVehName')?.value.trim();
-  const driver = document.getElementById('_quickVehDriver')?.value.trim();
-  if (!name) { alert('차량 이름을 입력하세요'); return; }
-  const data = loadData();
-  if (!data.vehicles) data.vehicles = [];
-  const newId = 'v_' + Date.now();
-  data.vehicles.push({ id: newId, name, plate: name, driver: driver || '', color: '#3498db', active: true });
-  saveData(data);
-  // 자동으로 현재 행사에 선택
-  const cfg = _getEvtCfg(eventId);
-  cfg.vehicles.push(newId);
-  _saveEvtCfg(eventId, cfg);
-  document.getElementById('_quickVehName').value = '';
-  document.getElementById('_quickVehDriver').value = '';
-  refreshAll();
-}
 
 // ────── 조 ──────
 function renderTeams() {
@@ -2318,6 +2201,110 @@ function renderMap() {
     map.setBounds(bounds);
     __adminMapFitDone = true;
   }
+}
+
+// ────── 행사별 조/차량 선택 ──────
+// _cache(전체 DB)에 이미 포함되므로 별도 리스너 불필요
+function _getEvtCfg(eventId) {
+  const all = (_cache || {}).eventConfig || {};
+  const c = all[eventId] || {};
+  return { teams: Array.isArray(c.teams) ? c.teams : [], vehicles: Array.isArray(c.vehicles) ? c.vehicles : [] };
+}
+
+function _saveEvtCfg(eventId, cfg) {
+  fbDb.ref('/eventConfig/' + eventId).set(cfg);
+}
+
+function toggleEvtTeam(eventId, teamId) {
+  const cfg = _getEvtCfg(eventId);
+  const idx = cfg.teams.indexOf(teamId);
+  if (idx >= 0) cfg.teams.splice(idx, 1); else cfg.teams.push(teamId);
+  _saveEvtCfg(eventId, cfg);
+}
+function toggleEvtVehicle(eventId, vehId) {
+  const cfg = _getEvtCfg(eventId);
+  const idx = cfg.vehicles.indexOf(vehId);
+  if (idx >= 0) cfg.vehicles.splice(idx, 1); else cfg.vehicles.push(vehId);
+  _saveEvtCfg(eventId, cfg);
+}
+
+function renderEvtAssign() {
+  const el = document.getElementById('evtAssignArea');
+  if (!el) return;
+  const data = loadData();
+  const eventId = document.getElementById('evtAssignSel')?.value;
+  const event = (data.events || []).find(e => e.id === eventId);
+  if (!event) { el.innerHTML = '<div class="empty">행사를 선택하세요</div>'; return; }
+  const cfg = _getEvtCfg(eventId);
+  const teams = data.teams || [];
+  const vehs = data.vehicles || [];
+
+  let h = '<div style="margin-bottom:12px;">';
+  h += '<div style="font-weight:700;margin-bottom:6px;">🏷 조 선택 <span style="font-weight:400;color:#888;font-size:12px;">(' + cfg.teams.length + '/' + teams.length + ')</span></div>';
+  if (!teams.length) {
+    h += '<div class="empty" style="font-size:12px;">조가 없습니다. 아래에서 추가하세요</div>';
+  } else {
+    const mems = data.members || [];
+    h += teams.map(t => {
+      const on = cfg.teams.indexOf(t.id) >= 0;
+      const ids = t.memberIds || [];
+      const leadMem = mems.find(m => m.id === t.leaderId);
+      const memNames = ids.map(mid => { const m = mems.find(x => x.id === mid); return m ? m.name : ''; }).filter(Boolean);
+      const leaderName = leadMem ? leadMem.name : (t.leader || '');
+      return `<div style="padding:6px 8px;margin:3px 0;border:1.5px solid ${on ? '#7c3aed' : '#e5e7eb'};border-radius:8px;background:${on ? '#f5f3ff' : '#fff'};">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;">
+          <input type="checkbox" ${on ? 'checked' : ''} onchange="toggleEvtTeam('${eventId}','${t.id}')">
+          <span style="font-weight:600;">${t.name}</span>
+          <span style="color:#888;font-size:11px;">${t.vehicle ? '🚗' + t.vehicle : ''} ${leaderName ? '👑' + leaderName : ''} ${ids.length}명</span>
+        </label>
+        ${ids.length ? '<div style="margin:4px 0 0 28px;font-size:11px;color:#666;">' + memNames.join(', ') + '</div>' : ''}
+      </div>`;
+    }).join('');
+  }
+  h += '</div>';
+
+  h += '<div>';
+  h += '<div style="font-weight:700;margin-bottom:6px;">🚗 차량 선택 <span style="font-weight:400;color:#888;font-size:12px;">(' + cfg.vehicles.length + '/' + vehs.length + ')</span></div>';
+  if (!vehs.length) {
+    h += '<div class="empty" style="font-size:12px;">차량이 없습니다. 아래에서 추가하세요</div>';
+  } else {
+    h += vehs.map(v => {
+      const on = cfg.vehicles.indexOf(v.id) >= 0;
+      return `<label style="display:flex;align-items:center;gap:8px;padding:6px 8px;margin:3px 0;border:1.5px solid ${on ? '#0ea5e9' : '#e5e7eb'};border-radius:8px;background:${on ? '#f0f9ff' : '#fff'};cursor:pointer;font-size:13px;">
+        <input type="checkbox" ${on ? 'checked' : ''} onchange="toggleEvtVehicle('${eventId}','${v.id}')">
+        <span style="font-weight:600;">${v.plate || v.name || v.id}</span>
+        <span style="color:#888;font-size:11px;">${v.driver || ''}</span>
+      </label>`;
+    }).join('');
+  }
+  h += '</div>';
+
+  // 차량 추가 간편 UI
+  h += `<div style="margin-top:10px;padding-top:10px;border-top:1px solid #eee;">
+    <div style="display:flex;gap:4px;">
+      <input id="_quickVehName" type="text" placeholder="차량 이름/번호" style="flex:1;padding:5px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px;">
+      <input id="_quickVehDriver" type="text" placeholder="운전자" style="flex:1;padding:5px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px;">
+      <button class="small" onclick="quickAddVehicle('${eventId}')">+ 차량</button>
+    </div>
+  </div>`;
+
+  el.innerHTML = h;
+}
+
+function quickAddVehicle(eventId) {
+  const name = document.getElementById('_quickVehName')?.value.trim();
+  const driver = document.getElementById('_quickVehDriver')?.value.trim();
+  if (!name) { alert('차량 이름을 입력하세요'); return; }
+  const data = loadData();
+  if (!data.vehicles) data.vehicles = [];
+  const newId = 'v_' + Date.now();
+  data.vehicles.push({ id: newId, name, plate: name, driver: driver || '', color: '#3498db', active: true });
+  saveData(data);
+  // 자동으로 현재 행사에 선택
+  const cfg = _getEvtCfg(eventId);
+  cfg.vehicles.push(newId);
+  _saveEvtCfg(eventId, cfg);
+  refreshAll();
 }
 </script>
 </body>
