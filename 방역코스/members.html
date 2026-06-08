@@ -98,7 +98,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
 <script src="firebase-config.js?v=20260512v"></script>
-<script src="common.js?v=20260529e"></script>
+<script src="common.js?v=20260608a"></script>
 <script>
 window.onAuthSuccess = () => onDataReady(refreshAll);
 window.onDataChanged = () => refreshAll();
@@ -812,19 +812,21 @@ async function resetMemberPin(memberId) {
   const newPw = pinToPassword(DEFAULT_PIN);
   const secAuth = getSecondaryAuth();
 
-  // DB에 저장된 PIN 우선 시도
-  const cands = [newPw];
-  if (m.pin) cands.push(pinToPassword(m.pin));
-  cands.push(pinToPassword('123456'), pinToPassword('1234'));
-  const candidates = [...new Set(cands)];
+  // 여러 비번 후보로 로그인 시도 (DB에 저장된 PIN 우선)
+  const candidates = [newPw];
+  if (m.pin) candidates.push(pinToPassword(m.pin));
+  candidates.push(pinToPassword('123456'), pinToPassword('1234'));
+  const unique = [...new Set(candidates)];
+
   let done = false;
   let lastErr = '';
-  for (const tryPw of candidates) {
+  for (const tryPw of unique) {
     try {
       const cred = await secAuth.signInWithEmailAndPassword(email, tryPw);
       if (tryPw !== newPw) await cred.user.updatePassword(newPw);
       const uid = cred.user.uid;
       await secAuth.signOut();
+      // 기본 PIN 플래그 설정
       const fresh = loadData();
       if (fresh.memberPinFlags) { fresh.memberPinFlags[uid] = true; saveData(fresh); }
       done = true;
@@ -833,10 +835,13 @@ async function resetMemberPin(memberId) {
   }
 
   if (done) {
+    // DB의 pin 필드도 동기화
     m.pin = DEFAULT_PIN;
     saveData(loadData());
     alert(`✅ ${m.name}님 PIN → ${DEFAULT_PIN} 초기화 완료\n\n본인에게 안내해주세요.`);
   } else if (lastErr.includes('user-not-found') || lastErr.includes('invalid-credential')) {
+    // Firebase Auth 계정이 없거나 비번 불일치 → 매핑 제거 후 재생성
+    // 기존 매핑 제거
     const freshData = loadData();
     const auth = freshData.memberAuth || {};
     for (const [uid, mid] of Object.entries(auth)) {
@@ -857,10 +862,10 @@ async function resetMemberPin(memberId) {
         alert(`❌ 계정 생성 실패: ${e2.message}`);
       }
     } else {
-      renderMembers();
+      renderMembers(); // 매핑 제거됐으니 UI 갱신
     }
   } else {
-    alert(`❌ PIN 초기화 실패\n\n원인: ${lastErr}\n이메일: ${email}\n시도 PIN: ${candidates.map(p=>p.replace('bsp','')).join(', ')}`);
+    alert(`❌ PIN 초기화 실패\n\n원인: ${lastErr}\n이메일: ${email}\n시도 PIN: ${unique.map(p=>p.replace('bsp','')).join(', ')}`);
   }
 }
 
