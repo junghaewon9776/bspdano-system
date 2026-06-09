@@ -2505,7 +2505,7 @@ function _qzPrintLabels(def, rows, opt){
   var chain=Promise.resolve();
   rows.forEach(function(r){
     chain=chain.then(function(){
-      var html='<div style="margin:0;padding:0;width:'+w+'mm;height:'+(h-0.5)+'mm;overflow:hidden;box-sizing:border-box">'+_modLabelHtml(def,r,opt)+'</div>';
+      var html='<html><head><style>*{margin:0;padding:0;box-sizing:border-box}</style></head><body><div style="width:'+w+'mm;height:'+h+'mm;overflow:hidden">'+_modLabelHtml(def,r,opt)+'</div></body></html>';
       return qz.print(cfg,[{type:'pixel',format:'html',flavor:'plain',data:html,options:{pageWidth:w,pageHeight:h||null}}]);
     });
   });
