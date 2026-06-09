@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260609v34';
+var _MOD_ENGINE_VER='20260609v35';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -2635,13 +2635,18 @@ async function _qzPrintLabelsBitmap(def, rows, opt){
   try{
     // 비트맵 이미지를 QZ pixel 인쇄(엑셀과 동일한 Windows 드라이버 경로)로 전송
     // → 한글/QR/진한색은 이미지로 유지, 라벨 끊기는 드라이버 gap센서가 처리
-    var pcfg=qz.configs.create(pn,{colorType:'blackwhite',margins:0,units:'mm',size:{width:wmm,height:hmm},rasterize:false});
+    // RAW 비트맵 (드라이버 무관) + 라벨길이 미세조정으로 누적밀림 보정
+    var adj=0; try{ adj=parseFloat(localStorage.getItem('_mlSizeAdj')||'0')||0; }catch(e){}
+    var sizeH=hmm+adj; // 실측 피치에 맞게 SIZE 높이 보정
     for(var i=0;i<rows.length;i++){
       var canvas=await _labelToCanvas(_modLabelHtml(def,rows[i],opt),wmm,hmm,203);
-      var dataUrl=canvas.toDataURL('image/png');
-      await qz.print(pcfg,[{type:'pixel',format:'image',flavor:'base64',data:dataUrl.split(',')[1],options:{pageWidth:wmm,pageHeight:hmm}}]);
-      // 한 장 완전히 뽑고 프린터가 gap센서로 다음 라벨 머리를 찾을 시간 확보
-      await new Promise(function(ok){ setTimeout(ok, 1500); });
+      var bmp=_canvasToTSPL(canvas,160);
+      var head='SIZE '+wmm+' mm,'+sizeH+' mm\r\nGAP '+gap+' mm,0 mm\r\nDIRECTION 1\r\nREFERENCE 0,0\r\nCLS\r\nBITMAP 0,0,'+bmp.wbytes+','+bmp.h+',0,';
+      await qz.print(cfg,[
+        {type:'raw',format:'plain',data:head},
+        {type:'raw',format:'base64',data:_bytesToBase64(bmp.bytes)},
+        {type:'raw',format:'plain',data:'\r\nPRINT 1\r\n'}
+      ]);
     }
     toast('🖨 RAW비트맵 '+rows.length+'장 출력');
     return true;
@@ -2663,6 +2668,7 @@ function _qzPrintLabels(def, rows, opt){
     .catch(function(e){ toast('QZ 출력 실패: '+(e.message||e),true); return false; });
 }
 function _qzToggleBitmap(on){ try{ localStorage.setItem('_mlBitmap', on?'1':'0'); }catch(e){} _qzUpdateUI(); toast(on?'RAW 비트맵 모드 ON (이미지+GAP)':'일반 모드',false); }
+function _qzAdjSize(d){ var v=0; try{ v=parseFloat(localStorage.getItem('_mlSizeAdj')||'0')||0; }catch(e){} v=Math.round((v+d)*10)/10; try{ localStorage.setItem('_mlSizeAdj', String(v)); }catch(e){} _qzUpdateUI(); toast('라벨길이 보정: '+(v>0?'+':'')+v.toFixed(1)+'mm',false); }
 // 라벨 팝업 내 QZ 영역 갱신
 function _qzUpdateUI(){
   var box=document.getElementById('ml_qz_box'); if(!box) return;
@@ -2689,6 +2695,13 @@ function _qzUpdateUI(){
     var _bm=(localStorage.getItem('_mlBitmap')==='1');
     h+='<label style="display:inline-flex;align-items:center;gap:4px;font-size:11px;background:'+(_bm?'#7c3aed':'#e2e8f0')+';color:'+(_bm?'#fff':'#475569')+';padding:5px 9px;border-radius:6px;cursor:pointer;font-weight:700" title="공유 프린터에서 밀림 방지: 라벨을 이미지로 변환해 프린터 GAP으로 직접 출력">'
       +'<input type="checkbox" '+(_bm?'checked':'')+' onchange="_qzToggleBitmap(this.checked)" style="margin:0"> RAW 비트맵</label>';
+    if(_bm){
+      var _adj=0; try{ _adj=parseFloat(localStorage.getItem('_mlSizeAdj')||'0')||0; }catch(e){}
+      h+='<label style="display:inline-flex;align-items:center;gap:4px;font-size:11px;background:#f1f5f9;color:#475569;padding:4px 8px;border-radius:6px" title="장마다 위로 밀리면 +0.5씩, 아래로 밀리면 -0.5씩 조절해 딱 맞추세요">'
+        +'라벨길이보정 <button onclick="_qzAdjSize(-0.5)" style="border:none;background:#cbd5e1;border-radius:4px;width:22px;height:22px;cursor:pointer;font-weight:800">−</button>'
+        +'<b style="min-width:46px;text-align:center">'+(_adj>0?'+':'')+_adj.toFixed(1)+'mm</b>'
+        +'<button onclick="_qzAdjSize(0.5)" style="border:none;background:#cbd5e1;border-radius:4px;width:22px;height:22px;cursor:pointer;font-weight:800">+</button></label>';
+    }
   }
   box.innerHTML=h;
 }
