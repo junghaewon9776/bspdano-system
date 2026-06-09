@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260609v28';
+var _MOD_ENGINE_VER='20260609v29';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -2294,7 +2294,8 @@ function modDoPrint(){
   if(opt.mode==='label' && qzIsReady()){
     window.__mlPrinting=true;
     var _pb=document.getElementById('ml_printbtn'); if(_pb){ _pb.disabled=true; _pb.style.opacity='0.6'; _pb.innerHTML='🖨 출력 중…'; }
-    _qzPrintLabels(def, rows, opt).then(function(ok){
+    var _useBmp=false; try{ _useBmp=(localStorage.getItem('_mlBitmap')==='1'); }catch(e){}
+    (_useBmp ? _qzPrintLabelsBitmap(def, rows, opt) : _qzPrintLabels(def, rows, opt)).then(function(ok){
       window.__mlPrinting=false;
       if(ok){ modBumpPrint(key, ids); closePopup(); }
       else { if(_pb){ _pb.disabled=false; _pb.style.opacity='1'; _pb.innerHTML='🖨 '+rows.length+'장 출력'; } }
@@ -2661,6 +2662,7 @@ function _qzPrintLabels(def, rows, opt){
   return chain.then(function(){ toast('🖨 QZ로 '+rows.length+'장 출력'); return true; })
     .catch(function(e){ toast('QZ 출력 실패: '+(e.message||e),true); return false; });
 }
+function _qzToggleBitmap(on){ try{ localStorage.setItem('_mlBitmap', on?'1':'0'); }catch(e){} _qzUpdateUI(); toast(on?'RAW 비트맵 모드 ON (이미지+GAP)':'일반 모드',false); }
 // 라벨 팝업 내 QZ 영역 갱신
 function _qzUpdateUI(){
   var box=document.getElementById('ml_qz_box'); if(!box) return;
@@ -2684,6 +2686,9 @@ function _qzUpdateUI(){
     h+='</select>';
     h+='<button class="btn btn-s" style="font-size:11px;background:#0ea5e9;color:#fff" onclick="_qzScan()">🔄 새로고침</button>';
     h+='<button class="btn btn-s" style="font-size:11px;background:#64748b;color:#fff" onclick="qzDisconnect()">해제</button>';
+    var _bm=(localStorage.getItem('_mlBitmap')==='1');
+    h+='<label style="display:inline-flex;align-items:center;gap:4px;font-size:11px;background:'+(_bm?'#7c3aed':'#e2e8f0')+';color:'+(_bm?'#fff':'#475569')+';padding:5px 9px;border-radius:6px;cursor:pointer;font-weight:700" title="공유 프린터에서 밀림 방지: 라벨을 이미지로 변환해 프린터 GAP으로 직접 출력">'
+      +'<input type="checkbox" '+(_bm?'checked':'')+' onchange="_qzToggleBitmap(this.checked)" style="margin:0"> RAW 비트맵</label>';
   }
   box.innerHTML=h;
 }
