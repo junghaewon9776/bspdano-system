@@ -2477,12 +2477,13 @@ function _qzPrintLabels(def, rows, opt){
   var pn=_qzPrinterName();
   if(!qzIsReady()){ toast('QZ 프린터를 먼저 연결·선택하세요',true); return Promise.resolve(false); }
   var w=opt.w, h=opt.h;
-  var cfg=qz.configs.create(pn,{colorType:'blackwhite',margins:0,units:'mm',jobName:'LABEL-'+def.key,size:{width:w,height:h||null}});
+  var cfg=qz.configs.create(pn,{colorType:'blackwhite',margins:0,units:'mm',jobName:'LABEL-'+def.key,size:{width:w,height:h},scaleContent:true});
   var chain=Promise.resolve();
   rows.forEach(function(r){
     chain=chain.then(function(){
-      var html='<div style="margin:0;padding:0;width:'+w+'mm;height:'+h+'mm;overflow:hidden">'+_modLabelHtml(def,r,opt)+'</div>';
-      return qz.print(cfg,[{type:'pixel',format:'html',flavor:'plain',data:html,options:{pageWidth:w,pageHeight:h}}]);
+      var lbl=_modLabelHtml(def,r,opt);
+      var html='<html><head><style>html,body{margin:0;padding:0;width:'+w+'mm;height:'+h+'mm;overflow:hidden}*{font-family:"Malgun Gothic","맑은 고딕",sans-serif}</style></head><body>'+lbl+'</body></html>';
+      return qz.print(cfg,[{type:'pixel',format:'html',flavor:'plain',data:html,options:{pageWidth:w,pageHeight:h,scaleContent:true}}]);
     });
   });
   return chain.then(function(){ toast('🖨 QZ로 '+rows.length+'장 출력'); return true; })
