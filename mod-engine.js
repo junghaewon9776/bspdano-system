@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260609v46';
+var _MOD_ENGINE_VER='20260609v47';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -286,6 +286,7 @@ function _modListHtml(key){
         h+='<button class="btn btn-s" onclick="modSetStatusSel(\''+key+'\',\''+esc(sk)+'\')" style="background:'+(bm.bg||'#f1f5f9')+';color:'+(bm.color||'#475569')+';border:1px solid '+(bm.bg||'#cbd5e1')+';font-weight:700">'+esc(bm.label||sk)+' 처리</button>';
       });
     }
+    h+='<button class="btn btn-s" style="background:#0891b2;color:#fff" onclick="popModMarkSel(\''+key+'\')">🎨 색칠</button>';
     h+='<button class="btn btn-s" style="background:#dc2626;color:#fff" onclick="modDelSel(\''+key+'\')">🗑 선택 삭제</button>';
     h+='<button class="btn btn-s" style="margin-left:auto;background:#64748b;color:#fff" onclick="_modSelClear(\''+key+'\')">선택 해제</button>';
     h+='</div>';
@@ -441,6 +442,44 @@ function modSetStatusSel(key,statusKey){
   showLoading('처리 중...');
   fbDb.ref(path).set(data).then(function(){ hideLoading(); toast('✅ '+ids.length+'개 "'+lbl+'" 처리'+(actor?' · '+actor:'')); _modLogAdd(key,lbl,'','('+ids.length+'개 일괄)','상태변경'); _modSel[key]={}; })
     .catch(function(e){ hideLoading(); toast('실패: '+(e.message||e),true); });
+}
+// 선택 항목 → 일괄 색칠 + 메모
+function popModMarkSel(key){
+  var ids=_modSelIds(key);
+  if(!ids.length) return toast('선택된 항목이 없습니다',true);
+  var h='<div class="pop-head"><h3>🎨 '+ids.length+'개 색칠 · 메모</h3></div>';
+  h+='<div style="padding:16px">';
+  h+='<div style="font-size:12px;color:#475569;font-weight:600;margin-bottom:8px">색상 <span style="font-size:10px;color:#94a3b8;font-weight:400">(클릭하면 바로 적용)</span></div>';
+  h+='<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px">';
+  _MOD_MARK_COLORS.forEach(function(c){
+    var inner = c.k==='' ? '<span style="font-size:16px;color:#94a3b8">✕</span>' : '';
+    h+='<button onclick="_modSetMarkSel(\''+key+'\',\''+c.k+'\')" title="'+c.name+'" style="width:40px;height:40px;border-radius:10px;cursor:pointer;background:'+(c.bg||'#fff')+';border:2px solid #e2e8f0;display:flex;align-items:center;justify-content:center">'+inner+'</button>';
+  });
+  h+='</div>';
+  h+='<div style="font-size:12px;color:#475569;font-weight:600;margin-bottom:8px">메모 <span style="font-size:10px;color:#94a3b8;font-weight:400">(선택 항목 전체에 동일 적용)</span></div>';
+  h+='<input id="_modMarkSelMemo" placeholder="짧은 메모 (비우고 저장하면 메모 지움)" maxlength="20" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px;box-sizing:border-box">';
+  h+='<div style="display:flex;gap:8px;margin-top:16px">';
+  h+='<button class="btn" style="flex:0 0 auto;background:#475569;color:#fff" onclick="closePopup()">닫기</button>';
+  h+='<button class="btn btn-b" style="flex:1;background:#2563eb;color:#fff;font-weight:700" onclick="_modSaveMarkSelMemo(\''+key+'\')">💾 메모 저장</button>';
+  h+='</div></div>';
+  openPopup(h,420);
+}
+function _modSetMarkSel(key,color){
+  var ids=_modSelIds(key); if(!ids.length) return;
+  var path=_modFbPath(key); if(!path) return;
+  var data=(_modData[key]||[]).slice(), now=new Date().toISOString(), n=0;
+  data.forEach(function(r){ if(ids.indexOf(r._id)>=0){ r._mark=color; r._updatedAt=now; n++; } });
+  fbDb.ref(path).set(data).then(function(){ var c=_MOD_MARK_COLORS.find(function(x){return x.k===color;}); toast('🎨 '+n+'개 '+(color?(c?c.name:''):'색 지움')); })
+    .catch(function(e){ toast('실패: '+(e.message||e),true); });
+}
+function _modSaveMarkSelMemo(key){
+  var ids=_modSelIds(key); if(!ids.length) return;
+  var path=_modFbPath(key); if(!path) return;
+  var el=document.getElementById('_modMarkSelMemo'); var memo=el?el.value.trim():'';
+  var data=(_modData[key]||[]).slice(), now=new Date().toISOString(), n=0;
+  data.forEach(function(r){ if(ids.indexOf(r._id)>=0){ r._markMemo=memo; r._updatedAt=now; n++; } });
+  fbDb.ref(path).set(data).then(function(){ toast(memo?('📝 '+n+'개 메모: '+memo):(n+'개 메모 지움')); closePopup(); })
+    .catch(function(e){ toast('실패: '+(e.message||e),true); });
 }
 // 선택 항목 → 일괄 삭제
 function modDelSel(key){
