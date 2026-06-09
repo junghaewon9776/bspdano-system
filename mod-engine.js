@@ -2503,7 +2503,7 @@ function _qzPrintLabels(def, rows, opt){
   var chain=Promise.resolve();
   rows.forEach(function(r){
     chain=chain.then(function(){
-      var html='<html><head><style>*{margin:0;padding:0}body{width:'+w+'mm;height:'+(h-0.5)+'mm;overflow:hidden}</style></head><body>'+_modLabelHtml(def,r,opt)+'</body></html>';
+      var html='<div style="margin:0;padding:0;width:'+w+'mm;height:'+(h-0.5)+'mm;overflow:hidden;box-sizing:border-box">'+_modLabelHtml(def,r,opt)+'</div>';
       return qz.print(cfg,[{type:'pixel',format:'html',flavor:'plain',data:html,options:{pageWidth:w,pageHeight:h||null}}]);
     });
   });
