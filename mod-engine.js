@@ -2503,7 +2503,7 @@ function _qzPrintLabels(def, rows, opt){
     chain=chain.then(function(){
       var lbl=_modLabelHtml(def,r,opt);
       var html='<html><head><style>html,body{margin:0;padding:0;width:'+w+'mm;height:'+h+'mm;overflow:hidden}.mlabel{overflow:hidden}</style></head><body>'+lbl+'</body></html>';
-      return qz.print(cfg,[{type:'pixel',format:'html',flavor:'html',data:html,options:{pageWidth:w,pageHeight:h}}]);
+      return qz.print(cfg,[{type:'pixel',format:'html',flavor:'plain',data:html,options:{pageWidth:w,pageHeight:h}}]);
     });
   });
   return chain.then(function(){ toast('🖨 QZ로 '+rows.length+'장 출력'); return true; })
