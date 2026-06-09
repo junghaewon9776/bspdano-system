@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260609v20';
+var _MOD_ENGINE_VER='20260609v21';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -2501,15 +2501,18 @@ function _qzPrintLabels(def, rows, opt){
   var pn=_qzPrinterName();
   if(!qzIsReady()){ toast('QZ 프린터를 먼저 연결·선택하세요',true); return Promise.resolve(false); }
   var w=opt.w, h=opt.h;
-  var cfg=qz.configs.create(pn,{colorType:'blackwhite',margins:0,units:'mm',jobName:'LABEL-'+def.key,size:{width:w,height:h||null}});
-  var pages=[];
-  rows.forEach(function(r){
-    pages.push('<div style="margin:0;padding:0;width:'+w+'mm;height:'+h+'mm;overflow:hidden;box-sizing:border-box;page-break-after:always">'+_modLabelHtml(def,r,opt)+'</div>');
-  });
-  var html='<html><head><style>*{margin:0;padding:0}@page{size:'+w+'mm '+h+'mm;margin:0}</style></head><body>'+pages.join('')+'</body></html>';
-  return qz.print(cfg,[{type:'pixel',format:'html',flavor:'plain',data:html,options:{pageWidth:w,pageHeight:h||null}}])
-    .then(function(){ toast('🖨 QZ로 '+rows.length+'장 출력'); return true; })
-    .catch(function(e){ toast('QZ 출력 실패: '+(e.message||e),true); return false; });
+  var total=rows.length, printed=0;
+  function printOne(){
+    if(printed>=total){toast('🖨 QZ로 '+total+'장 출력 완료');return;}
+    var r=rows[printed];
+    var cfg=qz.configs.create(pn,{colorType:'blackwhite',margins:0,units:'mm',jobName:'LABEL-'+def.key+'-'+(printed+1),size:{width:w,height:h||null}});
+    var html='<div style="margin:0;padding:0">'+_modLabelHtml(def,r,opt)+'</div>';
+    qz.print(cfg,[{type:'pixel',format:'html',flavor:'plain',data:html,options:{pageWidth:w,pageHeight:h||null}}])
+      .then(function(){printed++;setTimeout(printOne,3000);})
+      .catch(function(e){toast('QZ 출력 실패: '+(e.message||e),true);});
+  }
+  printOne();
+  return Promise.resolve(true);
 }
 // 라벨 팝업 내 QZ 영역 갱신
 function _qzUpdateUI(){
