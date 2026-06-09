@@ -1758,9 +1758,11 @@ function modSmsSend(){
 
 // 모드별 기본 크기 — 낱장은 크게, A4 모아찍기는 작게
 var _MODLBL_DEFAULTS={
-  label:{w:90,h:50,pt:4,pr:4,pb:4,pl:4,gap:0,sheetMargin:0,border:false,qr:0,orientation:'portrait',sheetW:210,sheetH:297},
+  label:{w:100,h:30,pt:2,pr:3,pb:2,pl:3,gap:0,sheetMargin:0,border:false,qr:0,orientation:'portrait',sheetW:210,sheetH:297},
   a4:{w:50,h:30,pt:2,pr:2,pb:2,pl:2,gap:2,sheetMargin:10,border:true,qr:0,orientation:'portrait',sheetW:210,sheetH:297}
 };
+// 일회성 localStorage 초기화 (꼬인 설정 리셋)
+try{if(!localStorage.getItem('_mlReset20260609r')){Object.keys(localStorage).forEach(function(k){if(/^modLabelOpt_/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlReset20260609r','1');}}catch(e){}
 // 모드별 크기 세트 로드 (+ 구버전 평면 구조 마이그레이션)
 function _modLabelSizes(key){
   var sz={label:Object.assign({},_MODLBL_DEFAULTS.label), a4:Object.assign({},_MODLBL_DEFAULTS.a4)};
