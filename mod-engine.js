@@ -2334,7 +2334,8 @@ function modDoPrint(){
   } else {
     css='@page{size:'+opt.w+'mm '+opt.h+'mm;margin:0}'
       +'html,body{margin:0;padding:0;width:'+opt.w+'mm}'
-      +'.mlabel{width:'+opt.w+'mm;height:'+opt.h+'mm;box-sizing:border-box;margin:0;padding:0;overflow:hidden;page-break-after:always;page-break-inside:avoid}'
+      +'.mlabel{width:'+opt.w+'mm !important;height:'+opt.h+'mm !important;max-height:'+opt.h+'mm !important;box-sizing:border-box;margin:0;padding:0;overflow:hidden;page-break-after:always;page-break-inside:avoid}'
+      +'.mlabel>*{max-height:'+opt.h+'mm;overflow:hidden}'
       +'.mlabel:last-child{page-break-after:auto}'
       +'@media screen{body{background:#e2e8f0;padding:10px;width:auto}.mlabel{background:#fff;margin:0 auto 8px;box-shadow:0 1px 4px rgba(0,0,0,.2)}}';
     bodyHtml=labels;
