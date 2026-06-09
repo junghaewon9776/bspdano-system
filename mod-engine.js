@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260609v35';
+var _MOD_ENGINE_VER='20260609v36';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -2290,8 +2290,10 @@ function modDoPrint(){
   if(opt.mode==='a4'){ var _g=_mlA4Grid(opt); var _pg=Math.ceil(rows.length/(_g.perPage||1)); _cntMsg='총 '+rows.length+'건을 A4 약 '+_pg+'장에 출력합니다.\n진행할까요?'; }
   else _cntMsg='총 '+rows.length+'장(낱장)을 출력합니다.\n진행할까요?';
   if(!confirm(_cntMsg)) return;
+  // 브라우저 인쇄 모드(메일머지식): QZ 연결돼 있어도 브라우저 @page 인쇄로 → Excel처럼 드라이버가 gap 처리
+  var _browserPrint=false; try{ _browserPrint=(localStorage.getItem('_mlBrowserPrint')==='1'); }catch(e){}
   // QZ Tray 연결+프린터선택 시 → 라벨 프린터로 직접 출력 (낱장 모드)
-  if(opt.mode==='label' && qzIsReady()){
+  if(opt.mode==='label' && qzIsReady() && !_browserPrint){
     window.__mlPrinting=true;
     var _pb=document.getElementById('ml_printbtn'); if(_pb){ _pb.disabled=true; _pb.style.opacity='0.6'; _pb.innerHTML='🖨 출력 중…'; }
     var _useBmp=false; try{ _useBmp=(localStorage.getItem('_mlBitmap')==='1'); }catch(e){}
@@ -2669,6 +2671,7 @@ function _qzPrintLabels(def, rows, opt){
 }
 function _qzToggleBitmap(on){ try{ localStorage.setItem('_mlBitmap', on?'1':'0'); }catch(e){} _qzUpdateUI(); toast(on?'RAW 비트맵 모드 ON (이미지+GAP)':'일반 모드',false); }
 function _qzAdjSize(d){ var v=0; try{ v=parseFloat(localStorage.getItem('_mlSizeAdj')||'0')||0; }catch(e){} v=Math.round((v+d)*10)/10; try{ localStorage.setItem('_mlSizeAdj', String(v)); }catch(e){} _qzUpdateUI(); toast('라벨길이 보정: '+(v>0?'+':'')+v.toFixed(1)+'mm',false); }
+function _qzToggleBrowserPrint(on){ try{ localStorage.setItem('_mlBrowserPrint', on?'1':'0'); }catch(e){} _qzUpdateUI(); toast(on?'브라우저 인쇄 모드 ON (Excel 메일머지식)':'QZ 직접 출력 모드',false); }
 // 라벨 팝업 내 QZ 영역 갱신
 function _qzUpdateUI(){
   var box=document.getElementById('ml_qz_box'); if(!box) return;
@@ -2692,6 +2695,9 @@ function _qzUpdateUI(){
     h+='</select>';
     h+='<button class="btn btn-s" style="font-size:11px;background:#0ea5e9;color:#fff" onclick="_qzScan()">🔄 새로고침</button>';
     h+='<button class="btn btn-s" style="font-size:11px;background:#64748b;color:#fff" onclick="qzDisconnect()">해제</button>';
+    var _bp=(localStorage.getItem('_mlBrowserPrint')==='1');
+    h+='<label style="display:inline-flex;align-items:center;gap:4px;font-size:11px;background:'+(_bp?'#0891b2':'#e2e8f0')+';color:'+(_bp?'#fff':'#475569')+';padding:5px 9px;border-radius:6px;cursor:pointer;font-weight:700" title="Excel 메일머지처럼 브라우저 인쇄로 100x30 페이지를 라벨마다 잘라 출력(드라이버가 gap 처리)">'
+      +'<input type="checkbox" '+(_bp?'checked':'')+' onchange="_qzToggleBrowserPrint(this.checked)" style="margin:0"> 🖨 브라우저 인쇄(메일머지식)</label>';
     var _bm=(localStorage.getItem('_mlBitmap')==='1');
     h+='<label style="display:inline-flex;align-items:center;gap:4px;font-size:11px;background:'+(_bm?'#7c3aed':'#e2e8f0')+';color:'+(_bm?'#fff':'#475569')+';padding:5px 9px;border-radius:6px;cursor:pointer;font-weight:700" title="공유 프린터에서 밀림 방지: 라벨을 이미지로 변환해 프린터 GAP으로 직접 출력">'
       +'<input type="checkbox" '+(_bm?'checked':'')+' onchange="_qzToggleBitmap(this.checked)" style="margin:0"> RAW 비트맵</label>';
