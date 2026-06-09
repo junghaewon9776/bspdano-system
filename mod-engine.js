@@ -2310,8 +2310,11 @@ function modDoPrint(){
       +'@media screen{body{background:#e2e8f0;padding:10px}.sheet{background:#fff;width:'+pw+'mm;margin:0 auto;padding:'+opt.sheetMargin+'mm;box-sizing:border-box;box-shadow:0 1px 6px rgba(0,0,0,.2)}}';
     bodyHtml='<div class="sheet">'+labels+'</div>';
   } else {
-    css='@page{size:'+opt.w+'mm '+opt.h+'mm;margin:0}html,body{margin:0;padding:0}.mlabel{page-break-after:always}'
-      +'@media screen{body{background:#e2e8f0;padding:10px}.mlabel{background:#fff;margin:0 auto 8px;box-shadow:0 1px 4px rgba(0,0,0,.2)}}';
+    css='@page{size:'+opt.w+'mm '+opt.h+'mm;margin:0}'
+      +'html,body{margin:0;padding:0;width:'+opt.w+'mm}'
+      +'.mlabel{width:'+opt.w+'mm;height:'+opt.h+'mm;box-sizing:border-box;margin:0;padding:0;overflow:hidden;page-break-after:always;page-break-inside:avoid}'
+      +'.mlabel:last-child{page-break-after:auto}'
+      +'@media screen{body{background:#e2e8f0;padding:10px;width:auto}.mlabel{background:#fff;margin:0 auto 8px;box-shadow:0 1px 4px rgba(0,0,0,.2)}}';
     bodyHtml=labels;
   }
   win.document.write('<html><head><meta charset="utf-8"><title>라벨 출력</title><style>'+css+'</style></head><body>'+bodyHtml+'<scr'+'ipt>setTimeout(function(){window.print();},800);</scr'+'ipt></body></html>');
