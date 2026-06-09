@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260609v36';
+var _MOD_ENGINE_VER='20260609v37';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -2317,7 +2317,8 @@ function modDoPrint(){
       +'@media screen{body{background:#e2e8f0;padding:10px}.sheet{background:#fff;width:'+pw+'mm;margin:0 auto;padding:'+opt.sheetMargin+'mm;box-sizing:border-box;box-shadow:0 1px 6px rgba(0,0,0,.2)}}';
     bodyHtml='<div class="sheet">'+labels+'</div>';
   } else {
-    css='@page{size:'+opt.w+'mm '+opt.h+'mm;margin:0}html,body{margin:0;padding:0}.mlabel{page-break-after:always}'
+    css='@page{size:'+opt.w+'mm '+opt.h+'mm;margin:0}html,body{margin:0;padding:0;width:'+opt.w+'mm}'
+      +'.mlabel{page-break-after:always;width:'+opt.w+'mm;height:'+opt.h+'mm;overflow:hidden}'
       +'@media screen{body{background:#e2e8f0;padding:10px}.mlabel{background:#fff;margin:0 auto 8px;box-shadow:0 1px 4px rgba(0,0,0,.2)}}';
     bodyHtml=labels;
   }
