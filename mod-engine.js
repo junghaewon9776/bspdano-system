@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260609v30';
+var _MOD_ENGINE_VER='20260609v31';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -2633,8 +2633,8 @@ async function _qzPrintLabelsBitmap(def, rows, opt){
   var wmm=opt.w, hmm=opt.h, gap=(opt.gap!=null?opt.gap:2);
   var cfg=qz.configs.create(pn);
   try{
-    // SIZE/GAP는 맨 처음 한 번만 → 프린터가 gap 등록을 연속 유지(장마다 밀림 방지)
-    var data=[{type:'raw',format:'plain',data:'SIZE '+wmm+' mm,'+hmm+' mm\r\nGAP '+gap+' mm,0 mm\r\nDIRECTION 1\r\nREFERENCE 0,0\r\nSET TEAR ON\r\n'}];
+    // SIZE/GAP 설정 + GAPDETECT로 프린터가 실제 라벨 길이를 직접 측정(밀림 방지)
+    var data=[{type:'raw',format:'plain',data:'SIZE '+wmm+' mm,'+hmm+' mm\r\nGAP '+gap+' mm,0 mm\r\nDIRECTION 1\r\nREFERENCE 0,0\r\nSET TEAR ON\r\nGAPDETECT\r\n'}];
     for(var i=0;i<rows.length;i++){
       var canvas=await _labelToCanvas(_modLabelHtml(def,rows[i],opt),wmm,hmm,203);
       var bmp=_canvasToTSPL(canvas,160);
