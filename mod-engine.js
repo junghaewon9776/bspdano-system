@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260609v38';
+var _MOD_ENGINE_VER='20260609v39';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -2321,7 +2321,7 @@ function modDoPrint(){
     if(_rot){
       // 프린터가 용지를 세로(높이=w)로 인식 → 페이지는 30x100, 내용은 90도 회전해 가로로 보이게
       css='@page{size:'+opt.h+'mm '+opt.w+'mm;margin:0}html,body{margin:0;padding:0}'
-        +'.mlabel{page-break-after:always;width:'+opt.w+'mm;height:'+opt.h+'mm;overflow:hidden;transform:rotate(90deg);transform-origin:top left;position:relative;left:'+opt.h+'mm}'
+        +'.mlabel{page-break-after:always;width:'+opt.w+'mm;height:'+opt.h+'mm;overflow:hidden;transform:rotate(-90deg);transform-origin:top left;position:relative;top:'+opt.w+'mm}'
         +'@media screen{body{background:#e2e8f0;padding:10px}}';
     } else {
       css='@page{size:'+opt.w+'mm '+opt.h+'mm;margin:0}html,body{margin:0;padding:0;width:'+opt.w+'mm}'
