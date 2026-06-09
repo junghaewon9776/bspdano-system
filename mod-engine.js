@@ -2481,8 +2481,8 @@ function _qzPrintLabels(def, rows, opt){
   var chain=Promise.resolve();
   rows.forEach(function(r){
     chain=chain.then(function(){
-      var html='<div style="margin:0;padding:0">'+_modLabelHtml(def,r,opt)+'</div>';
-      return qz.print(cfg,[{type:'pixel',format:'html',flavor:'plain',data:html,options:{pageWidth:w,pageHeight:h||null}}]);
+      var html='<div style="margin:0;padding:0;width:'+w+'mm;height:'+h+'mm;overflow:hidden">'+_modLabelHtml(def,r,opt)+'</div>';
+      return qz.print(cfg,[{type:'pixel',format:'html',flavor:'plain',data:html,options:{pageWidth:w,pageHeight:h}}]);
     });
   });
   return chain.then(function(){ toast('🖨 QZ로 '+rows.length+'장 출력'); return true; })
