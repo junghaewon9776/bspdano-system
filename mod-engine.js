@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260609v39';
+var _MOD_ENGINE_VER='20260609v40';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -2679,7 +2679,7 @@ function _qzPrintLabels(def, rows, opt){
     .catch(function(e){ toast('QZ 출력 실패: '+(e.message||e),true); return false; });
 }
 function _qzToggleBitmap(on){ try{ localStorage.setItem('_mlBitmap', on?'1':'0'); }catch(e){} _qzUpdateUI(); toast(on?'RAW 비트맵 모드 ON (이미지+GAP)':'일반 모드',false); }
-function _qzAdjSize(d){ var v=0; try{ v=parseFloat(localStorage.getItem('_mlSizeAdj')||'0')||0; }catch(e){} v=Math.round((v+d)*10)/10; try{ localStorage.setItem('_mlSizeAdj', String(v)); }catch(e){} _qzUpdateUI(); toast('라벨길이 보정: '+(v>0?'+':'')+v.toFixed(1)+'mm',false); }
+function _qzAdjSize(d){ var v=0; try{ v=parseFloat(localStorage.getItem('_mlSizeAdj')||'0')||0; }catch(e){} v=Math.round((v+d)*100)/100; try{ localStorage.setItem('_mlSizeAdj', String(v)); }catch(e){} _qzUpdateUI(); toast('라벨길이 보정: '+(v>0?'+':'')+v.toFixed(2)+'mm',false); }
 function _qzToggleBrowserPrint(on){ try{ localStorage.setItem('_mlBrowserPrint', on?'1':'0'); }catch(e){} _qzUpdateUI(); toast(on?'브라우저 인쇄 모드 ON (Excel 메일머지식)':'QZ 직접 출력 모드',false); }
 function _qzToggleRotate(on){ try{ localStorage.setItem('_mlRotate', on?'1':'0'); }catch(e){} _qzUpdateUI(); toast(on?'90도 회전 ON':'회전 OFF',false); }
 // 라벨 팝업 내 QZ 영역 갱신
@@ -2718,10 +2718,12 @@ function _qzUpdateUI(){
       +'<input type="checkbox" '+(_bm?'checked':'')+' onchange="_qzToggleBitmap(this.checked)" style="margin:0"> RAW 비트맵</label>';
     if(_bm){
       var _adj=0; try{ _adj=parseFloat(localStorage.getItem('_mlSizeAdj')||'0')||0; }catch(e){}
-      h+='<label style="display:inline-flex;align-items:center;gap:4px;font-size:11px;background:#f1f5f9;color:#475569;padding:4px 8px;border-radius:6px" title="장마다 위로 밀리면 +0.5씩, 아래로 밀리면 -0.5씩 조절해 딱 맞추세요">'
-        +'라벨길이보정 <button onclick="_qzAdjSize(-0.5)" style="border:none;background:#cbd5e1;border-radius:4px;width:22px;height:22px;cursor:pointer;font-weight:800">−</button>'
-        +'<b style="min-width:46px;text-align:center">'+(_adj>0?'+':'')+_adj.toFixed(1)+'mm</b>'
-        +'<button onclick="_qzAdjSize(0.5)" style="border:none;background:#cbd5e1;border-radius:4px;width:22px;height:22px;cursor:pointer;font-weight:800">+</button></label>';
+      h+='<label style="display:inline-flex;align-items:center;gap:3px;font-size:11px;background:#f1f5f9;color:#475569;padding:4px 8px;border-radius:6px" title="장마다 아래로 밀리면 + , 위로 밀리면 − 로 0.05mm씩 조절해 딱 맞추세요">'
+        +'라벨길이보정 <button onclick="_qzAdjSize(-0.5)" style="border:none;background:#94a3b8;color:#fff;border-radius:4px;width:30px;height:22px;cursor:pointer;font-weight:800" title="크게 줄임">−−</button>'
+        +'<button onclick="_qzAdjSize(-0.05)" style="border:none;background:#cbd5e1;border-radius:4px;width:22px;height:22px;cursor:pointer;font-weight:800">−</button>'
+        +'<b style="min-width:54px;text-align:center">'+(_adj>0?'+':'')+_adj.toFixed(2)+'mm</b>'
+        +'<button onclick="_qzAdjSize(0.05)" style="border:none;background:#cbd5e1;border-radius:4px;width:22px;height:22px;cursor:pointer;font-weight:800">+</button>'
+        +'<button onclick="_qzAdjSize(0.5)" style="border:none;background:#94a3b8;color:#fff;border-radius:4px;width:30px;height:22px;cursor:pointer;font-weight:800" title="크게 늘림">++</button></label>';
     }
   }
   box.innerHTML=h;
