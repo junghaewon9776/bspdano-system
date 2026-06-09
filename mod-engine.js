@@ -323,7 +323,7 @@ function _modListHtml(key){
       }
       h+='<div style="display:flex;gap:1px">';
       var _pc=pn(row._printCount);
-      h+='<button onclick="modPrintOne(\''+key+'\',\''+esc(row._id||'')+'\')" title="'+(_pc?'재출력('+_pc+')':'출력')+'" style="width:24px;height:22px;border-radius:4px;border:1px solid #e2e8f0;cursor:pointer;font-size:11px;background:'+(_pc?'#475569':'#f8fafc')+';color:'+(_pc?'#fff':'#334155')+';padding:0;line-height:1">🖨</button>';
+      h+='<button onclick="modPrintOne(\''+key+'\',\''+esc(row._id||'')+'\')" title="'+(_pc?'재출력('+_pc+'회 출력됨)':'라벨 출력')+'" style="'+(_pc?'min-width:32px;':'width:24px;')+'height:22px;border-radius:4px;border:1px solid '+(_pc?'#475569':'#e2e8f0')+';cursor:pointer;font-size:11px;background:'+(_pc?'#475569':'#f8fafc')+';color:'+(_pc?'#fff':'#334155')+';padding:0 2px;line-height:1">🖨'+(_pc?'<b>'+_pc+'</b>':'')+'</button>';
       if(typeof isSuper==='function'&&isSuper()) h+='<button onclick="popModLog(\''+key+'\',\''+esc(row._id||'')+'\')" title="로그" style="width:24px;height:22px;border-radius:4px;border:1px solid #e2e8f0;cursor:pointer;font-size:11px;background:#f8fafc;color:#334155;padding:0;line-height:1">📋</button>';
       h+='<button onclick="popModEdit(\''+key+'\',\''+esc(row._id||'')+'\')" title="수정" style="width:24px;height:22px;border-radius:4px;border:1px solid #e2e8f0;cursor:pointer;font-size:11px;background:#f8fafc;color:#334155;padding:0;line-height:1">✏️</button>';
       h+='<button onclick="modDel(\''+key+'\',\''+esc(row._id||'')+'\')" title="삭제" style="width:24px;height:22px;border-radius:4px;border:1px solid #fecaca;cursor:pointer;font-size:11px;background:#fef2f2;color:#dc2626;padding:0;line-height:1">🗑</button>';
@@ -1930,7 +1930,7 @@ function _modLabelHtml(def,row,opt){
     }
     if(showTitle){
       var tp=pos['_title']||{x:4,y:4,fs:14};
-      var _tv=String(titleV); if(tp.star) _tv='★ '+_tv+' ★';
+      var _tv=_modMaskVal(String(titleV),tp);
       var tef=_mlElemFit(tp, _tv, tp.fs||14, opt.w);
       h+='<div style="position:absolute;left:'+tp.x+'%;top:'+tp.y+'%;font-size:'+tef.fs+'pt;font-weight:800;line-height:1.1;'+tef.css+'">'+esc(_tv)+'</div>';
     }
@@ -1940,7 +1940,7 @@ function _modLabelHtml(def,row,opt){
       var fp=pos[c.key]||null;
       if(!fp) return;
       var pv=_modPlain(c,v);
-      if(fp.star) pv='★ '+pv+' ★';
+      pv=_modMaskVal(pv,fp);
       var plain=c.label+(fp.colon?': ':' ')+pv;
       var ef=_mlElemFit(fp, plain, fp.fs||7.5, opt.w);
       var sep=fp.brk?((fp.colon?':':'')+'<br>'):(fp.colon?': ':' ');
@@ -2576,14 +2576,13 @@ function _mllRender(){
 
   var items=[];
   var tp=pos['_title']||{x:4,y:4,fs:14};
-  var _titleText=String(titleV); if(tp.star) _titleText='★ '+_titleText+' ★';
+  var _titleText=_modMaskVal(String(titleV),tp);
   items.push({id:'_title',label:'제목',text:_titleText,x:tp.x,y:tp.y,fs:tp.fs||14,bold:true,mode:(tp.mode||(tp.wrap?'wrap':'line')),w:tp.w,align:tp.align,color:'#6366f1'});
   L.cols.forEach(function(c){
     if(c.key===L.opt.titleKey) return;
     var fp=pos[c.key]||{x:4,y:20,fs:7.5};
     ci=(ci+1)%colors.length;
-    var v=row[c.key]||'샘플';
-    if(fp.star) v='★ '+v+' ★';
+    var v=_modMaskVal(row[c.key]||'샘플',fp);
     var sepC=fp.brk?((fp.colon?':':'')+'\n'):(fp.colon?': ':' ');
     items.push({id:c.key,label:c.label,text:c.label+sepC+v,x:fp.x,y:fp.y,fs:fp.fs||7.5,bold:fp.bold,mode:(fp.mode||(fp.wrap?'wrap':'line')),w:fp.w,align:fp.align,color:colors[ci]});
   });
@@ -2708,8 +2707,13 @@ function _mllShowCtrl(id){
     h+='<div style="margin-top:8px;font-size:11px;color:#94a3b8;margin-bottom:5px">서식</div>';
     h+='<div style="display:flex;flex-wrap:wrap;gap:4px">';
     h+='<button onclick="_mllToggle(\''+id+'\',\'bold\')" style="'+bs(p.bold)+'">B 굵게</button>';
-    h+='<button onclick="_mllToggle(\''+id+'\',\'star\')" style="'+bs(p.star)+'">★ 별표</button>';
     if(id!=='_title'){ h+='<button onclick="_mllToggle(\''+id+'\',\'brk\')" style="'+bs(p.brk)+'">↵ 라벨/값</button>'; h+='<button onclick="_mllToggle(\''+id+'\',\'colon\')" style="'+bs(p.colon)+'">: 표시</button>'; }
+    h+='</div>';
+    h+='<div style="margin-top:6px;font-size:11px;color:#94a3b8;margin-bottom:4px">가리기 · 장식</div>';
+    h+='<div style="display:flex;flex-wrap:wrap;gap:4px">';
+    h+='<button onclick="_mllToggle(\''+id+'\',\'star\')" style="'+bs(p.star)+'">★ 별표</button>';
+    h+='<button onclick="_mllToggle(\''+id+'\',\'maskMid\')" style="'+bs(p.maskMid)+'">홍*동</button>';
+    h+='<button onclick="_mllToggle(\''+id+'\',\'maskEnd\')" style="'+bs(p.maskEnd)+'">홍길*</button>';
     h+='</div>';
     h+='<div style="display:flex;gap:4px;margin-top:5px">';
     h+='<button onclick="_mllSetAlign(\''+id+'\',\'left\')" style="flex:1;'+bs(!p.align||p.align==='left')+'">⬅ 왼쪽</button>';
@@ -2733,6 +2737,26 @@ function _mllToggle(id,prop){
   if(!L.pos[id]) L.pos[id]={};
   L.pos[id][prop]=!L.pos[id][prop];
   _mllRender(); _mllBindEvents(); _mllShowCtrl(id);
+}
+// 가리기: 가운데(홍*동, 010-****-5678) / 끝(홍길*, 010-1234-****)
+function _modMaskVal(v,fp){
+  if(!v||!fp) return v;
+  var s=String(v);
+  if(fp.maskMid){
+    // 전화번호 형태(- 포함): 가운데 자리 마스킹
+    if(/^\d{2,4}-\d{3,4}-\d{4}$/.test(s)){
+      var ps=s.split('-'); ps[1]=ps[1].replace(/./g,'*'); s=ps.join('-');
+    } else if(s.length<=2){ s=s[0]+'*';
+    } else { var st=Math.ceil(s.length/3); var en=s.length-Math.ceil(s.length/3); s=s.substring(0,st)+s.substring(st,en).replace(/./g,'*')+s.substring(en); }
+  }
+  if(fp.maskEnd){
+    if(/^\d{2,4}-\d{3,4}-\d{4}$/.test(s)){
+      var ps=s.split('-'); ps[2]=ps[2].replace(/./g,'*'); s=ps.join('-');
+    } else if(s.length<=2){ s=s[0]+'*';
+    } else { var keep=Math.ceil(s.length*0.6); s=s.substring(0,keep)+s.substring(keep).replace(/./g,'*'); }
+  }
+  if(fp.star) s='★ '+s+' ★';
+  return s;
 }
 function _mllSetAlign(id,al){
   var L=window.__mlLayout; if(!L) return;
