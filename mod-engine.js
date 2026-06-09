@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260609v47';
+var _MOD_ENGINE_VER='20260609v48';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -31,8 +31,16 @@ function _modFmtDateTime(iso){
 }
 // 행 대표 제목(첫 표시 컬럼 값)
 function _modRowTitle(def,row){
-  var c=(def.columns||[]).filter(function(x){return !x.adminOnly&&x.key!=='status'&&!x.hideTable;})[0];
-  return c?String(row[c.key]||''):'';
+  var cols=(def.columns||[]).filter(function(x){return !x.adminOnly&&x.key!=='status'&&!x.hideTable;});
+  // 1) 모듈에 titleKey 지정돼 있으면 그것
+  if(def.titleKey){ var tc=cols.find(function(x){return x.key===def.titleKey;}); if(tc&&row[tc.key]) return String(row[tc.key]); }
+  // 2) 이름/성함/성명/대표자/신청자 같은 이름컬럼 우선
+  var nameRe=/(이름|성함|성명|대표자|신청자|참가자|회원명|업체명|상호|닉네임|name)/i;
+  var nc=cols.find(function(x){ return nameRe.test(String(x.label||''))&&row[x.key]!=null&&row[x.key]!==''; });
+  if(nc) return String(row[nc.key]);
+  // 3) 그래도 없으면 값이 있는 첫 컬럼
+  var fc=cols.find(function(x){ return row[x.key]!=null&&row[x.key]!==''; }) || cols[0];
+  return fc?String(row[fc.key]||''):'';
 }
 // 행 상세 설명(표시 컬럼 전체 조합) — 로그/구분용 (열이 늘어도 다 표시)
 function _modRowDesc(def,row){
