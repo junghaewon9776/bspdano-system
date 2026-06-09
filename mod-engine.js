@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260609v26';
+var _MOD_ENGINE_VER='20260609v27';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -2536,6 +2536,25 @@ function _qzRawTest(mode){
   qz.print(cfg,[{type:'raw',format:'plain',data:data}])
     .then(function(){toast('RAW('+(mode||'tspl')+') 전송 완료');console.log('전송OK');})
     .catch(function(e){toast('RAW 실패: '+e,true);console.error('RAW err',e);});
+}
+function _qzKorTest(enc){
+  var pn=_qzPrinterName();
+  if(!qzIsReady()){toast('QZ 프린터를 먼저 연결·선택하세요',true);return;}
+  var tspl=[
+    'SIZE 100 mm, 30 mm',
+    'GAP 2 mm, 0 mm',
+    'DIRECTION 1',
+    'CODEPAGE 949',
+    'CLS',
+    'TEXT 50,30,"TSS24.BF2",0,1,1,"한글테스트 차량번호"',
+    'TEXT 50,90,"4",0,1,1,"123가4567"',
+    'PRINT 1'
+  ].join('\r\n')+'\r\n';
+  console.log('[KOR TEST] enc='+(enc||'euc-kr'));
+  var cfg=qz.configs.create(pn);
+  qz.print(cfg,[{type:'raw',format:'plain',data:tspl,options:{encoding:enc||'EUC-KR'}}])
+    .then(function(){toast('한글 테스트 전송 완료');})
+    .catch(function(e){toast('한글 실패: '+e,true);console.error(e);});
 }
 function _qzPrintLabels(def, rows, opt){
   var pn=_qzPrinterName();
