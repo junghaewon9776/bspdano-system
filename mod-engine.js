@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260609v33';
+var _MOD_ENGINE_VER='20260609v34';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -2640,6 +2640,8 @@ async function _qzPrintLabelsBitmap(def, rows, opt){
       var canvas=await _labelToCanvas(_modLabelHtml(def,rows[i],opt),wmm,hmm,203);
       var dataUrl=canvas.toDataURL('image/png');
       await qz.print(pcfg,[{type:'pixel',format:'image',flavor:'base64',data:dataUrl.split(',')[1],options:{pageWidth:wmm,pageHeight:hmm}}]);
+      // 한 장 완전히 뽑고 프린터가 gap센서로 다음 라벨 머리를 찾을 시간 확보
+      await new Promise(function(ok){ setTimeout(ok, 1500); });
     }
     toast('🖨 RAW비트맵 '+rows.length+'장 출력');
     return true;
