@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260609v44';
+var _MOD_ENGINE_VER='20260609v45';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -310,9 +310,13 @@ function _modListHtml(key){
   data.forEach(function(row,idx){
     var st=row.status||'';
     var sel=!!selMap[row._id];
-    h+='<tr'+(st==='탈락'?' style="opacity:.5"':'')+(sel?' class="_modSelRow" style="background:#eff6ff"':'')+' ondblclick="popModEdit(\''+key+'\',\''+esc(row._id||'')+'\');event.stopPropagation()" style="cursor:pointer'+(st==='탈락'?';opacity:.5':'')+(sel?';background:#eff6ff':'')+'">';
+    var mk=row._mark||'';
+    var rowBg = sel ? '#eff6ff' : (mk||'');
+    var mkBorder = mk ? ';border-left:5px solid '+_modMarkDot(mk) : '';
+    h+='<tr'+' ondblclick="popModEdit(\''+key+'\',\''+esc(row._id||'')+'\');event.stopPropagation()" style="cursor:pointer'+(st==='탈락'?';opacity:.5':'')+(rowBg?';background:'+rowBg:'')+mkBorder+'">';
     if(isA()) h+='<td class="ctr"><input type="checkbox" class="_modChk" data-id="'+esc(row._id||'')+'" data-idx="'+idx+'"'+(sel?' checked':'')+' onclick="_modSelToggle(event,\''+key+'\',\''+esc(row._id||'')+'\','+idx+')"></td>';
-    h+='<td class="ctr" style="color:#94a3b8">'+(idx+1)+'</td>';
+    var _memoChip = row._markMemo ? ' <span style="display:inline-block;background:'+(mk||'#e2e8f0')+';color:#334155;border:1px solid '+_modMarkDot(mk||'#e2e8f0')+';border-radius:8px;padding:0 6px;font-size:10px;font-weight:700;white-space:nowrap;vertical-align:middle" title="메모">'+esc(row._markMemo)+'</span>' : '';
+    h+='<td class="ctr" style="color:#94a3b8;white-space:nowrap">'+(idx+1)+_memoChip+'</td>';
     // 접수일
     if(isA()){
       var _ca=row._createdAt?_modFmtDateTime(row._createdAt):'';
@@ -341,6 +345,7 @@ function _modListHtml(key){
       h+='<div style="display:flex;gap:1px">';
       var _pc=pn(row._printCount);
       h+='<button onclick="modPrintOne(\''+key+'\',\''+esc(row._id||'')+'\')" title="'+(_pc?'재출력('+_pc+'회 출력됨)':'라벨 출력')+'" style="'+(_pc?'min-width:32px;':'width:24px;')+'height:22px;border-radius:4px;border:1px solid '+(_pc?'#475569':'#e2e8f0')+';cursor:pointer;font-size:11px;background:'+(_pc?'#475569':'#f8fafc')+';color:'+(_pc?'#fff':'#334155')+';padding:0 2px;line-height:1">🖨'+(_pc?'<b>'+_pc+'</b>':'')+'</button>';
+      h+='<button onclick="popModMark(\''+key+'\',\''+esc(row._id||'')+'\')" title="색칠·메모" style="width:24px;height:22px;border-radius:4px;border:1px solid '+(mk?_modMarkDot(mk):'#e2e8f0')+';cursor:pointer;font-size:11px;background:'+(mk||'#f8fafc')+';color:#334155;padding:0;line-height:1">🎨</button>';
       if(typeof isSuper==='function'&&isSuper()) h+='<button onclick="popModLog(\''+key+'\',\''+esc(row._id||'')+'\')" title="로그" style="width:24px;height:22px;border-radius:4px;border:1px solid #e2e8f0;cursor:pointer;font-size:11px;background:#f8fafc;color:#334155;padding:0;line-height:1">📋</button>';
       h+='<button onclick="popModEdit(\''+key+'\',\''+esc(row._id||'')+'\')" title="수정" style="width:24px;height:22px;border-radius:4px;border:1px solid #e2e8f0;cursor:pointer;font-size:11px;background:#f8fafc;color:#334155;padding:0;line-height:1">✏️</button>';
       h+='<button onclick="modDel(\''+key+'\',\''+esc(row._id||'')+'\')" title="삭제" style="width:24px;height:22px;border-radius:4px;border:1px solid #fecaca;cursor:pointer;font-size:11px;background:#fef2f2;color:#dc2626;padding:0;line-height:1">🗑</button>';
@@ -1354,6 +1359,66 @@ function modSetStatus(key,id,status){
     .catch(function(e){ hideLoading(); toast('실패: '+e.message,true); });
 }
 
+// ===== 행 색칠 + 메모 마킹 =====
+var _MOD_MARK_COLORS=[
+  {k:'',     bg:'',        dot:'#e2e8f0', name:'없음'},
+  {k:'#fee2e2', bg:'#fee2e2', dot:'#ef4444', name:'빨강'},
+  {k:'#ffedd5', bg:'#ffedd5', dot:'#f97316', name:'주황'},
+  {k:'#fef9c3', bg:'#fef9c3', dot:'#eab308', name:'노랑'},
+  {k:'#dcfce7', bg:'#dcfce7', dot:'#22c55e', name:'초록'},
+  {k:'#cffafe', bg:'#cffafe', dot:'#06b6d4', name:'청록'},
+  {k:'#dbeafe', bg:'#dbeafe', dot:'#3b82f6', name:'파랑'},
+  {k:'#ede9fe', bg:'#ede9fe', dot:'#8b5cf6', name:'보라'},
+  {k:'#fce7f3', bg:'#fce7f3', dot:'#ec4899', name:'분홍'},
+  {k:'#e2e8f0', bg:'#e2e8f0', dot:'#64748b', name:'회색'}
+];
+function _modMarkDot(hex){ var c=_MOD_MARK_COLORS.find(function(x){return x.k===hex;}); return c?c.dot:hex; }
+function popModMark(key,id){
+  var def=_modDefs[key]; if(!def) return;
+  var row=(_modData[key]||[]).find(function(r){return r._id===id;}); if(!row) return;
+  var cur=row._mark||'', memo=row._markMemo||'';
+  var nm=_modRowTitle(def,row)||'';
+  var h='<div class="pop-head"><h3>🎨 색칠 · 메모'+(nm?' <span style="font-size:12px;color:#94a3b8;font-weight:400">'+esc(nm)+'</span>':'')+'</h3></div>';
+  h+='<div style="padding:16px">';
+  h+='<div style="font-size:12px;color:#475569;font-weight:600;margin-bottom:8px">색상</div>';
+  h+='<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px">';
+  _MOD_MARK_COLORS.forEach(function(c){
+    var on=(cur===c.k);
+    var inner = c.k==='' ? '<span style="font-size:16px;color:#94a3b8">✕</span>' : '';
+    h+='<button onclick="_modSetMark(\''+key+'\',\''+esc(id)+'\',\''+c.k+'\')" title="'+c.name+'" style="width:40px;height:40px;border-radius:10px;cursor:pointer;background:'+(c.bg||'#fff')+';border:'+(on?'3px solid #2563eb':'2px solid #e2e8f0')+';display:flex;align-items:center;justify-content:center;position:relative;box-shadow:'+(on?'0 0 0 2px #bfdbfe':'none')+'">'+inner+(on&&c.k!==''?'<span style="position:absolute;color:#1e3a8a;font-weight:900;font-size:15px">✓</span>':'')+'</button>';
+  });
+  h+='</div>';
+  h+='<div style="font-size:12px;color:#475569;font-weight:600;margin-bottom:8px">메모 <span style="font-size:10px;color:#94a3b8;font-weight:400">(예: 미납, VIP, 확인필요)</span></div>';
+  h+='<input id="_modMarkMemo" value="'+esc(memo)+'" placeholder="짧은 메모" maxlength="20" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px;box-sizing:border-box" onkeydown="if(event.key===\'Enter\')_modSaveMarkMemo(\''+key+'\',\''+esc(id)+'\')">';
+  h+='<div style="display:flex;gap:8px;margin-top:16px">';
+  h+='<button class="btn" style="flex:0 0 auto;background:#475569;color:#fff" onclick="closePopup()">닫기</button>';
+  h+='<button class="btn btn-b" style="flex:1;background:#2563eb;color:#fff;font-weight:700" onclick="_modSaveMarkMemo(\''+key+'\',\''+esc(id)+'\')">💾 메모 저장</button>';
+  h+='</div></div>';
+  openPopup(h,420);
+}
+function _modSetMark(key,id,color){
+  var path=_modFbPath(key); if(!path) return;
+  var data=(_modData[key]||[]).slice();
+  var idx=-1; for(var i=0;i<data.length;i++){if(data[i]._id===id){idx=i;break}}
+  if(idx<0) return;
+  var merged={}; for(var k in data[idx])merged[k]=data[idx][k];
+  merged._mark=color; merged._updatedAt=new Date().toISOString();
+  data[idx]=merged;
+  fbDb.ref(path).set(data).then(function(){ var c=_MOD_MARK_COLORS.find(function(x){return x.k===color;}); toast(color?('🎨 '+(c?c.name:'')+' 표시'):'색 지움'); })
+    .catch(function(e){ toast('실패: '+(e.message||e),true); });
+}
+function _modSaveMarkMemo(key,id){
+  var path=_modFbPath(key); if(!path) return;
+  var el=document.getElementById('_modMarkMemo'); var memo=el?el.value.trim():'';
+  var data=(_modData[key]||[]).slice();
+  var idx=-1; for(var i=0;i<data.length;i++){if(data[i]._id===id){idx=i;break}}
+  if(idx<0) return;
+  var merged={}; for(var k in data[idx])merged[k]=data[idx][k];
+  merged._markMemo=memo; merged._updatedAt=new Date().toISOString();
+  data[idx]=merged;
+  fbDb.ref(path).set(data).then(function(){ toast(memo?('📝 메모: '+memo):'메모 지움'); closePopup(); })
+    .catch(function(e){ toast('실패: '+(e.message||e),true); });
+}
 // 신청폼 링크 팝업
 function popModFormLink(key){
   var def=_modDefs[key]; if(!def) return;
