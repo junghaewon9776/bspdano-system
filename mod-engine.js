@@ -2495,20 +2495,39 @@ function _qzInstallCert(){
   setTimeout(function(){ URL.revokeObjectURL(a.href); },1500);
   toast('📥 install_qz_cert.bat 다운로드 → 더블클릭 → "관리자 권한 예" → 8곳 설치 후 QZ Tray 재시작',true);
 }
+var _qzPrintCancel=false;
+function _qzCancelPrint(){_qzPrintCancel=true;}
 function _qzPrintLabels(def, rows, opt){
   var pn=_qzPrinterName();
   if(!qzIsReady()){ toast('QZ 프린터를 먼저 연결·선택하세요',true); return Promise.resolve(false); }
   var w=opt.w, h=opt.h;
   var cfg=qz.configs.create(pn,{colorType:'blackwhite',margins:0,units:'mm',jobName:'LABEL-'+def.key,size:{width:w,height:h||null}});
+  _qzPrintCancel=false;
+  var total=rows.length, printed=0;
+  // 진행/취소 토스트
+  var tId='_qzProg';
+  var tBox=document.getElementById(tId);
+  if(!tBox){tBox=document.createElement('div');tBox.id=tId;tBox.style.cssText='position:fixed;top:20px;left:50%;transform:translateX(-50%);z-index:99999;background:#1e293b;color:#fff;padding:12px 20px;border-radius:10px;font-size:14px;display:flex;align-items:center;gap:12px;box-shadow:0 4px 20px rgba(0,0,0,.3)';document.body.appendChild(tBox);}
+  function updProg(){tBox.innerHTML='<span>🖨 출력 중 <b>'+printed+' / '+total+'</b></span><button onclick="_qzCancelPrint()" style="background:#ef4444;color:#fff;border:none;border-radius:6px;padding:4px 12px;cursor:pointer;font-size:13px;font-weight:700">✕ 취소</button>';}
+  updProg();
   var chain=Promise.resolve();
   rows.forEach(function(r){
     chain=chain.then(function(){
+      if(_qzPrintCancel) return;
       var html='<div style="margin:0;padding:0">'+_modLabelHtml(def,r,opt)+'</div>';
-      return qz.print(cfg,[{type:'pixel',format:'html',flavor:'plain',data:html,options:{pageWidth:w,pageHeight:h||null}}]);
+      return qz.print(cfg,[{type:'pixel',format:'html',flavor:'plain',data:html,options:{pageWidth:w,pageHeight:h||null}}]).then(function(){
+        printed++;
+        updProg();
+      });
     });
   });
-  return chain.then(function(){ toast('🖨 QZ로 '+rows.length+'장 출력'); return true; })
-    .catch(function(e){ toast('QZ 출력 실패: '+(e.message||e),true); return false; });
+  return chain.then(function(){
+    tBox.remove();
+    if(_qzPrintCancel){toast('🛑 출력 취소 — '+printed+'/'+total+'장 출력됨',true);}
+    else{toast('🖨 QZ로 '+total+'장 출력 완료');}
+    _qzPrintCancel=false;
+    return !_qzPrintCancel;
+  }).catch(function(e){tBox.remove();toast('QZ 출력 실패: '+(e.message||e),true);return false;});
 }
 // 라벨 팝업 내 QZ 영역 갱신
 function _qzUpdateUI(){
