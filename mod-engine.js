@@ -1997,8 +1997,7 @@ function _modLabelHtml(def,row,opt){
     h+='</div>';
     return h;
   }
-  var h='<div class="mlabel" style="width:'+opt.w+'mm;height:'+opt.h+'mm;box-sizing:border-box;position:relative;overflow:hidden">';
-  h+='<div style="position:absolute;top:'+opt.pt+'mm;left:'+opt.pl+'mm;right:'+opt.pr+'mm;bottom:'+opt.pb+'mm;display:flex;gap:2mm;overflow:hidden">';
+  var h='<div class="mlabel" style="width:'+opt.w+'mm;height:'+opt.h+'mm;padding:'+opt.pt+'mm '+opt.pr+'mm '+opt.pb+'mm '+opt.pl+'mm;box-sizing:border-box;display:flex;gap:2mm;overflow:hidden">';
   h+='<div style="flex:1;min-width:0;overflow:hidden">';
   if(showTitle) h+='<div style="font-size:14pt;font-weight:800;line-height:1.1;margin-bottom:1mm;word-break:break-all">'+esc(String(titleV))+'</div>';
   cols.forEach(function(c){
@@ -2008,7 +2007,7 @@ function _modLabelHtml(def,row,opt){
   });
   h+='</div>';
   if(showQr) h+='<img src="'+qr+'" style="width:'+qrmm+'mm;height:'+qrmm+'mm;align-self:flex-start;flex-shrink:0">';
-  h+='</div></div>';
+  h+='</div>';
   return h;
 }
 
@@ -2334,8 +2333,7 @@ function modDoPrint(){
     bodyHtml='<div class="sheet">'+labels+'</div>';
   } else {
     css='@page{size:'+opt.w+'mm '+opt.h+'mm;margin:0}html,body{margin:0;padding:0}'
-      +'.mlabel{height:'+opt.h+'mm !important;max-height:'+opt.h+'mm !important;overflow:hidden;page-break-after:always}'
-      +'.mlabel>*{max-height:'+opt.h+'mm;overflow:hidden}'
+      +'.mlabel{page-break-after:always;overflow:hidden;clip-path:inset(0)}'
       +'@media screen{body{background:#e2e8f0;padding:10px}.mlabel{background:#fff;margin:0 auto 8px;box-shadow:0 1px 4px rgba(0,0,0,.2)}}';
     bodyHtml=labels;
   }
