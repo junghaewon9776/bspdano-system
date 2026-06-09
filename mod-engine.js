@@ -2501,7 +2501,7 @@ function _qzPrintLabels(def, rows, opt){
   var pn=_qzPrinterName();
   if(!qzIsReady()){ toast('QZ 프린터를 먼저 연결·선택하세요',true); return Promise.resolve(false); }
   var w=opt.w, h=opt.h;
-  var cfg=qz.configs.create(pn,{colorType:'blackwhite',margins:0,units:'mm',jobName:'LABEL-'+def.key,size:{width:w,height:h||null}});
+  var cfg=qz.configs.create(pn,{colorType:'blackwhite',margins:0,units:'mm',jobName:'LABEL-'+def.key,size:{width:w,height:h||null},density:203,scaleContent:false,rasterize:true});
   _qzPrintCancel=false;
   var total=rows.length, printed=0;
   // 진행/취소 토스트
