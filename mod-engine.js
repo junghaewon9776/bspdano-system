@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260609v45';
+var _MOD_ENGINE_VER='20260609v46';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -345,7 +345,6 @@ function _modListHtml(key){
       h+='<div style="display:flex;gap:1px">';
       var _pc=pn(row._printCount);
       h+='<button onclick="modPrintOne(\''+key+'\',\''+esc(row._id||'')+'\')" title="'+(_pc?'재출력('+_pc+'회 출력됨)':'라벨 출력')+'" style="'+(_pc?'min-width:32px;':'width:24px;')+'height:22px;border-radius:4px;border:1px solid '+(_pc?'#475569':'#e2e8f0')+';cursor:pointer;font-size:11px;background:'+(_pc?'#475569':'#f8fafc')+';color:'+(_pc?'#fff':'#334155')+';padding:0 2px;line-height:1">🖨'+(_pc?'<b>'+_pc+'</b>':'')+'</button>';
-      h+='<button onclick="popModMark(\''+key+'\',\''+esc(row._id||'')+'\')" title="색칠·메모" style="width:24px;height:22px;border-radius:4px;border:1px solid '+(mk?_modMarkDot(mk):'#e2e8f0')+';cursor:pointer;font-size:11px;background:'+(mk||'#f8fafc')+';color:#334155;padding:0;line-height:1">🎨</button>';
       if(typeof isSuper==='function'&&isSuper()) h+='<button onclick="popModLog(\''+key+'\',\''+esc(row._id||'')+'\')" title="로그" style="width:24px;height:22px;border-radius:4px;border:1px solid #e2e8f0;cursor:pointer;font-size:11px;background:#f8fafc;color:#334155;padding:0;line-height:1">📋</button>';
       h+='<button onclick="popModEdit(\''+key+'\',\''+esc(row._id||'')+'\')" title="수정" style="width:24px;height:22px;border-radius:4px;border:1px solid #e2e8f0;cursor:pointer;font-size:11px;background:#f8fafc;color:#334155;padding:0;line-height:1">✏️</button>';
       h+='<button onclick="modDel(\''+key+'\',\''+esc(row._id||'')+'\')" title="삭제" style="width:24px;height:22px;border-radius:4px;border:1px solid #fecaca;cursor:pointer;font-size:11px;background:#fef2f2;color:#dc2626;padding:0;line-height:1">🗑</button>';
@@ -531,6 +530,8 @@ function popModEdit(key,id){
     h+=_modFormField(c,row[c.key]||'');
     h+='</div>';
   });
+  // 🎨 색칠 + 메모 (저장 버튼으로 같이 저장)
+  h+=_modMarkEditSection(row);
   h+='</div>';
   h+='<div style="padding:10px 14px;border-top:1px solid #e2e8f0;text-align:right;background:#f8fafc;border-radius:0 0 12px 12px">';
   h+='<button class="btn" style="background:#64748b;color:#fff" onclick="closePopup()">취소</button> ';
@@ -539,6 +540,35 @@ function popModEdit(key,id){
   openPopup(h,460);
 }
 
+// 수정 팝업용 색칠+메모 섹션 (저장 버튼으로 같이 저장됨)
+function _modMarkEditSection(row){
+  var cur=(row&&row._mark)||'', memo=(row&&row._markMemo)||'';
+  var h='<div style="margin-top:16px;padding-top:14px;border-top:1px dashed #e2e8f0">';
+  h+='<label style="font-size:12px;font-weight:700;color:#64748b;display:block;margin-bottom:8px">🎨 색칠 · 메모</label>';
+  h+='<input type="hidden" id="_modEditMark" value="'+esc(cur)+'">';
+  h+='<div id="_modEditSwatches" style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:10px">';
+  _MOD_MARK_COLORS.forEach(function(c){
+    var on=(cur===c.k);
+    var inner = c.k==='' ? '<span style="font-size:14px;color:#94a3b8">✕</span>' : (on?'<span style="color:#1e3a8a;font-weight:900;font-size:14px">✓</span>':'');
+    h+='<button type="button" data-mk="'+c.k+'" onclick="_modPickMark(this)" title="'+c.name+'" style="width:34px;height:34px;border-radius:9px;cursor:pointer;background:'+(c.bg||'#fff')+';border:'+(on?'3px solid #2563eb':'2px solid #e2e8f0')+';display:flex;align-items:center;justify-content:center;box-shadow:'+(on?'0 0 0 2px #bfdbfe':'none')+'">'+inner+'</button>';
+  });
+  h+='</div>';
+  h+='<input id="_modEditMemo" value="'+esc(memo)+'" placeholder="짧은 메모 (예: 미납, VIP, 확인필요)" maxlength="20" style="width:100%;box-sizing:border-box;padding:9px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px">';
+  h+='</div>';
+  return h;
+}
+function _modPickMark(btn){
+  var hex=btn.getAttribute('data-mk')||'';
+  var hid=document.getElementById('_modEditMark'); if(hid) hid.value=hex;
+  var wrap=document.getElementById('_modEditSwatches'); if(!wrap) return;
+  Array.prototype.forEach.call(wrap.querySelectorAll('button'),function(b){
+    var on=(b.getAttribute('data-mk')===hex);
+    b.style.border=on?'3px solid #2563eb':'2px solid #e2e8f0';
+    b.style.boxShadow=on?'0 0 0 2px #bfdbfe':'none';
+    var mk=b.getAttribute('data-mk');
+    b.innerHTML = mk==='' ? '<span style="font-size:14px;color:#94a3b8">✕</span>' : (on?'<span style="color:#1e3a8a;font-weight:900;font-size:14px">✓</span>':'');
+  });
+}
 function _modFormField(col,val){
   var id='mod_f_'+col.key;
   // 기본값: 빈 값이면 정의된 기본값으로 자동 채움
@@ -637,6 +667,11 @@ function modSave(key,editId){
     obj[c.key]=v;
   });
   if(!valid) return;
+  // 🎨 색칠+메모 (수정 팝업에 있을 때만)
+  var _mkEl=document.getElementById('_modEditMark');
+  if(_mkEl){ obj._mark=_mkEl.value||''; }
+  var _memoEl=document.getElementById('_modEditMemo');
+  if(_memoEl){ obj._markMemo=(_memoEl.value||'').trim(); }
 
   var path=_modFbPath(key);
   if(!path) return toast('행사를 선택하세요',true);
