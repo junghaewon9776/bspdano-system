@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260609v52';
+var _MOD_ENGINE_VER='20260609v53';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -2906,14 +2906,12 @@ function _qzPrintLabels(def, rows, opt){
   if(!qzIsReady()){ toast('QZ 프린터를 먼저 연결·선택하세요',true); return Promise.resolve(false); }
   var w=opt.w, h=opt.h;
   var cfg=qz.configs.create(pn,{colorType:'blackwhite',margins:0,units:'mm',jobName:'LABEL-'+def.key,size:{width:w,height:h||null}});
-  var chain=Promise.resolve();
-  rows.forEach(function(r){
-    chain=chain.then(function(){
-      var html='<div style="margin:0;padding:0">'+_modLabelHtml(def,r,opt)+'</div>';
-      return qz.print(cfg,[{type:'pixel',format:'html',flavor:'plain',data:html,options:{pageWidth:w,pageHeight:h||null}}]);
-    });
+  // 모든 라벨을 한 작업으로 묶어 전송 → 장마다 백피드 없이 연속 출력(빠름)
+  var data=rows.map(function(r){
+    var html='<div style="margin:0;padding:0">'+_modLabelHtml(def,r,opt)+'</div>';
+    return {type:'pixel',format:'html',flavor:'plain',data:html,options:{pageWidth:w,pageHeight:h||null}};
   });
-  return chain.then(function(){ toast('🖨 QZ로 '+rows.length+'장 출력'); return true; })
+  return qz.print(cfg,data).then(function(){ toast('🖨 QZ로 '+rows.length+'장 출력'); return true; })
     .catch(function(e){ toast('QZ 출력 실패: '+(e.message||e),true); return false; });
 }
 function _qzToggleBitmap(on){ try{ localStorage.setItem('_mlBitmap', on?'1':'0'); }catch(e){} _qzUpdateUI(); toast(on?'RAW 비트맵 모드 ON (이미지+GAP)':'일반 모드',false); }
