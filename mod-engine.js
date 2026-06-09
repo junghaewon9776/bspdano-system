@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260609v37';
+var _MOD_ENGINE_VER='20260609v38';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -2317,9 +2317,17 @@ function modDoPrint(){
       +'@media screen{body{background:#e2e8f0;padding:10px}.sheet{background:#fff;width:'+pw+'mm;margin:0 auto;padding:'+opt.sheetMargin+'mm;box-sizing:border-box;box-shadow:0 1px 6px rgba(0,0,0,.2)}}';
     bodyHtml='<div class="sheet">'+labels+'</div>';
   } else {
-    css='@page{size:'+opt.w+'mm '+opt.h+'mm;margin:0}html,body{margin:0;padding:0;width:'+opt.w+'mm}'
-      +'.mlabel{page-break-after:always;width:'+opt.w+'mm;height:'+opt.h+'mm;overflow:hidden}'
-      +'@media screen{body{background:#e2e8f0;padding:10px}.mlabel{background:#fff;margin:0 auto 8px;box-shadow:0 1px 4px rgba(0,0,0,.2)}}';
+    var _rot=false; try{ _rot=(localStorage.getItem('_mlRotate')==='1'); }catch(e){}
+    if(_rot){
+      // 프린터가 용지를 세로(높이=w)로 인식 → 페이지는 30x100, 내용은 90도 회전해 가로로 보이게
+      css='@page{size:'+opt.h+'mm '+opt.w+'mm;margin:0}html,body{margin:0;padding:0}'
+        +'.mlabel{page-break-after:always;width:'+opt.w+'mm;height:'+opt.h+'mm;overflow:hidden;transform:rotate(90deg);transform-origin:top left;position:relative;left:'+opt.h+'mm}'
+        +'@media screen{body{background:#e2e8f0;padding:10px}}';
+    } else {
+      css='@page{size:'+opt.w+'mm '+opt.h+'mm;margin:0}html,body{margin:0;padding:0;width:'+opt.w+'mm}'
+        +'.mlabel{page-break-after:always;width:'+opt.w+'mm;height:'+opt.h+'mm;overflow:hidden}'
+        +'@media screen{body{background:#e2e8f0;padding:10px}.mlabel{background:#fff;margin:0 auto 8px;box-shadow:0 1px 4px rgba(0,0,0,.2)}}';
+    }
     bodyHtml=labels;
   }
   win.document.write('<html><head><meta charset="utf-8"><title>라벨 출력</title><style>'+css+'</style></head><body>'+bodyHtml+'<scr'+'ipt>setTimeout(function(){window.print();},800);</scr'+'ipt></body></html>');
@@ -2673,6 +2681,7 @@ function _qzPrintLabels(def, rows, opt){
 function _qzToggleBitmap(on){ try{ localStorage.setItem('_mlBitmap', on?'1':'0'); }catch(e){} _qzUpdateUI(); toast(on?'RAW 비트맵 모드 ON (이미지+GAP)':'일반 모드',false); }
 function _qzAdjSize(d){ var v=0; try{ v=parseFloat(localStorage.getItem('_mlSizeAdj')||'0')||0; }catch(e){} v=Math.round((v+d)*10)/10; try{ localStorage.setItem('_mlSizeAdj', String(v)); }catch(e){} _qzUpdateUI(); toast('라벨길이 보정: '+(v>0?'+':'')+v.toFixed(1)+'mm',false); }
 function _qzToggleBrowserPrint(on){ try{ localStorage.setItem('_mlBrowserPrint', on?'1':'0'); }catch(e){} _qzUpdateUI(); toast(on?'브라우저 인쇄 모드 ON (Excel 메일머지식)':'QZ 직접 출력 모드',false); }
+function _qzToggleRotate(on){ try{ localStorage.setItem('_mlRotate', on?'1':'0'); }catch(e){} _qzUpdateUI(); toast(on?'90도 회전 ON':'회전 OFF',false); }
 // 라벨 팝업 내 QZ 영역 갱신
 function _qzUpdateUI(){
   var box=document.getElementById('ml_qz_box'); if(!box) return;
@@ -2699,6 +2708,11 @@ function _qzUpdateUI(){
     var _bp=(localStorage.getItem('_mlBrowserPrint')==='1');
     h+='<label style="display:inline-flex;align-items:center;gap:4px;font-size:11px;background:'+(_bp?'#0891b2':'#e2e8f0')+';color:'+(_bp?'#fff':'#475569')+';padding:5px 9px;border-radius:6px;cursor:pointer;font-weight:700" title="Excel 메일머지처럼 브라우저 인쇄로 100x30 페이지를 라벨마다 잘라 출력(드라이버가 gap 처리)">'
       +'<input type="checkbox" '+(_bp?'checked':'')+' onchange="_qzToggleBrowserPrint(this.checked)" style="margin:0"> 🖨 브라우저 인쇄(메일머지식)</label>';
+    if(_bp){
+      var _rt=(localStorage.getItem('_mlRotate')==='1');
+      h+='<label style="display:inline-flex;align-items:center;gap:4px;font-size:11px;background:'+(_rt?'#f59e0b':'#e2e8f0')+';color:'+(_rt?'#fff':'#475569')+';padding:5px 9px;border-radius:6px;cursor:pointer;font-weight:700" title="세로로 나오면 체크 → 내용을 90도 돌려 가로로 출력">'
+        +'<input type="checkbox" '+(_rt?'checked':'')+' onchange="_qzToggleRotate(this.checked)" style="margin:0"> ↻ 90도 회전</label>';
+    }
     var _bm=(localStorage.getItem('_mlBitmap')==='1');
     h+='<label style="display:inline-flex;align-items:center;gap:4px;font-size:11px;background:'+(_bm?'#7c3aed':'#e2e8f0')+';color:'+(_bm?'#fff':'#475569')+';padding:5px 9px;border-radius:6px;cursor:pointer;font-weight:700" title="공유 프린터에서 밀림 방지: 라벨을 이미지로 변환해 프린터 GAP으로 직접 출력">'
       +'<input type="checkbox" '+(_bm?'checked':'')+' onchange="_qzToggleBitmap(this.checked)" style="margin:0"> RAW 비트맵</label>';
