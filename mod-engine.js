@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260609v48';
+var _MOD_ENGINE_VER='20260609v49';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -1722,6 +1722,8 @@ function popModSms(key, preSelIds){
   var vars=(def.columns||[]).filter(function(c){return c.key!=='status'&&c.type!=='consent'&&c.type!=='file'})
     .map(function(c){return {key:c.label, srcKey:c.key, sample:sample[c.key]||''};});
   if(typeof _smsDateVars==='function') vars=vars.concat(_smsDateVars());
+  // 📱 디지털 패스 링크 변수 (열면 QR 표시 → 입구 스캔)
+  vars.push({key:'패스링크', srcKey:'_passLink', sample:'https://…(QR 패스)'});
   window._SMS_POPUP_VARS=vars;
 
   var h='<div class="pop-head"><h3>💬 '+esc(def.label)+' 문자 발송</h3></div>';
@@ -1881,6 +1883,8 @@ function modSmsSend(){
       if(typeof _smsDateVars==='function'){
         _smsDateVars().forEach(function(v){ msg=msg.split('{'+v.key+'}').join(v.sample||''); });
       }
+      // 📱 디지털 패스 링크 (열면 QR 표시)
+      msg=msg.split('{패스링크}').join(_modViewUrl(def,tr.row));
       return api('sendSmsAligo',{tels:[tr.tel], msg:msg});
     });
     Promise.all(promises).then(function(results){
@@ -3332,6 +3336,16 @@ function _renderModViewUI(def,row){
     if(row._statusByName) meta+='<div>승인처리자: <b style="color:#475569">'+esc(row._statusByName)+'</b>'+(row._statusAt?' · '+esc(_modFmtDateTime(row._statusAt)):'')+'</div>';
     if(row._printByName) meta+='<div>라벨발행자: <b style="color:#475569">'+esc(row._printByName)+'</b>'+(row._printedAt?' · '+esc(_modFmtDateTime(row._printedAt)):'')+'</div>';
     if(meta) h+='<div style="text-align:center;font-size:11px;color:#94a3b8;margin-bottom:14px;line-height:1.7">'+meta+'</div>';
+  }
+
+  // 📱 디지털 패스 QR — 핸드폰으로 보여주면 입구에서 스캔해 통과 (라벨과 동일)
+  if(!_isAdminView){
+    var _passUrl=(typeof location!=='undefined')?location.href:_modViewUrl(def,row);
+    var _qrImg='';
+    try{ if(typeof qrcode!=='undefined'){ var _q=qrcode(0,'M'); _q.addData(_passUrl); _q.make(); _qrImg=_q.createDataURL(6,8); } }catch(e){}
+    if(!_qrImg) _qrImg='https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=6&data='+encodeURIComponent(_passUrl);
+    h+='<div style="text-align:center;margin:6px 0 16px"><div style="display:inline-block;background:#fff;border:2px solid #e2e8f0;border-radius:14px;padding:12px"><img src="'+_qrImg+'" style="width:200px;height:200px;display:block"></div>'
+      +'<div style="font-size:12px;color:#64748b;margin-top:8px;font-weight:600">📱 입구에서 이 QR을 보여주세요</div></div>';
   }
 
   h+='<table style="width:100%;border-collapse:collapse;font-size:14px">';
