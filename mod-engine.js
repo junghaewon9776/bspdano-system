@@ -2511,6 +2511,7 @@ function _qzPrintLabels(def, rows, opt){
   function updProg(){tBox.innerHTML='<span>🖨 출력 중 <b>'+printed+' / '+total+'</b></span><button onclick="_qzCancelPrint()" style="background:#ef4444;color:#fff;border:none;border-radius:6px;padding:4px 12px;cursor:pointer;font-size:13px;font-weight:700">✕ 취소</button>';}
   updProg();
   var chain=Promise.resolve();
+  var DELAY=800;
   rows.forEach(function(r){
     chain=chain.then(function(){
       if(_qzPrintCancel) return;
@@ -2518,6 +2519,7 @@ function _qzPrintLabels(def, rows, opt){
       return qz.print(cfg,[{type:'pixel',format:'html',flavor:'plain',data:html,options:{pageWidth:w,pageHeight:h||null}}]).then(function(){
         printed++;
         updProg();
+        return new Promise(function(ok){setTimeout(ok,DELAY);});
       });
     });
   });
