@@ -8,6 +8,7 @@ var _modData={};   // key → 데이터 배열
 var _modSort={};   // key → {col, asc}
 var _modSearch={}; // key → 검색어
 var _modFilter={}; // key → 필터값
+var _modPrintFilter={}; // key → 'no'|'yes'|''
 var _modSel={};    // key → {_id: true} 선택된 행
 var _modSelLast={};// key → 마지막 클릭 인덱스 (Shift 범위선택)
 var _modListeners={};
@@ -171,6 +172,7 @@ function dMod(key){
   if(isA()) h+='<button class="btn" style="background:#0d9488;color:#fff" onclick="modImportExcel(\''+key+'\')">📤 가져오기</button>';
   if(feat.excel!==false) h+='<button class="btn" onclick="modExportExcel(\''+key+'\')">📥 내보내기</button>';
   if(typeof isSuper==='function'&&isSuper()) h+='<button class="btn" style="background:#7c3aed;color:#fff" onclick="popModLog(\''+key+'\')">📋 로그</button>';
+  if(typeof isSuper==='function'&&isSuper()) h+='<button class="btn" style="background:#dc2626;color:#fff" onclick="modResetPrintCount(\''+key+'\')">🖨 출력횟수 초기화</button>';
   h+='</div></div>';
 
   // 검색 + 필터 (검색은 목록 영역만 갱신 → 입력 포커스 유지)
@@ -193,7 +195,14 @@ function dMod(key){
       });
       h+='</select>';
     });
-    if(anyActive) h+='<button class="btn btn-s" style="font-size:11px" onclick="_modClearFilter(\''+key+'\')">필터 해제</button>';
+    // 출력 필터
+    var _pf=_modPrintFilter[key]||'';
+    h+='<select onchange="_modSetPrintFilter(\''+key+'\',this.value)" style="padding:7px 10px;border:1px solid '+(_pf?'#7c3aed':'#d1d5db')+';border-radius:8px;font-size:13px;background:'+(_pf?'#f5f3ff':'#fff')+';color:#334155;font-weight:'+(_pf?'700':'400')+'">';
+    h+='<option value="">🖨 출력 전체</option>';
+    h+='<option value="no"'+(_pf==='no'?' selected':'')+'>미출력만</option>';
+    h+='<option value="yes"'+(_pf==='yes'?' selected':'')+'>출력됨만</option>';
+    h+='</select>';
+    if(anyActive||_pf) h+='<button class="btn btn-s" style="font-size:11px" onclick="_modClearFilter(\''+key+'\')">필터 해제</button>';
     h+='</div>';
   }
 
@@ -228,6 +237,10 @@ function _modFilteredData(key){
     var fc=(def.columns||[]).find(function(c){return c.filter});
     if(fc) data=data.filter(function(row){return String(row[fc.key]||'')===filter});
   }
+  // 출력 필터
+  var pf=_modPrintFilter[key]||'';
+  if(pf==='no') data=data.filter(function(r){return !r._printCount||pn(r._printCount)===0;});
+  else if(pf==='yes') data=data.filter(function(r){return pn(r._printCount)>0;});
   if(sort.col){
     data.sort(function(a,b){
       var va=a[sort.col]||"",vb=b[sort.col]||"";
@@ -368,7 +381,8 @@ function _modSetFilter(key,colKey,val){
   if(val==='') delete _modFilter[key][colKey]; else _modFilter[key][colKey]=val;
   draw();
 }
-function _modClearFilter(key){ _modFilter[key]={}; draw(); }
+function _modClearFilter(key){ _modFilter[key]={}; _modPrintFilter[key]=''; draw(); }
+function _modSetPrintFilter(key,val){ _modPrintFilter[key]=val; draw(); }
 
 // ─── 명단 행 선택(체크박스) ───
 function _modSelToggle(ev,key,id,idx){
@@ -659,6 +673,17 @@ function modSave(key,editId){
   }).catch(function(e){hideLoading();toast('실패: '+(e.message||e),true)});
 }
 
+function modResetPrintCount(key){
+  var path=_modFbPath(key); if(!path) return;
+  var data=(_modData[key]||[]).slice();
+  var cnt=data.filter(function(r){return pn(r._printCount)>0}).length;
+  if(!cnt) return toast('출력된 항목이 없습니다');
+  if(!confirm('⚠ '+cnt+'개 항목의 출력 횟수를 0으로 초기화할까요?\n(되돌릴 수 없습니다)')) return;
+  data.forEach(function(r){ r._printCount=0; });
+  showLoading('초기화 중...');
+  fbDb.ref(path).set(data).then(function(){ hideLoading(); toast('🖨 '+cnt+'개 출력횟수 초기화 완료'); draw(); })
+    .catch(function(e){ hideLoading(); toast('실패: '+(e.message||e),true); });
+}
 function modDel(key,id){
   var def=_modDefs[key]; if(!def) return;
   if(!confirm(def.label+' 항목을 삭제할까요?')) return;
@@ -2712,7 +2737,8 @@ function _mllShowCtrl(id){
     h+='<div style="margin-top:6px;font-size:11px;color:#94a3b8;margin-bottom:4px">가리기 · 장식</div>';
     h+='<div style="display:flex;flex-wrap:wrap;gap:4px">';
     h+='<button onclick="_mllToggle(\''+id+'\',\'star\')" style="'+bs(p.star)+'">★ 별표</button>';
-    h+='<button onclick="_mllToggle(\''+id+'\',\'maskMid\')" style="'+bs(p.maskMid)+'">홍*동</button>';
+    h+='<button onclick="_mllToggle(\''+id+'\',\'maskMid\')" style="'+bs(p.maskMid)+'">정*원</button>';
+    h+='<button onclick="_mllToggle(\''+id+'\',\'maskEdge\')" style="'+bs(p.maskEdge)+'">*해*</button>';
     h+='<button onclick="_mllToggle(\''+id+'\',\'maskEnd\')" style="'+bs(p.maskEnd)+'">홍길*</button>';
     h+='</div>';
     h+='<div style="display:flex;gap:4px;margin-top:5px">';
@@ -2743,13 +2769,21 @@ function _modMaskVal(v,fp){
   if(!v||!fp) return v;
   var s=String(v);
   if(fp.maskMid){
-    // 전화번호 형태(- 포함): 가운데 자리 마스킹
+    // 가운데 가리기: 정*원, 010-****-9999
     if(/^\d{2,4}-\d{3,4}-\d{4}$/.test(s)){
       var ps=s.split('-'); ps[1]=ps[1].replace(/./g,'*'); s=ps.join('-');
     } else if(s.length<=2){ s=s[0]+'*';
     } else { var st=Math.ceil(s.length/3); var en=s.length-Math.ceil(s.length/3); s=s.substring(0,st)+s.substring(st,en).replace(/./g,'*')+s.substring(en); }
   }
+  if(fp.maskEdge){
+    // 양쪽끝 가리기: *해*, ***-1234-****
+    if(/^\d{2,4}-\d{3,4}-\d{4}$/.test(s)){
+      var ps=s.split('-'); ps[0]=ps[0].replace(/./g,'*'); ps[2]=ps[2].replace(/./g,'*'); s=ps.join('-');
+    } else if(s.length<=2){ s='*'.repeat(s.length);
+    } else { s='*'+s.substring(1,s.length-1)+'*'; }
+  }
   if(fp.maskEnd){
+    // 끝 가리기: 홍길*, 010-1111-****
     if(/^\d{2,4}-\d{3,4}-\d{4}$/.test(s)){
       var ps=s.split('-'); ps[2]=ps[2].replace(/./g,'*'); s=ps.join('-');
     } else if(s.length<=2){ s=s[0]+'*';
