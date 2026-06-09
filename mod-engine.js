@@ -1997,7 +1997,8 @@ function _modLabelHtml(def,row,opt){
     h+='</div>';
     return h;
   }
-  var h='<div class="mlabel" style="width:'+opt.w+'mm;height:'+opt.h+'mm;padding:'+opt.pt+'mm '+opt.pr+'mm '+opt.pb+'mm '+opt.pl+'mm;box-sizing:border-box;display:flex;gap:2mm;overflow:hidden">';
+  var h='<div class="mlabel" style="width:'+opt.w+'mm;height:'+opt.h+'mm;box-sizing:border-box;position:relative;overflow:hidden">';
+  h+='<div style="position:absolute;top:'+opt.pt+'mm;left:'+opt.pl+'mm;right:'+opt.pr+'mm;bottom:'+opt.pb+'mm;display:flex;gap:2mm;overflow:hidden">';
   h+='<div style="flex:1;min-width:0;overflow:hidden">';
   if(showTitle) h+='<div style="font-size:14pt;font-weight:800;line-height:1.1;margin-bottom:1mm;word-break:break-all">'+esc(String(titleV))+'</div>';
   cols.forEach(function(c){
@@ -2007,7 +2008,7 @@ function _modLabelHtml(def,row,opt){
   });
   h+='</div>';
   if(showQr) h+='<img src="'+qr+'" style="width:'+qrmm+'mm;height:'+qrmm+'mm;align-self:flex-start;flex-shrink:0">';
-  h+='</div>';
+  h+='</div></div>';
   return h;
 }
 
