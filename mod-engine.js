@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260609v43';
+var _MOD_ENGINE_VER='20260609v44';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -2112,7 +2112,19 @@ function popModLabel(key,singleId,idsList){
 
   h+='<div style="font-size:12px;font-weight:700;margin-bottom:4px;color:#475569">미리보기 (QR 스캔 → 정보 조회 페이지)</div>';
   h+='<div id="ml_preview" style="background:#e2e8f0;padding:12px;border-radius:8px;overflow:auto;text-align:center"></div>';
-  h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px"><div style="display:flex;gap:6px"><button class="btn" style="background:#6366f1;color:#fff" onclick="popModLabelLayout(\''+key+'\')">📐 배치 편집</button><button class="btn" style="background:#16a34a;color:#fff" onclick="_mlExportMailMerge(\''+key+'\')" title="선택 항목을 엑셀로 내보내 메일머지(차량명찰 xlsm)로 완벽하게 출력">📊 메일머지용 엑셀</button><button class="btn" style="background:#0891b2;color:#fff" onclick="_mlExportPdfRotated(\''+key+'\')" title="세로 용지용: 내용을 90도 돌린 PDF로 저장(세로 피드 프린터용)">📄 세로 PDF</button><button class="btn btn-s" style="background:#94a3b8;color:#fff;font-size:11px" onclick="_mlTogglePdfDir()" title="세로 PDF가 거꾸로면 누르세요">↻방향</button></div><div><button class="btn" style="background:#64748b;color:#fff" onclick="closePopup()">취소</button> <button id="ml_printbtn" class="btn btn-b" style="background:#2563eb;color:#fff;font-weight:700" onclick="modDoPrint()">🖨 <span id="ml_printcnt">'+rows.length+'</span>장 출력</button></div></div>';
+  h+='<div style="margin-top:14px;border-top:1px solid #e2e8f0;padding-top:12px">';
+  // 1줄: 보조 도구 (줄바꿈 허용)
+  h+='<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">';
+  h+='<button class="btn btn-s" style="background:#6366f1;color:#fff;font-weight:600" onclick="popModLabelLayout(\''+key+'\')">📐 배치 편집</button>';
+  h+='<button class="btn btn-s" style="background:#16a34a;color:#fff;font-weight:600" onclick="_mlExportMailMerge(\''+key+'\')" title="선택 항목을 엑셀로 내보내 메일머지(차량명찰 xlsm)로 완벽하게 출력">📊 메일머지 엑셀</button>';
+  h+='<div style="display:inline-flex;border-radius:7px;overflow:hidden;box-shadow:0 1px 2px rgba(0,0,0,.12)">';
+  h+='<button class="btn btn-s" style="background:#0891b2;color:#fff;font-weight:600;border-radius:0" onclick="_mlExportPdfRotated(\''+key+'\')" title="세로 용지용: 내용을 90도 돌린 PDF로 저장">📄 세로 PDF</button>';
+  h+='<button class="btn btn-s" style="background:#0e7490;color:#fff;font-weight:700;border-radius:0;border-left:1px solid rgba(255,255,255,.3)" onclick="_mlTogglePdfDir()" title="세로 PDF가 거꾸로 나오면 누르세요">↻ 방향</button>';
+  h+='</div></div>';
+  // 2줄: 취소 / 출력 (주 동작)
+  h+='<div style="display:flex;gap:8px"><button class="btn" style="flex:0 0 auto;background:#475569;color:#fff;font-weight:600" onclick="closePopup()">취소</button>';
+  h+='<button id="ml_printbtn" class="btn btn-b" style="flex:1;background:#2563eb;color:#fff;font-weight:700" onclick="modDoPrint()">🖨 <span id="ml_printcnt">'+rows.length+'</span>장 출력</button></div>';
+  h+='</div>';
   h+='</div>';
   openPopup(h,560);
   setTimeout(function(){
