@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260609v32';
+var _MOD_ENGINE_VER='20260609v33';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -2633,16 +2633,13 @@ async function _qzPrintLabelsBitmap(def, rows, opt){
   var wmm=opt.w, hmm=opt.h, gap=(opt.gap!=null?opt.gap:2);
   var cfg=qz.configs.create(pn);
   try{
-    // 각 라벨을 개별 작업으로(엑셀처럼) + 라벨마다 SIZE/GAP 재설정 → 매번 gap센서로 머리 정렬
+    // 비트맵 이미지를 QZ pixel 인쇄(엑셀과 동일한 Windows 드라이버 경로)로 전송
+    // → 한글/QR/진한색은 이미지로 유지, 라벨 끊기는 드라이버 gap센서가 처리
+    var pcfg=qz.configs.create(pn,{colorType:'blackwhite',margins:0,units:'mm',size:{width:wmm,height:hmm},rasterize:false});
     for(var i=0;i<rows.length;i++){
       var canvas=await _labelToCanvas(_modLabelHtml(def,rows[i],opt),wmm,hmm,203);
-      var bmp=_canvasToTSPL(canvas,160);
-      var head='SIZE '+wmm+' mm,'+hmm+' mm\r\nGAP '+gap+' mm,0 mm\r\nDIRECTION 1\r\nREFERENCE 0,0\r\nCLS\r\nBITMAP 0,0,'+bmp.wbytes+','+bmp.h+',0,';
-      await qz.print(cfg,[
-        {type:'raw',format:'plain',data:head},
-        {type:'raw',format:'base64',data:_bytesToBase64(bmp.bytes)},
-        {type:'raw',format:'plain',data:'\r\nPRINT 1\r\n'}
-      ]);
+      var dataUrl=canvas.toDataURL('image/png');
+      await qz.print(pcfg,[{type:'pixel',format:'image',flavor:'base64',data:dataUrl.split(',')[1],options:{pageWidth:wmm,pageHeight:hmm}}]);
     }
     toast('🖨 RAW비트맵 '+rows.length+'장 출력');
     return true;
