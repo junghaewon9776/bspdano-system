@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260609v25';
+var _MOD_ENGINE_VER='20260609v26';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -2497,22 +2497,45 @@ function _qzInstallCert(){
   setTimeout(function(){ URL.revokeObjectURL(a.href); },1500);
   toast('📥 install_qz_cert.bat 다운로드 → 더블클릭 → "관리자 권한 예" → 8곳 설치 후 QZ Tray 재시작',true);
 }
-function _qzRawTest(){
+function _qzRawTest(mode){
   var pn=_qzPrinterName();
   if(!qzIsReady()){toast('QZ 프린터를 먼저 연결·선택하세요',true);return;}
-  var tspl=[
-    'SIZE 100 mm, 30 mm',
-    'GAP 2 mm, 0 mm',
-    'DIRECTION 1',
-    'CLS',
-    'TEXT 50,30,"4",0,1,1,"RAW TEST OK"',
-    'TEXT 50,70,"3",0,1,1,"TSPL WORKING"',
-    'PRINT 1'
-  ].join('\r\n')+'\r\n';
+  var data;
+  if(mode==='epl'){
+    data=[
+      'N',
+      'q812',
+      'Q240,24',
+      'A50,30,0,4,1,1,N,"EPL TEST OK"',
+      'A50,90,0,3,1,1,N,"EPL WORKING"',
+      'P1',
+      ''
+    ].join('\n');
+  } else if(mode==='zpl'){
+    data=[
+      '^XA',
+      '^PW812',
+      '^LL240',
+      '^FO50,30^A0N,40,40^FDZPL TEST OK^FS',
+      '^FO50,90^A0N,30,30^FDZPL WORKING^FS',
+      '^XZ'
+    ].join('\n');
+  } else {
+    data=[
+      'SIZE 100 mm, 30 mm',
+      'GAP 2 mm, 0 mm',
+      'DIRECTION 1',
+      'CLS',
+      'TEXT 50,30,"4",0,1,1,"TSPL TEST OK"',
+      'TEXT 50,90,"3",0,1,1,"TSPL WORKING"',
+      'PRINT 1'
+    ].join('\r\n')+'\r\n';
+  }
+  console.log('[RAW TEST] mode='+(mode||'tspl')+', printer='+pn);
   var cfg=qz.configs.create(pn);
-  qz.print(cfg,[{type:'raw',format:'plain',data:tspl}])
-    .then(function(){toast('RAW 테스트 전송 완료');})
-    .catch(function(e){toast('RAW 실패: '+e,true);});
+  qz.print(cfg,[{type:'raw',format:'plain',data:data}])
+    .then(function(){toast('RAW('+(mode||'tspl')+') 전송 완료');console.log('전송OK');})
+    .catch(function(e){toast('RAW 실패: '+e,true);console.error('RAW err',e);});
 }
 function _qzPrintLabels(def, rows, opt){
   var pn=_qzPrinterName();
