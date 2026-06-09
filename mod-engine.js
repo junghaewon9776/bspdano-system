@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260609v40';
+var _MOD_ENGINE_VER='20260609v41';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -2112,7 +2112,7 @@ function popModLabel(key,singleId,idsList){
 
   h+='<div style="font-size:12px;font-weight:700;margin-bottom:4px;color:#475569">미리보기 (QR 스캔 → 정보 조회 페이지)</div>';
   h+='<div id="ml_preview" style="background:#e2e8f0;padding:12px;border-radius:8px;overflow:auto;text-align:center"></div>';
-  h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px"><button class="btn" style="background:#6366f1;color:#fff" onclick="popModLabelLayout(\''+key+'\')">📐 배치 편집</button><div><button class="btn" style="background:#64748b;color:#fff" onclick="closePopup()">취소</button> <button id="ml_printbtn" class="btn btn-b" style="background:#2563eb;color:#fff;font-weight:700" onclick="modDoPrint()">🖨 <span id="ml_printcnt">'+rows.length+'</span>장 출력</button></div></div>';
+  h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px"><div style="display:flex;gap:6px"><button class="btn" style="background:#6366f1;color:#fff" onclick="popModLabelLayout(\''+key+'\')">📐 배치 편집</button><button class="btn" style="background:#16a34a;color:#fff" onclick="_mlExportMailMerge(\''+key+'\')" title="선택 항목을 엑셀로 내보내 메일머지(차량명찰 xlsm)로 완벽하게 출력">📊 메일머지용 엑셀</button></div><div><button class="btn" style="background:#64748b;color:#fff" onclick="closePopup()">취소</button> <button id="ml_printbtn" class="btn btn-b" style="background:#2563eb;color:#fff;font-weight:700" onclick="modDoPrint()">🖨 <span id="ml_printcnt">'+rows.length+'</span>장 출력</button></div></div>';
   h+='</div>';
   openPopup(h,560);
   setTimeout(function(){
@@ -2260,6 +2260,40 @@ function _modLabelPreview(){
     var pages=Math.ceil((sel||1)/g.perPage);
     info.innerHTML='용지 <b>'+(opt.sheetW||210)+'×'+(opt.sheetH||297)+'mm</b> · 한 장에 <b>'+g.cols+'×'+g.rows+' = '+g.perPage+'칸</b> · 선택 '+sel+'개 → 약 <b>'+pages+'장</b>';
   }
+}
+// 메일머지용 엑셀 내보내기 — 라벨 항목 + QR링크 열. 차량명찰 xlsm에 붙여 완벽 출력
+function _mlExportMailMerge(key){
+  var def=_modDefs[key]; if(!def){ toast('정의를 찾을 수 없습니다',true); return; }
+  if(typeof XLSX==='undefined'){ toast('엑셀 라이브러리 로딩 중… 잠시 후 다시',true); return; }
+  var opt=_modLabelReadOpt();
+  var ids=_mlSelectedIds();
+  var all=window.__modLabelAll||(_modData[key]||[]);
+  var rows=all.filter(function(r){return ids.indexOf(r._id)>=0;});
+  if(!rows.length){ toast('내보낼 항목을 선택하세요',true); return; }
+  // 승인된 항목만
+  var _statusCol=(def.columns||[]).find(function(c){return c.key==='status'&&c.type==='badge';});
+  if(_statusCol){
+    var _ok=function(r){ return /승인|선정|허가|통과|확정|완료|발급|합격|당첨|입점/.test(String(r.status||'')); };
+    rows=rows.filter(_ok);
+    if(!rows.length){ toast('승인된 항목이 없습니다',true); return; }
+  }
+  // 라벨에 표시되는 컬럼 (파일/동의/상태 제외)
+  var cols=(def.columns||[]).filter(function(c){return c.key!=='status'&&!c.hideTable&&c.type!=='file'&&c.type!=='consent';});
+  var headers=cols.map(function(c){return c.label;});
+  headers.push('QR링크');
+  var aoa=[headers];
+  rows.forEach(function(r){
+    var line=cols.map(function(c){ var v=r[c.key]; return (v==null||v==='')?'':_modPlain(c,v); });
+    line.push(_modViewUrl(def,r));
+    aoa.push(line);
+  });
+  var wb=XLSX.utils.book_new();
+  var ws=XLSX.utils.aoa_to_sheet(aoa);
+  XLSX.utils.book_append_sheet(wb,ws,'라벨');
+  var fn=def.label+'_메일머지_'+(new Date().toISOString().slice(0,10))+'.xlsx';
+  XLSX.writeFile(wb,fn);
+  toast('📊 '+rows.length+'건 엑셀 내보냄 — 차량명찰 메일머지에 붙여넣으세요');
+  _modLogAdd(key,'발급','', '('+rows.length+'건 메일머지 엑셀)','메일머지 엑셀 내보내기');
 }
 function modDoPrint(){
   if(window.__mlPrinting){ toast('출력 처리 중입니다… 잠시만 기다려주세요',true); return; } // 연타 방지
