@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260609v27';
+var _MOD_ENGINE_VER='20260609v28';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -2555,6 +2555,96 @@ function _qzKorTest(enc){
   qz.print(cfg,[{type:'raw',format:'plain',data:tspl,options:{encoding:enc||'EUC-KR'}}])
     .then(function(){toast('한글 테스트 전송 완료');})
     .catch(function(e){toast('한글 실패: '+e,true);console.error(e);});
+}
+// ===== RAW 비트맵 라벨 출력 (드라이버 무관, 프린터 GAP 직접 감지) =====
+function _bytesToBase64(bytes){
+  var bin='',chunk=0x8000;
+  for(var i=0;i<bytes.length;i+=chunk){ bin+=String.fromCharCode.apply(null,bytes.subarray(i,Math.min(i+chunk,bytes.length))); }
+  return btoa(bin);
+}
+function _canvasToTSPL(canvas, threshold){
+  threshold=threshold||150;
+  var w=canvas.width,h=canvas.height,wbytes=Math.ceil(w/8);
+  var img=canvas.getContext('2d').getImageData(0,0,w,h).data;
+  var bytes=new Uint8Array(wbytes*h);
+  for(var i=0;i<bytes.length;i++) bytes[i]=0xFF; // 0xFF=흰색(bit1)
+  for(var y=0;y<h;y++){
+    for(var x=0;x<w;x++){
+      var idx=(y*w+x)*4, a=img[idx+3];
+      var lum = a<128 ? 255 : (0.299*img[idx]+0.587*img[idx+1]+0.114*img[idx+2]);
+      if(lum<threshold){ bytes[y*wbytes+(x>>3)] &= ~(0x80>>(x&7)); } // 검정=bit0
+    }
+  }
+  return {bytes:bytes,wbytes:wbytes,h:h};
+}
+async function _labelToCanvas(innerHtml, wmm, hmm, dpi){
+  dpi=dpi||203;
+  var targetW=Math.round(wmm*dpi/25.4), targetH=Math.round(hmm*dpi/25.4);
+  var host=document.createElement('div');
+  host.style.cssText='position:fixed;left:-99999px;top:0;background:#fff;z-index:-1';
+  host.innerHTML='<div id="_bmpwrap" style="width:'+wmm+'mm;height:'+hmm+'mm;background:#fff;overflow:hidden">'+innerHtml+'</div>';
+  document.body.appendChild(host);
+  // QR 원격이미지 → 로컬 데이터URL 교체 (CORS taint 방지)
+  var imgs=host.querySelectorAll('img');
+  for(var i=0;i<imgs.length;i++){
+    var src=imgs[i].getAttribute('src')||'';
+    if(/qrserver|api\.qr/.test(src) && typeof qrcode!=='undefined'){
+      var m=src.match(/[?&]data=([^&]+)/);
+      if(m){ try{ var d=decodeURIComponent(m[1]); var qr=qrcode(0,'M'); qr.addData(d); qr.make(); imgs[i].src=qr.createDataURL(6,0); }catch(e){} }
+    }
+  }
+  await Promise.all(Array.prototype.map.call(host.querySelectorAll('img'),function(im){
+    return new Promise(function(res){ if(im.complete&&im.naturalWidth) res(); else { im.onload=res; im.onerror=res; setTimeout(res,2000); } });
+  }));
+  var cssW=wmm*96/25.4, cssH=hmm*96/25.4;
+  var canvas=await html2canvas(host.querySelector('#_bmpwrap'),{backgroundColor:'#fff',scale:targetW/cssW,width:cssW,height:cssH,useCORS:true,logging:false});
+  document.body.removeChild(host);
+  var c2=document.createElement('canvas'); c2.width=targetW; c2.height=targetH;
+  var ctx=c2.getContext('2d'); ctx.fillStyle='#fff'; ctx.fillRect(0,0,targetW,targetH);
+  ctx.drawImage(canvas,0,0,targetW,targetH);
+  return c2;
+}
+async function _qzBmpTest(){
+  var pn=_qzPrinterName();
+  if(!qzIsReady()){toast('QZ 프린터를 먼저 연결·선택하세요',true);return;}
+  var html='<div style="width:100mm;height:30mm;padding:2mm 3mm;box-sizing:border-box;display:flex;gap:2mm;overflow:hidden">'
+    +'<img src="https://api.qrserver.com/v1/create-qr-code/?size=160x160&margin=0&data='+encodeURIComponent('https://test.example/abc')+'" style="width:24mm;height:24mm;flex-shrink:0">'
+    +'<div style="flex:1"><div style="font-size:15pt;font-weight:800">차량번호: 154무2359</div>'
+    +'<div style="font-size:13pt;font-weight:700">연락처: 010-6678-7983</div>'
+    +'<div style="font-size:9pt;margin-top:1mm">단오제보존회　　성명: 강*삼</div></div></div>';
+  try{
+    var canvas=await _labelToCanvas(html,100,30,203);
+    var bmp=_canvasToTSPL(canvas,160);
+    var header='SIZE 100 mm,30 mm\r\nGAP 2 mm,0 mm\r\nDIRECTION 1\r\nREFERENCE 0,0\r\nCLS\r\nBITMAP 0,0,'+bmp.wbytes+','+bmp.h+',0,';
+    var cfg=qz.configs.create(pn);
+    await qz.print(cfg,[
+      {type:'raw',format:'plain',data:header},
+      {type:'raw',format:'base64',data:_bytesToBase64(bmp.bytes)},
+      {type:'raw',format:'plain',data:'\r\nPRINT 1\r\n'}
+    ]);
+    toast('🖨 비트맵 테스트 출력 완료');
+  }catch(e){ toast('비트맵 테스트 실패: '+(e.message||e),true); console.error(e); }
+}
+async function _qzPrintLabelsBitmap(def, rows, opt){
+  var pn=_qzPrinterName();
+  if(!qzIsReady()){ toast('QZ 프린터를 먼저 연결·선택하세요',true); return false; }
+  if(typeof html2canvas==='undefined'){ toast('이미지 라이브러리 로딩중',true); return false; }
+  var wmm=opt.w, hmm=opt.h, gap=(opt.gap!=null?opt.gap:2);
+  var cfg=qz.configs.create(pn);
+  try{
+    for(var i=0;i<rows.length;i++){
+      var canvas=await _labelToCanvas(_modLabelHtml(def,rows[i],opt),wmm,hmm,203);
+      var bmp=_canvasToTSPL(canvas,160);
+      var header='SIZE '+wmm+' mm,'+hmm+' mm\r\nGAP '+gap+' mm,0 mm\r\nDIRECTION 1\r\nREFERENCE 0,0\r\nCLS\r\nBITMAP 0,0,'+bmp.wbytes+','+bmp.h+',0,';
+      await qz.print(cfg,[
+        {type:'raw',format:'plain',data:header},
+        {type:'raw',format:'base64',data:_bytesToBase64(bmp.bytes)},
+        {type:'raw',format:'plain',data:'\r\nPRINT 1\r\n'}
+      ]);
+    }
+    toast('🖨 RAW비트맵 '+rows.length+'장 출력');
+    return true;
+  }catch(e){ toast('RAW비트맵 실패: '+(e.message||e),true); console.error(e); return false; }
 }
 function _qzPrintLabels(def, rows, opt){
   var pn=_qzPrinterName();
