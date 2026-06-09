@@ -1764,13 +1764,6 @@ var _MODLBL_DEFAULTS={
 // 모드별 크기 세트 로드 (+ 구버전 평면 구조 마이그레이션)
 function _modLabelSizes(key){
   var sz={label:Object.assign({},_MODLBL_DEFAULTS.label), a4:Object.assign({},_MODLBL_DEFAULTS.a4)};
-  // Firebase fallback (다른 PC 공유) — localStorage보다 먼저 적용, localStorage가 덮어씀
-  var def=_modDefs[key]||{};
-  if(def.lastLabelOpt && def.lastLabelOpt.sizes){
-    var fs=def.lastLabelOpt.sizes;
-    if(fs.label) sz.label=Object.assign(sz.label,fs.label);
-    if(fs.a4)    sz.a4=Object.assign(sz.a4,fs.a4);
-  }
   try{
     var s=localStorage.getItem('modLabelOpt_'+key);
     if(s){
@@ -1800,15 +1793,7 @@ function _saveModLabelLayout(key,mode,layout){ try{ localStorage.setItem('modLab
 function _modLabelOpt(key){
   var def=_modDefs[key]||{};
   var mode='label', titleKey='', fields=null;
-  // 1) localStorage (현재 브라우저)
   try{ var s=localStorage.getItem('modLabelOpt_'+key); if(s){ var o=JSON.parse(s); mode=o.mode||'label'; titleKey=o.titleKey||''; fields=o.fields||null; } }catch(e){}
-  // 2) Firebase fallback (다른 PC 공유용) — localStorage에 없을 때
-  if(!mode||mode==='label'){
-    var fb=def.lastLabelOpt||null;
-    if(fb && !localStorage.getItem('modLabelOpt_'+key)){
-      mode=fb.mode||'label'; titleKey=fb.titleKey||''; fields=fb.fields||null;
-    }
-  }
   if(!titleKey){ var c0=(def.columns||[]).filter(function(c){return !c.adminOnly&&c.key!=='status'&&!c.hideTable})[0]; titleKey=c0?c0.key:''; }
   var sizes=_modLabelSizes(key);
   var cur=sizes[mode]||sizes.label;
@@ -1816,18 +1801,11 @@ function _modLabelOpt(key){
   d.layout=_modLabelLayout(key,mode);
   return d;
 }
-var _mlSaveTimer={};
 function _saveModLabelOpt(key,opt){
-  var save={mode:opt.mode,titleKey:opt.titleKey,fields:opt.fields,sizes:opt.sizes};
-  // localStorage (즉시)
-  try{ localStorage.setItem('modLabelOpt_'+key, JSON.stringify(save)); }catch(e){}
-  // Firebase (디바운스 2초 — 모든 PC 공유)
-  var def=_modDefs[key];
-  if(def && typeof _saveModDefs==='function'){
-    def.lastLabelOpt=save;
-    clearTimeout(_mlSaveTimer[key]);
-    _mlSaveTimer[key]=setTimeout(function(){ _saveModDefs(); },2000);
-  }
+  try{
+    var save={mode:opt.mode,titleKey:opt.titleKey,fields:opt.fields,sizes:opt.sizes};
+    localStorage.setItem('modLabelOpt_'+key, JSON.stringify(save));
+  }catch(e){}
 }
 
 // ─── 라벨 프리셋 (커스텀 규격: 크기·여백·표시항목·배치 통째 저장) ───
@@ -2332,8 +2310,7 @@ function modDoPrint(){
       +'@media screen{body{background:#e2e8f0;padding:10px}.sheet{background:#fff;width:'+pw+'mm;margin:0 auto;padding:'+opt.sheetMargin+'mm;box-sizing:border-box;box-shadow:0 1px 6px rgba(0,0,0,.2)}}';
     bodyHtml='<div class="sheet">'+labels+'</div>';
   } else {
-    css='@page{size:'+opt.w+'mm '+opt.h+'mm;margin:0}html,body{margin:0;padding:0}'
-      +'.mlabel{page-break-after:always;overflow:hidden;clip-path:inset(0)}'
+    css='@page{size:'+opt.w+'mm '+opt.h+'mm;margin:0}html,body{margin:0;padding:0}.mlabel{page-break-after:always}'
       +'@media screen{body{background:#e2e8f0;padding:10px}.mlabel{background:#fff;margin:0 auto 8px;box-shadow:0 1px 4px rgba(0,0,0,.2)}}';
     bodyHtml=labels;
   }
