@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260609v54';
+var _MOD_ENGINE_VER='20260609v55';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -2808,6 +2808,22 @@ function _bytesToBase64(bytes){
   for(var i=0;i<bytes.length;i+=chunk){ bin+=String.fromCharCode.apply(null,bytes.subarray(i,Math.min(i+chunk,bytes.length))); }
   return btoa(bin);
 }
+// 캔버스를 순흑/순백 1비트로 변환(선명·진하게) → 새 캔버스 반환
+function _canvasToMonoCanvas(canvas, threshold){
+  threshold=threshold||160;
+  var w=canvas.width,h=canvas.height;
+  var ctx=canvas.getContext('2d');
+  var im=ctx.getImageData(0,0,w,h), d=im.data;
+  for(var p=0;p<d.length;p+=4){
+    var a=d[p+3];
+    var lum = a<128 ? 255 : (0.299*d[p]+0.587*d[p+1]+0.114*d[p+2]);
+    var v = lum<threshold ? 0 : 255;
+    d[p]=d[p+1]=d[p+2]=v; d[p+3]=255;
+  }
+  var c2=document.createElement('canvas'); c2.width=w; c2.height=h;
+  c2.getContext('2d').putImageData(im,0,0);
+  return c2;
+}
 function _canvasToTSPL(canvas, threshold){
   threshold=threshold||150;
   var w=canvas.width,h=canvas.height,wbytes=Math.ceil(w/8);
@@ -2875,31 +2891,21 @@ async function _qzPrintLabelsBitmap(def, rows, opt){
   var pn=_qzPrinterName();
   if(!qzIsReady()){ toast('QZ 프린터를 먼저 연결·선택하세요',true); return false; }
   if(typeof html2canvas==='undefined'){ toast('이미지 라이브러리 로딩중',true); return false; }
-  var wmm=opt.w, hmm=opt.h, gap=(opt.gap!=null?opt.gap:2);
-  var cfg=qz.configs.create(pn);
+  var wmm=opt.w, hmm=opt.h;
+  // 선명한 1비트 비트맵을 드라이버 경로(pixel image)로 묶어 전송
+  // → 비트맵 선명함 + 드라이버 gap처리(밀림 없음) + 한 작업 묶음(빠름, 백피드 최소)
+  var cfg=qz.configs.create(pn,{colorType:'blackwhite',margins:0,units:'mm',jobName:'LABEL-'+def.key,size:{width:wmm,height:hmm}});
   try{
-    // 비트맵 이미지를 QZ pixel 인쇄(엑셀과 동일한 Windows 드라이버 경로)로 전송
-    // → 한글/QR/진한색은 이미지로 유지, 라벨 끊기는 드라이버 gap센서가 처리
-    // RAW 비트맵 (드라이버 무관) + 라벨길이 미세조정으로 누적밀림 보정
-    var adj=0; try{ adj=parseFloat(localStorage.getItem('_mlSizeAdj')||'0')||0; }catch(e){}
-    var sizeH=hmm+adj; // 실측 피치에 맞게 SIZE 높이 보정
-    var delayMs=1500; try{ var _d=localStorage.getItem('_mlBmpDelay'); if(_d!=null&&_d!=='') delayMs=parseInt(_d,10)||0; }catch(e){}
+    var data=[];
     for(var i=0;i<rows.length;i++){
       var canvas=await _labelToCanvas(_modLabelHtml(def,rows[i],opt),wmm,hmm,203);
-      var bmp=_canvasToTSPL(canvas,160);
-      // 매 장을 완전 분리된 1건 작업으로: SIZE/GAP 재설정 + 출력 후 다음 라벨 머리로 자동 정렬
-      var head='SIZE '+wmm+' mm,'+sizeH+' mm\r\nGAP '+gap+' mm,0 mm\r\nDIRECTION 1\r\nREFERENCE 0,0\r\nSET TEAR OFF\r\nCLS\r\nBITMAP 0,0,'+bmp.wbytes+','+bmp.h+',0,';
-      await qz.print(cfg,[
-        {type:'raw',format:'plain',data:head},
-        {type:'raw',format:'base64',data:_bytesToBase64(bmp.bytes)},
-        {type:'raw',format:'plain',data:'\r\nPRINT 1\r\n'}
-      ]);
-      // 프린터가 한 장 뽑고 다음 라벨 머리로 정렬할 시간 (컴퓨터별 조절)
-      if(delayMs>0 && i<rows.length-1) await new Promise(function(ok){ setTimeout(ok, delayMs); });
+      // 순백/순흑 1비트화 → 선명하고 진하게
+      var bw=_canvasToMonoCanvas(canvas,160);
+      data.push({type:'pixel',format:'image',flavor:'base64',data:bw.toDataURL('image/png').split(',')[1],options:{pageWidth:wmm,pageHeight:hmm}});
     }
-    toast('🖨 RAW비트맵 '+rows.length+'장 출력');
-    return true;
-  }catch(e){ toast('RAW비트맵 실패: '+(e.message||e),true); console.error(e); return false; }
+    return qz.print(cfg,data).then(function(){ toast('🖨 비트맵 '+rows.length+'장 출력'); return true; })
+      .catch(function(e){ toast('비트맵 출력 실패: '+(e.message||e),true); return false; });
+  }catch(e){ toast('비트맵 실패: '+(e.message||e),true); console.error(e); return false; }
 }
 function _qzPrintLabels(def, rows, opt){
   var pn=_qzPrinterName();
@@ -2961,11 +2967,6 @@ function _qzUpdateUI(){
         +'<b style="min-width:54px;text-align:center">'+(_adj>0?'+':'')+_adj.toFixed(2)+'mm</b>'
         +'<button onclick="_qzAdjSize(0.05)" style="border:none;background:#cbd5e1;border-radius:4px;width:22px;height:22px;cursor:pointer;font-weight:800">+</button>'
         +'<button onclick="_qzAdjSize(0.5)" style="border:none;background:#94a3b8;color:#fff;border-radius:4px;width:30px;height:22px;cursor:pointer;font-weight:800" title="크게 늘림">++</button></label>';
-      var _dly=1500; try{ var _dd=localStorage.getItem('_mlBmpDelay'); if(_dd!=null&&_dd!=='') _dly=parseInt(_dd,10)||0; }catch(e){}
-      h+='<label style="display:inline-flex;align-items:center;gap:3px;font-size:11px;background:#f1f5f9;color:#475569;padding:4px 8px;border-radius:6px" title="여러 장 출력 시 장 사이 멈춤 시간. 밀리면 늘리고, 잘 되면 0으로 줄여 빠르게">'
-        +'장간격 <button onclick="_qzAdjBmpDelay(-500)" style="border:none;background:#cbd5e1;border-radius:4px;width:22px;height:22px;cursor:pointer;font-weight:800">−</button>'
-        +'<b style="min-width:48px;text-align:center">'+(_dly/1000).toFixed(1)+'초</b>'
-        +'<button onclick="_qzAdjBmpDelay(500)" style="border:none;background:#cbd5e1;border-radius:4px;width:22px;height:22px;cursor:pointer;font-weight:800">+</button></label>';
     }
   }
   box.innerHTML=h;
