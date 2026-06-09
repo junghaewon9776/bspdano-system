@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260609v42';
+var _MOD_ENGINE_VER='20260609v43';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -2112,7 +2112,7 @@ function popModLabel(key,singleId,idsList){
 
   h+='<div style="font-size:12px;font-weight:700;margin-bottom:4px;color:#475569">미리보기 (QR 스캔 → 정보 조회 페이지)</div>';
   h+='<div id="ml_preview" style="background:#e2e8f0;padding:12px;border-radius:8px;overflow:auto;text-align:center"></div>';
-  h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px"><div style="display:flex;gap:6px"><button class="btn" style="background:#6366f1;color:#fff" onclick="popModLabelLayout(\''+key+'\')">📐 배치 편집</button><button class="btn" style="background:#16a34a;color:#fff" onclick="_mlExportMailMerge(\''+key+'\')" title="선택 항목을 엑셀로 내보내 메일머지(차량명찰 xlsm)로 완벽하게 출력">📊 메일머지용 엑셀</button></div><div><button class="btn" style="background:#64748b;color:#fff" onclick="closePopup()">취소</button> <button id="ml_printbtn" class="btn btn-b" style="background:#2563eb;color:#fff;font-weight:700" onclick="modDoPrint()">🖨 <span id="ml_printcnt">'+rows.length+'</span>장 출력</button></div></div>';
+  h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px"><div style="display:flex;gap:6px"><button class="btn" style="background:#6366f1;color:#fff" onclick="popModLabelLayout(\''+key+'\')">📐 배치 편집</button><button class="btn" style="background:#16a34a;color:#fff" onclick="_mlExportMailMerge(\''+key+'\')" title="선택 항목을 엑셀로 내보내 메일머지(차량명찰 xlsm)로 완벽하게 출력">📊 메일머지용 엑셀</button><button class="btn" style="background:#0891b2;color:#fff" onclick="_mlExportPdfRotated(\''+key+'\')" title="세로 용지용: 내용을 90도 돌린 PDF로 저장(세로 피드 프린터용)">📄 세로 PDF</button><button class="btn btn-s" style="background:#94a3b8;color:#fff;font-size:11px" onclick="_mlTogglePdfDir()" title="세로 PDF가 거꾸로면 누르세요">↻방향</button></div><div><button class="btn" style="background:#64748b;color:#fff" onclick="closePopup()">취소</button> <button id="ml_printbtn" class="btn btn-b" style="background:#2563eb;color:#fff;font-weight:700" onclick="modDoPrint()">🖨 <span id="ml_printcnt">'+rows.length+'</span>장 출력</button></div></div>';
   h+='</div>';
   openPopup(h,560);
   setTimeout(function(){
@@ -2261,6 +2261,43 @@ function _modLabelPreview(){
     info.innerHTML='용지 <b>'+(opt.sheetW||210)+'×'+(opt.sheetH||297)+'mm</b> · 한 장에 <b>'+g.cols+'×'+g.rows+' = '+g.perPage+'칸</b> · 선택 '+sel+'개 → 약 <b>'+pages+'장</b>';
   }
 }
+// 세로 용지(HxW)용 PDF — 라벨 내용을 90도 회전해 넣어, 세로 피드 프린터로 깔끔 출력
+async function _mlExportPdfRotated(key){
+  var def=_modDefs[key]; if(!def){ toast('정의를 찾을 수 없습니다',true); return; }
+  var jspdfNS=(window.jspdf||window.jsPDF); var JsPDF=jspdfNS&&(jspdfNS.jsPDF||jspdfNS);
+  if(!JsPDF){ toast('PDF 라이브러리 로딩 중… 잠시 후 다시',true); return; }
+  if(typeof html2canvas==='undefined'){ toast('이미지 라이브러리 로딩 중',true); return; }
+  var opt=_modLabelReadOpt();
+  var ids=_mlSelectedIds();
+  var all=window.__modLabelAll||(_modData[key]||[]);
+  var rows=all.filter(function(r){return ids.indexOf(r._id)>=0;});
+  if(!rows.length){ toast('출력할 항목을 선택하세요',true); return; }
+  var _statusCol=(def.columns||[]).find(function(c){return c.key==='status'&&c.type==='badge';});
+  if(_statusCol){ var _ok=function(r){ return /승인|선정|허가|통과|확정|완료|발급|합격|당첨|입점/.test(String(r.status||'')); }; rows=rows.filter(_ok); if(!rows.length){ toast('승인된 항목이 없습니다',true); return; } }
+  var wmm=opt.w, hmm=opt.h;
+  var cw=(localStorage.getItem('_mlPdfCW')!=='0'); // 회전 방향(기본 시계방향)
+  showLoading('PDF 만드는 중… (0/'+rows.length+')');
+  try{
+    // 세로 페이지: 가로=hmm, 세로=wmm
+    var pdf=new JsPDF({orientation:'portrait',unit:'mm',format:[hmm,wmm]});
+    for(var i=0;i<rows.length;i++){
+      var canvas=await _labelToCanvas(_modLabelHtml(def,rows[i],opt),wmm,hmm,203);
+      // 90도 회전한 캔버스 생성
+      var rc=document.createElement('canvas'); rc.width=canvas.height; rc.height=canvas.width;
+      var rx=rc.getContext('2d'); rx.fillStyle='#fff'; rx.fillRect(0,0,rc.width,rc.height);
+      if(cw){ rx.translate(rc.width,0); rx.rotate(Math.PI/2); }
+      else { rx.translate(0,rc.height); rx.rotate(-Math.PI/2); }
+      rx.drawImage(canvas,0,0);
+      if(i>0) pdf.addPage([hmm,wmm],'portrait');
+      pdf.addImage(rc.toDataURL('image/png'),'PNG',0,0,hmm,wmm);
+      showLoading('PDF 만드는 중… ('+(i+1)+'/'+rows.length+')');
+    }
+    hideLoading();
+    pdf.save(def.label+'_세로라벨_'+(new Date().toISOString().slice(0,10))+'.pdf');
+    toast('📄 '+rows.length+'장 세로 PDF 저장 — 거꾸로면 회전방향 버튼으로 바꾸세요');
+  }catch(e){ hideLoading(); toast('PDF 실패: '+(e.message||e),true); console.error(e); }
+}
+function _mlTogglePdfDir(){ var cur=(localStorage.getItem('_mlPdfCW')!=='0'); try{ localStorage.setItem('_mlPdfCW', cur?'0':'1'); }catch(e){} toast('PDF 회전방향: '+(cur?'반시계':'시계')+'방향',false); _qzUpdateUI(); }
 // 메일머지용 엑셀 내보내기 — 라벨 항목 + QR링크 열. 차량명찰 xlsm에 붙여 완벽 출력
 function _mlExportMailMerge(key){
   var def=_modDefs[key]; if(!def){ toast('정의를 찾을 수 없습니다',true); return; }
