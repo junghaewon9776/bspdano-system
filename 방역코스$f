@@ -1,0 +1,1815 @@
+﻿<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>인원관리</title>
+  <link rel="stylesheet" href="style.css?v=20260512v">
+  <style>body.viewer-mode .admin-only { display: none !important; }</style>
+</head>
+<body>
+<header>
+  <h1>👥 인원관리</h1>
+  <nav>
+    <a href="index.html">홈</a>
+    <a href="admin.html">관리</a>
+    <a href="members.html" class="active">인원</a>
+    <a href="today.html">오늘운영</a>
+    <a href="monitor.html">모니터링</a>
+    <a href="stats.html">통계</a>
+    <a href="accounts.html">계정</a>
+    <a href="#" onclick="adminLogout();return false;">로그아웃</a>
+  </nav>
+</header>
+
+<div class="container">
+  <div class="row">
+    <!-- 회원 목록 -->
+    <div class="col" style="flex:1;min-width:320px;">
+      <div class="card">
+        <div class="flex-between"><h2>회원 목록 <span id="memberCount" class="muted"></span></h2>
+          <div class="admin-only">
+            <button class="small" onclick="addMember()">+ 추가</button>
+          </div>
+        </div>
+        <div class="admin-only" style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px;">
+          <button class="small gray" onclick="downloadMemberTemplate()">📄 양식</button>
+          <button class="small gray" onclick="exportMembersCSV()">⬇️ 다운로드</button>
+          <button class="small gray" onclick="document.getElementById('memUpload').click()">📤 엑셀 업로드</button>
+          <button class="small gray" onclick="bulkImportMembers()">📋 붙여넣기</button>
+          <button class="small success" onclick="makeAllMemberAccounts()">🔑 계정 일괄생성</button>
+          <button class="small danger" onclick="deleteAllMembers()">🗑 전체 삭제</button>
+        </div>
+        <input type="file" id="memUpload" accept=".csv,.xlsx,.xls" style="display:none">
+        <div style="display:flex;gap:4px;margin-bottom:8px;">
+          <input id="memSearch" type="text" placeholder="이름 검색..." oninput="renderMembers()" style="flex:1;">
+          <select id="posFilter" onchange="renderMembers()" style="width:auto;">
+            <option value="">모든 직책</option>
+          </select>
+        </div>
+        <div id="memberList" style="max-height:600px;overflow-y:auto;"></div>
+      </div>
+    </div>
+
+    <!-- 조 편성 -->
+    <div class="col" style="flex:2;min-width:400px;">
+      <div class="card">
+        <div class="flex-between">
+          <h2>방역조 편성</h2>
+          <div class="admin-only">
+            <button onclick="randomAssign()" class="success">🎲 팀짜기</button>
+            <button onclick="saveTeamSnapshot()">💾 현재 팀 저장</button>
+            <button onclick="exportTeamsExcel()" class="small" style="background:#27ae60;color:#fff;">⬇ 조 내보내기</button>
+            <button onclick="document.getElementById('teamUpload').click()" class="small" style="background:#3498db;color:#fff;">📤 조 불러오기</button>
+            <button onclick="resetTeams()" class="gray small">조원 리셋</button>
+            <input type="file" id="teamUpload" accept=".xlsx,.xls,.csv" style="display:none" onchange="importTeamsExcel(event)">
+          </div>
+        </div>
+        <p class="muted" style="font-size:12px;">조장·부조장 고정 / 📌 = 고정 조원 / 팀짜기 = 나머지 랜덤 분배</p>
+        <div id="teamPanels" style="margin-top:10px;"></div>
+      </div>
+
+      <div class="card">
+        <h2>저장된 팀 구성 <span id="savedCount" class="muted"></span></h2>
+        <p class="muted" style="font-size:12px;">팀 구성을 저장해두고 나중에 불러올 수 있습니다 (이전 구성 비교/복원용)</p>
+        <div id="savedTeamsList"></div>
+      </div>
+
+      <!-- 차량 등록 -->
+      <div class="card" style="border-left:4px solid #e67e22;">
+        <div class="flex-between">
+          <h2>🚐 차량 등록</h2>
+          <div class="admin-only" style="display:flex;gap:4px;flex-wrap:wrap;">
+            <button class="small success" onclick="setAllVehiclesActive(true)" title="차량 모두 활성화 → 오늘운영에서 차량 버튼만 표시 (조 입력 비활성화)">🚐 차량 활성화 <span style="opacity:0.85;font-weight:400;">(조 입력 OFF)</span></button>
+            <button class="small gray" onclick="setAllVehiclesActive(false)" title="차량 모두 비활성화 → 오늘운영에서 조 입력 폼 표시 (차량 버튼 비활성화)">🧑 차량 비활성화 <span style="opacity:0.85;font-weight:400;">(조 입력 ON)</span></button>
+            <button class="small" onclick="printAllVehicles()">🖨 전체 호차 인쇄</button>
+            <button onclick="exportVehiclesExcel()" class="small" style="background:#27ae60;color:#fff;">⬇ 차량 내보내기</button>
+            <button onclick="document.getElementById('vehUpload').click()" class="small" style="background:#3498db;color:#fff;">📤 차량 불러오기</button>
+            <input type="file" id="vehUpload" accept=".xlsx,.xls,.csv" style="display:none" onchange="importVehiclesExcel(event)">
+            <button class="small success" onclick="addVehicle()">+ 차량 추가</button>
+          </div>
+        </div>
+        <p class="muted" style="font-size:12px;">차량별 운전자/보조 등록. today.html 에서 차량 선택하면 자동으로 운전자가 채워집니다. 각 카드 <b>🖨</b>로 한 대씩 또는 <b>전체 호차 인쇄</b>로 A4 출력.</p>
+        <div id="vehicleList"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
+<script src="firebase-config.js?v=20260512v"></script>
+<script src="common.js?v=20260608c"></script>
+<script>
+window.onAuthSuccess = () => onDataReady(refreshAll);
+window.onDataChanged = () => refreshAll();
+checkAdminAuth().then(ok => { if (ok) onDataReady(refreshAll); });
+
+// 권한에 따라 isAdmin 결정 (viewer면 조회만)
+let isAdmin = true;
+
+function refreshAll() {
+  // 입력 중인 필드 포커스 복원 — 차량 카드 인라인 입력이 자꾸 풀리지 않게
+  const ae = document.activeElement;
+  const fid = ae && ae.id ? ae.id : '';
+  const ss = ae && ae.selectionStart, se = ae && ae.selectionEnd;
+
+  document.body.classList.toggle('viewer-mode', !isAdmin);
+  renderMembers();
+  renderTeams();
+  renderSavedTeams();
+  renderVehicles();
+
+  if (fid) {
+    const el = document.getElementById(fid);
+    if (el && el.focus) {
+      el.focus();
+      try { if (typeof ss === 'number') el.setSelectionRange(ss, se); } catch (e) {}
+    }
+  }
+}
+
+// ────── 차량 등록 ──────
+function renderVehicles() {
+  const data = loadData();
+  const vehicles = (data.vehicles || []).slice().sort((a, b) => (a.order || 9999) - (b.order || 9999));
+  const el = document.getElementById('vehicleList');
+  if (!el) return;
+  if (!vehicles.length) {
+    el.innerHTML = '<div class="empty">등록된 차량이 없습니다. <b>+ 차량 추가</b> 클릭</div>';
+    return;
+  }
+  const total = vehicles.length;
+
+  let activeCount = 0;
+  el.innerHTML = vehicles.map((v, idx) => {
+    const isActive = v.active !== false && v.active !== 'false';
+    if (isActive) activeCount++;
+    const displayName = isActive ? `${activeCount}호차` : `비활성`;  // 항상 N호차 표시
+    // 운전자/보조 정보 추출 (회원 또는 외부)
+    const drvMember = getMember(data, v.defaultDriverId);
+    const astMember = getMember(data, v.defaultAssistId);
+    const drvName = drvMember?.name || v.defaultDriverName || '';
+    const drvPhone = drvMember?.phone || v.defaultDriverPhone || '';
+    const drvIsExt = !drvMember && !!v.defaultDriverName;
+    const astName = astMember?.name || v.defaultAssistName || '';
+    const astPhone = astMember?.phone || v.defaultAssistPhone || '';
+    const astIsExt = !astMember && !!v.defaultAssistName;
+    const phoneLink = (ph) => ph
+      ? `<a href="tel:${ph.replace(/[^0-9+]/g,'')}" style="color:#3498db;text-decoration:none;font-family:monospace;" onclick="event.stopPropagation()">📞 ${ph.replace(/</g,'&lt;')}</a>`
+      : '';
+    return `
+      <div class="vehicle-card" style="border:1px solid ${isActive ? '#f0d4b3' : '#ddd'};border-radius:8px;padding:10px 12px;margin-bottom:8px;background:${isActive ? '#fffaf3' : '#f5f5f5'};${isActive ? '' : 'opacity:0.7;'}">
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+          <button class="small gray" onclick="moveVehicle('${v.id}', -1)" style="padding:2px 7px;font-size:13px;">▲</button>
+          <button class="small gray" onclick="moveVehicle('${v.id}', 1)" style="padding:2px 7px;font-size:13px;">▼</button>
+          <span style="background:${isActive ? '#e67e22' : '#bdc3c7'};color:#fff;padding:6px 14px;border-radius:6px;font-weight:700;font-size:16px;">🚐 ${displayName}</span>
+          <span style="flex:1;"></span>
+          <button onclick="toggleVehicleActive('${v.id}')"
+                  title="${isActive ? '활성화 — 클릭하면 비활성화 (오늘운영에서 숨김)' : '비활성화 — 클릭하면 활성화 (오늘운영에 표시)'}"
+                  style="background:${isActive ? '#27ae60' : '#95a5a6'};color:#fff;border:none;padding:6px 12px;border-radius:5px;font-weight:700;font-size:12px;cursor:pointer;">
+            ${isActive ? '✅ 활성' : '🚫 비활성'}
+          </button>
+          <button class="small" onclick="printOneVehicle('${v.id}')" title="이 차량 호차 A4 인쇄">🖨</button>
+          <button class="small" onclick="editVehicle('${v.id}')">✎ 수정</button>
+          <button class="small danger" onclick="deleteVehicle('${v.id}')">🗑</button>
+        </div>
+        <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:10px;font-size:13px;color:#34495e;">
+          ${v.plate ? `<span>🔖 <b style="font-family:monospace;">${v.plate.replace(/</g,'&lt;')}</b></span>` : ''}
+          ${v.color ? `<span>🎨 ${v.color.replace(/</g,'&lt;')}</span>` : ''}
+          ${v.owner ? `<span>🏢 ${v.owner.replace(/</g,'&lt;')}${v.ownerPhone ? ' · ' + phoneLink(v.ownerPhone) : ''}</span>` : ''}
+        </div>
+        <div style="margin-top:6px;font-size:13px;color:#34495e;">
+          🧑‍✈️ <b>운전:</b> ${drvName ? drvName.replace(/</g,'&lt;') + (drvIsExt ? ' <span style="font-size:10px;color:#888;">(외부)</span>' : '') : '<span style="color:#bbb;">미지정</span>'}
+          ${phoneLink(drvPhone) ? ' · ' + phoneLink(drvPhone) : ''}
+        </div>
+        <div style="margin-top:4px;font-size:13px;color:#34495e;">
+          🧑 <b>보조:</b> ${astName ? astName.replace(/</g,'&lt;') + (astIsExt ? ' <span style="font-size:10px;color:#888;">(외부)</span>' : '') : '<span style="color:#bbb;">미지정</span>'}
+          ${phoneLink(astPhone) ? ' · ' + phoneLink(astPhone) : ''}
+        </div>
+        <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;">
+          <span style="font-size:11px;color:#888;font-weight:600;">행사:</span>
+          ${(data.events||[]).map(ev => {
+            const cfg = (data.eventConfig||{})[ev.id] || {};
+            const vehs = Array.isArray(cfg.vehicles) ? cfg.vehicles : [];
+            const on = vehs.indexOf(v.id) >= 0;
+            return '<label style="display:inline-flex;align-items:center;gap:3px;font-size:12px;padding:3px 8px;border:1px solid '+(on?'#e67e22':'#ddd')+';border-radius:12px;background:'+(on?'#fef5ec':'#f9f9f9')+';cursor:pointer;">'
+              +'<input type="checkbox" '+(on?'checked':'')+' onchange="toggleVehEvent(\''+v.id+'\',\''+ev.id+'\')" style="width:14px;height:14px;">'
+              +'<span>'+ev.name.replace(/</g,'&lt;')+'</span></label>';
+          }).join('')}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+function addVehicle() {
+  openVehicleModal(null);  // 빈 모달
+}
+function editVehicle(id) {
+  openVehicleModal(id);
+}
+
+// 차량 추가/수정 모달 — 한 화면에 모든 항목
+function openVehicleModal(editId) {
+  const data = loadData();
+  const isEdit = !!editId;
+  const v = isEdit ? (data.vehicles || []).find(x => x.id === editId) : null;
+  const nextOrder = isEdit ? (v.order || 1) : ((data.vehicles?.length ? Math.max(...data.vehicles.map(v => v.order || 0)) : 0) + 1);
+  const memberOpts = (data.members || [])
+    .map(m => `<option value="${m.id}">${(m.name||'')}${m.phone ? ' ('+m.phone+')' : ''}</option>`).join('');
+  const drvSel = isEdit && v.defaultDriverId ? v.defaultDriverId : '';
+  const astSel = isEdit && v.defaultAssistId ? v.defaultAssistId : '';
+  const drvIsExt = !!(isEdit && !v.defaultDriverId && (v.defaultDriverName || v.defaultDriverPhone));
+  const astIsExt = !!(isEdit && !v.defaultAssistId && (v.defaultAssistName || v.defaultAssistPhone));
+
+  const overlay = document.createElement('div');
+  overlay.id = 'vehicleModalOverlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(44,62,80,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;';
+  overlay.innerHTML = `
+    <div style="background:#fff;border-radius:10px;padding:20px;max-width:420px;width:100%;max-height:90vh;overflow-y:auto;">
+      <h2 style="margin:0 0 14px;color:#e67e22;">🚐 ${nextOrder}호차 ${isEdit ? '수정' : '추가'}</h2>
+
+      <label style="font-size:12px;color:#555;">색상</label>
+      <input id="vmColor" type="text" placeholder="예: 흰색, 카니발 흰색" value="${isEdit ? (v.color||'').replace(/"/g,'&quot;') : ''}" autocomplete="off" style="width:100%;font-size:14px;margin-bottom:10px;box-sizing:border-box;">
+
+      <label style="font-size:12px;color:#555;">차번호</label>
+      <input id="vmPlate" type="text" placeholder="예: 12가 3456" value="${isEdit ? (v.plate||'').replace(/"/g,'&quot;') : ''}" autocomplete="off" style="width:100%;font-size:14px;margin-bottom:10px;box-sizing:border-box;">
+
+      <label style="font-size:12px;color:#555;">보험사 / 소유주</label>
+      <input id="vmOwner" type="text" placeholder="예: DB손보 홍길동" value="${isEdit ? (v.owner||'').replace(/"/g,'&quot;') : ''}" autocomplete="off" style="width:100%;font-size:14px;margin-bottom:10px;box-sizing:border-box;">
+
+      <label style="font-size:12px;color:#555;">보험사(소유주) 연락처</label>
+      <input id="vmOwnerPhone" type="tel" placeholder="예: 010-1234-5678" value="${isEdit ? (v.ownerPhone||'').replace(/"/g,'&quot;') : ''}" autocomplete="off" style="width:100%;font-size:14px;margin-bottom:14px;box-sizing:border-box;">
+
+      <div style="background:#f8f9fa;padding:10px;border-radius:6px;margin-bottom:10px;">
+        <label style="font-size:13px;font-weight:700;color:#34495e;">🧑‍✈️ 운전자</label>
+        <select id="vmDrv" style="width:100%;margin-top:4px;font-size:13px;" onchange="vmToggleExt('Drv')">
+          <option value="">- 미지정 -</option>
+          <option value="__external__"${drvIsExt ? ' selected' : ''}>+ 외부인원 직접입력</option>
+          ${memberOpts.replace(`value="${drvSel}"`, `value="${drvSel}" selected`)}
+        </select>
+        <div id="vmDrvExtBox" style="display:${drvIsExt ? 'block' : 'none'};margin-top:6px;">
+          <input id="vmDrvExtName" type="text" placeholder="외부인원 이름" value="${isEdit ? (v.defaultDriverName||'').replace(/"/g,'&quot;') : ''}" autocomplete="off" style="width:100%;font-size:13px;margin-bottom:4px;box-sizing:border-box;">
+          <input id="vmDrvExtPhone" type="tel" placeholder="010-1234-5678" value="${isEdit ? (v.defaultDriverPhone||'').replace(/"/g,'&quot;') : ''}" autocomplete="off" style="width:100%;font-size:13px;box-sizing:border-box;">
+        </div>
+      </div>
+
+      <div style="background:#f8f9fa;padding:10px;border-radius:6px;margin-bottom:14px;">
+        <label style="font-size:13px;font-weight:700;color:#34495e;">🧑 보조 (선택)</label>
+        <select id="vmAst" style="width:100%;margin-top:4px;font-size:13px;" onchange="vmToggleExt('Ast')">
+          <option value="">- 미지정 -</option>
+          <option value="__external__"${astIsExt ? ' selected' : ''}>+ 외부인원 직접입력</option>
+          ${memberOpts.replace(`value="${astSel}"`, `value="${astSel}" selected`)}
+        </select>
+        <div id="vmAstExtBox" style="display:${astIsExt ? 'block' : 'none'};margin-top:6px;">
+          <input id="vmAstExtName" type="text" placeholder="외부인원 이름" value="${isEdit ? (v.defaultAssistName||'').replace(/"/g,'&quot;') : ''}" autocomplete="off" style="width:100%;font-size:13px;margin-bottom:4px;box-sizing:border-box;">
+          <input id="vmAstExtPhone" type="tel" placeholder="010-1234-5678" value="${isEdit ? (v.defaultAssistPhone||'').replace(/"/g,'&quot;') : ''}" autocomplete="off" style="width:100%;font-size:13px;box-sizing:border-box;">
+        </div>
+      </div>
+
+      <div style="display:flex;gap:6px;">
+        <button class="success" style="flex:1;padding:10px;font-weight:700;" onclick="saveVehicleModal('${editId || ''}')">${isEdit ? '💾 저장' : '+ 추가'}</button>
+        <button class="gray" style="padding:10px 14px;" onclick="closeVehicleModal()">취소</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  setTimeout(() => document.getElementById('vmColor').focus(), 100);
+  overlay.onclick = (e) => { if (e.target === overlay) closeVehicleModal(); };
+  document.addEventListener('keydown', vehicleModalKeydown);
+}
+function vmToggleExt(prefix) {
+  const sel = document.getElementById('vm' + prefix);
+  const box = document.getElementById('vm' + prefix + 'ExtBox');
+  if (!sel || !box) return;
+  const isExt = sel.value === '__external__';
+  box.style.display = isExt ? 'block' : 'none';
+  if (isExt) {
+    setTimeout(() => {
+      const inp = document.getElementById('vm' + prefix + 'ExtName');
+      if (inp) inp.focus();
+    }, 50);
+  }
+}
+function vehicleModalKeydown(e) {
+  if (e.key === 'Escape') closeVehicleModal();
+}
+function closeVehicleModal() {
+  const ov = document.getElementById('vehicleModalOverlay');
+  if (ov) ov.remove();
+  document.removeEventListener('keydown', vehicleModalKeydown);
+}
+function saveVehicleModal(editId) {
+  const color = (document.getElementById('vmColor').value || '').trim();
+  const plate = (document.getElementById('vmPlate').value || '').trim();
+  const owner = (document.getElementById('vmOwner').value || '').trim();
+  const ownerPhone = (document.getElementById('vmOwnerPhone').value || '').trim();
+  const drvVal = document.getElementById('vmDrv').value;
+  const astVal = document.getElementById('vmAst').value;
+  const drvExtName = (document.getElementById('vmDrvExtName')?.value || '').trim();
+  const drvExtPhone = (document.getElementById('vmDrvExtPhone')?.value || '').trim();
+  const astExtName = (document.getElementById('vmAstExtName')?.value || '').trim();
+  const astExtPhone = (document.getElementById('vmAstExtPhone')?.value || '').trim();
+
+  const data = loadData();
+  if (!data.vehicles) data.vehicles = [];
+  let v;
+  if (editId) {
+    v = data.vehicles.find(x => x.id === editId);
+    if (!v) { alert('차량을 찾을 수 없습니다'); return; }
+  } else {
+    const nextOrder = (data.vehicles.length ? Math.max(...data.vehicles.map(vv => vv.order || 0)) : 0) + 1;
+    v = {
+      id: uid(), order: nextOrder, memberIds: [],
+      defaultDriverId:'', defaultAssistId:'',
+      defaultDriverName:'', defaultDriverPhone:'',
+      defaultAssistName:'', defaultAssistPhone:''
+    };
+    data.vehicles.push(v);
+  }
+  v.color = color;
+  v.plate = plate;
+  v.owner = owner;
+  v.ownerPhone = ownerPhone;
+  v.name = `${v.order || 1}호차`;  // 항상 N호차로 표시
+  // 운전자
+  if (drvVal === '__external__') {
+    v.defaultDriverId = '';
+    v.defaultDriverName = drvExtName;
+    v.defaultDriverPhone = drvExtPhone;
+  } else {
+    v.defaultDriverId = drvVal || '';
+    v.defaultDriverName = ''; v.defaultDriverPhone = '';
+  }
+  // 보조
+  if (astVal === '__external__') {
+    v.defaultAssistId = '';
+    v.defaultAssistName = astExtName;
+    v.defaultAssistPhone = astExtPhone;
+  } else {
+    v.defaultAssistId = astVal || '';
+    v.defaultAssistName = ''; v.defaultAssistPhone = '';
+  }
+  saveData(data);
+  closeVehicleModal();
+  refreshAll();
+}
+function toggleVehEvent(vehId, eventId) {
+  const cfg = (_cache || {}).eventConfig || {};
+  const evtCfg = cfg[eventId] || { teams: [], vehicles: [] };
+  if (!Array.isArray(evtCfg.vehicles)) evtCfg.vehicles = [];
+  const idx = evtCfg.vehicles.indexOf(vehId);
+  if (idx >= 0) evtCfg.vehicles.splice(idx, 1); else evtCfg.vehicles.push(vehId);
+  fbDb.ref('/eventConfig/' + eventId).set(evtCfg);
+}
+function toggleVehicleActive(id) {
+  const data = loadData();
+  const v = (data.vehicles || []).find(x => x.id === id);
+  if (!v) return;
+  // 기본은 활성 (true 또는 undefined). 한 번 누르면 false, 다시 누르면 true
+  v.active = (v.active === false);
+  saveData(data); refreshAll();
+}
+function setAllVehiclesActive(active) {
+  const data = loadData();
+  const vehicles = data.vehicles || [];
+  if (!vehicles.length) { alert('등록된 차량이 없습니다'); return; }
+  const msg = active
+    ? `차량 ${vehicles.length}대를 모두 활성화할까요?\n\n→ 오늘운영에서 차량 버튼만 표시됨\n→ 조 입력 폼은 비활성화 (안 보임)`
+    : `차량 ${vehicles.length}대를 모두 비활성화할까요?\n\n→ 오늘운영에서 차량 버튼 비활성화 (안 보임)\n→ 조 입력 폼이 다시 활성화됨`;
+  if (!confirm(msg)) return;
+  vehicles.forEach(v => { v.active = !!active; });
+  saveData(data); refreshAll();
+  alert(active
+    ? `🚐 차량 ${vehicles.length}대 모두 활성화 완료\n오늘운영 = 차량 버튼 모드`
+    : `🧑 차량 ${vehicles.length}대 모두 비활성화 완료\n오늘운영 = 조 입력 모드`);
+}
+function moveVehicle(id, dir) {
+  const data = loadData();
+  const sorted = (data.vehicles || []).slice().sort((a, b) => (a.order || 9999) - (b.order || 9999));
+  const idx = sorted.findIndex(v => v.id === id);
+  if (idx < 0) return;
+  const swapIdx = idx + dir;
+  if (swapIdx < 0 || swapIdx >= sorted.length) return;
+  const tmp = sorted[idx];
+  sorted[idx] = sorted[swapIdx];
+  sorted[swapIdx] = tmp;
+  sorted.forEach((v, i) => { v.order = i + 1; });
+  saveData(data); refreshAll();
+}
+function deleteVehicle(id) {
+  if (!confirm('차량을 삭제할까요?')) return;
+  const data = loadData();
+  data.vehicles = (data.vehicles || []).filter(v => v.id !== id);
+  // order 재정렬
+  data.vehicles.sort((a, b) => (a.order || 9999) - (b.order || 9999))
+    .forEach((v, i) => { v.order = i + 1; });
+  saveData(data); refreshAll();
+}
+function setVehicleOrder(id, val) {
+  const newOrder = parseInt(val, 10);
+  const data = loadData();
+  const sorted = (data.vehicles || []).slice().sort((a, b) => (a.order || 9999) - (b.order || 9999));
+  const total = sorted.length;
+  if (isNaN(newOrder) || newOrder < 1 || newOrder > total) {
+    alert(`순번은 1~${total} 사이여야 합니다`);
+    refreshAll();
+    return;
+  }
+  const idx = sorted.findIndex(v => v.id === id);
+  if (idx < 0) return;
+  const v = sorted.splice(idx, 1)[0];
+  sorted.splice(newOrder - 1, 0, v);
+  sorted.forEach((vv, i) => { vv.order = i + 1; });
+  saveData(data); refreshAll();
+}
+function setVehicleColor(id, val) {
+  const data = loadData();
+  const v = (data.vehicles || []).find(x => x.id === id);
+  if (!v) return;
+  v.color = (val || '').trim();
+  v.name = v.color || `${v.order || 1}호차`;
+  saveData(data); // refreshAll 안 함 (포커스 유지) — Firebase 에코가 알아서 갱신, refreshAll에 포커스 복원 로직 있음
+  refreshAll();
+}
+function setVehiclePlate(id, val) {
+  const data = loadData();
+  const v = (data.vehicles || []).find(x => x.id === id);
+  if (!v) return;
+  v.plate = (val || '').trim();
+  saveData(data); refreshAll();
+}
+function setVehicleDriver(id, value) {
+  const data = loadData();
+  const v = (data.vehicles || []).find(x => x.id === id);
+  if (!v) return;
+  if (value === '__external__') {
+    v.defaultDriverId = '';
+    if (!v.defaultDriverName) v.defaultDriverName = '';
+  } else {
+    v.defaultDriverId = value || '';
+    v.defaultDriverName = ''; v.defaultDriverPhone = '';
+  }
+  saveData(data); refreshAll();
+  // 외부 선택 시 이름 칸으로 자동 포커스
+  if (value === '__external__') {
+    setTimeout(() => {
+      const inp = document.getElementById('extDN-' + id);
+      if (inp) inp.focus();
+    }, 100);
+  }
+}
+function setVehicleAssist(id, value) {
+  const data = loadData();
+  const v = (data.vehicles || []).find(x => x.id === id);
+  if (!v) return;
+  if (value === '__external__') {
+    v.defaultAssistId = '';
+    if (!v.defaultAssistName) v.defaultAssistName = '';
+  } else {
+    v.defaultAssistId = value || '';
+    v.defaultAssistName = ''; v.defaultAssistPhone = '';
+  }
+  saveData(data); refreshAll();
+  if (value === '__external__') {
+    setTimeout(() => {
+      const inp = document.getElementById('extAN-' + id);
+      if (inp) inp.focus();
+    }, 100);
+  }
+}
+// oninput 디바운스 — 키 입력마다 저장하면 너무 자주 → 400ms 후 저장
+const __extSaveTimers = {};
+function setExternalDriverInline(id, name, phone) {
+  clearTimeout(__extSaveTimers['d-'+id]);
+  __extSaveTimers['d-'+id] = setTimeout(() => {
+    const data = loadData();
+    const v = (data.vehicles || []).find(x => x.id === id);
+    if (!v) return;
+    v.defaultDriverId = '';
+    v.defaultDriverName = (name || '').trim();
+    v.defaultDriverPhone = (phone || '').trim();
+    saveData(data); refreshAll();
+  }, 400);
+}
+function setExternalAssistInline(id, name, phone) {
+  clearTimeout(__extSaveTimers['a-'+id]);
+  __extSaveTimers['a-'+id] = setTimeout(() => {
+    const data = loadData();
+    const v = (data.vehicles || []).find(x => x.id === id);
+    if (!v) return;
+    v.defaultAssistId = '';
+    v.defaultAssistName = (name || '').trim();
+    v.defaultAssistPhone = (phone || '').trim();
+    saveData(data); refreshAll();
+  }, 400);
+}
+
+// ────── 호차 A4 인쇄 — print.html 호차 모드로 이동 ──────
+function printOneVehicle(id) {
+  // 한 대만 인쇄: print.html 에 vehicleId 전달
+  location.href = `print.html?mode=hocha&v=${encodeURIComponent(id)}`;
+}
+function printAllVehicles() {
+  const data = loadData();
+  const vehicles = (data.vehicles || []).filter(v => true);
+  if (!vehicles.length) { alert('등록된 차량이 없습니다'); return; }
+  location.href = 'print.html?mode=hocha';
+}
+function openVehiclePrint(vehicles) {
+  const data = loadData();
+  const todayUrl = location.href.replace(/[^/]*$/, '') + 'today.html';
+  const qrApi = (url) => `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(url)}`;
+  const pages = vehicles.map((v, idx) => {
+    const drvMember = getMember(data, v.defaultDriverId);
+    const astMember = getMember(data, v.defaultAssistId);
+    const drvName = drvMember?.name || v.defaultDriverName || '';
+    const drvPhone = drvMember?.phone || v.defaultDriverPhone || '';
+    const astName = astMember?.name || v.defaultAssistName || '';
+    const astPhone = astMember?.phone || v.defaultAssistPhone || '';
+    const orderNum = v.order || (idx + 1);
+    return `
+      <div class="page">
+        <div class="hocha">${orderNum}호차</div>
+        ${v.color ? `<div class="color">${(v.color||'').replace(/</g,'&lt;')}</div>` : ''}
+        ${v.plate ? `<div class="plate">${(v.plate||'').replace(/</g,'&lt;')}</div>` : ''}
+        <div class="crew">
+          ${drvName ? `<div class="crew-row"><span class="role">운전</span> <span class="name">${drvName.replace(/</g,'&lt;')}</span>${drvPhone ? `<span class="phone">${drvPhone}</span>` : ''}</div>` : ''}
+          ${astName ? `<div class="crew-row"><span class="role">보조</span> <span class="name">${astName.replace(/</g,'&lt;')}</span>${astPhone ? `<span class="phone">${astPhone}</span>` : ''}</div>` : ''}
+        </div>
+        <div class="qr">
+          <img src="${qrApi(todayUrl)}" alt="QR" width="180" height="180">
+          <div class="qr-label">📱 폰으로 QR 스캔 → 본인 호차 누르고 시작</div>
+        </div>
+      </div>
+    `;
+  }).join('');
+  const html = `<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><title>호차 인쇄</title>
+<style>
+  @page { size: A4; margin: 0; }
+  body { margin: 0; font-family: -apple-system, 'Malgun Gothic', sans-serif; }
+  .page {
+    width: 210mm; min-height: 297mm; box-sizing: border-box;
+    padding: 25mm 20mm; display: flex; flex-direction: column;
+    align-items: center; page-break-after: always;
+    text-align: center;
+  }
+  .page:last-child { page-break-after: auto; }
+  .hocha {
+    font-size: 240pt; font-weight: 900; color: #e67e22; line-height: 0.9;
+    margin-bottom: 15mm;
+  }
+  .color { font-size: 50pt; font-weight: 700; color: #34495e; margin-bottom: 8mm; }
+  .plate {
+    font-size: 60pt; font-weight: 800; color: #fff;
+    background: #2c3e50; padding: 8mm 15mm; border-radius: 6mm;
+    font-family: monospace; letter-spacing: 3mm; margin-bottom: 12mm;
+  }
+  .crew { font-size: 22pt; margin-bottom: 10mm; }
+  .crew-row { margin: 3mm 0; display: flex; justify-content: center; align-items: center; gap: 6mm; flex-wrap: wrap; }
+  .role {
+    background: #34495e; color: #fff; padding: 1.5mm 5mm; border-radius: 2mm;
+    font-size: 16pt; font-weight: 700;
+  }
+  .name { font-weight: 700; color: #2c3e50; }
+  .phone { color: #666; font-family: monospace; font-size: 18pt; }
+  .qr { margin-top: auto; text-align: center; }
+  .qr-label { font-size: 11pt; color: #555; margin-top: 3mm; }
+  .no-print {
+    position: fixed; top: 10px; right: 10px; z-index: 9999;
+    background: #27ae60; color: #fff; border: none; padding: 10px 18px;
+    border-radius: 6px; font-weight: 700; cursor: pointer; font-size: 14px;
+  }
+  @media print { .no-print { display: none; } }
+</style></head><body>
+  <button class="no-print" onclick="window.print()">🖨 인쇄</button>
+  ${pages}
+</body></html>`;
+  const win = window.open('', '_blank');
+  if (!win) { alert('팝업 차단됨 — 브라우저에서 팝업 허용 후 다시 시도'); return; }
+  win.document.write(html);
+  win.document.close();
+}
+
+// ────── 차량 엑셀 내보내기/불러오기 ──────
+function exportVehiclesExcel() {
+  const data = loadData();
+  const vehicles = (data.vehicles || []).slice().sort((a, b) => (a.order || 9999) - (b.order || 9999));
+  if (!vehicles.length) { alert('등록된 차량이 없습니다'); return; }
+  const members = data.members || [];
+  const getMem = id => members.find(m => m.id === id);
+  let activeIdx = 0;
+  const rows = vehicles.map(v => {
+    const isActive = v.active !== false && v.active !== 'false';
+    if (isActive) activeIdx++;
+    const drvM = getMem(v.defaultDriverId);
+    const astM = getMem(v.defaultAssistId);
+    return {
+      '호차': isActive ? activeIdx + '호차' : '비활성',
+      '상태': isActive ? '활성' : '비활성',
+      '색상': v.color || '',
+      '차번호': v.plate || '',
+      '소유주': v.owner || '',
+      '소유주연락처': v.ownerPhone || '',
+      '운전자': drvM?.name || v.defaultDriverName || '',
+      '운전자연락처': drvM?.phone || v.defaultDriverPhone || '',
+      '보조자': astM?.name || v.defaultAssistName || '',
+      '보조자연락처': astM?.phone || v.defaultAssistPhone || ''
+    };
+  });
+  const ws = XLSX.utils.json_to_sheet(rows);
+  ws['!cols'] = [{wch:8},{wch:6},{wch:14},{wch:12},{wch:14},{wch:14},{wch:10},{wch:14},{wch:10},{wch:14}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '차량등록');
+  XLSX.writeFile(wb, `차량등록-${todayStr()}.xlsx`);
+}
+
+function importVehiclesExcel(e) {
+  const file = e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(ev) {
+    try {
+      const wb = XLSX.read(ev.target.result, { type: 'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws);
+      if (!rows.length) { alert('데이터가 없습니다'); return; }
+      const data = loadData();
+      if (!data.vehicles) data.vehicles = [];
+      const members = data.members || [];
+      const findMember = name => {
+        const n = String(name || '').trim();
+        if (!n) return null;
+        return members.find(m => (m.name || '').trim() === n);
+      };
+      let updated = 0, created = 0;
+      const maxOrder = data.vehicles.length ? Math.max(...data.vehicles.map(v => v.order || 0)) : 0;
+      rows.forEach((r, idx) => {
+        const color = String(r['색상'] || '').trim();
+        const plate = String(r['차번호'] || '').trim();
+        const owner = String(r['소유주'] || '').trim();
+        const ownerPhone = String(r['소유주연락처'] || '').trim();
+        const drvName = String(r['운전자'] || '').trim();
+        const drvPhone = String(r['운전자연락처'] || '').trim();
+        const astName = String(r['보조자'] || '').trim();
+        const astPhone = String(r['보조자연락처'] || '').trim();
+        const statusStr = String(r['상태'] || '').trim();
+        // 기존 차량 매칭: 차번호 일치 또는 같은 순번
+        let v = null;
+        if (plate) v = data.vehicles.find(x => x.plate === plate);
+        if (!v) {
+          // 순번(order)으로 매칭
+          const order = idx + 1;
+          v = data.vehicles.find(x => x.order === order);
+        }
+        if (v) {
+          // 기존 업데이트
+          if (color) v.color = color;
+          if (plate) v.plate = plate;
+          if (owner) v.owner = owner;
+          if (ownerPhone) v.ownerPhone = ownerPhone;
+          if (statusStr === '비활성') v.active = false;
+          else if (statusStr === '활성') v.active = true;
+          // 운전자
+          const drvM = findMember(drvName);
+          if (drvM) { v.defaultDriverId = drvM.id; v.defaultDriverName = ''; v.defaultDriverPhone = ''; }
+          else if (drvName) { v.defaultDriverId = ''; v.defaultDriverName = drvName; v.defaultDriverPhone = drvPhone; }
+          // 보조자
+          const astM = findMember(astName);
+          if (astM) { v.defaultAssistId = astM.id; v.defaultAssistName = ''; v.defaultAssistPhone = ''; }
+          else if (astName) { v.defaultAssistId = ''; v.defaultAssistName = astName; v.defaultAssistPhone = astPhone; }
+          updated++;
+        } else {
+          // 새 차량 생성
+          const newOrder = maxOrder + idx + 1;
+          const newV = {
+            id: uid(), order: newOrder, active: statusStr !== '비활성',
+            color, plate, owner, ownerPhone,
+            name: newOrder + '호차', memberIds: [],
+            defaultDriverId: '', defaultAssistId: '',
+            defaultDriverName: '', defaultDriverPhone: '',
+            defaultAssistName: '', defaultAssistPhone: ''
+          };
+          const drvM = findMember(drvName);
+          if (drvM) newV.defaultDriverId = drvM.id;
+          else if (drvName) { newV.defaultDriverName = drvName; newV.defaultDriverPhone = drvPhone; }
+          const astM = findMember(astName);
+          if (astM) newV.defaultAssistId = astM.id;
+          else if (astName) { newV.defaultAssistName = astName; newV.defaultAssistPhone = astPhone; }
+          data.vehicles.push(newV);
+          created++;
+        }
+      });
+      saveData(data); refreshAll();
+      alert(`✅ 차량 불러오기 완료\n업데이트: ${updated}대, 새로 추가: ${created}대`);
+    } catch (err) {
+      alert('파일 읽기 실패: ' + err.message);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// ────── 회원 ──────
+// 직책 정렬 순서 (사용자 요청: 회장→부회장→감사→사무국장→재무국장→재무차장→...→회원)
+const POSITION_ORDER = [
+  '회장','부회장','감사',
+  '사무국장','사무차장',
+  '재무국장','재무차장',
+  '홍보국장','홍보차장',
+  '기획국장','기획차장',
+  '총무','이장',
+  '전임회장',
+  '회원','일반회원',''
+];
+function positionRank(p) {
+  const i = POSITION_ORDER.indexOf((p || '').trim());
+  return i === -1 ? POSITION_ORDER.length : i;
+}
+
+function renderMembers() {
+  const data = loadData();
+  const q = (document.getElementById('memSearch')?.value || '').toLowerCase();
+  const posFilter = document.getElementById('posFilter')?.value || '';
+  const allMembers = data.members || [];
+
+  // 직책 드롭다운 채우기
+  const positions = [...new Set(allMembers.map(m => m.position || '').filter(Boolean))]
+    .sort((a, b) => positionRank(a) - positionRank(b));
+  const posSel = document.getElementById('posFilter');
+  if (posSel) {
+    const cur = posSel.value;
+    posSel.innerHTML = '<option value="">모든 직책</option>' +
+      positions.map(p => `<option value="${p}">${p}</option>`).join('');
+    if (cur) posSel.value = cur;
+  }
+
+  const members = allMembers
+    .filter(m => !q || (m.name||'').toLowerCase().includes(q))
+    .filter(m => !posFilter || (m.position||'') === posFilter)
+    .sort((a, b) =>
+      positionRank(a.position) - positionRank(b.position) ||
+      // rank가 같으면 직책 문자열로 한 번 더 묶기 (전임회장이 회원 사이에 끼어들지 않게)
+      (a.position || '').localeCompare(b.position || '') ||
+      (a.name || '').localeCompare(b.name || '')
+    );
+
+  document.getElementById('memberCount').textContent = `(${allMembers.length}명)`;
+
+  if (!members.length) {
+    document.getElementById('memberList').innerHTML = '<div class="empty">회원이 없습니다</div>';
+    return;
+  }
+
+  // 어느 조에 속해있는지 매핑
+  const assignedTo = {};
+  for (const t of (data.teams || [])) {
+    if (t.leaderId) assignedTo[t.leaderId] = `${t.name} 조장`;
+    if (t.viceLeaderId) assignedTo[t.viceLeaderId] = `${t.name} 부조장`;
+    for (const id of (t.memberIds || [])) assignedTo[id] = `${t.name} 조원`;
+  }
+
+  // memberId ↔ uid 매핑 (계정 있는지 확인용)
+  const memberAuth = data.memberAuth || {};
+  const memberUidByMemberId = {};
+  for (const [uid, mid] of Object.entries(memberAuth)) memberUidByMemberId[mid] = uid;
+
+  // 직책별 그룹화
+  let html = '';
+  let currentGroup = null;
+  for (const m of members) {
+    const pos = m.position || '일반회원';
+    if (pos !== currentGroup) {
+      if (currentGroup !== null) html += '</div>';
+      currentGroup = pos;
+      const groupCount = members.filter(x => (x.position || '일반회원') === pos).length;
+      html += `<h3 style="margin:12px 0 6px;color:#34495e;border-bottom:2px solid #34495e;padding-bottom:4px;">${pos} <span class="muted" style="font-size:11px;">(${groupCount}명)</span></h3><div>`;
+    }
+    const hasAccount = !!memberUidByMemberId[m.id];
+    const phoneTel = (m.phone || '').replace(/[^0-9+]/g, '');
+    const phoneHtml = m.phone
+      ? `<a href="tel:${phoneTel}" style="color:#3498db;text-decoration:none;" onclick="event.stopPropagation()">📞 ${m.phone}</a>`
+      : '';
+    const posTag = m.position
+      ? ` <span class="tag" style="background:#34495e;color:#fff;">${m.position}</span>`
+      : '';
+    html += `
+      <div class="list-item">
+        <div class="info">
+          <div class="name">${m.name}${posTag} <span class="sub">${phoneHtml}</span> ${hasAccount ? '<span class="tag" style="background:#27ae60">🔑</span>' : ''}</div>
+          <div class="sub">${assignedTo[m.id] || '<span style="color:#aaa;">조 미배정</span>'}${m.birthday ? ' · 🎂 ' + m.birthday : ''}${m.address ? ' · 📍 ' + m.address : ''}${m.note ? ' · ' + m.note : ''}</div>
+        </div>
+        <span class="admin-only">
+          ${hasAccount
+            ? `<button class="small gray" onclick="resetMemberPin('${m.id}')">PIN</button>`
+            : `<button class="small success" onclick="makeMemberAccount('${m.id}')">계정</button>`}
+          <button class="small" onclick="editMember('${m.id}')">수정</button>
+          <button class="small danger" onclick="deleteMember('${m.id}')">삭제</button>
+        </span>
+      </div>
+    `;
+  }
+  if (currentGroup !== null) html += '</div>';
+  if (!html) html = '<div class="empty">회원이 없습니다</div>';
+  document.getElementById('memberList').innerHTML = html;
+}
+
+async function makeMemberAccount(memberId) {
+  const data = loadData();
+  const m = getMember(data, memberId);
+  if (!m) return;
+  if (!m.phone) { alert('전화번호가 필요합니다. 회원 수정에서 추가해주세요.'); return; }
+
+  const pin = m.pin || DEFAULT_PIN;
+  if (!confirm(`${m.name}님 계정 생성?\n\n로그인 ID: ${m.phone}\nPIN: ${pin}\n\n(첫 로그인 후 변경 안내됨)`)) return;
+
+  // 로딩 표시
+  const modal = document.createElement('div');
+  modal.id = 'singleModal';
+  modal.innerHTML = '<div style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:99999;display:flex;align-items:center;justify-content:center;"><div style="background:#fff;border-radius:10px;padding:24px;text-align:center;"><div style="font-size:30px;">⏳</div><p style="margin:8px 0 0;color:#555;">'+m.name+'님 계정 생성 중...</p></div></div>';
+  document.body.appendChild(modal);
+
+  try {
+    await createMemberAccount(memberId, m.phone, pin);
+    modal.remove();
+    alert(`✅ 계정 생성 완료\n\n${m.name}님께 안내:\n• 로그인: ${m.phone}\n• PIN: ${pin}`);
+  } catch (e) {
+    modal.remove();
+    alert('생성 실패: ' + e.message);
+  }
+}
+
+async function makeAllMemberAccounts() {
+  const data = loadData();
+  const members = data.members || [];
+  const memberAuth = data.memberAuth || {};
+  const existingMemberIds = new Set(Object.values(memberAuth));
+  const target = members.filter(m => m.phone && !existingMemberIds.has(m.id));
+  if (!target.length) { alert('새로 만들 계정이 없습니다.\n(전화번호가 있고 아직 계정 없는 회원이 없음)'); return; }
+  if (!confirm(`${target.length}명의 계정을 일괄 생성합니다.\n각자 PIN: ${DEFAULT_PIN} (기본)\n\n계속할까요?`)) return;
+
+  // 진행 모달
+  const modal = document.createElement('div');
+  modal.id = 'bulkModal';
+  modal.innerHTML = `
+    <div style="position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:99999;display:flex;align-items:center;justify-content:center;">
+      <div style="background:#fff;border-radius:12px;padding:28px 24px;width:340px;max-width:92vw;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,0.3);">
+        <div style="font-size:36px;margin-bottom:10px;">⏳</div>
+        <h3 style="margin:0 0 6px;color:#2c3e50;" id="bulkTitle">계정 일괄 생성 중...</h3>
+        <p style="color:#555;font-size:13px;margin-bottom:14px;">브라우저를 닫지 마세요</p>
+        <div style="background:#ecf0f1;border-radius:8px;height:22px;overflow:hidden;margin-bottom:10px;">
+          <div id="bulkBar" style="height:100%;background:linear-gradient(90deg,#3498db,#2ecc71);border-radius:8px;width:0%;transition:width 0.3s;"></div>
+        </div>
+        <div id="bulkStatus" style="font-size:13px;color:#666;">0 / ${target.length}</div>
+        <div id="bulkDetail" style="font-size:11px;color:#999;margin-top:4px;min-height:16px;"></div>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+
+  const bar = document.getElementById('bulkBar');
+  const status = document.getElementById('bulkStatus');
+  const detail = document.getElementById('bulkDetail');
+  const title = document.getElementById('bulkTitle');
+
+  let ok = 0, fail = 0;
+  const errors = [];
+  for (let i = 0; i < target.length; i++) {
+    const m = target[i];
+    detail.textContent = m.name + ' (' + m.phone + ')';
+    try {
+      const pin = m.pin || DEFAULT_PIN;
+      await createMemberAccount(m.id, m.phone, pin);
+      ok++;
+    } catch (e) {
+      fail++;
+      errors.push(m.name + '(' + m.phone + '): ' + e.message);
+    }
+    const pct = Math.round(((i + 1) / target.length) * 100);
+    bar.style.width = pct + '%';
+    status.textContent = (i + 1) + ' / ' + target.length + '  (✅' + ok + ' ❌' + fail + ')';
+  }
+
+  // 완료 — 모달 내용 교체
+  const box = modal.querySelector('div > div');
+  const hasErr = fail > 0;
+  box.innerHTML = `
+    <div style="width:64px;height:64px;border-radius:50%;background:${hasErr ? '#fff3e0' : '#e8f5e9'};display:flex;align-items:center;justify-content:center;margin:0 auto 16px;">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="${hasErr ? '#e67e22' : '#27ae60'}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        ${hasErr ? '<path d="M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>'
+                 : '<path d="M20 6L9 17l-5-5"/>'}
+      </svg>
+    </div>
+    <h3 style="margin:0 0 16px;color:#2c3e50;font-size:18px;">계정 생성 완료</h3>
+    <div style="display:flex;justify-content:center;gap:24px;margin-bottom:18px;">
+      <div style="background:#e8f5e9;border-radius:10px;padding:12px 24px;text-align:center;min-width:80px;">
+        <div style="font-size:26px;font-weight:700;color:#27ae60;">${ok}</div>
+        <div style="font-size:11px;color:#66bb6a;margin-top:2px;">성공</div>
+      </div>
+      ${hasErr ? `<div style="background:#ffeef0;border-radius:10px;padding:12px 24px;text-align:center;min-width:80px;">
+        <div style="font-size:26px;font-weight:700;color:#e74c3c;">${fail}</div>
+        <div style="font-size:11px;color:#ef5350;margin-top:2px;">실패</div>
+      </div>` : ''}
+    </div>
+    ${errors.length ? `<div style="text-align:left;max-height:100px;overflow-y:auto;padding:10px 12px;background:#fef5f5;border:1px solid #fde2e2;border-radius:8px;font-size:11px;color:#c0392b;margin-bottom:16px;line-height:1.6;">
+      ${errors.map(e => '• ' + e).join('<br>')}
+    </div>` : `<p style="font-size:13px;color:#888;margin-bottom:16px;">모든 회원 계정이 준비되었습니다</p>`}
+    <button onclick="this.closest('#bulkModal').remove();renderMembers();"
+      style="padding:11px 0;width:100%;font-size:15px;font-weight:600;border-radius:8px;background:${hasErr ? '#e67e22' : '#27ae60'};color:#fff;border:none;cursor:pointer;">
+      확인
+    </button>
+  `;
+}
+
+async function resetMemberPin(memberId) {
+  const data = loadData();
+  const m = getMember(data, memberId);
+  if (!m || !m.phone) return;
+  if (!confirm(`${m.name}님의 PIN을 ${DEFAULT_PIN}(기본)으로 초기화할까요?`)) return;
+
+  const email = memberEmail(m.phone);
+  const newPw = pinToPassword(DEFAULT_PIN);
+  const secAuth = getSecondaryAuth();
+
+  // 여러 비번 후보로 로그인 시도 (DB에 저장된 PIN 우선)
+  const candidates = [newPw];
+  if (m.pin) candidates.push(pinToPassword(m.pin));
+  candidates.push(pinToPassword('123456'), pinToPassword('1234'));
+  const unique = [...new Set(candidates)];
+
+  let done = false;
+  let lastErr = '';
+  for (const tryPw of unique) {
+    try {
+      const cred = await secAuth.signInWithEmailAndPassword(email, tryPw);
+      if (tryPw !== newPw) await cred.user.updatePassword(newPw);
+      const uid = cred.user.uid;
+      await secAuth.signOut();
+      // 기본 PIN 플래그 설정
+      const fresh = loadData();
+      if (fresh.memberPinFlags) { fresh.memberPinFlags[uid] = true; saveData(fresh); }
+      done = true;
+      break;
+    } catch (ex) { lastErr = ex.code || ex.message; }
+  }
+
+  if (done) {
+    // DB의 pin 필드도 동기화
+    m.pin = DEFAULT_PIN;
+    saveData(loadData());
+    alert(`✅ ${m.name}님 PIN → ${DEFAULT_PIN} 초기화 완료\n\n본인에게 안내해주세요.`);
+  } else if (lastErr.includes('user-not-found') || lastErr.includes('invalid-credential')) {
+    // Firebase Auth 계정이 없거나 비번 불일치 → 매핑 제거 후 재생성
+    // 기존 매핑 제거
+    const freshData = loadData();
+    const auth = freshData.memberAuth || {};
+    for (const [uid, mid] of Object.entries(auth)) {
+      if (mid === memberId) {
+        delete auth[uid];
+        if (freshData.memberPinFlags) delete freshData.memberPinFlags[uid];
+      }
+    }
+    freshData.memberAuth = auth;
+    saveData(freshData);
+
+    if (confirm(`${m.name}님 계정을 새로 생성합니다. (PIN: ${DEFAULT_PIN})\n진행할까요?`)) {
+      try {
+        await createMemberAccount(memberId, m.phone, DEFAULT_PIN);
+        alert(`✅ 계정 재생성 완료 (PIN: ${DEFAULT_PIN})`);
+        renderMembers();
+      } catch (e2) {
+        alert(`❌ 계정 생성 실패: ${e2.message}`);
+      }
+    } else {
+      renderMembers(); // 매핑 제거됐으니 UI 갱신
+    }
+  } else {
+    alert(`❌ PIN 초기화 실패\n\n원인: ${lastErr}\n이메일: ${email}\n시도 PIN: ${unique.map(p=>p.replace('bsp','')).join(', ')}`);
+  }
+}
+
+// ────── 양식 / 엑셀 다운로드/업로드 ──────
+function downloadMemberTemplate() {
+  // XLSX 형식 — 한글 Excel에서도 한 셀로 안 합쳐짐
+  const rows = [
+    ['이름', '직책', '연락처', '생년월일', '주소', '메모'],
+    ['홍길동', '회장', '010-1234-5678', '1970-05-12', '영광읍 영광로 123', ''],
+    ['김철수', '재무차장', '010-2222-3333', '', '', ''],
+    ['박영희', '일반회원', '010-3333-4444', '', '', '비고메모']
+  ];
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols'] = [{wch:10},{wch:10},{wch:14},{wch:12},{wch:30},{wch:14}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '회원');
+  XLSX.writeFile(wb, '회원등록양식.xlsx');
+  setTimeout(() => alert('양식 다운로드 완료\n\n컬럼: 이름, 직책, 연락처, 생년월일, 주소, 메모\n• 이름은 필수, 나머지는 선택\n• 직책 예시: 회장, 부회장, 사무국장, 재무차장, 감사, 이장, 일반회원 등\n• 엑셀에서 편집 후 업로드'), 200);
+}
+
+function exportMembersCSV() {
+  const data = loadData();
+  const members = data.members || [];
+  if (!members.length) { alert('회원이 없습니다'); return; }
+  const rows = [['이름', '직책', '연락처', '생년월일', '주소', '메모']];
+  for (const m of members) {
+    rows.push([m.name||'', m.position||'', m.phone||'', m.birthday||'', m.address||'', m.note||'']);
+  }
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols'] = [{wch:10},{wch:10},{wch:14},{wch:12},{wch:30},{wch:14}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '회원');
+  XLSX.writeFile(wb, `회원목록-${todayStr()}.xlsx`);
+  setTimeout(() => alert(`다운로드 완료 (${members.length}명)`), 200);
+}
+
+function csvEscape(s) {
+  s = String(s || '');
+  if (s.includes(',') || s.includes('"') || s.includes('\n')) {
+    return '"' + s.replace(/"/g, '""') + '"';
+  }
+  return s;
+}
+
+function downloadCSVFile(content, filename) {
+  const blob = new Blob([content], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+}
+
+document.getElementById('memUpload').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  e.target.value = '';
+
+  // Firebase 데이터 동기화 전에는 업로드 금지 — 빈 캐시로 저장하면 전체 DB가 날아감
+  if (typeof _cache === 'undefined' || !_cache) {
+    alert('⚠️ 데이터 동기화 중입니다. 잠시 후 다시 시도해주세요.\n(업로드를 지금 하면 기존 데이터가 사라질 수 있어요)');
+    return;
+  }
+
+  let rows;
+  try {
+    if (file.name.match(/\.(xlsx|xls)$/i)) {
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: 'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+    } else {
+      // CSV: UTF-8 우선, 깨지면 EUC-KR 폴백 (한글 엑셀 "CSV로 저장" 기본 인코딩)
+      const buf = await file.arrayBuffer();
+      let text;
+      try {
+        text = new TextDecoder('utf-8', { fatal: true }).decode(buf);
+      } catch (e) {
+        try { text = new TextDecoder('euc-kr').decode(buf); }
+        catch (e2) { text = new TextDecoder('utf-8').decode(buf); }
+      }
+      rows = parseCSVMembers(text);
+    }
+  } catch (err) {
+    alert('파일 읽기 실패: ' + err.message); return;
+  }
+
+  if (!rows.length) { alert('데이터 없음'); return; }
+
+  const data = loadData();
+  if (!data.members) data.members = [];
+  const existing = new Set(data.members.map(m => m.name + '|' + (m.phone || '')));
+  let added = 0, skipped = 0;
+  // 헤더 키를 trim/소문자 통일해서 한 번 정규화 → 매칭
+  const normRows = rows.map(r => {
+    const o = {};
+    for (const k of Object.keys(r)) {
+      o[String(k).trim().toLowerCase()] = r[k];
+    }
+    return o;
+  });
+  // 헤더 안에 키워드가 포함되어 있으면 매칭 (느슨하게)
+  const findByKeyword = (row, keywords) => {
+    for (const kw of keywords) {
+      for (const k of Object.keys(row)) {
+        if (k.includes(kw) && row[k] !== undefined && row[k] !== '') return row[k];
+      }
+    }
+    return '';
+  };
+  const pick = (row, ...keywords) => findByKeyword(row, keywords.map(s => s.toLowerCase()));
+  rows = normRows;
+  // 핸드폰 번호 정리: 앞 0 복원, 하이픈 보존
+  const normalizePhone = (v) => {
+    let s = String(v == null ? '' : v).trim();
+    if (!s) return '';
+    // 엑셀이 숫자로 저장한 경우 앞 0 빠짐 → 010, 011 패턴 복원 시도
+    const digits = s.replace(/\D/g, '');
+    if (digits && !s.startsWith('0') && digits.length >= 9 && digits.length <= 10) {
+      return '0' + digits;
+    }
+    return s;
+  };
+  // 엑셀 날짜 시리얼(숫자) → YYYY-MM-DD
+  const normalizeDate = (v) => {
+    if (v == null || v === '') return '';
+    if (typeof v === 'number') {
+      // 엑셀 epoch: 1900-01-00
+      const d = new Date(Math.round((v - 25569) * 86400 * 1000));
+      if (!isNaN(d)) return d.toISOString().slice(0, 10);
+    }
+    return String(v).trim();
+  };
+
+  const sampleAdded = [];
+  // 첫 행 헤더 디버그용
+  const firstHeaders = rows.length ? Object.keys(rows[0]).join(', ') : '(없음)';
+  // 직책으로 알려진 단어 — 헤더 라벨이 잘못된 파일 자동 보정용
+  const KNOWN_POSITIONS = new Set([
+    '회장','부회장','감사','사무국장','사무차장','재무국장','재무차장',
+    '홍보국장','홍보차장','기획국장','기획차장','총무','이장','부녀회장',
+    '청년회장','일반회원','회원','조장','부조장','새마을','노인회장'
+  ]);
+  let swapCount = 0;
+  for (const row of rows) {
+    let name = String(pick(row, '이름', '성명', '회원', 'name')).trim();
+    let position = String(pick(row, '직책', '직급', '직위', '소속', '담당', 'position', 'role')).trim();
+    // 헤더 라벨이 뒤바뀐 파일 자동 보정 — name이 직책 단어면 swap
+    if (name && KNOWN_POSITIONS.has(name) && position && !KNOWN_POSITIONS.has(position)) {
+      [name, position] = [position, name];
+      swapCount++;
+    }
+    const phone = normalizePhone(pick(row, '연락처', '연락', '전화', '핸드폰', '휴대폰', '번호', 'phone', 'tel', 'mobile'));
+    const birthday = normalizeDate(pick(row, '생년월일', '생일', '나이', 'birth'));
+    const address = String(pick(row, '주소', '거주지', 'address', 'addr')).trim();
+    const note = String(pick(row, '메모', '비고', '특이', 'note', 'memo')).trim();
+    if (!name) { skipped++; continue; }
+    const key = name + '|' + phone;
+    if (existing.has(key)) { skipped++; continue; }
+    data.members.push({ id: uid(), name, position, phone, birthday, address, note });
+    existing.add(key);
+    added++;
+    if (sampleAdded.length < 3) sampleAdded.push(`${position?position+' ':''}${name} ${phone}`);
+  }
+  saveData(data);
+  let msg = `✅ ${added}명 추가\n⏭ ${skipped}명 건너뜀 (이름없음 또는 중복)`;
+  if (swapCount > 0) msg += `\n🔄 이름/직책 컬럼이 뒤바뀌어 있어서 자동 보정 (${swapCount}명)`;
+  if (added > 0) msg += `\n\n샘플:\n${sampleAdded.join('\n')}`;
+  if (added === 0) {
+    msg += `\n\n⚠️ 한 명도 등록 안됨. 파일 첫 행 컬럼명 확인:\n[${firstHeaders}]\n\n→ "이름" 비슷한 컬럼이 있어야 함\n→ 양식 다운로드해서 컬럼 맞추거나, 알려주시면 코드에 그 이름 추가`;
+  }
+  alert(msg);
+});
+
+// 따옴표/콤마/탭 들어간 필드 안전 파싱 + 자동 구분자 감지 (콤마 vs 탭)
+function parseCSVMembers(text) {
+  text = text.replace(/^﻿/, '');
+  // 첫 줄에서 구분자 감지 — 탭이 더 많으면 TSV로 간주
+  const firstLine = text.split(/\r?\n/, 1)[0] || '';
+  const tabCount = (firstLine.match(/\t/g) || []).length;
+  const commaCount = (firstLine.match(/,/g) || []).length;
+  const sep = (tabCount > commaCount) ? '\t' : ',';
+  const rows = [];
+  let cur = [], cell = '', inQ = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (inQ) {
+      if (ch === '"') {
+        if (text[i+1] === '"') { cell += '"'; i++; }
+        else inQ = false;
+      } else cell += ch;
+    } else {
+      if (ch === '"') inQ = true;
+      else if (ch === sep) { cur.push(cell); cell = ''; }
+      else if (ch === '\r') {/* skip */}
+      else if (ch === '\n') { cur.push(cell); rows.push(cur); cur = []; cell = ''; }
+      else cell += ch;
+    }
+  }
+  if (cell !== '' || cur.length) { cur.push(cell); rows.push(cur); }
+  // 빈 줄 제거
+  const nonEmpty = rows.filter(r => r.some(c => String(c).trim() !== ''));
+  if (nonEmpty.length < 2) return [];
+  const headers = nonEmpty[0].map(s => String(s).trim());
+  return nonEmpty.slice(1).map(cells => {
+    const row = {};
+    headers.forEach((h, i) => { row[h] = (cells[i] !== undefined ? String(cells[i]).trim() : ''); });
+    return row;
+  });
+}
+
+function deleteAllMembers() {
+  if (!confirm('모든 회원을 삭제할까요? (조 편성도 초기화됨)')) return;
+  if (!confirm('정말요? 되돌릴 수 없어요.')) return;
+  const data = loadData();
+  data.members = [];
+  for (const t of (data.teams || [])) {
+    t.leaderId = ''; t.viceLeaderId = ''; t.memberIds = [];
+  }
+  saveData(data);
+}
+
+function bulkImportMembers() {
+  const text = prompt(
+    '회원 데이터 붙여넣기\n\n' +
+    '형식: 한 줄에 한 명, 탭(Tab) 또는 쉼표로 구분\n' +
+    '   이름   연락처   메모\n\n' +
+    '예시:\n' +
+    '홍길동\\t010-1234-5678\\t조장\n' +
+    '김철수\\t010-2222-3333\\t\n\n' +
+    '구글 시트나 엑셀에서 복사한 내용 그대로 붙여넣으면 됩니다.'
+  );
+  if (!text) return;
+
+  const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  if (!lines.length) { alert('데이터가 없습니다'); return; }
+
+  const data = loadData();
+  if (!data.members) data.members = [];
+  const existing = new Set(data.members.map(m => m.name + '|' + (m.phone || '')));
+
+  let added = 0, skipped = 0;
+  for (const line of lines) {
+    // 탭 우선, 그 다음 쉼표
+    const cells = line.includes('\t') ? line.split('\t') : line.split(',');
+    const name = (cells[0] || '').trim();
+    const phone = (cells[1] || '').trim();
+    const note = (cells[2] || '').trim();
+    if (!name) { skipped++; continue; }
+    const key = name + '|' + phone;
+    if (existing.has(key)) { skipped++; continue; }
+    data.members.push({ id: uid(), name, phone, note });
+    existing.add(key);
+    added++;
+  }
+  saveData(data);
+  alert(`✅ ${added}명 추가\n⏭ ${skipped}명 건너뜀 (이름 없음 또는 중복)`);
+}
+
+function addMember() {
+  openMemberForm(null);
+}
+function editMember(id) {
+  openMemberForm(id);
+}
+
+function openMemberForm(id) {
+  const data = loadData();
+  const m = id ? data.members.find(x => x.id === id) : { name:'', phone:'', position:'일반회원', birthday:'', address:'', note:'' };
+  if (id && !m) return;
+
+  const html = `
+    <div id="memberFormGate" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:99999;display:flex;align-items:center;justify-content:center;">
+      <div style="background:#fff;padding:20px;border-radius:8px;width:380px;max-width:92vw;max-height:90vh;overflow-y:auto;">
+        <h2 style="margin-bottom:10px;">${id ? '회원 수정' : '회원 추가'}</h2>
+        <label>이름 *</label>
+        <input id="mfName" type="text" value="${m.name||''}">
+        <label>직책</label>
+        <select id="mfPosition">
+          ${POSITION_ORDER.filter(p => p).map(p => `<option value="${p}" ${m.position===p?'selected':''}>${p}</option>`).join('')}
+        </select>
+        <label>연락처</label>
+        <input id="mfPhone" type="tel" value="${m.phone||''}" placeholder="010-0000-0000">
+        <label>생년월일</label>
+        <input id="mfBirthday" type="text" value="${m.birthday||''}" placeholder="840606 또는 1984-06-06">
+        <label>주소</label>
+        <input id="mfAddress" type="text" value="${m.address||''}">
+        <label>PIN (4자리, 기본 1234)</label>
+        <input id="mfPin" type="text" inputmode="numeric" maxlength="4" value="${m.pin||'1234'}" placeholder="1234">
+        <label>메모</label>
+        <input id="mfNote" type="text" value="${m.note||''}">
+        <div style="display:flex;gap:6px;margin-top:12px;">
+          <button class="success" style="flex:1;" onclick="saveMemberForm('${id||''}')">저장</button>
+          <button class="gray" onclick="document.getElementById('memberFormGate').remove()">취소</button>
+        </div>
+      </div>
+    </div>
+  `;
+  document.body.insertAdjacentHTML('beforeend', html);
+  setTimeout(() => document.getElementById('mfName').focus(), 50);
+}
+
+function saveMemberForm(id) {
+  const get = (k) => document.getElementById(k).value.trim();
+  const name = get('mfName');
+  if (!name) { alert('이름은 필수'); return; }
+  const obj = {
+    name,
+    position: get('mfPosition'),
+    phone: get('mfPhone'),
+    birthday: get('mfBirthday'),
+    address: get('mfAddress'),
+    pin: get('mfPin') || DEFAULT_PIN,
+    note: get('mfNote')
+  };
+  const data = loadData();
+  if (!data.members) data.members = [];
+  if (id) {
+    const m = data.members.find(x => x.id === id);
+    if (m) Object.assign(m, obj);
+  } else {
+    data.members.push({ id: uid(), ...obj });
+  }
+  saveData(data);
+  document.getElementById('memberFormGate').remove();
+}
+
+function deleteMember(id) {
+  if (!confirm('이 회원을 삭제할까요? (조 편성에서도 제외됨)')) return;
+  const data = loadData();
+  data.members = data.members.filter(m => m.id !== id);
+  // 조에서도 제거
+  for (const t of (data.teams || [])) {
+    if (t.leaderId === id) t.leaderId = '';
+    if (t.viceLeaderId === id) t.viceLeaderId = '';
+    t.memberIds = (t.memberIds || []).filter(mid => mid !== id);
+  }
+  saveData(data);
+}
+
+// ────── 조 ──────
+// ────── 조 엑셀 내보내기/가져오기 ──────
+function exportTeamsExcel() {
+  const data = loadData();
+  const teams = data.teams || [];
+  const members = data.members || [];
+  const getMem = id => members.find(m => m.id === id);
+  const rows = [];
+  teams.forEach(t => {
+    // 조장
+    if (t.leader) {
+      const m = getMem(t.leader);
+      rows.push({ 조: t.name, 역할: '조장', 이름: m?.name || t.leader, 연락처: m?.phone || '' });
+    }
+    // 부조장
+    (t.subLeaders || []).forEach(id => {
+      const m = getMem(id);
+      rows.push({ 조: t.name, 역할: '부조장', 이름: m?.name || id, 연락처: m?.phone || '' });
+    });
+    // 고정 조원
+    (t.fixed || []).forEach(id => {
+      const m = getMem(id);
+      rows.push({ 조: t.name, 역할: '고정', 이름: m?.name || id, 연락처: m?.phone || '' });
+    });
+    // 일반 조원
+    (t.members || []).forEach(id => {
+      if (id === t.leader || (t.subLeaders || []).includes(id) || (t.fixed || []).includes(id)) return;
+      const m = getMem(id);
+      rows.push({ 조: t.name, 역할: '조원', 이름: m?.name || id, 연락처: m?.phone || '' });
+    });
+    if (!t.leader && !(t.members || []).length) {
+      rows.push({ 조: t.name, 역할: '', 이름: '', 연락처: '' });
+    }
+  });
+  const ws = XLSX.utils.json_to_sheet(rows);
+  ws['!cols'] = [{ wch: 10 }, { wch: 8 }, { wch: 12 }, { wch: 15 }];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '조편성');
+  XLSX.writeFile(wb, `조편성-${todayStr()}.xlsx`);
+}
+
+function importTeamsExcel(e) {
+  const file = e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(ev) {
+    try {
+      const wb = XLSX.read(ev.target.result, { type: 'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws);
+      if (!rows.length) { alert('데이터가 없습니다'); return; }
+      const data = loadData();
+      const members = data.members || [];
+      // 이름으로 회원 찾기
+      const findMember = name => {
+        const n = String(name || '').trim();
+        if (!n) return null;
+        return members.find(m => (m.name || '').trim() === n);
+      };
+      // 조별로 그룹핑
+      const teamMap = {};
+      rows.forEach(r => {
+        const teamName = String(r['조'] || '').trim();
+        if (!teamName) return;
+        if (!teamMap[teamName]) teamMap[teamName] = { name: teamName, leader: null, subLeaders: [], fixed: [], members: [] };
+        const t = teamMap[teamName];
+        const role = String(r['역할'] || '').trim();
+        const name = String(r['이름'] || '').trim();
+        if (!name) return;
+        const m = findMember(name);
+        const id = m ? m.id : null;
+        if (!id) return; // 등록 안 된 회원은 스킵
+        if (role === '조장') { t.leader = id; if (!t.members.includes(id)) t.members.push(id); }
+        else if (role === '부조장') { t.subLeaders.push(id); if (!t.members.includes(id)) t.members.push(id); }
+        else if (role === '고정') { t.fixed.push(id); if (!t.members.includes(id)) t.members.push(id); }
+        else { if (!t.members.includes(id)) t.members.push(id); }
+      });
+      // 기존 조 업데이트 or 새 조 추가
+      const teamNames = Object.keys(teamMap);
+      let updated = 0, created = 0;
+      teamNames.forEach(name => {
+        const imp = teamMap[name];
+        const existing = data.teams.find(t => t.name === name);
+        if (existing) {
+          existing.leader = imp.leader || existing.leader;
+          existing.subLeaders = imp.subLeaders.length ? imp.subLeaders : (existing.subLeaders || []);
+          existing.fixed = imp.fixed.length ? imp.fixed : (existing.fixed || []);
+          existing.members = imp.members;
+          updated++;
+        } else {
+          data.teams.push({
+            id: uid(), name,
+            leader: imp.leader, subLeaders: imp.subLeaders, fixed: imp.fixed,
+            members: imp.members
+          });
+          created++;
+        }
+      });
+      saveData(data); refreshAll();
+      const skipped = rows.filter(r => r['이름'] && !findMember(r['이름'])).map(r => r['이름']);
+      let msg = `✅ 조 불러오기 완료\n업데이트: ${updated}조, 새로 생성: ${created}조`;
+      if (skipped.length) msg += `\n\n⚠ 미등록 회원 (스킵): ${skipped.join(', ')}`;
+      alert(msg);
+    } catch (err) {
+      alert('파일 읽기 실패: ' + err.message);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function renderTeams() {
+  const data = loadData();
+  const teams = data.teams || [];
+  const memberOpts = (data.members || []).map(m => `<option value="${m.id}">${m.name}</option>`).join('');
+
+  const teamCards = teams.map(t => {
+    const fixed = new Set(t.fixedMemberIds || []);
+    const leader = getMember(data, t.leaderId);
+    const vice = getMember(data, t.viceLeaderId);
+    const total = (t.leaderId?1:0) + (t.viceLeaderId?1:0) + (t.memberIds || []).length;
+
+    const memberRows = (t.memberIds || []).map((id, idx) => {
+      const m = getMember(data, id);
+      if (!m) return '';
+      const isFixed = fixed.has(id);
+      const phoneTel = (m.phone || '').replace(/[^0-9+]/g, '');
+      const phoneCell = m.phone
+        ? `<a href="tel:${phoneTel}" style="color:#3498db;text-decoration:none;">📞 ${m.phone}</a>`
+        : '';
+      return `
+        <tr style="${isFixed ? 'background:#fff8e1;' : ''}">
+          <td style="color:#888;font-size:11px;width:50px;padding:6px 4px;">회원${idx+1}</td>
+          <td style="padding:6px 4px;"><b>${m.name}</b></td>
+          <td style="padding:6px 4px;font-size:11px;color:#666;white-space:nowrap;">${phoneCell}</td>
+          <td class="admin-only" style="width:50px;text-align:right;padding:6px 4px;">
+            <span onclick="togglePinMember('${t.id}','${id}')" style="cursor:pointer;font-size:14px;" title="고정/해제">${isFixed ? '📌' : '📍'}</span>
+            <span onclick="removeFromTeam('${t.id}','${id}')" style="cursor:pointer;color:#e74c3c;margin-left:2px;">✕</span>
+          </td>
+        </tr>
+      `;
+    }).join('');
+
+    return `
+      <div style="border:1px solid #ddd;border-radius:8px;background:#fff;overflow:hidden;">
+        <div style="background:#34495e;color:#fff;padding:8px 12px;display:flex;justify-content:space-between;align-items:center;">
+          <div>
+            <span style="font-size:16px;font-weight:700;">${t.name}</span>
+            <span style="font-size:11px;opacity:0.8;margin-left:6px;">${total}명</span>
+          </div>
+          <button class="small gray admin-only" onclick="editTeamInfo('${t.id}')">⚙</button>
+        </div>
+        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+          <tr style="background:#fef3c7;border-bottom:1px solid #eee;">
+            <td style="color:#92400e;font-size:11px;width:50px;padding:6px 4px;font-weight:700;">조장</td>
+            <td style="padding:6px 4px;"><b>${leader?.name || '<span style="color:#aaa;font-weight:400;">(미지정)</span>'}</b></td>
+            <td style="padding:6px 4px;font-size:11px;color:#666;white-space:nowrap;">${leader?.phone ? `<a href="tel:${leader.phone.replace(/[^0-9+]/g,'')}" style="color:#3498db;text-decoration:none;">📞 ${leader.phone}</a>` : ''}</td>
+            <td class="admin-only" style="padding:4px;width:80px;text-align:right;">
+              <select onchange="setLeader('${t.id}', this.value)" style="font-size:11px;padding:2px;width:100%;">
+                <option value="">선택</option>
+                ${memberOpts.replace(`value="${t.leaderId}"`, `value="${t.leaderId}" selected`)}
+              </select>
+            </td>
+          </tr>
+          <tr style="background:#dbeafe;border-bottom:1px solid #eee;">
+            <td style="color:#1e40af;font-size:11px;padding:6px 4px;font-weight:700;">부조장</td>
+            <td style="padding:6px 4px;"><b>${vice?.name || '<span style="color:#aaa;font-weight:400;">(미지정)</span>'}</b></td>
+            <td style="padding:6px 4px;font-size:11px;color:#666;white-space:nowrap;">${vice?.phone ? `<a href="tel:${vice.phone.replace(/[^0-9+]/g,'')}" style="color:#3498db;text-decoration:none;">📞 ${vice.phone}</a>` : ''}</td>
+            <td class="admin-only" style="padding:4px;text-align:right;">
+              <select onchange="setViceLeader('${t.id}', this.value)" style="font-size:11px;padding:2px;width:100%;">
+                <option value="">선택</option>
+                ${memberOpts.replace(`value="${t.viceLeaderId}"`, `value="${t.viceLeaderId}" selected`)}
+              </select>
+            </td>
+          </tr>
+          ${memberRows || '<tr><td colspan="4" style="padding:14px;text-align:center;color:#aaa;font-size:12px;">조원 없음<br>(팀짜기 또는 직접 추가)</td></tr>'}
+        </table>
+        <div class="admin-only" style="padding:6px;background:#f8f9fa;display:flex;gap:4px;border-top:1px solid #eee;">
+          <select id="addToTeam_${t.id}" style="flex:1;font-size:12px;padding:3px;">
+            <option value="">조원 추가...</option>
+            ${memberOpts}
+          </select>
+          <button class="small" onclick="addToTeam('${t.id}')">+</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  // 예비조 카드
+  const reserveIds = data.reserveMemberIds || [];
+  const reserveRows = reserveIds.map(id => {
+    const m = getMember(data, id);
+    if (!m) return '';
+    const phoneTel = (m.phone || '').replace(/[^0-9+]/g, '');
+    const phoneCell = m.phone
+      ? `<a href="tel:${phoneTel}" style="color:#3498db;text-decoration:none;">📞 ${m.phone}</a>`
+      : '';
+    return `
+      <tr>
+        <td style="padding:6px 4px;"><b>${m.name}</b> <span class="sub">${m.position || ''}</span></td>
+        <td style="padding:6px 4px;font-size:11px;color:#666;white-space:nowrap;">${phoneCell}</td>
+        <td class="admin-only" style="width:30px;text-align:right;padding:6px 4px;">
+          <span onclick="removeFromReserve('${id}')" style="cursor:pointer;color:#e74c3c;">✕</span>
+        </td>
+      </tr>
+    `;
+  }).join('');
+
+  const reserveCard = `
+    <div style="border:1px solid #ddd;border-radius:8px;background:#fff;overflow:hidden;border-left:4px solid #95a5a6;">
+      <div style="background:#7f8c8d;color:#fff;padding:8px 12px;display:flex;justify-content:space-between;align-items:center;">
+        <div>
+          <span style="font-size:16px;font-weight:700;">🔁 예비조</span>
+          <span style="font-size:11px;opacity:0.8;margin-left:6px;">${reserveIds.length}명 · 랜덤 분배 제외</span>
+        </div>
+      </div>
+      <table style="width:100%;border-collapse:collapse;font-size:13px;">
+        ${reserveRows || '<tr><td colspan="3" style="padding:14px;text-align:center;color:#aaa;font-size:12px;">예비조 회원 없음<br>(아래에서 추가)</td></tr>'}
+      </table>
+      <div class="admin-only" style="padding:6px;background:#f8f9fa;display:flex;gap:4px;border-top:1px solid #eee;">
+        <select id="addToReserve" style="flex:1;font-size:12px;padding:3px;">
+          <option value="">예비조 추가...</option>
+          ${memberOpts}
+        </select>
+        <button class="small" onclick="addToReserve()">+</button>
+      </div>
+    </div>
+  `;
+
+  document.getElementById('teamPanels').innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px;">
+      ${teamCards}
+      ${reserveCard}
+    </div>
+  `;
+}
+
+function addToReserve() {
+  const sel = document.getElementById('addToReserve');
+  const memberId = sel.value;
+  if (!memberId) return;
+  const data = loadData();
+  if (!data.reserveMemberIds) data.reserveMemberIds = [];
+  if (data.reserveMemberIds.includes(memberId)) { alert('이미 예비조에 있습니다'); return; }
+  // 다른 조에 있으면 거기서 제거
+  removeFromAllTeams(data, memberId);
+  data.reserveMemberIds.push(memberId);
+  saveData(data);
+}
+
+function removeFromReserve(memberId) {
+  const data = loadData();
+  data.reserveMemberIds = (data.reserveMemberIds || []).filter(id => id !== memberId);
+  saveData(data);
+}
+
+function setLeader(teamId, memberId) {
+  const data = loadData();
+  const team = getTeam(data, teamId);
+  if (!team) return;
+  // 다른 조 조장/부조장이면 거기서 제거
+  removeFromAllTeams(data, memberId);
+  team.leaderId = memberId;
+  saveData(data);
+}
+
+function setViceLeader(teamId, memberId) {
+  const data = loadData();
+  const team = getTeam(data, teamId);
+  if (!team) return;
+  removeFromAllTeams(data, memberId);
+  team.viceLeaderId = memberId;
+  saveData(data);
+}
+
+function removeFromAllTeams(data, memberId) {
+  if (!memberId) return;
+  for (const t of (data.teams || [])) {
+    if (t.leaderId === memberId) t.leaderId = '';
+    if (t.viceLeaderId === memberId) t.viceLeaderId = '';
+    t.memberIds = (t.memberIds || []).filter(id => id !== memberId);
+  }
+}
+
+function addToTeam(teamId) {
+  const sel = document.getElementById('addToTeam_' + teamId);
+  const memberId = sel.value;
+  if (!memberId) return;
+  const data = loadData();
+  const team = getTeam(data, teamId);
+  if (!team) return;
+  removeFromAllTeams(data, memberId);
+  if (!team.memberIds) team.memberIds = [];
+  team.memberIds.push(memberId);
+  saveData(data);
+}
+
+function removeFromTeam(teamId, memberId) {
+  const data = loadData();
+  const team = getTeam(data, teamId);
+  if (!team) return;
+  team.memberIds = (team.memberIds || []).filter(id => id !== memberId);
+  team.fixedMemberIds = (team.fixedMemberIds || []).filter(id => id !== memberId);
+  saveData(data);
+}
+
+function togglePinMember(teamId, memberId) {
+  const data = loadData();
+  const team = getTeam(data, teamId);
+  if (!team) return;
+  if (!team.fixedMemberIds) team.fixedMemberIds = [];
+  const idx = team.fixedMemberIds.indexOf(memberId);
+  if (idx >= 0) team.fixedMemberIds.splice(idx, 1);
+  else team.fixedMemberIds.push(memberId);
+  saveData(data);
+}
+
+function editTeamInfo(teamId) {
+  const data = loadData();
+  const team = getTeam(data, teamId);
+  if (!team) return;
+  const name = prompt('조 이름', team.name); if (name === null) return;
+  team.name = name.trim();
+  saveData(data);
+}
+
+function randomAssign() {
+  const data = loadData();
+  const teams = data.teams || [];
+  if (teams.length === 0) { alert('조가 없습니다'); return; }
+
+  // 이미 고정된 회원 ID (조장/부조장/고정조원)
+  const fixedIds = new Set();
+  for (const t of teams) {
+    if (t.leaderId) fixedIds.add(t.leaderId);
+    if (t.viceLeaderId) fixedIds.add(t.viceLeaderId);
+    for (const id of (t.fixedMemberIds || [])) fixedIds.add(id);
+  }
+
+  // 예비조 회원 (랜덤 분배 제외)
+  const reserveIds = new Set(data.reserveMemberIds || []);
+
+  // 일반 조원 후보 = 전체 - 고정된 회원 - 예비조
+  const candidates = (data.members || [])
+    .filter(m => !fixedIds.has(m.id) && !reserveIds.has(m.id))
+    .map(m => m.id);
+
+  if (candidates.length === 0) { alert('랜덤 배정할 회원이 없습니다 (전부 고정/예비조)'); return; }
+
+  // 셔플
+  for (let i = candidates.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
+  }
+
+  // 각 조의 memberIds = 고정 + 분배받은 랜덤
+  for (const t of teams) {
+    t.memberIds = [...(t.fixedMemberIds || [])];
+  }
+  candidates.forEach((id, idx) => {
+    teams[idx % teams.length].memberIds.push(id);
+  });
+
+  saveData(data);
+  const fixedCount = fixedIds.size - teams.reduce((s, t) => s + (t.leaderId?1:0) + (t.viceLeaderId?1:0), 0);
+  alert(`✅ 팀짜기 완료!\n랜덤 분배: ${candidates.length}명\n고정 조원: ${fixedCount}명`);
+}
+
+// ────── 저장된 팀 구성 ──────
+function saveTeamSnapshot() {
+  const data = loadData();
+  const teams = data.teams || [];
+  if (!teams.length) { alert('저장할 조가 없습니다'); return; }
+
+  const defaultName = new Date().toISOString().slice(0, 10) + ' 구성';
+  const name = prompt('이 팀 구성의 이름을 입력하세요\n(예: "5월 1주차", "방역행사용")', defaultName);
+  if (!name) return;
+
+  if (!data.savedTeams) data.savedTeams = [];
+  data.savedTeams.push({
+    id: uid(),
+    name: name.trim(),
+    savedAt: Date.now(),
+    teams: JSON.parse(JSON.stringify(teams)) // 깊은 복사
+  });
+  saveData(data);
+  alert(`✅ "${name}" 저장 완료`);
+}
+
+function renderSavedTeams() {
+  const data = loadData();
+  const saved = (data.savedTeams || []).slice().sort((a, b) => (b.savedAt || 0) - (a.savedAt || 0));
+  document.getElementById('savedCount').textContent = `(${saved.length}개)`;
+  const el = document.getElementById('savedTeamsList');
+  if (!saved.length) {
+    el.innerHTML = '<div class="empty">저장된 팀 구성 없음<br><span class="sub">"💾 현재 팀 저장" 버튼으로 백업 가능</span></div>';
+    return;
+  }
+
+  el.innerHTML = saved.map(s => {
+    const when = new Date(s.savedAt).toLocaleString('ko-KR');
+    const summary = (s.teams || []).map(t => {
+      const total = (t.leaderId?1:0) + (t.viceLeaderId?1:0) + (t.memberIds||[]).length;
+      return `${t.name}(${total}명)`;
+    }).join(' · ');
+    return `
+      <div class="list-item" style="flex-direction:column;align-items:stretch;">
+        <div class="flex-between">
+          <div>
+            <b>${s.name}</b>
+            <div class="sub">${when} · ${summary}</div>
+          </div>
+          <div>
+            <button class="small" onclick="previewSavedTeam('${s.id}')">미리보기</button>
+            <button class="small success" onclick="loadSavedTeam('${s.id}')">불러오기</button>
+            <button class="small gray" onclick="renameSavedTeam('${s.id}')">이름</button>
+            <button class="small danger" onclick="deleteSavedTeam('${s.id}')">삭제</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function previewSavedTeam(id) {
+  const data = loadData();
+  const s = (data.savedTeams || []).find(x => x.id === id);
+  if (!s) return;
+  let msg = `📋 ${s.name}\n${new Date(s.savedAt).toLocaleString('ko-KR')}\n\n`;
+  for (const t of (s.teams || [])) {
+    const leader = getMember(data, t.leaderId);
+    const vice = getMember(data, t.viceLeaderId);
+    const members = (t.memberIds || []).map(mid => {
+      const m = getMember(data, mid);
+      return m ? m.name : '(삭제됨)';
+    });
+    msg += `[${t.name}] (${t.vehicle || '차량없음'})\n`;
+    msg += `  조장: ${leader?.name || '-'}\n`;
+    msg += `  부조장: ${vice?.name || '-'}\n`;
+    msg += `  조원(${members.length}): ${members.join(', ')}\n\n`;
+  }
+  alert(msg);
+}
+
+function loadSavedTeam(id) {
+  const data = loadData();
+  const s = (data.savedTeams || []).find(x => x.id === id);
+  if (!s) return;
+  if (!confirm(`"${s.name}" 구성을 현재 팀에 적용할까요?\n현재 팀 구성은 덮어씌워집니다.`)) return;
+  data.teams = JSON.parse(JSON.stringify(s.teams));
+  saveData(data);
+  alert('✅ 불러오기 완료');
+}
+
+function renameSavedTeam(id) {
+  const data = loadData();
+  const s = (data.savedTeams || []).find(x => x.id === id);
+  if (!s) return;
+  const name = prompt('이름 변경', s.name);
+  if (!name) return;
+  s.name = name.trim();
+  saveData(data);
+}
+
+function deleteSavedTeam(id) {
+  if (!confirm('이 저장된 팀 구성을 삭제할까요?')) return;
+  const data = loadData();
+  data.savedTeams = (data.savedTeams || []).filter(x => x.id !== id);
+  saveData(data);
+}
+
+function resetTeams() {
+  const choice = confirm('조원을 모두 미배정으로 되돌릴까요?\n[확인] = 랜덤 조원만 초기화 (고정·조장·부조장 유지)\n[취소] = 그대로 두기');
+  if (!choice) return;
+  const data = loadData();
+  for (const t of (data.teams || [])) {
+    t.memberIds = [...(t.fixedMemberIds || [])];
+  }
+  saveData(data);
+}
+</script>
+</body>
+</html>

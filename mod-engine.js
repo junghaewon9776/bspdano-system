@@ -1930,8 +1930,9 @@ function _modLabelHtml(def,row,opt){
     }
     if(showTitle){
       var tp=pos['_title']||{x:4,y:4,fs:14};
-      var tef=_mlElemFit(tp, String(titleV), tp.fs||14, opt.w);
-      h+='<div style="position:absolute;left:'+tp.x+'%;top:'+tp.y+'%;font-size:'+tef.fs+'pt;font-weight:800;line-height:1.1;'+tef.css+'">'+esc(String(titleV))+'</div>';
+      var _tv=String(titleV); if(tp.star) _tv='★ '+_tv+' ★';
+      var tef=_mlElemFit(tp, _tv, tp.fs||14, opt.w);
+      h+='<div style="position:absolute;left:'+tp.x+'%;top:'+tp.y+'%;font-size:'+tef.fs+'pt;font-weight:800;line-height:1.1;'+tef.css+'">'+esc(_tv)+'</div>';
     }
     cols.forEach(function(c){
       if(c.key===opt.titleKey) return;
@@ -1939,6 +1940,7 @@ function _modLabelHtml(def,row,opt){
       var fp=pos[c.key]||null;
       if(!fp) return;
       var pv=_modPlain(c,v);
+      if(fp.star) pv='★ '+pv+' ★';
       var plain=c.label+(fp.colon?': ':' ')+pv;
       var ef=_mlElemFit(fp, plain, fp.fs||7.5, opt.w);
       var sep=fp.brk?((fp.colon?':':'')+'<br>'):(fp.colon?': ':' ');
@@ -2574,12 +2576,14 @@ function _mllRender(){
 
   var items=[];
   var tp=pos['_title']||{x:4,y:4,fs:14};
-  items.push({id:'_title',label:'제목',text:String(titleV),x:tp.x,y:tp.y,fs:tp.fs||14,bold:true,mode:(tp.mode||(tp.wrap?'wrap':'line')),w:tp.w,align:tp.align,color:'#6366f1'});
+  var _titleText=String(titleV); if(tp.star) _titleText='★ '+_titleText+' ★';
+  items.push({id:'_title',label:'제목',text:_titleText,x:tp.x,y:tp.y,fs:tp.fs||14,bold:true,mode:(tp.mode||(tp.wrap?'wrap':'line')),w:tp.w,align:tp.align,color:'#6366f1'});
   L.cols.forEach(function(c){
     if(c.key===L.opt.titleKey) return;
     var fp=pos[c.key]||{x:4,y:20,fs:7.5};
     ci=(ci+1)%colors.length;
     var v=row[c.key]||'샘플';
+    if(fp.star) v='★ '+v+' ★';
     var sepC=fp.brk?((fp.colon?':':'')+'\n'):(fp.colon?': ':' ');
     items.push({id:c.key,label:c.label,text:c.label+sepC+v,x:fp.x,y:fp.y,fs:fp.fs||7.5,bold:fp.bold,mode:(fp.mode||(fp.wrap?'wrap':'line')),w:fp.w,align:fp.align,color:colors[ci]});
   });
@@ -2704,6 +2708,7 @@ function _mllShowCtrl(id){
     h+='<div style="margin-top:8px;font-size:11px;color:#94a3b8;margin-bottom:5px">서식</div>';
     h+='<div style="display:flex;flex-wrap:wrap;gap:4px">';
     h+='<button onclick="_mllToggle(\''+id+'\',\'bold\')" style="'+bs(p.bold)+'">B 굵게</button>';
+    h+='<button onclick="_mllToggle(\''+id+'\',\'star\')" style="'+bs(p.star)+'">★ 별표</button>';
     if(id!=='_title'){ h+='<button onclick="_mllToggle(\''+id+'\',\'brk\')" style="'+bs(p.brk)+'">↵ 라벨/값</button>'; h+='<button onclick="_mllToggle(\''+id+'\',\'colon\')" style="'+bs(p.colon)+'">: 표시</button>'; }
     h+='</div>';
     h+='<div style="display:flex;gap:4px;margin-top:5px">';
