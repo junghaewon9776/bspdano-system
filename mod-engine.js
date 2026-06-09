@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260609v31';
+var _MOD_ENGINE_VER='20260609v32';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -2633,16 +2633,17 @@ async function _qzPrintLabelsBitmap(def, rows, opt){
   var wmm=opt.w, hmm=opt.h, gap=(opt.gap!=null?opt.gap:2);
   var cfg=qz.configs.create(pn);
   try{
-    // SIZE/GAP 설정 + GAPDETECT로 프린터가 실제 라벨 길이를 직접 측정(밀림 방지)
-    var data=[{type:'raw',format:'plain',data:'SIZE '+wmm+' mm,'+hmm+' mm\r\nGAP '+gap+' mm,0 mm\r\nDIRECTION 1\r\nREFERENCE 0,0\r\nSET TEAR ON\r\nGAPDETECT\r\n'}];
+    // 각 라벨을 개별 작업으로(엑셀처럼) + 라벨마다 SIZE/GAP 재설정 → 매번 gap센서로 머리 정렬
     for(var i=0;i<rows.length;i++){
       var canvas=await _labelToCanvas(_modLabelHtml(def,rows[i],opt),wmm,hmm,203);
       var bmp=_canvasToTSPL(canvas,160);
-      data.push({type:'raw',format:'plain',data:'CLS\r\nBITMAP 0,0,'+bmp.wbytes+','+bmp.h+',0,'});
-      data.push({type:'raw',format:'base64',data:_bytesToBase64(bmp.bytes)});
-      data.push({type:'raw',format:'plain',data:'\r\nPRINT 1\r\n'});
+      var head='SIZE '+wmm+' mm,'+hmm+' mm\r\nGAP '+gap+' mm,0 mm\r\nDIRECTION 1\r\nREFERENCE 0,0\r\nCLS\r\nBITMAP 0,0,'+bmp.wbytes+','+bmp.h+',0,';
+      await qz.print(cfg,[
+        {type:'raw',format:'plain',data:head},
+        {type:'raw',format:'base64',data:_bytesToBase64(bmp.bytes)},
+        {type:'raw',format:'plain',data:'\r\nPRINT 1\r\n'}
+      ]);
     }
-    await qz.print(cfg,data);
     toast('🖨 RAW비트맵 '+rows.length+'장 출력');
     return true;
   }catch(e){ toast('RAW비트맵 실패: '+(e.message||e),true); console.error(e); return false; }
