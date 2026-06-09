@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260609v51';
+var _MOD_ENGINE_VER='20260609v52';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -2883,6 +2883,7 @@ async function _qzPrintLabelsBitmap(def, rows, opt){
     // RAW 비트맵 (드라이버 무관) + 라벨길이 미세조정으로 누적밀림 보정
     var adj=0; try{ adj=parseFloat(localStorage.getItem('_mlSizeAdj')||'0')||0; }catch(e){}
     var sizeH=hmm+adj; // 실측 피치에 맞게 SIZE 높이 보정
+    var delayMs=1500; try{ var _d=localStorage.getItem('_mlBmpDelay'); if(_d!=null&&_d!=='') delayMs=parseInt(_d,10)||0; }catch(e){}
     for(var i=0;i<rows.length;i++){
       var canvas=await _labelToCanvas(_modLabelHtml(def,rows[i],opt),wmm,hmm,203);
       var bmp=_canvasToTSPL(canvas,160);
@@ -2893,6 +2894,8 @@ async function _qzPrintLabelsBitmap(def, rows, opt){
         {type:'raw',format:'base64',data:_bytesToBase64(bmp.bytes)},
         {type:'raw',format:'plain',data:'\r\nPRINT 1\r\n'}
       ]);
+      // 프린터가 한 장 뽑고 다음 라벨 머리로 정렬할 시간 (컴퓨터별 조절)
+      if(delayMs>0 && i<rows.length-1) await new Promise(function(ok){ setTimeout(ok, delayMs); });
     }
     toast('🖨 RAW비트맵 '+rows.length+'장 출력');
     return true;
@@ -2915,6 +2918,7 @@ function _qzPrintLabels(def, rows, opt){
 }
 function _qzToggleBitmap(on){ try{ localStorage.setItem('_mlBitmap', on?'1':'0'); }catch(e){} _qzUpdateUI(); toast(on?'RAW 비트맵 모드 ON (이미지+GAP)':'일반 모드',false); }
 function _qzAdjSize(d){ var v=0; try{ v=parseFloat(localStorage.getItem('_mlSizeAdj')||'0')||0; }catch(e){} v=Math.round((v+d)*100)/100; try{ localStorage.setItem('_mlSizeAdj', String(v)); }catch(e){} _qzUpdateUI(); toast('라벨길이 보정: '+(v>0?'+':'')+v.toFixed(2)+'mm',false); }
+function _qzAdjBmpDelay(d){ var v=1500; try{ var s=localStorage.getItem('_mlBmpDelay'); if(s!=null&&s!=='') v=parseInt(s,10)||0; }catch(e){} v=Math.max(0,Math.min(5000,v+d)); try{ localStorage.setItem('_mlBmpDelay', String(v)); }catch(e){} _qzUpdateUI(); toast('장 간격: '+(v/1000).toFixed(1)+'초',false); }
 function _qzToggleBrowserPrint(on){ try{ localStorage.setItem('_mlBrowserPrint', on?'1':'0'); }catch(e){} _qzUpdateUI(); toast(on?'브라우저 인쇄 모드 ON (Excel 메일머지식)':'QZ 직접 출력 모드',false); }
 function _qzToggleRotate(on){ try{ localStorage.setItem('_mlRotate', on?'1':'0'); }catch(e){} _qzUpdateUI(); toast(on?'90도 회전 ON':'회전 OFF',false); }
 // 라벨 팝업 내 QZ 영역 갱신
@@ -2959,6 +2963,11 @@ function _qzUpdateUI(){
         +'<b style="min-width:54px;text-align:center">'+(_adj>0?'+':'')+_adj.toFixed(2)+'mm</b>'
         +'<button onclick="_qzAdjSize(0.05)" style="border:none;background:#cbd5e1;border-radius:4px;width:22px;height:22px;cursor:pointer;font-weight:800">+</button>'
         +'<button onclick="_qzAdjSize(0.5)" style="border:none;background:#94a3b8;color:#fff;border-radius:4px;width:30px;height:22px;cursor:pointer;font-weight:800" title="크게 늘림">++</button></label>';
+      var _dly=1500; try{ var _dd=localStorage.getItem('_mlBmpDelay'); if(_dd!=null&&_dd!=='') _dly=parseInt(_dd,10)||0; }catch(e){}
+      h+='<label style="display:inline-flex;align-items:center;gap:3px;font-size:11px;background:#f1f5f9;color:#475569;padding:4px 8px;border-radius:6px" title="여러 장 출력 시 장 사이 멈춤 시간. 밀리면 늘리고, 잘 되면 0으로 줄여 빠르게">'
+        +'장간격 <button onclick="_qzAdjBmpDelay(-500)" style="border:none;background:#cbd5e1;border-radius:4px;width:22px;height:22px;cursor:pointer;font-weight:800">−</button>'
+        +'<b style="min-width:48px;text-align:center">'+(_dly/1000).toFixed(1)+'초</b>'
+        +'<button onclick="_qzAdjBmpDelay(500)" style="border:none;background:#cbd5e1;border-radius:4px;width:22px;height:22px;cursor:pointer;font-weight:800">+</button></label>';
     }
   }
   box.innerHTML=h;
