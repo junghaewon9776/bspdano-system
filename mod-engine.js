@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260609v56';
+var _MOD_ENGINE_VER='20260609v57';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -2919,16 +2919,21 @@ async function _qzPrintLabelsRaw(def, rows, opt){
   var sizeH=hmm+adj;
   var cfg=qz.configs.create(pn);
   try{
-    // 하나의 연속 RAW 스트림으로 전송 → 공유 스풀러 거쳐도 그대로 통과
-    var data=[{type:'raw',format:'plain',data:'SIZE '+wmm+' mm,'+sizeH+' mm\r\nGAP '+gap+' mm,0 mm\r\nDIRECTION 1\r\nREFERENCE 0,0\r\nSET TEAR OFF\r\n'}];
+    // 전체 TSPL(텍스트+바이너리 비트맵)을 하나의 통짜 바이트로 묶음 → 공유 스풀러에서 안 쪼개짐
+    function strBytes(s){ var a=new Uint8Array(s.length); for(var j=0;j<s.length;j++) a[j]=s.charCodeAt(j)&0xff; return a; }
+    var parts=[];
+    parts.push(strBytes('SIZE '+wmm+' mm,'+sizeH+' mm\r\nGAP '+gap+' mm,0 mm\r\nDIRECTION 1\r\nREFERENCE 0,0\r\nSET TEAR OFF\r\n'));
     for(var i=0;i<rows.length;i++){
       var canvas=await _labelToCanvas(_modLabelHtml(def,rows[i],opt),wmm,hmm,203);
       var bmp=_canvasToTSPL(canvas,160);
-      data.push({type:'raw',format:'plain',data:'CLS\r\nBITMAP 0,0,'+bmp.wbytes+','+bmp.h+',0,'});
-      data.push({type:'raw',format:'base64',data:_bytesToBase64(bmp.bytes)});
-      data.push({type:'raw',format:'plain',data:'\r\nPRINT 1\r\n'});
+      parts.push(strBytes('CLS\r\nBITMAP 0,0,'+bmp.wbytes+','+bmp.h+',0,'));
+      parts.push(bmp.bytes);
+      parts.push(strBytes('\r\nPRINT 1\r\n'));
     }
-    return qz.print(cfg,data).then(function(){ toast('🖨 공유RAW '+rows.length+'장 출력'); return true; })
+    var total=0; parts.forEach(function(p){ total+=p.length; });
+    var all=new Uint8Array(total), off=0;
+    parts.forEach(function(p){ all.set(p,off); off+=p.length; });
+    return qz.print(cfg,[{type:'raw',format:'base64',data:_bytesToBase64(all)}]).then(function(){ toast('🖨 공유RAW '+rows.length+'장 출력'); return true; })
       .catch(function(e){ toast('공유RAW 실패: '+(e.message||e),true); return false; });
   }catch(e){ toast('공유RAW 실패: '+(e.message||e),true); console.error(e); return false; }
 }
