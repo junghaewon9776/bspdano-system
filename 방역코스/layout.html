@@ -359,11 +359,15 @@ body{font-family:'Pretendard','Noto Sans KR',sans-serif;background:#1a1a2e;color
       <option value="icon">아이콘 (이모지) 🚗</option>
     </select>
     <div id="ncIconOpts" style="display:none">
-      <label>아이콘 선택</label>
+      <label>아이콘 선택 (이모지)</label>
       <div class="icon-palette" id="ncIconPalette"></div>
       <input id="ncIcon" type="hidden" value="🚗">
+      <label>또는 이미지 (업로드 / URL)</label>
+      <input id="ncImgUrl" type="text" placeholder="이미지 URL 붙여넣기 (https://…)" oninput="_iconImgPreview('nc')">
+      <input id="ncImgFile" type="file" accept="image/*" onchange="_iconImgUpload('nc',this)" style="margin-top:4px">
+      <div id="ncImgPrev"></div>
       <label>아이콘 크기 (px)</label>
-      <input id="ncIconSize" type="number" value="34" min="14" max="120">
+      <input id="ncIconSize" type="number" value="34" min="14" max="200">
     </div>
     <div id="ncRectSize">
       <label>기본 크기 (가로m × 세로m)</label>
@@ -426,11 +430,15 @@ body{font-family:'Pretendard','Noto Sans KR',sans-serif;background:#1a1a2e;color
       <option value="icon">아이콘 (이모지) 🚗</option>
     </select>
     <div id="ecIconOpts" style="display:none">
-      <label>아이콘 선택</label>
+      <label>아이콘 선택 (이모지)</label>
       <div class="icon-palette" id="ecIconPalette"></div>
       <input id="ecIcon" type="hidden" value="🚗">
+      <label>또는 이미지 (업로드 / URL)</label>
+      <input id="ecImgUrl" type="text" placeholder="이미지 URL 붙여넣기 (https://…)" oninput="_iconImgPreview('ec')">
+      <input id="ecImgFile" type="file" accept="image/*" onchange="_iconImgUpload('ec',this)" style="margin-top:4px">
+      <div id="ecImgPrev"></div>
       <label>아이콘 크기 (px)</label>
-      <input id="ecIconSize" type="number" value="34" min="14" max="120">
+      <input id="ecIconSize" type="number" value="34" min="14" max="200">
     </div>
     <div id="ecRectSize">
       <label>기본 크기 (가로m × 세로m)</label>
@@ -1151,9 +1159,35 @@ function renderIconPicker(paletteId, hiddenId, cur){
   _FEST_ICONS.forEach(function(ic){
     var b=document.createElement('button'); b.type='button'; b.textContent=ic;
     b.style.cssText='font-size:20px;width:38px;height:38px;border-radius:8px;cursor:pointer;background:'+(ic===cur?'#2563eb':'#1e293b')+';border:2px solid '+(ic===cur?'#60a5fa':'#334155');
-    b.onclick=function(){ document.getElementById(hiddenId).value=ic; renderIconPicker(paletteId,hiddenId,ic); };
+    b.onclick=function(){ document.getElementById(hiddenId).value=ic; renderIconPicker(paletteId,hiddenId,ic); document.getElementById(paletteId.replace('IconPalette','ImgUrl')).value=''; _iconImgPreview(paletteId.replace('IconPalette','')); };
     box.appendChild(b);
   });
+}
+// 이미지 아이콘 — 파일 업로드(128px로 축소 → data URL) / URL
+function _iconImgUpload(prefix,input){
+  var f=input.files&&input.files[0]; if(!f) return;
+  var rd=new FileReader();
+  rd.onload=function(e){
+    var img=new Image();
+    img.onload=function(){
+      var max=160, w=img.width, h=img.height;
+      if(w>max||h>max){ var r=Math.min(max/w,max/h); w=Math.round(w*r); h=Math.round(h*r); }
+      var cv=document.createElement('canvas'); cv.width=w; cv.height=h;
+      cv.getContext('2d').drawImage(img,0,0,w,h);
+      var durl=cv.toDataURL('image/png');
+      document.getElementById(prefix+'ImgUrl').value=durl;
+      _iconImgPreview(prefix);
+    };
+    img.onerror=function(){ toast('이미지를 읽을 수 없습니다',true); };
+    img.src=e.target.result;
+  };
+  rd.readAsDataURL(f);
+}
+function _iconImgPreview(prefix){
+  var url=(document.getElementById(prefix+'ImgUrl').value||'').trim();
+  var box=document.getElementById(prefix+'ImgPrev'); if(!box) return;
+  if(url){ box.innerHTML='<div style="margin:6px 0;display:flex;align-items:center;gap:8px"><img src="'+url.replace(/"/g,'&quot;')+'" style="max-width:60px;max-height:60px;border:1px solid #334155;border-radius:6px;background:#fff"><button type="button" onclick="document.getElementById(\''+prefix+'ImgUrl\').value=\'\';_iconImgPreview(\''+prefix+'\')" style="background:#ef4444;color:#fff;border:none;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:12px">이미지 지우기</button></div>'; }
+  else box.innerHTML='';
 }
 document.getElementById('ncShape').addEventListener('change',function(){onShapeChange('nc')});
 document.getElementById('ecShape').addEventListener('change',function(){onShapeChange('ec')});
@@ -1171,7 +1205,10 @@ function showNewCatModal(){
   document.getElementById('ncTextSize').value=16;
   document.getElementById('ncIcon').value='🚗';
   document.getElementById('ncIconSize').value=34;
+  document.getElementById('ncImgUrl').value='';
+  document.getElementById('ncImgFile').value='';
   renderIconPicker('ncIconPalette','ncIcon','🚗');
+  _iconImgPreview('nc');
   onShapeChange('nc');
   renderPalette('ncPalette','ncColor','#FF6B6B');
   document.getElementById('newCatModal').style.display='flex';
@@ -1196,7 +1233,8 @@ function createCategory(){
     strokeWeight:parseInt(document.getElementById('ncStrokeW').value)||4,
     textSize:parseInt(document.getElementById('ncTextSize').value)||16,
     icon:document.getElementById('ncIcon').value||'🚗',
-    iconSize:parseInt(document.getElementById('ncIconSize').value)||34
+    iconSize:parseInt(document.getElementById('ncIconSize').value)||34,
+    imgUrl:(document.getElementById('ncImgUrl').value||'').trim()
   };
   categories.push(cat);
   renderCategories();
@@ -1223,7 +1261,10 @@ function showEditCat(catId){
   document.getElementById('ecTextSize').value=cat.textSize||16;
   document.getElementById('ecIcon').value=cat.icon||'🚗';
   document.getElementById('ecIconSize').value=cat.iconSize||34;
+  document.getElementById('ecImgUrl').value=cat.imgUrl||'';
+  document.getElementById('ecImgFile').value='';
   renderIconPicker('ecIconPalette','ecIcon',cat.icon||'🚗');
+  _iconImgPreview('ec');
   document.getElementById('ecOpacity').value=String(cat.opacity!=null?cat.opacity:0.4);
   onShapeChange('ec');
   renderPalette('ecPalette','ecColor',cat.color);
@@ -1246,6 +1287,7 @@ function updateCategory(){
   cat.textSize=parseInt(document.getElementById('ecTextSize').value)||16;
   cat.icon=document.getElementById('ecIcon').value||'🚗';
   cat.iconSize=parseInt(document.getElementById('ecIconSize').value)||34;
+  cat.imgUrl=(document.getElementById('ecImgUrl').value||'').trim();
   cat.opacity=parseFloat(document.getElementById('ecOpacity').value);
 
   items.forEach(function(it,i){
@@ -1325,7 +1367,7 @@ function addItem(catId){
       num:cat.prefix+'-'+String(cntI+1).padStart(2,'0'),
       name:nmI, duty:'', phone:'', memo:'',
       lat:cI.getLat(), lng:cI.getLng(),
-      shape:'icon', icon:cat.icon||'🚗', iconSize:cat.iconSize||34, rotation:0
+      shape:'icon', icon:cat.icon||'🚗', iconSize:cat.iconSize||34, imgUrl:cat.imgUrl||'', rotation:0
     };
     items.push(itI);
     drawItem(items.length-1);
@@ -1401,11 +1443,19 @@ function drawItem(idx){
   if(it.shape==='icon'){
     var icSize=cat.iconSize||it.iconSize||34;
     var icChar=cat.icon||it.icon||'🚗';
+    var icImg=cat.imgUrl||it.imgUrl||'';
     var icWrap=document.createElement('div');
     icWrap.style.cssText='display:flex;flex-direction:column;align-items:center;cursor:grab;user-select:none;line-height:1';
-    var icEl=document.createElement('div');
-    icEl.style.cssText='font-size:'+icSize+'px;filter:drop-shadow(0 2px 3px rgba(0,0,0,0.5))';
-    icEl.textContent=icChar;
+    var icEl;
+    if(icImg){
+      icEl=document.createElement('img');
+      icEl.src=icImg; icEl.draggable=false;
+      icEl.style.cssText='width:'+icSize+'px;height:auto;display:block;filter:drop-shadow(0 2px 3px rgba(0,0,0,0.5));pointer-events:none';
+    } else {
+      icEl=document.createElement('div');
+      icEl.style.cssText='font-size:'+icSize+'px;filter:drop-shadow(0 2px 3px rgba(0,0,0,0.5))';
+      icEl.textContent=icChar;
+    }
     icWrap.appendChild(icEl);
     var nm=(it.name||'').trim();
     if(nm){
@@ -1722,7 +1772,7 @@ function cloneItem(dx,dy){
   items.forEach(function(i){if(i.catId===it.catId){var m=i.num.match(/(\d+)$/);if(m)maxN=Math.max(maxN,parseInt(m[1]))}});
   var ni={id:nextItemId++,catId:it.catId,num:cat.prefix+'-'+String(maxN+1).padStart(2,'0'),
     name:(it.shape==='text'||it.shape==='icon')?(it.name||''):'',duty:'',phone:'',memo:'',lat:it.lat+dLat,lng:it.lng+dLng,
-    w:it.w,h:it.h,diameter:it.diameter,shape:it.shape,rotation:it.rotation||0,textSize:it.textSize||16,icon:it.icon,iconSize:it.iconSize};
+    w:it.w,h:it.h,diameter:it.diameter,shape:it.shape,rotation:it.rotation||0,textSize:it.textSize||16,icon:it.icon,iconSize:it.iconSize,imgUrl:it.imgUrl};
   if(it.path)ni.path=it.path.map(function(p){return{lat:p.lat+dLat,lng:p.lng+dLng}});
   items.push(ni);
   drawItem(items.length-1);
@@ -1793,7 +1843,7 @@ function panelCloneItem(dx,dy){
   items.forEach(function(i){if(i.catId===it.catId){var m=i.num.match(/(\d+)$/);if(m)maxN=Math.max(maxN,parseInt(m[1]))}});
   var ni={id:nextItemId++,catId:it.catId,num:cat.prefix+'-'+String(maxN+1).padStart(2,'0'),
     name:(it.shape==='text'||it.shape==='icon')?(it.name||''):'',duty:'',phone:'',memo:'',lat:it.lat+dLat,lng:it.lng+dLng,
-    w:it.w,h:it.h,diameter:it.diameter,shape:it.shape,rotation:it.rotation||0,textSize:it.textSize||16,icon:it.icon,iconSize:it.iconSize};
+    w:it.w,h:it.h,diameter:it.diameter,shape:it.shape,rotation:it.rotation||0,textSize:it.textSize||16,icon:it.icon,iconSize:it.iconSize,imgUrl:it.imgUrl};
   if(it.path)ni.path=it.path.map(function(p){return{lat:p.lat+dLat,lng:p.lng+dLng}});
   items.push(ni);
   drawItem(items.length-1);
