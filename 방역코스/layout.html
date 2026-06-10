@@ -1745,15 +1745,15 @@ function showItemInfo(idx){
   h+='<div style="'+lbSt+'">담당자</div><input id="iiDuty" type="text" value="'+esc(it.duty||'')+'" style="'+inSt+'">';
   h+='<div style="'+lbSt+'">연락처</div><input id="iiPhone" type="text" value="'+esc(it.phone||'')+'" style="'+inSt+'">';
   h+='<div style="'+lbSt+'">메모</div><input id="iiMemo" type="text" value="'+esc(it.memo||'')+'" style="'+inSt+'">';
-  // 크기 (도형별)
+  // 크기 (도형별) — 입력 즉시 도형 반영(oninput)
   if(it.shape==='rect'){
-    h+='<div style="'+lbSt+'">크기 (가로m × 세로m)</div><div style="display:flex;gap:6px;align-items:center;margin-bottom:6px"><input id="iiW" type="number" step="0.5" min="0.5" value="'+(it.w||3)+'" style="'+inSt+';margin:0"><span style="color:#64748b">×</span><input id="iiH" type="number" step="0.5" min="0.5" value="'+(it.h||6)+'" style="'+inSt+';margin:0"></div>';
+    h+='<div style="'+lbSt+'">크기 (가로m × 세로m)</div><div style="display:flex;gap:6px;align-items:center;margin-bottom:6px"><input id="iiW" type="number" step="0.5" min="0.5" value="'+(it.w||3)+'" oninput="_infoApplySize()" style="'+inSt+';margin:0"><span style="color:#64748b">×</span><input id="iiH" type="number" step="0.5" min="0.5" value="'+(it.h||6)+'" oninput="_infoApplySize()" style="'+inSt+';margin:0"></div>';
   } else if(it.shape==='circle'){
-    h+='<div style="'+lbSt+'">지름 (m)</div><input id="iiDiam" type="number" step="0.5" min="0.5" value="'+(it.diameter||5)+'" style="'+inSt+'">';
+    h+='<div style="'+lbSt+'">지름 (m)</div><input id="iiDiam" type="number" step="0.5" min="0.5" value="'+(it.diameter||5)+'" oninput="_infoApplySize()" style="'+inSt+'">';
   } else if(it.shape==='icon'){
-    h+='<div style="'+lbSt+'">아이콘 크기 (px)</div><input id="iiIconSize" type="number" min="10" max="300" value="'+(it.iconSize||34)+'" style="'+inSt+'">';
+    h+='<div style="'+lbSt+'">아이콘 크기 (px)</div><input id="iiIconSize" type="number" min="10" max="300" value="'+(it.iconSize||34)+'" oninput="_infoApplySize()" style="'+inSt+'">';
   } else if(it.shape==='text'){
-    h+='<div style="'+lbSt+'">글자 크기 (px)</div><input id="iiTextSize" type="number" min="10" max="200" value="'+(it.textSize||16)+'" style="'+inSt+'">';
+    h+='<div style="'+lbSt+'">글자 크기 (px)</div><input id="iiTextSize" type="number" min="10" max="200" value="'+(it.textSize||16)+'" oninput="_infoApplySize()" style="'+inSt+'">';
   }
   // 회전 컨트롤
   var rotStyle='padding:6px 10px;border:none;border-radius:5px;font-size:11px;font-weight:700;cursor:pointer;background:#334155;color:#fff';
@@ -1967,6 +1967,17 @@ function editFromInfo(){
   closeInfoModal();
   selectItem(idx);
 }
+// 모달 크기 입력 → 즉시 도형 반영(live)
+function _infoApplySize(){
+  if(_infoIdx<0)return;
+  var it=items[_infoIdx];
+  var g=function(id){var e=document.getElementById(id);return e?e.value:null;};
+  if(it.shape==='rect'){ var w=parseFloat(g('iiW')); var hh=parseFloat(g('iiH')); if(w>0)it.w=w; if(hh>0)it.h=hh; }
+  else if(it.shape==='circle'){ var d=parseFloat(g('iiDiam')); if(d>0)it.diameter=d; }
+  else if(it.shape==='icon'){ var s=parseInt(g('iiIconSize')); if(s>0)it.iconSize=Math.max(10,Math.min(300,s)); }
+  else if(it.shape==='text'){ var t=parseInt(g('iiTextSize')); if(t>0)it.textSize=Math.max(10,Math.min(200,t)); }
+  drawItem(_infoIdx);
+}
 // 모달에서 직접 저장
 function applyFromInfo(){
   if(_infoIdx<0)return;
@@ -2074,6 +2085,22 @@ function _doResizeMove(mx,my){
   drawItem(_resizing.idx);
   var off=_resizeHandlePos(it);
   if(_resizeHandle) _resizeHandle.setPosition(new kakao.maps.LatLng(off.lat,off.lng));
+  // 실시간 크기 표시
+  var txt='';
+  if(it.shape==='rect') txt='가로 '+it.w.toFixed(1)+'m × 세로 '+it.h.toFixed(1)+'m';
+  else if(it.shape==='circle') txt='지름 '+(it.diameter).toFixed(1)+'m';
+  else if(it.shape==='icon') txt='아이콘 '+it.iconSize+'px';
+  else if(it.shape==='text') txt='글자 '+it.textSize+'px';
+  _showResizeReadout(txt);
+  // 왼쪽 패널 크기칸도 갱신
+  var si=document.getElementById('panelSizeInput'); if(si&&(it.shape==='icon'||it.shape==='text')) si.value=(it.shape==='icon'?it.iconSize:it.textSize);
+  var sv=document.getElementById('panelSizeVal'); if(sv&&(it.shape==='icon'||it.shape==='text')) sv.textContent=(it.shape==='icon'?it.iconSize:it.textSize)+'px';
+}
+function _showResizeReadout(txt){
+  var el=document.getElementById('_resizeReadout');
+  if(!el){ el=document.createElement('div'); el.id='_resizeReadout'; el.style.cssText='position:fixed;top:60px;left:50%;transform:translateX(-50%);z-index:100;background:#f59e0b;color:#1e293b;font-weight:800;font-size:14px;padding:6px 14px;border-radius:8px;box-shadow:0 2px 10px rgba(0,0,0,.3);pointer-events:none'; document.body.appendChild(el); }
+  el.textContent=txt; el.style.display='block';
+  clearTimeout(window._rrTimer); window._rrTimer=setTimeout(function(){ if(el)el.style.display='none'; },1200);
 }
 // 아이콘/텍스트 크기 조절 UI (패널 안에 동적 삽입)
 function _panelSizeUI(it){
