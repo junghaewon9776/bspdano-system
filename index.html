@@ -1023,8 +1023,9 @@ async function doLogin(id,pw,keep,silent){
   mkTabs();drawEventBar();draw();
   if(keep)saveAuth(id,pw); else clearAuth();
   startIdleWatch();
-  // 비밀번호가 1234면 변경할 때까지 상단에 빨간 경고 배너 계속 표시
-  if(String(pw)==='1234') _showPwWarnBanner(); else _hidePwWarnBanner();
+  // 비밀번호가 1234면 변경할 때까지 상단 빨간 배너 + 메뉴이동마다 모달
+  _pwIsDefault=(String(pw)==='1234');
+  if(_pwIsDefault) _showPwWarnBanner(); else _hidePwWarnBanner();
 
   // 데이터 로드 — 실제 새로고침 중에만 표시
   showLoading("📡 서버에서 따끈한 데이터 가져오는 중...");
@@ -1059,6 +1060,35 @@ async function doLogin(id,pw,keep,silent){
   }
   return true;
 }
+// 비밀번호 1234 경고 — 배너 + 메뉴이동마다 모달
+var _pwIsDefault=false, _pwNagLastTab=null;
+function _pwNagCheck(){
+  if(!_pwIsDefault) return;
+  if(typeof CTAB==='undefined') return;
+  if(CTAB==='acct'||CTAB==='myinfo') return;  // 비밀번호 변경 화면에선 안 띄움
+  if(CTAB===_pwNagLastTab) return;   // 같은 탭 재렌더(자동새로고침)엔 안 띄움
+  _pwNagLastTab=CTAB;
+  setTimeout(_showPwChangeModal, 250);
+}
+function _showPwChangeModal(){
+  if(!_pwIsDefault) return;
+  if(document.getElementById('_pwChangeModal')) return;
+  var goPw = (typeof isA==='function' && isA()) ? "acct" : "myinfo";
+  var d=document.createElement('div');
+  d.id='_pwChangeModal';
+  d.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:100000;display:flex;align-items:center;justify-content:center;padding:20px';
+  d.innerHTML='<div style="background:#fff;border-radius:14px;padding:30px 26px;max-width:380px;width:100%;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,.35)">'
+    +'<div style="font-size:46px;margin-bottom:8px">🔒</div>'
+    +'<h3 style="margin:0 0 8px;color:#b91c1c;font-size:19px">보안 경고</h3>'
+    +'<p style="color:#555;font-size:14px;margin:0 0 20px;line-height:1.6"><b>기본 비밀번호</b>를 사용 중입니다.<br>보안을 위해 지금 변경하세요.</p>'
+    +'<div style="display:flex;flex-direction:column;gap:8px">'
+    +'<button onclick="_pwGoChange(\''+goPw+'\')" style="background:#dc2626;color:#fff;border:none;border-radius:8px;padding:13px;font-size:15px;font-weight:800;cursor:pointer">🔑 비밀번호 변경하러 가기</button>'
+    +'<button onclick="_pwCloseModal()" style="background:#f1f5f9;color:#64748b;border:none;border-radius:8px;padding:10px;font-size:13px;cursor:pointer">나중에 (계속 알림)</button>'
+    +'</div></div>';
+  document.body.appendChild(d);
+}
+function _pwCloseModal(){ var m=document.getElementById('_pwChangeModal'); if(m) m.remove(); }
+function _pwGoChange(tab){ _pwCloseModal(); try{ CTAB=tab; if(typeof mkTabs==='function')mkTabs(); if(typeof draw==='function')draw(); }catch(e){} }
 // 비밀번호 1234 경고 배너 (변경 전까지 상단 고정)
 function _showPwWarnBanner(){
   if(document.getElementById('_pwWarnBanner')) return;
@@ -5853,6 +5883,7 @@ function st(af,df){
 }
 
 function draw(){
+  _pwNagCheck();
   var el=document.getElementById("mc");
   if(CTAB=="apply")el.innerHTML=dApply();
   else if(CTAB=="awards")el.innerHTML=dAwards();
@@ -16031,7 +16062,7 @@ async function chgMyPw(){
   if(!r.ok){alert(r.err||"변경 실패");return}
   if(US[CID]) US[CID].pw=nw;
   document.getElementById("myPwCur").value="";document.getElementById("myPwNew").value="";document.getElementById("myPwNew2").value="";
-  if(String(nw)!=='1234') _hidePwWarnBanner();
+  if(String(nw)!=='1234'){ _pwIsDefault=false; _hidePwWarnBanner(); _pwCloseModal(); }
   toast("비밀번호 변경 완료");
 }
 function popAddArea(){
