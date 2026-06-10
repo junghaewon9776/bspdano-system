@@ -1425,6 +1425,8 @@ function addItem(catId){
 }
 
 // ═══ 도형 좌표 계산 ═══
+// HTML 이스케이프 (이 파일에 없어서 추가 — 모달/목록 입력값 안전 출력)
+function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 // 줌 배율 — 폴리곤(미터)과 어울리게 아이콘/텍스트 px 조정. 기준레벨2=1배, 줌아웃하면 작아짐
 function _zoomFactor(){
   var lv=(typeof map!=='undefined'&&map)?map.getLevel():2;
