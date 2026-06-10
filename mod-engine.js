@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260609v58';
+var _MOD_ENGINE_VER='20260609v59';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -2268,10 +2268,9 @@ function popModLabel(key,singleId,idsList){
   h+='<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">';
   h+='<button class="btn btn-s" style="background:#6366f1;color:#fff;font-weight:600" onclick="popModLabelLayout(\''+key+'\')">📐 배치 편집</button>';
   h+='<button class="btn btn-s" style="background:#16a34a;color:#fff;font-weight:600" onclick="_mlExportMailMerge(\''+key+'\')" title="선택 항목을 엑셀로 내보내 메일머지(차량명찰 xlsm)로 완벽하게 출력">📊 메일머지 엑셀</button>';
-  h+='<div style="display:inline-flex;border-radius:7px;overflow:hidden;box-shadow:0 1px 2px rgba(0,0,0,.12)">';
-  h+='<button class="btn btn-s" style="background:#0891b2;color:#fff;font-weight:600;border-radius:0" onclick="_mlExportPdfRotated(\''+key+'\')" title="세로 용지용: 내용을 90도 돌린 PDF로 저장">📄 세로 PDF</button>';
-  h+='<button class="btn btn-s" style="background:#0e7490;color:#fff;font-weight:700;border-radius:0;border-left:1px solid rgba(255,255,255,.3)" onclick="_mlTogglePdfDir()" title="세로 PDF가 거꾸로 나오면 누르세요">↻ 방향</button>';
-  h+='</div></div>';
+  // 세로 PDF / ↻방향 버튼 — 숨김(함수는 유지). 필요 시 아래 주석 해제
+  // h+='<button onclick="_mlExportPdfRotated(\''+key+'\')">📄 세로 PDF</button><button onclick="_mlTogglePdfDir()">↻ 방향</button>';
+  h+='</div>';
   // 2줄: 취소 / 출력 (주 동작)
   h+='<div style="display:flex;gap:8px"><button class="btn" style="flex:0 0 auto;background:#475569;color:#fff;font-weight:600" onclick="closePopup()">취소</button>';
   h+='<button id="ml_printbtn" class="btn btn-b" style="flex:1;background:#2563eb;color:#fff;font-weight:700" onclick="modDoPrint()">🖨 <span id="ml_printcnt">'+rows.length+'</span>장 출력</button></div>';
@@ -2990,6 +2989,15 @@ function _qzUpdateUI(){
     h+='<button class="btn btn-s" style="font-size:11px;background:#0ea5e9;color:#fff" onclick="_qzScan()">🔄 새로고침</button>';
     h+='<button class="btn btn-s" style="font-size:11px;background:#0f766e;color:#fff" onclick="_qzOpenPrinterSettings()" title="프린터 인쇄 기본 설정 창을 여는 .bat 다운로드 → 더블클릭 (용지 100x30 설정용)">⚙ 프린터 설정 열기</button>';
     h+='<button class="btn btn-s" style="font-size:11px;background:#64748b;color:#fff" onclick="qzDisconnect()">해제</button>';
+    // 공유 프린터(\\로 시작) 감지 → 용지 100x30 안내
+    var _isShared=/^\\\\/.test(curP);
+    if(curP){
+      if(_isShared){
+        h+='<div style="flex-basis:100%;font-size:11px;color:#b45309;background:#fffbeb;border:1px solid #fcd34d;border-radius:6px;padding:6px 10px;margin-top:4px;line-height:1.5">⚠️ <b>공유 프린터</b>입니다. 갭(라벨 끊김)이 안 되면 <b>⚙ 프린터 설정 열기 → 용지 100×30</b>으로 맞추세요.</div>';
+      } else {
+        h+='<div style="flex-basis:100%;font-size:11px;color:#15803d;margin-top:2px">✅ 직접 연결 프린터 (갭 정상 작동)</div>';
+      }
+    }
     var _bp=(localStorage.getItem('_mlBrowserPrint')==='1');
     h+='<label style="display:inline-flex;align-items:center;gap:4px;font-size:11px;background:'+(_bp?'#0891b2':'#e2e8f0')+';color:'+(_bp?'#fff':'#475569')+';padding:5px 9px;border-radius:6px;cursor:pointer;font-weight:700" title="Excel 메일머지처럼 브라우저 인쇄로 100x30 페이지를 라벨마다 잘라 출력(드라이버가 gap 처리)">'
       +'<input type="checkbox" '+(_bp?'checked':'')+' onchange="_qzToggleBrowserPrint(this.checked)" style="margin:0"> 🖨 브라우저 인쇄(메일머지식)</label>';
@@ -3001,9 +3009,9 @@ function _qzUpdateUI(){
     var _bm=(localStorage.getItem('_mlBitmap')==='1');
     h+='<label style="display:inline-flex;align-items:center;gap:4px;font-size:11px;background:'+(_bm?'#7c3aed':'#e2e8f0')+';color:'+(_bm?'#fff':'#475569')+';padding:5px 9px;border-radius:6px;cursor:pointer;font-weight:700" title="선명한 1비트 비트맵을 드라이버로 출력(USB직결 컴에서 선명+빠름)">'
       +'<input type="checkbox" '+(_bm?'checked':'')+' onchange="_qzToggleBitmap(this.checked)" style="margin:0"> 비트맵(선명)</label>';
-    var _rs=(localStorage.getItem('_mlRawShare')==='1');
-    h+='<label style="display:inline-flex;align-items:center;gap:4px;font-size:11px;background:'+(_rs?'#be123c':'#e2e8f0')+';color:'+(_rs?'#fff':'#475569')+';padding:5px 9px;border-radius:6px;cursor:pointer;font-weight:700" title="공유 프린터용: 드라이버/스풀러 우회 RAW 직접 전송(프린터 갭센서 캘리브레이션 필수)">'
-      +'<input type="checkbox" '+(_rs?'checked':'')+' onchange="_qzToggleRawShare(this.checked)" style="margin:0"> 공유RAW</label>';
+    // 공유RAW 토글 — 숨김(함수는 유지). 필요 시 아래 주석 해제
+    // var _rs=(localStorage.getItem('_mlRawShare')==='1');
+    // h+='<label ...><input type="checkbox" '+(_rs?'checked':'')+' onchange="_qzToggleRawShare(this.checked)"> 공유RAW</label>';
     if(_bm){
       var _adj=0; try{ _adj=parseFloat(localStorage.getItem('_mlSizeAdj')||'0')||0; }catch(e){}
       h+='<label style="display:inline-flex;align-items:center;gap:3px;font-size:11px;background:#f1f5f9;color:#475569;padding:4px 8px;border-radius:6px" title="장마다 아래로 밀리면 + , 위로 밀리면 − 로 0.05mm씩 조절해 딱 맞추세요">'
