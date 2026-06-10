@@ -924,6 +924,7 @@ async function uploadAll(files, ar, type){
 // ===== 로그인 =====
 var AUTH_KEY="cleanFarm_auth_v1";
 var IDLE_MS=(/Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent))?60*60*1000:10*60*1000; // 모바일 1시간 / PC 10분 무활동 → 연장 팝업
+function _idleLabel(){ return IDLE_MS>=3600000 ? (Math.round(IDLE_MS/3600000))+'시간' : (Math.round(IDLE_MS/60000))+'분'; }
 var WARN_COUNT_MS=60*1000;  // 팝업 뜬 뒤 60초 내 응답 없으면 자동 로그아웃
 // 자동로그인 TTL — 마지막 활동 이후 이 시간이 지나면 자동로그인 X, 수동 로그인 필요
 var AUTO_LOGIN_TTL_MS=1*60*60*1000; // 1시간
@@ -1298,7 +1299,7 @@ function showIdleWarning(){
   d.innerHTML='<div style="background:#fff;border-radius:12px;padding:28px;max-width:400px;width:100%;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,.3)">'+
     '<div style="font-size:40px;margin-bottom:10px">⏰</div>'+
     '<h3 style="margin:0 0 8px;color:#111">장시간 활동이 없습니다</h3>'+
-    '<p style="color:#666;font-size:13px;margin:0 0 6px">1시간 동안 사용하지 않으셨습니다.<br>로그인을 연장하시겠습니까?</p>'+
+    '<p style="color:#666;font-size:13px;margin:0 0 6px">'+_idleLabel()+' 동안 사용하지 않으셨습니다.<br>로그인을 연장하시겠습니까?</p>'+
     '<p style="color:#dc2626;font-size:12px;margin:0 0 18px"><b id="idleCount">60</b>초 후 자동 로그아웃됩니다</p>'+
     '<div style="display:flex;gap:10px;justify-content:center">'+
       '<button class="btn btn-r" style="padding:10px 20px" onclick="logout(\'로그아웃되었습니다\')">로그아웃</button>'+
@@ -1313,7 +1314,7 @@ function showIdleWarning(){
     if(el)el.textContent=left;
     if(left<=0){
       clearInterval(warnTimer);warnTimer=null;
-      logout("1시간 동안 활동이 없어 자동 로그아웃되었습니다");
+      logout(_idleLabel()+" 동안 활동이 없어 자동 로그아웃되었습니다");
     }
   },1000);
 }
