@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260609v59';
+var _MOD_ENGINE_VER='20260609v60';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -2527,14 +2527,17 @@ function modDoPrint(){
   var _browserPrint=false; try{ _browserPrint=(localStorage.getItem('_mlBrowserPrint')==='1'); }catch(e){}
   // QZ Tray 연결+프린터선택 시 → 라벨 프린터로 직접 출력 (낱장 모드)
   if(opt.mode==='label' && qzIsReady() && !_browserPrint){
-    window.__mlPrinting=true;
-    var _pb=document.getElementById('ml_printbtn'); if(_pb){ _pb.disabled=true; _pb.style.opacity='0.6'; _pb.innerHTML='🖨 출력 중…'; }
+    window.__mlPrinting=true; window.__mlCancel=false; window.__mlPrintTotal=rows.length;
+    var _pb=document.getElementById('ml_printbtn');
+    if(_pb){ _pb.disabled=false; _pb.style.opacity='1'; _pb.style.background='#dc2626'; _pb.innerHTML='✕ 취소 <span id="ml_prog" style="font-weight:800">0/'+rows.length+'</span>'; _pb.onclick=_mlCancelPrint; }
+    var _restoreBtn=function(){ if(_pb){ _pb.disabled=false; _pb.style.opacity='1'; _pb.style.background='#2563eb'; _pb.innerHTML='🖨 <span id="ml_printcnt">'+rows.length+'</span>장 출력'; _pb.onclick=function(){modDoPrint();}; } };
     var _useBmp=false, _useRaw=false; try{ _useBmp=(localStorage.getItem('_mlBitmap')==='1'); _useRaw=(localStorage.getItem('_mlRawShare')==='1'); }catch(e){}
     var _printFn = _useRaw ? _qzPrintLabelsRaw : (_useBmp ? _qzPrintLabelsBitmap : _qzPrintLabels);
     _printFn(def, rows, opt).then(function(ok){
-      window.__mlPrinting=false;
-      if(ok){ modBumpPrint(key, ids); closePopup(); }
-      else { if(_pb){ _pb.disabled=false; _pb.style.opacity='1'; _pb.innerHTML='🖨 '+rows.length+'장 출력'; } }
+      window.__mlPrinting=false; window.__mlCancel=false;
+      if(ok==='cancel'){ toast('🛑 출력 취소됨'); _restoreBtn(); }
+      else if(ok){ modBumpPrint(key, ids); closePopup(); }
+      else { _restoreBtn(); }
     });
     return;
   }
@@ -2898,11 +2901,15 @@ async function _qzPrintLabelsBitmap(def, rows, opt){
   try{
     var data=[];
     for(var i=0;i<rows.length;i++){
+      if(window.__mlCancel) return 'cancel';
+      _mlPrintProg(i,rows.length);
       var canvas=await _labelToCanvas(_modLabelHtml(def,rows[i],opt),wmm,hmm,203);
       // 순백/순흑 1비트화 → 선명하고 진하게
       var bw=_canvasToMonoCanvas(canvas,160);
       data.push({type:'pixel',format:'image',flavor:'base64',data:bw.toDataURL('image/png').split(',')[1],options:{pageWidth:wmm,pageHeight:hmm}});
     }
+    if(window.__mlCancel) return 'cancel';
+    _mlPrintProg(rows.length,rows.length,true);
     return qz.print(cfg,data).then(function(){ toast('🖨 비트맵 '+rows.length+'장 출력'); return true; })
       .catch(function(e){ toast('비트맵 출력 실패: '+(e.message||e),true); return false; });
   }catch(e){ toast('비트맵 실패: '+(e.message||e),true); console.error(e); return false; }
@@ -2923,12 +2930,16 @@ async function _qzPrintLabelsRaw(def, rows, opt){
     var parts=[];
     parts.push(strBytes('SIZE '+wmm+' mm,'+sizeH+' mm\r\nGAP '+gap+' mm,0 mm\r\nDIRECTION 1\r\nREFERENCE 0,0\r\nSET TEAR OFF\r\n'));
     for(var i=0;i<rows.length;i++){
+      if(window.__mlCancel) return 'cancel';
+      _mlPrintProg(i,rows.length);
       var canvas=await _labelToCanvas(_modLabelHtml(def,rows[i],opt),wmm,hmm,203);
       var bmp=_canvasToTSPL(canvas,160);
       parts.push(strBytes('CLS\r\nBITMAP 0,0,'+bmp.wbytes+','+bmp.h+',0,'));
       parts.push(bmp.bytes);
       parts.push(strBytes('\r\nPRINT 1\r\n'));
     }
+    if(window.__mlCancel) return 'cancel';
+    _mlPrintProg(rows.length,rows.length,true);
     var total=0; parts.forEach(function(p){ total+=p.length; });
     var all=new Uint8Array(total), off=0;
     parts.forEach(function(p){ all.set(p,off); off+=p.length; });
@@ -2941,13 +2952,26 @@ function _qzPrintLabels(def, rows, opt){
   if(!qzIsReady()){ toast('QZ 프린터를 먼저 연결·선택하세요',true); return Promise.resolve(false); }
   var w=opt.w, h=opt.h;
   var cfg=qz.configs.create(pn,{colorType:'blackwhite',margins:0,units:'mm',jobName:'LABEL-'+def.key,size:{width:w,height:h||null}});
+  if(window.__mlCancel) return Promise.resolve('cancel');
   // 모든 라벨을 한 작업으로 묶어 전송 → 장마다 백피드 없이 연속 출력(빠름)
   var data=rows.map(function(r){
     var html='<div style="margin:0;padding:0">'+_modLabelHtml(def,r,opt)+'</div>';
     return {type:'pixel',format:'html',flavor:'plain',data:html,options:{pageWidth:w,pageHeight:h||null}};
   });
+  _mlPrintProg(rows.length,rows.length,true);
   return qz.print(cfg,data).then(function(){ toast('🖨 QZ로 '+rows.length+'장 출력'); return true; })
     .catch(function(e){ toast('QZ 출력 실패: '+(e.message||e),true); return false; });
+}
+// 출력 진행률 표시 / 취소
+function _mlPrintProg(done,total,sending){
+  var e=document.getElementById('ml_prog'); if(!e) return;
+  e.textContent = sending ? (total+'/'+total+' 전송…') : (done+'/'+total);
+}
+function _mlCancelPrint(){
+  window.__mlCancel=true;
+  var pb=document.getElementById('ml_printbtn');
+  if(pb){ pb.disabled=true; pb.style.opacity='0.6'; pb.innerHTML='취소 중…'; }
+  toast('출력 취소 중…');
 }
 function _qzToggleBitmap(on){ try{ localStorage.setItem('_mlBitmap', on?'1':'0'); if(on) localStorage.setItem('_mlRawShare','0'); }catch(e){} _qzUpdateUI(); toast(on?'비트맵(선명) 모드 ON':'일반 모드',false); }
 // 프린터 인쇄 기본 설정 창 여는 .bat 다운로드 (용지 100x30 설정용)
