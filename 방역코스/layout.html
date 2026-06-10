@@ -927,6 +927,34 @@ function _showCtxMenu(x,y){
   if(r.bottom>window.innerHeight) m.style.top=(y-r.height)+'px';
 }
 function _hideCtxMenu(){document.getElementById('ctxMenu').style.display='none';}
+// 아이템 우클릭 컨텍스트 메뉴 (수정/크기변경/삭제)
+function _showItemCtxMenu(idx,x,y){
+  _hideItemCtxMenu(); _hideCtxMenu();
+  var m=document.createElement('div');
+  m.id='itemCtxMenu';
+  m.style.cssText='position:fixed;z-index:700;background:#1e293b;border:1px solid #334155;border-radius:10px;padding:4px 0;min-width:150px;box-shadow:0 8px 30px rgba(0,0,0,.5)';
+  m.innerHTML='<div class="ctx-item" onclick="_itemCtx(\'edit\','+idx+')">✏️ 수정</div>'
+    +'<div class="ctx-item" onclick="_itemCtx(\'resize\','+idx+')">📐 크기 변경</div>'
+    +'<div class="ctx-item" onclick="_itemCtx(\'clone\','+idx+')">➕ 복제</div>'
+    +'<div class="ctx-sep"></div>'
+    +'<div class="ctx-item" onclick="_itemCtx(\'delete\','+idx+')" style="color:#fca5a5">🗑 삭제</div>';
+  document.body.appendChild(m);
+  m.style.left=x+'px'; m.style.top=y+'px';
+  var r=m.getBoundingClientRect();
+  if(r.right>window.innerWidth) m.style.left=(x-r.width)+'px';
+  if(r.bottom>window.innerHeight) m.style.top=(y-r.height)+'px';
+}
+function _hideItemCtxMenu(){ var m=document.getElementById('itemCtxMenu'); if(m)m.remove(); }
+function _itemCtx(act,idx){
+  _hideItemCtxMenu();
+  if(act==='edit'){ showItemInfo(idx); }
+  else if(act==='resize'){ selectItem(idx); toast('🔶 주황 핸들을 드래그해 크기를 조절하세요'); }
+  else if(act==='clone'){ selectItem(idx); panelCloneItem(1,0); }
+  else if(act==='delete'){ deleteItemAt(idx); }
+}
+document.addEventListener('click',function(e){ var m=document.getElementById('itemCtxMenu'); if(m&&!m.contains(e.target)) _hideItemCtxMenu(); });
+var _lastPtrX=0,_lastPtrY=0;
+document.addEventListener('mousemove',function(e){ _lastPtrX=e.clientX; _lastPtrY=e.clientY; });
 function ctxAction(act){
   _hideCtxMenu();
   if(act==='save') saveAll();
@@ -1511,7 +1539,7 @@ function drawItem(idx){
     };
     icWrap.addEventListener('mousedown',function(ev){ if(ev.button===2)return; ev.preventDefault();ev.stopPropagation(); _icDown(ev.clientX,ev.clientY,ev.ctrlKey||ev.metaKey); });
     icWrap.addEventListener('touchstart',function(ev){ var t=ev.touches[0]; _icDown(t.clientX,t.clientY,false); },{passive:false});
-    icWrap.addEventListener('contextmenu',function(ev){ ev.preventDefault();ev.stopPropagation(); showItemInfo(idx); });
+    icWrap.addEventListener('contextmenu',function(ev){ ev.preventDefault();ev.stopPropagation(); _showItemCtxMenu(idx,ev.clientX,ev.clientY); });
     it._label=new kakao.maps.CustomOverlay({ position:new kakao.maps.LatLng(it.lat,it.lng), content:icWrap, yAnchor:0.5, xAnchor:0.5 });
     it._label.setMap(map);
     it._poly=null;
@@ -1533,7 +1561,7 @@ function drawItem(idx){
       _drag={active:true,moved:false,idx:idx,sx:ev.clientX-rect.left,sy:ev.clientY-rect.top,slat:it.lat,slng:it.lng,sPath:null};
       map.setDraggable(false);
     });
-    labelEl.addEventListener('contextmenu',function(ev){ ev.preventDefault();ev.stopPropagation(); showItemInfo(idx); });
+    labelEl.addEventListener('contextmenu',function(ev){ ev.preventDefault();ev.stopPropagation(); _showItemCtxMenu(idx,ev.clientX,ev.clientY); });
     labelEl.addEventListener('touchstart',function(ev){
       if(_multiClickItem(idx,false)) return;
       var touch=ev.touches[0];
@@ -1618,7 +1646,7 @@ function drawItem(idx){
     _drag={active:true,moved:false,idx:idx,sx:ev.clientX-rect.left,sy:ev.clientY-rect.top,slat:it.lat,slng:it.lng,sPath:it.path?it.path.map(function(p){return{lat:p.lat,lng:p.lng}}):null};
     map.setDraggable(false);
   });
-  labelEl.addEventListener('contextmenu',function(ev){ ev.preventDefault();ev.stopPropagation(); showItemInfo(idx); });
+  labelEl.addEventListener('contextmenu',function(ev){ ev.preventDefault();ev.stopPropagation(); _showItemCtxMenu(idx,ev.clientX,ev.clientY); });
   // 드래그 시작 (터치)
   labelEl.addEventListener('touchstart',function(ev){
     if(_multiClickItem(idx,false)) return;
@@ -1645,7 +1673,10 @@ function drawItem(idx){
       _drag={active:true,moved:false,idx:idx,sx:e.point.x,sy:e.point.y,slat:it.lat,slng:it.lng,sPath:it.path?it.path.map(function(p){return{lat:p.lat,lng:p.lng}}):null};
       map.setDraggable(false);
     });
-    kakao.maps.event.addListener(it._poly,'rightclick',function(e){ showItemInfo(idx); });
+    kakao.maps.event.addListener(it._poly,'rightclick',function(e){
+      var x=_lastPtrX||window.innerWidth/2, y=_lastPtrY||window.innerHeight/2;
+      _showItemCtxMenu(idx,x,y);
+    });
   }catch(e){}
 }
 
