@@ -1016,8 +1016,8 @@ async function doLogin(id,pw,keep,silent){
   mkTabs();drawEventBar();draw();
   if(keep)saveAuth(id,pw); else clearAuth();
   startIdleWatch();
-  // 비밀번호가 1234면 변경 권고
-  if(String(pw)==='1234'){ setTimeout(function(){ alert('⚠ 비밀번호가 "1234" 입니다.\n보안을 위해 꼭 변경해 주세요!\n(인원관리 → 내 계정에서 변경)'); },800); }
+  // 비밀번호가 1234면 변경할 때까지 상단에 빨간 경고 배너 계속 표시
+  if(String(pw)==='1234') _showPwWarnBanner(); else _hidePwWarnBanner();
 
   // 데이터 로드 — 실제 새로고침 중에만 표시
   showLoading("📡 서버에서 따끈한 데이터 가져오는 중...");
@@ -1043,6 +1043,22 @@ async function doLogin(id,pw,keep,silent){
     if(!single) toast("행사를 선택하세요 ▼", false);
   }
   return true;
+}
+// 비밀번호 1234 경고 배너 (변경 전까지 상단 고정)
+function _showPwWarnBanner(){
+  if(document.getElementById('_pwWarnBanner')) return;
+  var goPw = (typeof isA==='function' && isA()) ? "CTAB='acct'" : "CTAB='myinfo'";
+  var b=document.createElement('div');
+  b.id='_pwWarnBanner';
+  b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:99998;background:linear-gradient(90deg,#dc2626,#b91c1c);color:#fff;padding:9px 14px;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap;box-shadow:0 2px 10px rgba(0,0,0,.25)';
+  b.innerHTML='⚠ 비밀번호가 <b>"1234"</b> 입니다 — 보안 위험! 지금 바로 변경하세요.'
+    +'<button onclick="'+goPw+';mkTabs();draw();" style="background:#fff;color:#b91c1c;border:none;border-radius:6px;padding:5px 14px;font-size:12px;font-weight:800;cursor:pointer">🔑 비밀번호 변경</button>';
+  document.body.appendChild(b);
+  document.body.style.paddingTop='40px';
+}
+function _hidePwWarnBanner(){
+  var b=document.getElementById('_pwWarnBanner');
+  if(b){ b.remove(); document.body.style.paddingTop=''; }
 }
 async function login(){
   var id=document.getElementById("lId").value.trim();
@@ -15997,6 +16013,7 @@ async function chgMyPw(){
   if(!r.ok){alert(r.err||"변경 실패");return}
   if(US[CID]) US[CID].pw=nw;
   document.getElementById("myPwCur").value="";document.getElementById("myPwNew").value="";document.getElementById("myPwNew2").value="";
+  if(String(nw)!=='1234') _hidePwWarnBanner();
   toast("비밀번호 변경 완료");
 }
 function popAddArea(){
