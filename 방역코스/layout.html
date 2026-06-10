@@ -1130,11 +1130,12 @@ function renderCategories(){
       catItems.forEach(function(it){
         var idx=items.indexOf(it);
         var itemHidden=catHidden||!!_hiddenItems[idx];
-        html+='<div class="cat-item'+(selectedItemIdx===idx?' active':'')+'" onclick="selectItem('+idx+')">';
+        html+='<div class="cat-item'+(selectedItemIdx===idx?' active':'')+'" onclick="showItemInfo('+idx+')">';
         html+='<button onclick="event.stopPropagation();toggleItemVis('+idx+')" style="background:none;border:none;cursor:pointer;font-size:11px;padding:0 2px;flex-shrink:0;opacity:'+(itemHidden?'0.4':'0.7')+'" title="보이기/숨기기">'+(itemHidden?'🙈':'👁')+'</button>';
         html+='<div class="cat-item-num"'+(itemHidden?' style="opacity:0.4"':'')+'>'+it.num+'</div>';
         html+='<div class="cat-item-name"'+(itemHidden?' style="opacity:0.4"':'')+'>'+(it.name||cat.name)+'</div>';
         html+='<button onclick="event.stopPropagation();focusItem('+idx+')" style="background:none;border:none;cursor:pointer;font-size:12px;padding:2px 4px;flex-shrink:0" title="위치로 이동">📍</button>';
+        html+='<button onclick="event.stopPropagation();deleteItemAt('+idx+')" style="background:none;border:none;cursor:pointer;font-size:12px;padding:2px 4px;flex-shrink:0" title="삭제">🗑</button>';
         html+='</div>';
       });
       html+='</div>';
@@ -1692,6 +1693,17 @@ function closeItemBubble(){
 function editFromBubble(idx){
   closeItemBubble();
   if(items[idx]) selectItem(idx);
+}
+// 목록/버블에서 idx로 바로 삭제
+function deleteItemAt(idx){
+  var it=items[idx]; if(!it) return;
+  if(!confirm((it.num||'이 항목')+' 삭제하시겠습니까?')) return;
+  clearItemGfx(it);
+  items.splice(idx,1);
+  closeItemBubble();
+  if(typeof closeInfoModal==='function') closeInfoModal();
+  if(selectedItemIdx===idx){ selectedItemIdx=-1; var sb=document.getElementById('panelSizeBox'); if(sb)sb.remove(); document.getElementById('itemPanel').style.display='none'; }
+  renderCategories(); toast('삭제됨'); autoSave();
 }
 function deleteFromBubble(idx){
   var it=items[idx]; if(!it) return;
