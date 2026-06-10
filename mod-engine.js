@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260609v57';
+var _MOD_ENGINE_VER='20260609v58';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -2951,6 +2951,16 @@ function _qzPrintLabels(def, rows, opt){
     .catch(function(e){ toast('QZ 출력 실패: '+(e.message||e),true); return false; });
 }
 function _qzToggleBitmap(on){ try{ localStorage.setItem('_mlBitmap', on?'1':'0'); if(on) localStorage.setItem('_mlRawShare','0'); }catch(e){} _qzUpdateUI(); toast(on?'비트맵(선명) 모드 ON':'일반 모드',false); }
+// 프린터 인쇄 기본 설정 창 여는 .bat 다운로드 (용지 100x30 설정용)
+function _qzOpenPrinterSettings(){
+  var pn=_qzPrinterName();
+  if(!pn){ toast('먼저 프린터를 선택하세요',true); return; }
+  var bat='@echo off\r\nrundll32 printui.dll,PrintUIEntry /e /n "'+pn.replace(/"/g,'')+'"\r\n';
+  var blob=new Blob([bat],{type:'application/bat'});
+  var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='프린터설정_'+pn.replace(/[\\\/:*?"<>|]/g,'_')+'.bat'; a.click();
+  setTimeout(function(){ URL.revokeObjectURL(a.href); },1500);
+  toast('📥 .bat 다운로드 → 더블클릭하면 프린터 설정 창이 열려요 (용지 100x30으로 변경)',true);
+}
 function _qzToggleRawShare(on){ try{ localStorage.setItem('_mlRawShare', on?'1':'0'); if(on) localStorage.setItem('_mlBitmap','0'); }catch(e){} _qzUpdateUI(); toast(on?'공유RAW 모드 ON (드라이버 우회 · 프린터 캘리브레이션 필요)':'일반 모드',false); }
 function _qzAdjSize(d){ var v=0; try{ v=parseFloat(localStorage.getItem('_mlSizeAdj')||'0')||0; }catch(e){} v=Math.round((v+d)*100)/100; try{ localStorage.setItem('_mlSizeAdj', String(v)); }catch(e){} _qzUpdateUI(); toast('라벨길이 보정: '+(v>0?'+':'')+v.toFixed(2)+'mm',false); }
 function _qzAdjBmpDelay(d){ var v=1500; try{ var s=localStorage.getItem('_mlBmpDelay'); if(s!=null&&s!=='') v=parseInt(s,10)||0; }catch(e){} v=Math.max(0,Math.min(5000,v+d)); try{ localStorage.setItem('_mlBmpDelay', String(v)); }catch(e){} _qzUpdateUI(); toast('장 간격: '+(v/1000).toFixed(1)+'초',false); }
@@ -2978,6 +2988,7 @@ function _qzUpdateUI(){
     printers.forEach(function(p){ h+='<option value="'+esc(p)+'"'+(p===curP?' selected':'')+'>'+esc(p)+'</option>'; });
     h+='</select>';
     h+='<button class="btn btn-s" style="font-size:11px;background:#0ea5e9;color:#fff" onclick="_qzScan()">🔄 새로고침</button>';
+    h+='<button class="btn btn-s" style="font-size:11px;background:#0f766e;color:#fff" onclick="_qzOpenPrinterSettings()" title="프린터 인쇄 기본 설정 창을 여는 .bat 다운로드 → 더블클릭 (용지 100x30 설정용)">⚙ 프린터 설정 열기</button>';
     h+='<button class="btn btn-s" style="font-size:11px;background:#64748b;color:#fff" onclick="qzDisconnect()">해제</button>';
     var _bp=(localStorage.getItem('_mlBrowserPrint')==='1');
     h+='<label style="display:inline-flex;align-items:center;gap:4px;font-size:11px;background:'+(_bp?'#0891b2':'#e2e8f0')+';color:'+(_bp?'#fff':'#475569')+';padding:5px 9px;border-radius:6px;cursor:pointer;font-weight:700" title="Excel 메일머지처럼 브라우저 인쇄로 100x30 페이지를 라벨마다 잘라 출력(드라이버가 gap 처리)">'
