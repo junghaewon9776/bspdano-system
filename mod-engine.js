@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260609v55';
+var _MOD_ENGINE_VER='20260609v56';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -2530,8 +2530,9 @@ function modDoPrint(){
   if(opt.mode==='label' && qzIsReady() && !_browserPrint){
     window.__mlPrinting=true;
     var _pb=document.getElementById('ml_printbtn'); if(_pb){ _pb.disabled=true; _pb.style.opacity='0.6'; _pb.innerHTML='🖨 출력 중…'; }
-    var _useBmp=false; try{ _useBmp=(localStorage.getItem('_mlBitmap')==='1'); }catch(e){}
-    (_useBmp ? _qzPrintLabelsBitmap(def, rows, opt) : _qzPrintLabels(def, rows, opt)).then(function(ok){
+    var _useBmp=false, _useRaw=false; try{ _useBmp=(localStorage.getItem('_mlBitmap')==='1'); _useRaw=(localStorage.getItem('_mlRawShare')==='1'); }catch(e){}
+    var _printFn = _useRaw ? _qzPrintLabelsRaw : (_useBmp ? _qzPrintLabelsBitmap : _qzPrintLabels);
+    _printFn(def, rows, opt).then(function(ok){
       window.__mlPrinting=false;
       if(ok){ modBumpPrint(key, ids); closePopup(); }
       else { if(_pb){ _pb.disabled=false; _pb.style.opacity='1'; _pb.innerHTML='🖨 '+rows.length+'장 출력'; } }
@@ -2907,6 +2908,30 @@ async function _qzPrintLabelsBitmap(def, rows, opt){
       .catch(function(e){ toast('비트맵 출력 실패: '+(e.message||e),true); return false; });
   }catch(e){ toast('비트맵 실패: '+(e.message||e),true); console.error(e); return false; }
 }
+// 공유 프린터용 RAW: 드라이버/스풀러 우회 → TSPL 직접 전송(passthrough, 갭신호 안 뭉개짐)
+// 전제: 프린터 갭센서 캘리브레이션 됨(전원ON+FEED). SIZE/GAP 1회 + 라벨마다 CLS/BITMAP/PRINT
+async function _qzPrintLabelsRaw(def, rows, opt){
+  var pn=_qzPrinterName();
+  if(!qzIsReady()){ toast('QZ 프린터를 먼저 연결·선택하세요',true); return false; }
+  if(typeof html2canvas==='undefined'){ toast('이미지 라이브러리 로딩중',true); return false; }
+  var wmm=opt.w, hmm=opt.h, gap=(opt.gap!=null?opt.gap:2);
+  var adj=0; try{ adj=parseFloat(localStorage.getItem('_mlSizeAdj')||'0')||0; }catch(e){}
+  var sizeH=hmm+adj;
+  var cfg=qz.configs.create(pn);
+  try{
+    // 하나의 연속 RAW 스트림으로 전송 → 공유 스풀러 거쳐도 그대로 통과
+    var data=[{type:'raw',format:'plain',data:'SIZE '+wmm+' mm,'+sizeH+' mm\r\nGAP '+gap+' mm,0 mm\r\nDIRECTION 1\r\nREFERENCE 0,0\r\nSET TEAR OFF\r\n'}];
+    for(var i=0;i<rows.length;i++){
+      var canvas=await _labelToCanvas(_modLabelHtml(def,rows[i],opt),wmm,hmm,203);
+      var bmp=_canvasToTSPL(canvas,160);
+      data.push({type:'raw',format:'plain',data:'CLS\r\nBITMAP 0,0,'+bmp.wbytes+','+bmp.h+',0,'});
+      data.push({type:'raw',format:'base64',data:_bytesToBase64(bmp.bytes)});
+      data.push({type:'raw',format:'plain',data:'\r\nPRINT 1\r\n'});
+    }
+    return qz.print(cfg,data).then(function(){ toast('🖨 공유RAW '+rows.length+'장 출력'); return true; })
+      .catch(function(e){ toast('공유RAW 실패: '+(e.message||e),true); return false; });
+  }catch(e){ toast('공유RAW 실패: '+(e.message||e),true); console.error(e); return false; }
+}
 function _qzPrintLabels(def, rows, opt){
   var pn=_qzPrinterName();
   if(!qzIsReady()){ toast('QZ 프린터를 먼저 연결·선택하세요',true); return Promise.resolve(false); }
@@ -2920,7 +2945,8 @@ function _qzPrintLabels(def, rows, opt){
   return qz.print(cfg,data).then(function(){ toast('🖨 QZ로 '+rows.length+'장 출력'); return true; })
     .catch(function(e){ toast('QZ 출력 실패: '+(e.message||e),true); return false; });
 }
-function _qzToggleBitmap(on){ try{ localStorage.setItem('_mlBitmap', on?'1':'0'); }catch(e){} _qzUpdateUI(); toast(on?'RAW 비트맵 모드 ON (이미지+GAP)':'일반 모드',false); }
+function _qzToggleBitmap(on){ try{ localStorage.setItem('_mlBitmap', on?'1':'0'); if(on) localStorage.setItem('_mlRawShare','0'); }catch(e){} _qzUpdateUI(); toast(on?'비트맵(선명) 모드 ON':'일반 모드',false); }
+function _qzToggleRawShare(on){ try{ localStorage.setItem('_mlRawShare', on?'1':'0'); if(on) localStorage.setItem('_mlBitmap','0'); }catch(e){} _qzUpdateUI(); toast(on?'공유RAW 모드 ON (드라이버 우회 · 프린터 캘리브레이션 필요)':'일반 모드',false); }
 function _qzAdjSize(d){ var v=0; try{ v=parseFloat(localStorage.getItem('_mlSizeAdj')||'0')||0; }catch(e){} v=Math.round((v+d)*100)/100; try{ localStorage.setItem('_mlSizeAdj', String(v)); }catch(e){} _qzUpdateUI(); toast('라벨길이 보정: '+(v>0?'+':'')+v.toFixed(2)+'mm',false); }
 function _qzAdjBmpDelay(d){ var v=1500; try{ var s=localStorage.getItem('_mlBmpDelay'); if(s!=null&&s!=='') v=parseInt(s,10)||0; }catch(e){} v=Math.max(0,Math.min(5000,v+d)); try{ localStorage.setItem('_mlBmpDelay', String(v)); }catch(e){} _qzUpdateUI(); toast('장 간격: '+(v/1000).toFixed(1)+'초',false); }
 function _qzToggleBrowserPrint(on){ try{ localStorage.setItem('_mlBrowserPrint', on?'1':'0'); }catch(e){} _qzUpdateUI(); toast(on?'브라우저 인쇄 모드 ON (Excel 메일머지식)':'QZ 직접 출력 모드',false); }
@@ -2957,8 +2983,11 @@ function _qzUpdateUI(){
         +'<input type="checkbox" '+(_rt?'checked':'')+' onchange="_qzToggleRotate(this.checked)" style="margin:0"> ↻ 90도 회전</label>';
     }
     var _bm=(localStorage.getItem('_mlBitmap')==='1');
-    h+='<label style="display:inline-flex;align-items:center;gap:4px;font-size:11px;background:'+(_bm?'#7c3aed':'#e2e8f0')+';color:'+(_bm?'#fff':'#475569')+';padding:5px 9px;border-radius:6px;cursor:pointer;font-weight:700" title="공유 프린터에서 밀림 방지: 라벨을 이미지로 변환해 프린터 GAP으로 직접 출력">'
-      +'<input type="checkbox" '+(_bm?'checked':'')+' onchange="_qzToggleBitmap(this.checked)" style="margin:0"> RAW 비트맵</label>';
+    h+='<label style="display:inline-flex;align-items:center;gap:4px;font-size:11px;background:'+(_bm?'#7c3aed':'#e2e8f0')+';color:'+(_bm?'#fff':'#475569')+';padding:5px 9px;border-radius:6px;cursor:pointer;font-weight:700" title="선명한 1비트 비트맵을 드라이버로 출력(USB직결 컴에서 선명+빠름)">'
+      +'<input type="checkbox" '+(_bm?'checked':'')+' onchange="_qzToggleBitmap(this.checked)" style="margin:0"> 비트맵(선명)</label>';
+    var _rs=(localStorage.getItem('_mlRawShare')==='1');
+    h+='<label style="display:inline-flex;align-items:center;gap:4px;font-size:11px;background:'+(_rs?'#be123c':'#e2e8f0')+';color:'+(_rs?'#fff':'#475569')+';padding:5px 9px;border-radius:6px;cursor:pointer;font-weight:700" title="공유 프린터용: 드라이버/스풀러 우회 RAW 직접 전송(프린터 갭센서 캘리브레이션 필수)">'
+      +'<input type="checkbox" '+(_rs?'checked':'')+' onchange="_qzToggleRawShare(this.checked)" style="margin:0"> 공유RAW</label>';
     if(_bm){
       var _adj=0; try{ _adj=parseFloat(localStorage.getItem('_mlSizeAdj')||'0')||0; }catch(e){}
       h+='<label style="display:inline-flex;align-items:center;gap:3px;font-size:11px;background:#f1f5f9;color:#475569;padding:4px 8px;border-radius:6px" title="장마다 아래로 밀리면 + , 위로 밀리면 − 로 0.05mm씩 조절해 딱 맞추세요">'
