@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260609v60';
+var _MOD_ENGINE_VER='20260609v61';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -2529,7 +2529,7 @@ function modDoPrint(){
   if(opt.mode==='label' && qzIsReady() && !_browserPrint){
     window.__mlPrinting=true; window.__mlCancel=false; window.__mlPrintTotal=rows.length;
     var _pb=document.getElementById('ml_printbtn');
-    if(_pb){ _pb.disabled=false; _pb.style.opacity='1'; _pb.style.background='#dc2626'; _pb.innerHTML='✕ 취소 <span id="ml_prog" style="font-weight:800">0/'+rows.length+'</span>'; _pb.onclick=_mlCancelPrint; }
+    if(_pb){ _pb.disabled=false; _pb.style.opacity='1'; _pb.style.background='#dc2626'; _pb.innerHTML='✕ 취소 <span id="ml_prog" style="font-weight:800">생성중 0/'+rows.length+'</span>'; _pb.onclick=_mlCancelPrint; }
     var _restoreBtn=function(){ if(_pb){ _pb.disabled=false; _pb.style.opacity='1'; _pb.style.background='#2563eb'; _pb.innerHTML='🖨 <span id="ml_printcnt">'+rows.length+'</span>장 출력'; _pb.onclick=function(){modDoPrint();}; } };
     var _useBmp=false, _useRaw=false; try{ _useBmp=(localStorage.getItem('_mlBitmap')==='1'); _useRaw=(localStorage.getItem('_mlRawShare')==='1'); }catch(e){}
     var _printFn = _useRaw ? _qzPrintLabelsRaw : (_useBmp ? _qzPrintLabelsBitmap : _qzPrintLabels);
@@ -2965,7 +2965,7 @@ function _qzPrintLabels(def, rows, opt){
 // 출력 진행률 표시 / 취소
 function _mlPrintProg(done,total,sending){
   var e=document.getElementById('ml_prog'); if(!e) return;
-  e.textContent = sending ? (total+'/'+total+' 전송…') : (done+'/'+total);
+  e.textContent = sending ? (total+'/'+total+' 전송…') : ('생성중 '+done+'/'+total);
 }
 function _mlCancelPrint(){
   window.__mlCancel=true;
