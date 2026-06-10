@@ -1051,7 +1051,7 @@ function _showPwWarnBanner(){
   var b=document.createElement('div');
   b.id='_pwWarnBanner';
   b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:99998;background:linear-gradient(90deg,#dc2626,#b91c1c);color:#fff;padding:9px 14px;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap;box-shadow:0 2px 10px rgba(0,0,0,.25)';
-  b.innerHTML='⚠ 비밀번호가 <b>"1234"</b> 입니다 — 보안 위험! 지금 바로 변경하세요.'
+  b.innerHTML='⚠ <b>기본 비밀번호</b>를 사용 중입니다 — 보안 위험! 지금 바로 변경하세요.'
     +'<button onclick="'+goPw+';mkTabs();draw();" style="background:#fff;color:#b91c1c;border:none;border-radius:6px;padding:5px 14px;font-size:12px;font-weight:800;cursor:pointer">🔑 비밀번호 변경</button>';
   document.body.appendChild(b);
   document.body.style.paddingTop='40px';
