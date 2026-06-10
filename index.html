@@ -451,7 +451,7 @@ label{display:block;font-size:10px;color:#999;margin-bottom:3px}
 <!-- firebase-storage 제거: 구글 드라이브 프록시로 대체 -->
 <script src="firebase-config.js"></script>
 <script src="common.js?v=20260604c"></script>
-<script src="mod-engine.js?v=20260609v62"></script>
+<script src="mod-engine.js?v=20260609v63"></script>
 
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" onerror="console.warn('XLSX CDN load failed')"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js" onerror="console.warn('xlsx-js-style CDN load failed')"></script>
@@ -516,6 +516,7 @@ var MODFORM_EVT_ID = "";
 var DEEP_TAB = "";   // ?tab= 딥링크 (로그인 후 해당 탭 자동 열기)
 var DEEP_EVT = "";   // ?evtId= 딥링크 (해당 행사 자동 선택)
 var IS_MODVIEW_MODE = false; var MODVIEW_KEY=""; var MODVIEW_ID=""; var MODVIEW_EVT="";  // QR 조회 페이지
+var DEEP_MOD_KEY = "";  // 모듈 바로가기(?modlist=) — 로그인 후 이동할 모듈 키
 (function(){
   try {
     var sp = new URLSearchParams(window.location.search);
@@ -557,6 +558,11 @@ var IS_MODVIEW_MODE = false; var MODVIEW_KEY=""; var MODVIEW_ID=""; var MODVIEW_
       document.getElementById("loginPage").style.display = "none";
       document.getElementById("mainPage").style.display = "none";
       document.title = "📋 정보 조회";
+    }
+    // ===== 모듈 바로가기 (?modlist={key}) — 홈페이지(로그인) → 로그인 후 그 모듈 화면으로 이동 =====
+    if (sp.get("modlist")) {
+      DEEP_MOD_KEY = sp.get("modlist") || "";
+      if (sp.get("evtId")) DEEP_EVT = sp.get("evtId");
     }
   } catch(e){}
 })();
@@ -1041,6 +1047,14 @@ async function doLogin(id,pw,keep,silent){
   if(!silent){
     toast("✅ 최신화 완료! 어서오세요, "+(ME.nm||ME.id)+"님");
     if(!single) toast("행사를 선택하세요 ▼", false);
+  }
+  // 모듈 바로가기(?modlist=)로 들어왔으면 → 로그인 후 바로 그 모듈 화면으로
+  if (DEEP_MOD_KEY) {
+    var _dk = DEEP_MOD_KEY; DEEP_MOD_KEY = "";
+    setTimeout(function(){
+      try { CTAB = 'mod_'+_dk; if(typeof mkTabs==='function') mkTabs(); if(typeof draw==='function') draw(); }
+      catch(e){ console.warn('deep mod nav err', e); }
+    }, 300);
   }
   return true;
 }

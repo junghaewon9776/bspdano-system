@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260609v62';
+var _MOD_ENGINE_VER='20260609v63';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -176,6 +176,7 @@ function dMod(key){
   var _hasTel=(def.columns||[]).some(function(c){return c.type==='tel'});
   h+='<div style="display:flex;gap:6px;flex-wrap:wrap">';
   if(isA() && feat.applyForm) h+='<button class="btn" style="background:#0ea5e9;color:#fff" onclick="popModFormLink(\''+key+'\')">🔗 신청폼 링크</button>';
+  if(isA()) h+='<button class="btn" style="background:#0891b2;color:#fff" onclick="_modCopyShortcut(\''+key+'\')" title="이 모듈로 바로 가는 링크 복사 (담당자용 — 로그인하면 이 화면)">🔗 바로가기 링크</button>';
   if(isA() && _hasTel) h+='<button class="btn" style="background:#8b5cf6;color:#fff" onclick="popModSms(\''+key+'\')">💬 문자 발송</button>';
   if(isA()) h+='<button class="btn" style="background:#475569;color:#fff" onclick="popModLabel(\''+key+'\')">🖨 라벨 출력</button>';
   if(isA()) h+='<button class="btn btn-b" onclick="popModAdd(\''+key+'\')">➕ 추가</button>';
@@ -1501,6 +1502,20 @@ function _modSaveMarkMemo(key,id){
   data[idx]=merged;
   fbDb.ref(path).set(data).then(function(){ toast(memo?('📝 메모: '+memo):'메모 지움'); closePopup(); })
     .catch(function(e){ toast('실패: '+(e.message||e),true); });
+}
+// 모듈 바로가기 링크 복사 (담당자용 — 로그인하면 이 모듈 화면)
+function _modCopyShortcut(key){
+  var def=_modDefs[key]; if(!def) return;
+  var base=location.href.split(/[?#]/)[0];
+  var evtId=def.global?'':((CUR_EVT&&CUR_EVT.evtId)||'');
+  var url=base+'?modlist='+encodeURIComponent(key)+(evtId?'&evtId='+encodeURIComponent(evtId):'');
+  var done=function(){ toast('🔗 바로가기 링크 복사됨 — 담당자에게 공유하세요'); };
+  if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(url).then(done).catch(function(){ _modCopyFallback(url,done); }); }
+  else { _modCopyFallback(url,done); }
+}
+function _modCopyFallback(text,cb){
+  try{ var ta=document.createElement('textarea'); ta.value=text; ta.style.position='fixed'; ta.style.left='-9999px'; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); cb&&cb(); }
+  catch(e){ prompt('아래 링크를 복사하세요:', text); }
 }
 // 신청폼 링크 팝업
 function popModFormLink(key){
@@ -3452,7 +3467,7 @@ function _renderModViewUI(def,row){
   if(!_isAdminView){
     h+='<div id="mvLoginBox" style="display:none;margin-top:16px;background:#f8fafc;border-radius:12px;padding:16px">'
       +'<div style="font-size:13px;font-weight:700;color:#334155;margin-bottom:8px">관리자 로그인</div>'
-      +'<input id="mvId" placeholder="아이디" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px;margin-bottom:6px">'
+      +'<input id="mvId" placeholder="아이디" value="'+esc((function(){try{return localStorage.getItem("lastLoginId")||"";}catch(e){return "";}})())+'" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px;margin-bottom:6px">'
       +'<input id="mvPw" type="password" placeholder="비밀번호" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px;margin-bottom:8px">'
       +'<div id="mvErr" style="color:#ef4444;font-size:12px;margin-bottom:6px;display:none"></div>'
       +'<button onclick="_mvDoLogin()" style="width:100%;background:#1e40af;color:#fff;border:none;border-radius:8px;padding:10px;font-size:14px;font-weight:700;cursor:pointer">로그인</button>'
@@ -3466,6 +3481,92 @@ function _renderModViewUI(def,row){
   }
 }
 
+// ═══════════════════════════════════════════
+// 모듈 전체 명단 바로가기 (?modlist={key}) — 로그인 게이트 후 명단 표시 (비상연락망 등)
+// ═══════════════════════════════════════════
+function renderModList(key,evtId){
+  document.body.innerHTML='<div style="min-height:100vh;background:#f1f5f9"><div id="modListWrap" style="max-width:680px;margin:0 auto;padding:16px"><div style="text-align:center;color:#94a3b8;padding:50px">불러오는 중...</div></div></div>';
+  if(typeof fbDb==='undefined'){ document.getElementById('modListWrap').innerHTML='<div style="text-align:center;color:#ef4444;padding:40px">시스템 오류</div>'; return; }
+  window.__modListKey=key; window.__modListEvt=evtId||'';
+  var _au=(typeof loadAuth==='function')?loadAuth():null;
+  if(_au&&_au.id) _mlistLoad(key,evtId); else _mlistShowLogin();
+}
+function _mlistShowLogin(){
+  var w=document.getElementById('modListWrap'); if(!w) return;
+  w.innerHTML='<div style="background:#fff;border-radius:16px;padding:28px 24px;margin-top:8vh;box-shadow:0 10px 40px rgba(0,0,0,.12);max-width:380px;margin-left:auto;margin-right:auto">'
+    +'<div style="text-align:center;font-size:36px;margin-bottom:6px">🔒</div>'
+    +'<h2 style="text-align:center;color:#0f172a;font-size:18px;margin:0 0 4px">명단 조회</h2>'
+    +'<p style="text-align:center;color:#94a3b8;font-size:12px;margin:0 0 18px">아이디·비밀번호로 로그인하세요</p>'
+    +'<input id="mlistId" placeholder="아이디" value="'+esc((function(){try{return localStorage.getItem("lastLoginId")||"";}catch(e){return "";}})())+'" style="width:100%;box-sizing:border-box;padding:12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px;margin-bottom:8px">'
+    +'<input id="mlistPw" type="password" placeholder="비밀번호" onkeydown="if(event.key===\'Enter\')_mlistDoLogin()" style="width:100%;box-sizing:border-box;padding:12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px;margin-bottom:10px">'
+    +'<div id="mlistErr" style="color:#ef4444;font-size:12px;margin-bottom:8px;display:none"></div>'
+    +'<button onclick="_mlistDoLogin()" style="width:100%;background:#2563eb;color:#fff;border:none;border-radius:8px;padding:12px;font-size:15px;font-weight:700;cursor:pointer">로그인</button>'
+    +'</div>';
+  setTimeout(function(){ var idE=document.getElementById('mlistId'); var pwE=document.getElementById('mlistPw'); if(idE&&idE.value&&pwE){ pwE.focus(); } else if(idE){ idE.focus(); } },60);
+}
+function _mlistDoLogin(){
+  var id=(document.getElementById('mlistId').value||'').trim();
+  var pw=(document.getElementById('mlistPw').value||'').trim();
+  var errEl=document.getElementById('mlistErr');
+  if(!id||!pw){ if(errEl){errEl.textContent='아이디와 비밀번호를 입력하세요';errEl.style.display='block';} return; }
+  fbDb.ref('/main/Users').once('value').then(function(s){
+    var users=s.val()||[]; if(!Array.isArray(users)) users=Object.values(users);
+    var user=null; for(var i=0;i<users.length;i++){if(users[i]&&users[i].id===id){user=users[i];break;}}
+    if(!user||user.pw!==pw){ if(errEl){errEl.textContent='아이디 또는 비밀번호가 올바르지 않습니다';errEl.style.display='block';} return; }
+    if(typeof saveAuth==='function') saveAuth(id,pw);
+    _mlistLoad(window.__modListKey, window.__modListEvt);
+  }).catch(function(e){ if(errEl){errEl.textContent='연결 오류: '+e.message;errEl.style.display='block';} });
+}
+function _mlistLoad(key,evtId){
+  var w=document.getElementById('modListWrap'); if(w) w.innerHTML='<div style="text-align:center;color:#94a3b8;padding:50px">명단 불러오는 중...</div>';
+  fbDb.ref('/main/ModDefs').once('value').then(function(s){
+    var defs=s.val()||[]; if(!Array.isArray(defs))defs=Object.values(defs);
+    var def=null; for(var i=0;i<defs.length;i++){if(defs[i]&&defs[i].key===key){def=defs[i];break}}
+    if(!def){ if(w) w.innerHTML='<div style="text-align:center;color:#64748b;padding:40px">모듈을 찾을 수 없습니다</div>'; return; }
+    var path=def.global?'/main/'+def.fbPath:'/evtData/'+(evtId||'')+'/'+def.fbPath;
+    fbDb.ref(path).once('value').then(function(s2){
+      var arr=s2.val()||[]; if(!Array.isArray(arr))arr=Object.values(arr);
+      arr=arr.filter(Boolean);
+      window.__modListDef=def; window.__modListRows=arr;
+      _renderModListUI(def,arr);
+    }).catch(function(e){ if(w) w.innerHTML='<div style="text-align:center;color:#ef4444;padding:40px">오류: '+esc(e.message)+'</div>'; });
+  }).catch(function(e){ if(w) w.innerHTML='<div style="text-align:center;color:#ef4444;padding:40px">오류: '+esc(e.message)+'</div>'; });
+}
+function _renderModListUI(def,rows,q){
+  var w=document.getElementById('modListWrap'); if(!w) return;
+  var telCols=(def.columns||[]).filter(function(c){return c.type==='tel';});
+  var infoCols=(def.columns||[]).filter(function(c){return c.key!=='status'&&c.type!=='consent'&&c.type!=='file'&&c.type!=='tel'&&!c.hideTable&&!c.sysOnly;});
+  q=(q||'').trim();
+  var filtered=rows;
+  if(q){ var ql=q.toLowerCase(); filtered=rows.filter(function(r){ return (def.columns||[]).some(function(c){ return String(r[c.key]||'').toLowerCase().indexOf(ql)>=0; }); }); }
+  var h='<div style="position:sticky;top:0;background:#f1f5f9;padding:12px 2px 10px;z-index:5">';
+  h+='<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px"><div style="font-size:28px">'+(def.icon||'📋')+'</div>'
+    +'<div><div style="font-size:18px;font-weight:800;color:#0f172a">'+esc(def.label)+'</div><div style="font-size:12px;color:#94a3b8">총 '+rows.length+'명'+(q?(' · 검색 '+filtered.length):'')+'</div></div></div>';
+  h+='<input type="search" oninput="_renderModListUI(window.__modListDef,window.__modListRows,this.value)" value="'+esc(q)+'" placeholder="🔍 이름·전화·소속 검색" style="width:100%;box-sizing:border-box;padding:11px 14px;border:1px solid #cbd5e1;border-radius:10px;font-size:14px">';
+  h+='</div>';
+  h+='<div style="display:flex;flex-direction:column;gap:8px;padding-bottom:30px">';
+  if(!filtered.length){ h+='<div style="text-align:center;color:#94a3b8;padding:40px">결과 없음</div>'; }
+  filtered.forEach(function(r){
+    var name=_modRowTitle(def,r)||'(이름 없음)';
+    h+='<div style="background:#fff;border-radius:12px;padding:12px 14px;box-shadow:0 1px 3px rgba(0,0,0,.06)">';
+    h+='<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap">';
+    h+='<div style="flex:1;min-width:0"><div style="font-size:16px;font-weight:800;color:#0f172a;margin-bottom:3px">'+esc(name)+'</div>';
+    // 부가 정보 (이름 컬럼 제외)
+    var infoBits=[];
+    infoCols.forEach(function(c){ var v=r[c.key]; if(v==null||v==='') return; if(_modRowTitle(def,r)===String(v)) return; infoBits.push('<span style="color:#64748b">'+esc(c.label)+':</span> '+esc(_modPlain(c,v))); });
+    if(infoBits.length) h+='<div style="font-size:12px;color:#334155;line-height:1.6">'+infoBits.join(' · ')+'</div>';
+    h+='</div>';
+    // 전화 버튼
+    if(telCols.length){
+      h+='<div style="display:flex;flex-direction:column;gap:4px">';
+      telCols.forEach(function(c){ var v=r[c.key]; if(!v) return; var cl=String(v).replace(/[^0-9+]/g,''); h+='<a href="tel:'+cl+'" style="display:inline-flex;align-items:center;gap:5px;background:#16a34a;color:#fff;padding:7px 13px;border-radius:8px;text-decoration:none;font-weight:700;font-size:13px;white-space:nowrap">📞 '+esc(String(v))+'</a>'; });
+      h+='</div>';
+    }
+    h+='</div></div>';
+  });
+  h+='</div>';
+  w.innerHTML=h;
+}
 function _mvDoLogin(){
   var id=(document.getElementById('mvId').value||'').trim();
   var pw=(document.getElementById('mvPw').value||'').trim();
