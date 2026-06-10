@@ -318,6 +318,7 @@ body{font-family:'Pretendard','Noto Sans KR',sans-serif;background:#1a1a2e;color
   <div id="measureTotal" style="position:absolute;bottom:50px;left:50%;transform:translateX(-50%);z-index:50;background:rgba(139,92,246,0.92);color:#fff;padding:8px 16px;border-radius:8px;font-size:13px;font-weight:700;display:none;backdrop-filter:blur(8px);white-space:nowrap"></div>
   <!-- 지도 버튼들 -->
   <div id="mapBtns">
+    <button id="multiModeBtn" onclick="toggleMultiMode()">☑ 다중선택</button>
     <button onclick="toggleMapType()">🗺️ 지도 전환</button>
     <button onclick="startMeasure('distance')">📏 거리 측정</button>
     <button onclick="startMeasure('area')">📐 면적 측정</button>
@@ -326,6 +327,26 @@ body{font-family:'Pretendard','Noto Sans KR',sans-serif;background:#1a1a2e;color
     <button onclick="saveMapPos()">📍 현재위치 기본설정</button>
     <button onclick="clearSearchPin()">🔍 핀 제거</button>
     <button onclick="saveMapImage()">📷 이미지 저장</button>
+  </div>
+  <!-- 다중선택 툴바 -->
+  <div id="multiBar" style="display:none;position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:60;background:rgba(15,23,42,0.95);border:1px solid #334155;border-radius:10px;padding:8px 12px;display:none;align-items:center;gap:6px;flex-wrap:wrap;box-shadow:0 4px 16px rgba(0,0,0,.4);max-width:94vw">
+    <span id="multiCnt" style="color:#fff;font-size:12px;font-weight:700">0개 선택</span>
+    <span style="color:#475569">|</span>
+    <span style="color:#94a3b8;font-size:11px">정렬</span>
+    <button onclick="multiAlign('left')" title="왼쪽 맞춤" style="background:#334155;color:#fff;border:none;border-radius:5px;padding:5px 8px;font-size:11px;cursor:pointer">⬅</button>
+    <button onclick="multiAlign('right')" title="오른쪽 맞춤" style="background:#334155;color:#fff;border:none;border-radius:5px;padding:5px 8px;font-size:11px;cursor:pointer">➡</button>
+    <button onclick="multiAlign('top')" title="위 맞춤" style="background:#334155;color:#fff;border:none;border-radius:5px;padding:5px 8px;font-size:11px;cursor:pointer">⬆</button>
+    <button onclick="multiAlign('bottom')" title="아래 맞춤" style="background:#334155;color:#fff;border:none;border-radius:5px;padding:5px 8px;font-size:11px;cursor:pointer">⬇</button>
+    <button onclick="multiAlign('hcenter')" title="가로 가운데(같은 세로선)" style="background:#334155;color:#fff;border:none;border-radius:5px;padding:5px 8px;font-size:11px;cursor:pointer">↕가운데</button>
+    <button onclick="multiAlign('vcenter')" title="세로 가운데(같은 가로선)" style="background:#334155;color:#fff;border:none;border-radius:5px;padding:5px 8px;font-size:11px;cursor:pointer">↔가운데</button>
+    <span style="color:#475569">|</span>
+    <span style="color:#94a3b8;font-size:11px">간격</span>
+    <button onclick="multiDistribute('h')" title="가로 간격 균등" style="background:#334155;color:#fff;border:none;border-radius:5px;padding:5px 8px;font-size:11px;cursor:pointer">↔균등</button>
+    <button onclick="multiDistribute('v')" title="세로 간격 균등" style="background:#334155;color:#fff;border:none;border-radius:5px;padding:5px 8px;font-size:11px;cursor:pointer">↕균등</button>
+    <span style="color:#475569">|</span>
+    <button onclick="multiRotate(90)" title="모두 회전" style="background:#334155;color:#fff;border:none;border-radius:5px;padding:5px 8px;font-size:11px;cursor:pointer">↻회전</button>
+    <button onclick="multiDelete()" style="background:#dc2626;color:#fff;border:none;border-radius:5px;padding:5px 8px;font-size:11px;cursor:pointer">🗑삭제</button>
+    <button onclick="multiClear()" style="background:#64748b;color:#fff;border:none;border-radius:5px;padding:5px 8px;font-size:11px;cursor:pointer">해제</button>
   </div>
   <!-- 우클릭 메뉴 -->
   <div id="ctxMenu">
@@ -1465,6 +1486,7 @@ function drawItem(idx){
       icWrap.appendChild(nmEl);
     }
     var _icDown=function(cx,cy){
+      if(_multiClickItem(idx)) return;
       var mapEl=document.getElementById('map'); var rect=mapEl.getBoundingClientRect();
       _drag={active:true,moved:false,idx:idx,sx:cx-rect.left,sy:cy-rect.top,slat:it.lat,slng:it.lng,sPath:null};
       map.setDraggable(false);
@@ -1485,12 +1507,14 @@ function drawItem(idx){
     // 드래그 시작 (마우스)
     labelEl.addEventListener('mousedown',function(ev){
       ev.preventDefault();ev.stopPropagation();
+      if(_multiClickItem(idx)) return;
       var mapEl=document.getElementById('map');
       var rect=mapEl.getBoundingClientRect();
       _drag={active:true,moved:false,idx:idx,sx:ev.clientX-rect.left,sy:ev.clientY-rect.top,slat:it.lat,slng:it.lng,sPath:null};
       map.setDraggable(false);
     });
     labelEl.addEventListener('touchstart',function(ev){
+      if(_multiClickItem(idx)) return;
       var touch=ev.touches[0];
       var mapEl=document.getElementById('map');
       var rect=mapEl.getBoundingClientRect();
@@ -1566,6 +1590,7 @@ function drawItem(idx){
   // 드래그 시작 (마우스)
   labelEl.addEventListener('mousedown',function(ev){
     ev.preventDefault();ev.stopPropagation();
+    if(_multiClickItem(idx)) return;
     var mapEl=document.getElementById('map');
     var rect=mapEl.getBoundingClientRect();
     _drag={active:true,moved:false,idx:idx,sx:ev.clientX-rect.left,sy:ev.clientY-rect.top,slat:it.lat,slng:it.lng,sPath:it.path?it.path.map(function(p){return{lat:p.lat,lng:p.lng}}):null};
@@ -1573,6 +1598,7 @@ function drawItem(idx){
   });
   // 드래그 시작 (터치)
   labelEl.addEventListener('touchstart',function(ev){
+    if(_multiClickItem(idx)) return;
     var touch=ev.touches[0];
     var mapEl=document.getElementById('map');
     var rect=mapEl.getBoundingClientRect();
@@ -1591,6 +1617,7 @@ function drawItem(idx){
   try{
     kakao.maps.event.addListener(it._poly,'mousedown',function(e){
       if(_drag.active)return;
+      if(_multiClickItem(idx)) return;
       _drag={active:true,moved:false,idx:idx,sx:e.point.x,sy:e.point.y,slat:it.lat,slng:it.lng,sPath:it.path?it.path.map(function(p){return{lat:p.lat,lng:p.lng}}):null};
       map.setDraggable(false);
     });
@@ -2007,6 +2034,98 @@ function deleteItem(){
 }
 
 function closeItem(){deselectItem();renderCategories()}
+
+// ══════════════════════════════════════
+//  다중선택 (정렬 / 간격 / 회전 / 삭제)
+// ══════════════════════════════════════
+var _multiMode=false, _multiSel=[], _multiOverlays=[];
+function toggleMultiMode(){
+  _multiMode=!_multiMode;
+  var btn=document.getElementById('multiModeBtn');
+  if(btn){ btn.style.background=_multiMode?'rgba(37,99,235,0.95)':''; btn.textContent=_multiMode?'☑ 다중선택 ON':'☑ 다중선택'; }
+  if(!_multiMode) multiClear();
+  else { deselectItem(); closeItemBubble(); toast('다중선택 ON — 아이템을 눌러 여러 개 선택'); }
+}
+// 아이템 클릭 시 다중모드면 토글 (각 mousedown 핸들러에서 호출). true 반환=다중처리됨
+function _multiClickItem(idx){
+  if(!_multiMode) return false;
+  var p=_multiSel.indexOf(idx);
+  if(p>=0) _multiSel.splice(p,1); else _multiSel.push(idx);
+  _multiRefresh();
+  return true;
+}
+function _multiRefresh(){
+  _multiOverlays.forEach(function(o){try{o.setMap(null)}catch(e){}}); _multiOverlays=[];
+  _multiSel.forEach(function(idx){
+    var it=items[idx]; if(!it) return;
+    var ring=document.createElement('div');
+    ring.style.cssText='width:22px;height:22px;border:3px solid #f59e0b;border-radius:50%;background:rgba(245,158,11,0.25);box-shadow:0 0 0 2px #fff';
+    var ov=new kakao.maps.CustomOverlay({position:new kakao.maps.LatLng(it.lat,it.lng),content:ring,yAnchor:0.5,xAnchor:0.5,zIndex:9999});
+    ov.setMap(map); _multiOverlays.push(ov);
+  });
+  var bar=document.getElementById('multiBar');
+  var cnt=document.getElementById('multiCnt'); if(cnt) cnt.textContent=_multiSel.length+'개 선택';
+  if(bar) bar.style.display=_multiSel.length?'flex':'none';
+}
+function multiClear(){
+  _multiSel=[];
+  _multiOverlays.forEach(function(o){try{o.setMap(null)}catch(e){}}); _multiOverlays=[];
+  var bar=document.getElementById('multiBar'); if(bar) bar.style.display='none';
+}
+// 아이템 중심을 새 좌표로 이동(경로도 같이)
+function _setItemPos(it,lat,lng){
+  var dLat=lat-it.lat, dLng=lng-it.lng;
+  it.lat=lat; it.lng=lng;
+  if(it.path) it.path=it.path.map(function(p){return{lat:p.lat+dLat,lng:p.lng+dLng}});
+}
+function _multiItems(){ return _multiSel.map(function(i){return items[i]}).filter(Boolean); }
+function multiAlign(mode){
+  var its=_multiItems(); if(its.length<2){toast('2개 이상 선택하세요',true);return}
+  var lats=its.map(function(i){return i.lat}), lngs=its.map(function(i){return i.lng});
+  if(mode==='left'){ var v=Math.min.apply(null,lngs); its.forEach(function(i){_setItemPos(i,i.lat,v)}); }
+  else if(mode==='right'){ var v=Math.max.apply(null,lngs); its.forEach(function(i){_setItemPos(i,i.lat,v)}); }
+  else if(mode==='top'){ var v=Math.max.apply(null,lats); its.forEach(function(i){_setItemPos(i,v,i.lng)}); }
+  else if(mode==='bottom'){ var v=Math.min.apply(null,lats); its.forEach(function(i){_setItemPos(i,v,i.lng)}); }
+  else if(mode==='hcenter'){ var avg=lngs.reduce(function(a,b){return a+b},0)/lngs.length; its.forEach(function(i){_setItemPos(i,i.lat,avg)}); }
+  else if(mode==='vcenter'){ var avg=lats.reduce(function(a,b){return a+b},0)/lats.length; its.forEach(function(i){_setItemPos(i,avg,i.lng)}); }
+  _multiSel.forEach(function(idx){drawItem(idx)}); _multiRefresh(); autoSave(); toast('정렬 완료');
+}
+function multiDistribute(axis){
+  var its=_multiItems(); if(its.length<3){toast('3개 이상 선택하세요',true);return}
+  if(axis==='h'){
+    its.sort(function(a,b){return a.lng-b.lng});
+    var min=its[0].lng, max=its[its.length-1].lng, step=(max-min)/(its.length-1);
+    its.forEach(function(i,k){_setItemPos(i,i.lat,min+step*k)});
+  } else {
+    its.sort(function(a,b){return a.lat-b.lat});
+    var min=its[0].lat, max=its[its.length-1].lat, step=(max-min)/(its.length-1);
+    its.forEach(function(i,k){_setItemPos(i,min+step*k,i.lng)});
+  }
+  _multiSel.forEach(function(idx){drawItem(idx)}); _multiRefresh(); autoSave(); toast('간격 균등 완료');
+}
+function multiRotate(deg){
+  var its=_multiItems(); if(!its.length){return}
+  its.forEach(function(it,k){
+    var idx=_multiSel[k];
+    if(it.shape==='line'||it.shape==='polygon'){
+      var cen=pathCenter(it.path);
+      var rad=deg*Math.PI/180,cosA=Math.cos(rad),sinA=Math.sin(rad),cosLat=Math.cos(cen.lat*Math.PI/180);
+      it.path=it.path.map(function(p){var dy=p.lat-cen.lat,dx=(p.lng-cen.lng)*cosLat;return{lat:cen.lat+dx*sinA+dy*cosA,lng:cen.lng+(dx*cosA-dy*sinA)/cosLat}});
+    } else { it.rotation=(((it.rotation||0)+deg)%360+360)%360; }
+    drawItem(idx);
+  });
+  _multiRefresh(); autoSave(); toast(deg+'° 회전');
+}
+function multiDelete(){
+  var its=_multiItems(); if(!its.length){return}
+  if(!confirm(its.length+'개 항목을 삭제하시겠습니까?'))return;
+  // 인덱스 큰 것부터 제거
+  var idxs=_multiSel.slice().sort(function(a,b){return b-a});
+  idxs.forEach(function(idx){ if(items[idx]){ clearItemGfx(items[idx]); items.splice(idx,1); } });
+  multiClear(); selectedItemIdx=-1;
+  document.getElementById('itemPanel').style.display='none';
+  renderCategories(); toast(idxs.length+'개 삭제됨'); autoSave();
+}
 
 function focusItem(idx){
   var it=items[idx];
