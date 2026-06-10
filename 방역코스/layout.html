@@ -1630,6 +1630,11 @@ function showItemBubble(idx){
   else if(it.shape==='polygon')h+='<div><b>꼭짓점:</b> '+(it.path?it.path.length:0)+'개</div>';
   if(it.rotation)h+='<div><b>회전:</b> '+it.rotation+'°</div>';
   if(!it.name&&!it.duty&&!it.phone&&!it.memo)h+='<div style="color:#78716c">정보 없음</div>';
+  // 편집 / 삭제 버튼
+  h+='<div style="display:flex;gap:6px;margin-top:8px">';
+  h+='<button onclick="editFromBubble('+idx+')" style="flex:1;background:#3b82f6;color:#fff;border:none;border-radius:6px;padding:6px;font-size:12px;font-weight:700;cursor:pointer">✏️ 편집</button>';
+  h+='<button onclick="deleteFromBubble('+idx+')" style="flex:1;background:#dc2626;color:#fff;border:none;border-radius:6px;padding:6px;font-size:12px;font-weight:700;cursor:pointer">🗑 삭제</button>';
+  h+='</div>';
   var el=document.createElement('div');
   el.className='item-bubble';
   el.innerHTML=h;
@@ -1642,6 +1647,22 @@ function showItemBubble(idx){
 }
 function closeItemBubble(){
   if(_itemBubble){try{_itemBubble.setMap(null);}catch(e){}_itemBubble=null;}
+}
+// 버블에서 편집/삭제
+function editFromBubble(idx){
+  closeItemBubble();
+  if(items[idx]) selectItem(idx);
+}
+function deleteFromBubble(idx){
+  var it=items[idx]; if(!it) return;
+  if(!confirm((it.num||'이 항목')+' 삭제하시겠습니까?')) return;
+  clearItemGfx(it);
+  items.splice(idx,1);
+  closeItemBubble();
+  if(selectedItemIdx===idx){ selectedItemIdx=-1; var sb=document.getElementById('panelSizeBox'); if(sb)sb.remove(); document.getElementById('itemPanel').style.display='none'; }
+  renderCategories();
+  toast('삭제됨');
+  autoSave();
 }
 
 var _infoIdx=-1;
