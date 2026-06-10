@@ -5894,12 +5894,15 @@ function draw(){
   }
 }
 
+var LAYOUT_VER="20260610b";  // 방역코스 iframe 캐시 무력화용 (layout.html 등 수정 시 올리기)
 function _getFrameUrl(tabKey){
   var map={field_layout:"방역코스/layout.html",field_monitor:"방역코스/monitor.html",field_admin:"방역코스/admin.html",field_vehicle:"방역코스/vehicle.html",field_today:"방역코스/today.html"};
   if(FIELD_MENU==="on"){
     var url=map[tabKey]||null;
     if(url){
-      if(CUR_EVT && CUR_EVT.evtId) url += (url.indexOf('?')>=0?'&':'?')+'evtId='+encodeURIComponent(CUR_EVT.evtId);
+      // 캐시 무력화 — 방역코스 로컬 파일은 항상 최신 로드
+      url += (url.indexOf('?')>=0?'&':'?')+'v='+LAYOUT_VER;
+      if(CUR_EVT && CUR_EVT.evtId) url += '&evtId='+encodeURIComponent(CUR_EVT.evtId);
       return url;
     }
   }
