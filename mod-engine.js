@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260610v65';
+var _MOD_ENGINE_VER='20260610v66';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -1150,7 +1150,9 @@ function popModDef(keyOrIdx){
   h+='<label style="font-size:12px;font-weight:700;color:#64748b">신청폼 제목</label>';
   h+='<input id="mdf_formTitle" value="'+esc(def.formTitle||"")+'" placeholder="비우면 「'+esc(def.label||"모듈명")+' 신청」">';
   h+='<label style="font-size:12px;font-weight:700;color:#64748b">신청폼 안내문</label>';
-  h+='<input id="mdf_formDesc" value="'+esc(def.formDesc||"")+'" placeholder="예: 아래 내용을 작성 후 신청해 주세요">';
+  h+='<textarea id="mdf_formDesc" rows="5" placeholder="여러 줄 가능 — 베타테스트 안내 등 길게 작성하세요" style="width:100%;box-sizing:border-box;resize:vertical;font-size:13px;line-height:1.5">'+esc(def.formDesc||"")+'</textarea>';
+  h+='<label style="font-size:12px;font-weight:700;color:#64748b">완료 후 다운로드 링크</label>';
+  h+='<div><input id="mdf_downloadUrl" value="'+esc(def.downloadUrl||"")+'" placeholder="예: 플레이스토어 베타 링크 https://play.google.com/…" style="width:100%;font-family:monospace;font-size:11px"><div style="font-size:10px;color:#94a3b8;margin-top:2px">넣으면 신청 완료 화면에 「앱 다운로드」 버튼이 떠서 누르면 이 링크로 이동</div></div>';
   h+='<label style="font-size:12px;font-weight:700;color:#64748b">파일 업로드 URL</label>';
   var _curDrive=def.driveUploadUrl||(typeof DRIVE_UPLOAD_URL!=='undefined'?DRIVE_UPLOAD_URL:'')||'';
   h+='<div><input id="mdf_driveUrl" value="'+esc(_curDrive)+'" placeholder="파일첨부 컬럼 쓸 때만 — 신청 설정의 Drive URL 붙여넣기" style="width:100%;font-family:monospace;font-size:11px"><div style="font-size:10px;color:#94a3b8;margin-top:2px">신청폼에서 파일첨부를 받으려면 필요 (참가신청 설정의 📤 Drive 업로드 URL과 동일한 값)</div></div>';
@@ -1361,6 +1363,7 @@ function saveModDef(keyOrNew){
   var adminTab=((document.getElementById('mdf_adminTab')||{}).checked)||false;
   var formTitle=((document.getElementById('mdf_formTitle')||{}).value||'').trim();
   var formDesc=((document.getElementById('mdf_formDesc')||{}).value||'').trim();
+  var downloadUrl=((document.getElementById('mdf_downloadUrl')||{}).value||'').trim();
 
   // 신청폼 켜면 선정용 status 컬럼 자동 보장
   if(applyForm && !cols.some(function(c){return c.key==='status'})){
@@ -1382,7 +1385,7 @@ function saveModDef(keyOrNew){
     fbPath:'Mod_'+key, global:global, evtId:modEvtId,
     adminTab:adminTab,
     columns:cols,
-    formTitle:formTitle, formDesc:formDesc,
+    formTitle:formTitle, formDesc:formDesc, downloadUrl:downloadUrl,
     driveUploadUrl:driveUrl,
     features:{search:true,excel:true,applyForm:applyForm,googleEmail:googleEmail}
   };
@@ -1656,12 +1659,15 @@ function _renderModApplyUI(def,evtId){
   // 탭/공유 제목을 이 신청폼 이름으로 (시스템명 대신)
   try{ document.title=(def.formTitle||(def.label+' 신청하기')); }catch(e){}
   var title=def.formTitle?esc(def.formTitle):((def.icon||'📝')+' '+esc(def.label)+' 신청하기');
-  var desc=def.formDesc?esc(def.formDesc):'아래 내용을 작성하고 신청 버튼을 눌러주세요';
+  var hasDesc=!!def.formDesc;
+  var desc=hasDesc?esc(def.formDesc).replace(/\n/g,'<br>'):'아래 내용을 작성하고 신청 버튼을 눌러주세요';
   // 상단 제목 영역 (크고 직관적으로)
-  var h='<div style="text-align:center;margin-bottom:22px">';
+  var h='<div style="text-align:center;margin-bottom:14px">';
   h+='<h2 style="color:#2563eb;margin:0 0 6px;font-size:26px;font-weight:800;line-height:1.25">'+title+'</h2>';
-  h+='<p style="color:#94a3b8;font-size:13px;margin:0">'+desc+'</p>';
   h+='</div>';
+  // 안내문 — 길면 왼쪽 정렬 박스로
+  if(hasDesc) h+='<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px 16px;margin-bottom:20px;font-size:13px;color:#334155;line-height:1.7;white-space:normal">'+desc+'</div>';
+  else h+='<p style="text-align:center;color:#94a3b8;font-size:13px;margin:0 0 18px">'+desc+'</p>';
   // 📧 구글 이메일 공유 (모듈 설정에서 켰고 이메일 컬럼이 있을 때)
   if(def.features&&def.features.googleEmail){
     var _emCol=(def.columns||[]).find(function(c){return /이메일|메일|e-?mail|gmail|지메일/i.test(String(c.label));});
@@ -1759,7 +1765,8 @@ function submitModApply(){
     arr.push(obj);
     return fbDb.ref(path).set(arr);
   }).then(function(){
-    document.getElementById('modApplyCard').innerHTML='<div style="text-align:center;padding:30px"><div style="font-size:48px">✅</div><h2 style="color:#16a34a;margin:12px 0;font-size:20px">신청 완료</h2><p style="color:#64748b;font-size:14px;line-height:1.6">신청이 정상 접수되었습니다.<br>검토 후 개별 안내드리겠습니다.</p></div>';
+    var dl=def.downloadUrl?('<a href="'+esc(def.downloadUrl)+'" target="_blank" rel="noopener" style="display:inline-block;margin-top:18px;padding:15px 28px;background:#16a34a;color:#fff;border-radius:12px;text-decoration:none;font-size:16px;font-weight:800;box-shadow:0 4px 12px rgba(22,163,74,.3)">⬇ 앱 다운로드 / 설치하기</a><div style="font-size:12px;color:#94a3b8;margin-top:8px">버튼을 눌러 설치 페이지로 이동하세요</div>'):'';
+    document.getElementById('modApplyCard').innerHTML='<div style="text-align:center;padding:30px"><div style="font-size:48px">✅</div><h2 style="color:#16a34a;margin:12px 0;font-size:20px">신청 완료</h2><p style="color:#64748b;font-size:14px;line-height:1.6">신청이 정상 접수되었습니다.'+(def.downloadUrl?'':'<br>검토 후 개별 안내드리겠습니다.')+'</p>'+dl+'</div>';
   }).catch(function(e){
     if(btn){btn.disabled=false;btn.textContent='신청하기';}
     if(msg)msg.innerHTML='<span style="color:#ef4444">제출 실패: '+esc(e.message||e)+'</span>';
