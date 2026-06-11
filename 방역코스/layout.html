@@ -332,13 +332,17 @@ body{font-family:'Pretendard','Noto Sans KR',sans-serif;background:#1a1a2e;color
   <div id="multiBar" style="display:none;position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:60;background:rgba(15,23,42,0.95);border:1px solid #334155;border-radius:10px;padding:8px 12px;display:none;align-items:center;gap:6px;flex-wrap:wrap;box-shadow:0 4px 16px rgba(0,0,0,.4);max-width:94vw">
     <span id="multiCnt" style="color:#fff;font-size:12px;font-weight:700">0개 선택</span>
     <span style="color:#475569">|</span>
-    <span style="color:#94a3b8;font-size:11px">딱붙여</span>
-    <button onclick="multiRow('h')" title="가로 한 줄로 딱 붙여 정렬" style="background:#0891b2;color:#fff;border:none;border-radius:5px;padding:5px 9px;font-size:11px;cursor:pointer;font-weight:700">↔ 가로</button>
-    <button onclick="multiRow('v')" title="세로 한 줄로 딱 붙여 정렬" style="background:#0891b2;color:#fff;border:none;border-radius:5px;padding:5px 9px;font-size:11px;cursor:pointer;font-weight:700">↕ 세로</button>
+    <span style="color:#94a3b8;font-size:11px">정렬</span>
+    <button onclick="multiAlign('top')" title="가로 한 줄(위쪽 라인)에 정렬 — 간격 유지" style="background:#2563eb;color:#fff;border:none;border-radius:5px;padding:5px 9px;font-size:11px;cursor:pointer;font-weight:700">⬆ 가로</button>
+    <button onclick="multiAlign('hcenter')" title="세로 한 줄(같은 세로선)에 정렬 — 간격 유지" style="background:#2563eb;color:#fff;border:none;border-radius:5px;padding:5px 9px;font-size:11px;cursor:pointer;font-weight:700">↕ 세로</button>
     <span style="color:#475569">|</span>
-    <span style="color:#94a3b8;font-size:11px">간격</span>
-    <button onclick="multiDistribute('h')" title="가로 간격 균등" style="background:#334155;color:#fff;border:none;border-radius:5px;padding:5px 8px;font-size:11px;cursor:pointer">↔균등</button>
-    <button onclick="multiDistribute('v')" title="세로 간격 균등" style="background:#334155;color:#fff;border:none;border-radius:5px;padding:5px 8px;font-size:11px;cursor:pointer">↕균등</button>
+    <span style="color:#94a3b8;font-size:11px">균등</span>
+    <button onclick="multiDistribute('h')" title="가로 사이 간격 균등" style="background:#334155;color:#fff;border:none;border-radius:5px;padding:5px 8px;font-size:11px;cursor:pointer">↔균등</button>
+    <button onclick="multiDistribute('v')" title="세로 사이 간격 균등" style="background:#334155;color:#fff;border:none;border-radius:5px;padding:5px 8px;font-size:11px;cursor:pointer">↕균등</button>
+    <span style="color:#475569">|</span>
+    <span style="color:#94a3b8;font-size:11px">테두리맞춤</span>
+    <button onclick="multiRow('h')" title="가로로 테두리 딱 붙여(빈틈없이)" style="background:#0891b2;color:#fff;border:none;border-radius:5px;padding:5px 9px;font-size:11px;cursor:pointer;font-weight:700">↔ 가로</button>
+    <button onclick="multiRow('v')" title="세로로 테두리 딱 붙여(빈틈없이)" style="background:#0891b2;color:#fff;border:none;border-radius:5px;padding:5px 9px;font-size:11px;cursor:pointer;font-weight:700">↕ 세로</button>
     <span style="color:#475569">|</span>
     <button onclick="multiRotate(90)" title="모두 회전" style="background:#334155;color:#fff;border:none;border-radius:5px;padding:5px 8px;font-size:11px;cursor:pointer">↻회전</button>
     <button onclick="multiDelete()" style="background:#dc2626;color:#fff;border:none;border-radius:5px;padding:5px 8px;font-size:11px;cursor:pointer">🗑삭제</button>
@@ -2324,20 +2328,14 @@ function multiAlign(mode){
   _multiSel.forEach(function(idx){drawItem(idx)}); _multiRefresh(); autoSave(); toast('정렬 완료');
 }
 function multiDistribute(axis){
-  var its=_multiItems(); if(its.length<2){toast('2개 이상 선택하세요',true);return}
+  var its=_multiItems(); if(its.length<3){toast('3개 이상 선택하세요',true);return}
   if(axis==='h'){
     its.sort(function(a,b){return a.lng-b.lng});
     var min=its[0].lng, max=its[its.length-1].lng, step=(max-min)/(its.length-1);
-    var avgW=its.reduce(function(a,b){return a+_itemW(b)},0)/its.length, lat0=its[0].lat;
-    var minStep=(avgW+0.8)/mLng(lat0);
-    if(!(step>minStep)) step=minStep;
     its.forEach(function(i,k){_setItemPos(i,i.lat,min+step*k)});
   } else {
     its.sort(function(a,b){return b.lat-a.lat});
     var maxL=its[0].lat, minL=its[its.length-1].lat, st=(maxL-minL)/(its.length-1);
-    var avgH=its.reduce(function(a,b){return a+_itemH(b)},0)/its.length;
-    var minStepV=(avgH+0.8)/M_LAT;
-    if(!(st>minStepV)) st=minStepV;
     its.forEach(function(i,k){_setItemPos(i,maxL-st*k,i.lng)});
   }
   _multiSel.forEach(function(idx){drawItem(idx)}); _multiRefresh(); autoSave(); toast('간격 균등 완료');
