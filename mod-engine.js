@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260610v64';
+var _MOD_ENGINE_VER='20260610v65';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -1144,6 +1144,9 @@ function popModDef(keyOrIdx){
   h+='<label style="font-size:12px;font-weight:700;color:#64748b">공개 신청폼</label>';
   var afOn=def.features&&def.features.applyForm;
   h+='<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#475569"><input type="checkbox" id="mdf_applyForm"'+(afOn?' checked':'')+'> 켜면 신청폼 링크가 생기고 외부에서 신청 → 선정/탈락 처리 가능</label>';
+  h+='<label style="font-size:12px;font-weight:700;color:#64748b">구글 이메일</label>';
+  var geOn=def.features&&def.features.googleEmail;
+  h+='<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#475569"><input type="checkbox" id="mdf_googleEmail"'+(geOn?' checked':'')+'> 📧 신청폼에 「구글 이메일 공유」 체크박스 표시 → 구글 로그인으로 이메일 자동 입력 <span style="color:#94a3b8">(이름에 "이메일/메일/gmail" 들어간 컬럼이 있어야 함)</span></label>';
   h+='<label style="font-size:12px;font-weight:700;color:#64748b">신청폼 제목</label>';
   h+='<input id="mdf_formTitle" value="'+esc(def.formTitle||"")+'" placeholder="비우면 「'+esc(def.label||"모듈명")+' 신청」">';
   h+='<label style="font-size:12px;font-weight:700;color:#64748b">신청폼 안내문</label>';
@@ -1354,6 +1357,7 @@ function saveModDef(keyOrNew){
   var global=document.getElementById('mdf_global').value==='true';
   var afEl=document.getElementById('mdf_applyForm');
   var applyForm=afEl?afEl.checked:false;
+  var googleEmail=((document.getElementById('mdf_googleEmail')||{}).checked)||false;
   var adminTab=((document.getElementById('mdf_adminTab')||{}).checked)||false;
   var formTitle=((document.getElementById('mdf_formTitle')||{}).value||'').trim();
   var formDesc=((document.getElementById('mdf_formDesc')||{}).value||'').trim();
@@ -1380,7 +1384,7 @@ function saveModDef(keyOrNew){
     columns:cols,
     formTitle:formTitle, formDesc:formDesc,
     driveUploadUrl:driveUrl,
-    features:{search:true,excel:true,applyForm:applyForm}
+    features:{search:true,excel:true,applyForm:applyForm,googleEmail:googleEmail}
   };
   // 기존 모듈 수정 시 라벨 프리셋 등 부가 데이터 보존 (덮어쓰기 방지)
   if(!isNew && _modDefs[key] && _modDefs[key].labelPresets) def.labelPresets=_modDefs[key].labelPresets;
@@ -1658,6 +1662,16 @@ function _renderModApplyUI(def,evtId){
   h+='<h2 style="color:#2563eb;margin:0 0 6px;font-size:26px;font-weight:800;line-height:1.25">'+title+'</h2>';
   h+='<p style="color:#94a3b8;font-size:13px;margin:0">'+desc+'</p>';
   h+='</div>';
+  // 📧 구글 이메일 공유 (모듈 설정에서 켰고 이메일 컬럼이 있을 때)
+  if(def.features&&def.features.googleEmail){
+    var _emCol=(def.columns||[]).find(function(c){return /이메일|메일|e-?mail|gmail|지메일/i.test(String(c.label));});
+    if(_emCol){
+      h+='<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:14px;margin-bottom:16px">';
+      h+='<label style="display:flex;align-items:flex-start;gap:9px;font-size:14px;color:#1e40af;font-weight:700;cursor:pointer"><input type="checkbox" id="_modGoogleChk" onchange="_modGoogleAuth(\''+_emCol.key+'\')" style="width:18px;height:18px;margin-top:1px;flex-shrink:0"><span>📧 내 구글 계정 이메일 공유<br><span style="font-size:11px;color:#64748b;font-weight:400">체크하면 구글 로그인 → 이메일이 자동 입력됩니다 (플레이스토어 테스터 등록용)</span></span></label>';
+      h+='<div id="_modGoogleStat" style="font-size:13px;margin-top:8px"></div>';
+      h+='</div>';
+    }
+  }
   (def.columns||[]).forEach(function(c){
     if(c.auto||c.adminOnly||c.sysOnly||c.key==='status') return;
     h+='<div style="margin-bottom:16px"><label style="display:block;font-size:14px;color:#334155;font-weight:700;margin-bottom:6px">'+esc(c.label)+(c.required?' <span style="color:#ef4444">*</span>':'')+'</label>';
@@ -1669,6 +1683,29 @@ function _renderModApplyUI(def,evtId){
   document.getElementById('modApplyCard').innerHTML=h;
 }
 
+// 구글 로그인으로 이메일 자동 입력 (체크박스)
+function _modGoogleAuth(emailKey){
+  var cb=document.getElementById('_modGoogleChk');
+  var st=document.getElementById('_modGoogleStat');
+  var inp=document.getElementById('mod_f_'+emailKey);
+  if(cb && !cb.checked){ if(inp){inp.value='';inp.readOnly=false;inp.style.background='';} if(st)st.innerHTML=''; return; }
+  if(typeof firebase==='undefined'||typeof fbAuth==='undefined'){ if(st)st.innerHTML='<span style="color:#ef4444">구글 로그인을 쓸 수 없습니다</span>'; if(cb)cb.checked=false; return; }
+  if(st)st.innerHTML='<span style="color:#64748b">구글 로그인 중…</span>';
+  try{
+    var provider=new firebase.auth.GoogleAuthProvider();
+    fbAuth.signInWithPopup(provider).then(function(res){
+      var email=(res && res.user && res.user.email)||'';
+      if(!email){ if(st)st.innerHTML='<span style="color:#ef4444">이메일을 가져오지 못했습니다</span>'; if(cb)cb.checked=false; return; }
+      if(inp){ inp.value=email; inp.readOnly=true; inp.style.background='#f1f5f9'; }
+      if(st)st.innerHTML='✅ <b style="color:#16a34a">'+esc(email)+'</b> 확인됨';
+    }).catch(function(e){
+      if(cb)cb.checked=false;
+      var m=(e&&e.message)||e;
+      if(/operation-not-allowed|configuration/i.test(String(m))) m='Firebase 콘솔에서 Google 로그인을 켜야 합니다';
+      if(st)st.innerHTML='<span style="color:#ef4444">구글 로그인 실패: '+esc(m)+'</span>';
+    });
+  }catch(e){ if(cb)cb.checked=false; if(st)st.innerHTML='<span style="color:#ef4444">구글 로그인 불가</span>'; }
+}
 function submitModApply(){
   var def=window.__modApplyDef, evtId=window.__modApplyEvt;
   if(!def) return;
