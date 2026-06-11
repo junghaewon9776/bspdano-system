@@ -1669,9 +1669,12 @@ function drawItem(idx){
   // 라벨 (번호) — DOM 요소로 생성하여 드래그 핸들로 사용
   var labelEl=document.createElement('div');
   labelEl.className='f-label';
-  // 번호 칩은 색칠 박스 대신 투명 다크칩 — 색(면)은 박스 폴리곤이 담당(테두리와 같은 직사각형)
-  labelEl.style.background='rgba(15,23,42,0.55)';
-  labelEl.style.border='1px solid '+color;
+  // 번호는 박스 없이 글자만 — 색(면)은 박스 폴리곤이 담당(테두리=면 일치)
+  labelEl.style.background='transparent';
+  labelEl.style.border='none';
+  labelEl.style.padding='0';
+  labelEl.style.color='#fff';
+  labelEl.style.textShadow='0 1px 3px rgba(0,0,0,.95),0 0 5px rgba(0,0,0,.8)';
   labelEl.textContent=getDisplayNum(it);
 
   // 드래그 시작 (마우스)
