@@ -1045,7 +1045,13 @@ function initMap(){
 
   // ── DOM 레벨 드래그 (마우스 + 터치) ──
   var mapEl=document.getElementById('map');
+  // 범위선택 모드: 지도 빈 곳 mousedown → 마키 시작
+  mapEl.addEventListener('mousedown',function(ev){
+    if(!_multiMode||ev.button!==0)return;
+    _marqueeStart(ev.clientX,ev.clientY);
+  });
   document.addEventListener('mousemove',function(ev){
+    if(_marquee.active){ _marqueeMove(ev.clientX,ev.clientY); return; }
     var rect=mapEl.getBoundingClientRect();
     var mx=ev.clientX-rect.left,my=ev.clientY-rect.top;
     if(_resizing.active){ _doResizeMove(mx,my); return; }
@@ -1053,7 +1059,8 @@ function initMap(){
     var it=items[_drag.idx];if(!it)return;
     _doDragMove(it,mx,my);
   });
-  document.addEventListener('mouseup',function(){
+  document.addEventListener('mouseup',function(ev){
+    if(_marquee.active){ _marqueeEnd(ev.clientX,ev.clientY); return; }
     if(_resizing.active){ _resizing.active=false; map.setDraggable(true); autoSave(); return; }
     if(!_drag.active)return;
     _doDragEnd();
@@ -2213,9 +2220,40 @@ var _multiMode=false, _multiSel=[], _multiOverlays=[];
 function toggleMultiMode(){
   _multiMode=!_multiMode;
   var btn=document.getElementById('multiModeBtn');
-  if(btn){ btn.style.background=_multiMode?'rgba(37,99,235,0.95)':''; btn.textContent=_multiMode?'☑ 다중선택 ON':'☑ 다중선택'; }
-  if(!_multiMode) multiClear();
-  else { deselectItem(); closeItemBubble(); toast('다중선택 ON — 아이템을 눌러 여러 개 선택'); }
+  if(btn){ btn.style.background=_multiMode?'rgba(37,99,235,0.95)':''; btn.textContent=_multiMode?'☑ 범위선택 ON':'☑ 범위선택'; }
+  if(typeof map!=='undefined'&&map) map.setDraggable(!_multiMode); // 모드 중엔 지도 이동 잠금(드래그=박스선택)
+  if(!_multiMode){ multiClear(); _marqueeClear(); }
+  else { deselectItem(); closeItemBubble(); toast('범위선택 ON — 빈 곳을 드래그해 박스로 선택 (또는 도형 클릭)'); }
+}
+// ── 범위(마키) 선택 ──
+var _marquee={active:false,sx:0,sy:0,el:null};
+function _marqueeClear(){ if(_marquee.el){_marquee.el.remove();_marquee.el=null;} _marquee.active=false; }
+function _marqueeStart(cx,cy){
+  _marquee.active=true; _marquee.sx=cx; _marquee.sy=cy;
+  var d=document.createElement('div');
+  d.style.cssText='position:fixed;border:2px dashed #f59e0b;background:rgba(245,158,11,0.15);z-index:80;pointer-events:none;left:'+cx+'px;top:'+cy+'px;width:0;height:0';
+  document.body.appendChild(d); _marquee.el=d;
+}
+function _marqueeMove(cx,cy){
+  if(!_marquee.active||!_marquee.el)return;
+  var l=Math.min(cx,_marquee.sx),t=Math.min(cy,_marquee.sy),w=Math.abs(cx-_marquee.sx),h=Math.abs(cy-_marquee.sy);
+  var s=_marquee.el.style; s.left=l+'px';s.top=t+'px';s.width=w+'px';s.height=h+'px';
+}
+function _marqueeEnd(cx,cy){
+  if(!_marquee.active)return;
+  var l=Math.min(cx,_marquee.sx),t=Math.min(cy,_marquee.sy),r=Math.max(cx,_marquee.sx),b=Math.max(cy,_marquee.sy);
+  _marqueeClear();
+  if(r-l<5&&b-t<5) return; // 클릭 수준이면 무시
+  var mapEl=document.getElementById('map'); var mr=mapEl.getBoundingClientRect();
+  var proj=map.getProjection();
+  items.forEach(function(it,idx){
+    if(_hiddenItems[idx]||_hiddenCats[it.catId])return;
+    var cp=proj.containerPointFromCoords(new kakao.maps.LatLng(it.lat,it.lng));
+    var ix=mr.left+cp.x, iy=mr.top+cp.y;
+    if(ix>=l&&ix<=r&&iy>=t&&iy<=b){ if(_multiSel.indexOf(idx)<0)_multiSel.push(idx); }
+  });
+  _multiRefresh();
+  if(_multiSel.length) toast(_multiSel.length+'개 선택됨');
 }
 // 아이템 클릭 시 다중모드 또는 Ctrl이면 토글. true 반환=다중처리됨(드래그/선택 막음)
 function _multiClickItem(idx, ctrl){
@@ -2262,33 +2300,49 @@ function multiAlign(mode){
   _multiSel.forEach(function(idx){drawItem(idx)}); _multiRefresh(); autoSave(); toast('정렬 완료');
 }
 function multiDistribute(axis){
-  var its=_multiItems(); if(its.length<3){toast('3개 이상 선택하세요',true);return}
+  var its=_multiItems(); if(its.length<2){toast('2개 이상 선택하세요',true);return}
   if(axis==='h'){
     its.sort(function(a,b){return a.lng-b.lng});
     var min=its[0].lng, max=its[its.length-1].lng, step=(max-min)/(its.length-1);
+    var avgW=its.reduce(function(a,b){return a+_itemW(b)},0)/its.length, lat0=its[0].lat;
+    var minStep=(avgW+0.8)/mLng(lat0);
+    if(!(step>minStep)) step=minStep;
     its.forEach(function(i,k){_setItemPos(i,i.lat,min+step*k)});
   } else {
-    its.sort(function(a,b){return a.lat-b.lat});
-    var min=its[0].lat, max=its[its.length-1].lat, step=(max-min)/(its.length-1);
-    its.forEach(function(i,k){_setItemPos(i,min+step*k,i.lng)});
+    its.sort(function(a,b){return b.lat-a.lat});
+    var maxL=its[0].lat, minL=its[its.length-1].lat, st=(maxL-minL)/(its.length-1);
+    var avgH=its.reduce(function(a,b){return a+_itemH(b)},0)/its.length;
+    var minStepV=(avgH+0.8)/M_LAT;
+    if(!(st>minStepV)) st=minStepV;
+    its.forEach(function(i,k){_setItemPos(i,maxL-st*k,i.lng)});
   }
   _multiSel.forEach(function(idx){drawItem(idx)}); _multiRefresh(); autoSave(); toast('간격 균등 완료');
 }
-// 한 줄로 세우고 + 간격 균등 (가로줄/세로줄)
+// 아이템의 가로/세로 점유 폭(m)
+function _itemW(it){ if(it.shape==='rect')return it.w||3; if(it.shape==='circle')return it.diameter||5; return 2.5; }
+function _itemH(it){ if(it.shape==='rect')return it.h||6; if(it.shape==='circle')return it.diameter||5; return 2.5; }
+// 한 줄로 세우고 + 간격 균등 (가로줄/세로줄) — 겹쳐있어도 기본 간격으로 펼침
 function multiRow(axis){
   var its=_multiItems(); if(its.length<2){toast('2개 이상 선택하세요',true);return}
   if(axis==='h'){
-    // 같은 가로선(평균 lat) + lng 균등
     var avgLat=its.reduce(function(a,b){return a+b.lat},0)/its.length;
     its.sort(function(a,b){return a.lng-b.lng});
-    var min=its[0].lng, max=its[its.length-1].lng, step=(max-min)/(its.length-1);
-    its.forEach(function(i,k){_setItemPos(i,avgLat,min+step*k)});
+    var min=its[0].lng, max=its[its.length-1].lng;
+    var stepDeg=(max-min)/(its.length-1);
+    // 범위가 거의 0(겹침)이면 평균 폭+0.8m 간격으로 펼침
+    var avgW=its.reduce(function(a,b){return a+_itemW(b)},0)/its.length;
+    var minStep=(avgW+0.8)/mLng(avgLat);
+    if(!(stepDeg>minStep)) stepDeg=minStep;
+    its.forEach(function(i,k){_setItemPos(i,avgLat,min+stepDeg*k)});
   } else {
-    // 같은 세로선(평균 lng) + lat 균등
     var avgLng=its.reduce(function(a,b){return a+b.lng},0)/its.length;
-    its.sort(function(a,b){return b.lat-a.lat}); // 위→아래
-    var maxL=its[0].lat, minL=its[its.length-1].lat, st=(maxL-minL)/(its.length-1);
-    its.forEach(function(i,k){_setItemPos(i,maxL-st*k,avgLng)});
+    its.sort(function(a,b){return b.lat-a.lat});
+    var maxL=its[0].lat, minL=its[its.length-1].lat;
+    var stDeg=(maxL-minL)/(its.length-1);
+    var avgH=its.reduce(function(a,b){return a+_itemH(b)},0)/its.length;
+    var minStepV=(avgH+0.8)/M_LAT;
+    if(!(stDeg>minStepV)) stDeg=minStepV;
+    its.forEach(function(i,k){_setItemPos(i,maxL-stDeg*k,avgLng)});
   }
   _multiSel.forEach(function(idx){drawItem(idx)}); _multiRefresh(); autoSave(); toast('한 줄 정렬 완료');
 }
