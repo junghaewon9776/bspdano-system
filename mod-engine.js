@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260609v63';
+var _MOD_ENGINE_VER='20260610v64';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -1094,7 +1094,9 @@ function dModManager(){
       h+='<div><span style="font-size:15px;font-weight:700">'+esc(d.label)+'</span>';
       h+='<span style="color:#94a3b8;font-size:12px;margin-left:8px">key: '+esc(d.key)+'</span>';
       h+='<span style="color:#94a3b8;font-size:12px;margin-left:8px">컬럼 '+(d.columns||[]).length+'개</span></div></div>';
-      h+='<div style="display:flex;gap:6px">';
+      h+='<div style="display:flex;gap:6px;align-items:center">';
+      h+='<button class="btn btn-s" onclick="_modMoveOrder(\''+esc(d.key)+'\',-1)" title="위로" '+(di===0?'disabled ':'')+'style="font-size:13px;padding:4px 8px'+(di===0?';opacity:.3':'')+'">▲</button>';
+      h+='<button class="btn btn-s" onclick="_modMoveOrder(\''+esc(d.key)+'\',1)" title="아래로" '+(di===defs.length-1?'disabled ':'')+'style="font-size:13px;padding:4px 8px'+(di===defs.length-1?';opacity:.3':'')+'">▼</button>';
       h+='<button class="btn btn-s" onclick="popModDef(\''+esc(d.key)+'\')" style="font-size:11px">✏️ 수정</button>';
       h+='<button class="btn btn-s" onclick="delModDef(\''+esc(d.key)+'\')" style="font-size:11px;color:#dc2626">🗑 삭제</button>';
       h+='</div></div>';
@@ -1395,6 +1397,22 @@ function saveModDef(keyOrNew){
   }).catch(function(e){hideLoading();toast('실패: '+e.message,true)});
 }
 
+// 모듈 순서 변경 (위/아래) — _modDefs 키 순서 재배열 후 저장
+function _modMoveOrder(key, dir){
+  var keys=Object.keys(_modDefs);
+  var i=keys.indexOf(key); if(i<0) return;
+  var j=i+dir; if(j<0||j>=keys.length) return;
+  var t=keys[i]; keys[i]=keys[j]; keys[j]=t;
+  // 같은 객체 유지하며 키 순서만 재배열
+  var saved={}; keys.forEach(function(k){ saved[k]=_modDefs[k]; });
+  Object.keys(_modDefs).forEach(function(k){ delete _modDefs[k]; });
+  keys.forEach(function(k){ _modDefs[k]=saved[k]; });
+  _saveModDefs().then(function(){
+    toast('순서 변경됨');
+    if(typeof mkTabs==='function') mkTabs();
+    if(typeof draw==='function') draw();
+  }).catch(function(e){ toast('저장 실패: '+(e.message||e),true); });
+}
 function delModDef(key){
   var def=_modDefs[key]; if(!def) return;
   if(!confirm('"'+def.label+'" 모듈 정의를 삭제할까요?\n(이미 입력된 데이터는 유지됩니다)')) return;
