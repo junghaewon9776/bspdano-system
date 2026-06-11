@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260610v68';
+var _MOD_ENGINE_VER='20260610v69';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -1768,7 +1768,11 @@ function submitModApply(){
     arr.push(obj);
     return fbDb.ref(path).set(arr);
   }).then(function(){
-    var dl=def.downloadUrl?('<a href="'+esc(def.downloadUrl)+'" target="_blank" rel="noopener" style="display:inline-block;margin-top:18px;padding:15px 28px;background:#16a34a;color:#fff;border-radius:12px;text-decoration:none;font-size:16px;font-weight:800;box-shadow:0 4px 12px rgba(22,163,74,.3)">⬇ 앱 다운로드 / 설치하기</a><div style="font-size:12px;color:#94a3b8;margin-top:8px">버튼을 눌러 설치 페이지로 이동하세요</div>'):'';
+    var _dlUrl=(def.downloadUrl||'').trim();
+    var _um=_dlUrl.match(/https?:\/\/\S+/i);          // 앞에 글자 섞여 있어도 URL만 추출
+    if(_um) _dlUrl=_um[0];
+    else if(_dlUrl) _dlUrl='https://'+_dlUrl.replace(/^[^\w]*/,'').replace(/\s+/g,'');
+    var dl=_dlUrl?('<a href="'+esc(_dlUrl)+'" target="_blank" rel="noopener" style="display:inline-block;margin-top:18px;padding:15px 28px;background:#16a34a;color:#fff;border-radius:12px;text-decoration:none;font-size:16px;font-weight:800;box-shadow:0 4px 12px rgba(22,163,74,.3)">⬇ 앱 다운로드 / 설치하기</a><div style="font-size:12px;color:#94a3b8;margin-top:8px">버튼을 눌러 설치 페이지로 이동하세요</div>'):'';
     document.getElementById('modApplyCard').innerHTML='<div style="text-align:center;padding:30px"><div style="font-size:48px">✅</div><h2 style="color:#16a34a;margin:12px 0;font-size:20px">신청 완료</h2><p style="color:#64748b;font-size:14px;line-height:1.6">신청이 정상 접수되었습니다.'+(def.downloadUrl?'':'<br>검토 후 개별 안내드리겠습니다.')+'</p>'+dl+'</div>';
   }).catch(function(e){
     if(btn){btn.disabled=false;btn.textContent='신청하기';}
