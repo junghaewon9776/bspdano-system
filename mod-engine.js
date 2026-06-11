@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260610v66';
+var _MOD_ENGINE_VER='20260610v67';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -1548,10 +1548,8 @@ function popModFormLink(key){
   var base=location.href.split(/[?#]/)[0];
   var dir=base.replace(/\/[^\/]*$/,'/'); // 디렉토리(끝 /)
   var evtId=def.global?'':((CUR_EVT&&CUR_EVT.evtId)||'');
-  // 공통(global) 모듈은 카톡 미리보기 제목용 공유 전용 페이지(f/{key}.html) 사용
-  var url;
-  if(def.global){ url=dir+'f/'+encodeURIComponent(key)+'.html'; }
-  else { url=base+'?modform='+encodeURIComponent(key)+(evtId?'&evtId='+encodeURIComponent(evtId):''); }
+  // ?modform= 직접 사용 — 공통/행사별 모두 정적파일 없이 작동(404 방지)
+  var url=base+'?modform='+encodeURIComponent(key)+(evtId?'&evtId='+encodeURIComponent(evtId):'');
   window.__modFormUrl=url; window.__modFormName=def.label||'신청폼';
   var qrPrev='https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=8&data='+encodeURIComponent(url);
   var h='<div class="pop-head"><h3>🔗 '+esc(def.label)+' 신청폼 공유</h3></div>';
