@@ -1095,10 +1095,12 @@ function _apiChgMyPw(p) {
       return saveMainNode("Users", users).then(function() {
         _cache.Users = users;
         return {ok:true};
+      }).catch(function(e){
+        return {ok:false, err:"저장 실패: "+((e&&e.message)||e)+" (DB 규칙/권한 확인)"};
       });
     }
   }
-  return Promise.resolve({ok:false, err:"계정을 찾을 수 없습니다"});
+  return Promise.resolve({ok:false, err:"계정을 찾을 수 없습니다 (목록 미로딩일 수 있음)"});
 }
 
 function _apiSaveAcctEvt(p) {

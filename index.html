@@ -450,7 +450,7 @@ label{display:block;font-size:10px;color:#999;margin-bottom:3px}
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <!-- firebase-storage 제거: 구글 드라이브 프록시로 대체 -->
 <script src="firebase-config.js"></script>
-<script src="common.js?v=20260604c"></script>
+<script src="common.js?v=20260610d"></script>
 <script src="mod-engine.js?v=20260610v69"></script>
 
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" onerror="console.warn('XLSX CDN load failed')"></script>
@@ -16057,9 +16057,20 @@ async function chgMyPw(){
   if(nw.length<4){alert("새 비밀번호는 4자 이상");return}
   if(nw!==nw2){alert("새 비밀번호가 일치하지 않습니다");return}
   showLoading("변경 중...");
-  var r=await api("chgMyPw",{id:CID,oldPw:cur,newPw:nw});
+  var r;
+  try {
+    // 15초 안에 응답 없으면 타임아웃 (Firebase 쓰기 멈춤 대비)
+    r = await Promise.race([
+      api("chgMyPw",{id:CID,oldPw:cur,newPw:nw}),
+      new Promise(function(_,rej){ setTimeout(function(){ rej(new Error("시간 초과 — Firebase 쓰기 권한/규칙을 확인하세요")); }, 15000); })
+    ]);
+  } catch(e) {
+    hideLoading();
+    alert("변경 실패: "+(e.message||e)+"\n\n(Firebase 데이터베이스 규칙이 만료되었거나 쓰기 권한이 없을 수 있습니다)");
+    return;
+  }
   hideLoading();
-  if(!r.ok){alert(r.err||"변경 실패");return}
+  if(!r||!r.ok){alert((r&&r.err)||"변경 실패");return}
   if(US[CID]) US[CID].pw=nw;
   document.getElementById("myPwCur").value="";document.getElementById("myPwNew").value="";document.getElementById("myPwNew2").value="";
   if(String(nw)!=='1234'){ _pwIsDefault=false; _hidePwWarnBanner(); _pwCloseModal(); }
