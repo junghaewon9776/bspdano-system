@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260610v69';
+var _MOD_ENGINE_VER='20260612v70';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -1671,15 +1671,17 @@ function _renderModApplyUI(def,evtId){
   // 안내문 — 길면 왼쪽 정렬 박스로
   if(hasDesc) h+='<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px 16px;margin-bottom:20px;font-size:13px;color:#334155;line-height:1.7;white-space:normal">'+desc+'</div>';
   else h+='<p style="text-align:center;color:#94a3b8;font-size:13px;margin:0 0 18px">'+desc+'</p>';
-  // 📧 구글 이메일 공유 (모듈 설정에서 켰고 이메일 컬럼이 있을 때)
+  // 📧 구글 이메일 공유 (모듈 설정에서 켰을 때)
+  window.__modGoogleEmail=''; window.__modEmColKey='';
   if(def.features&&def.features.googleEmail){
     var _emCol=(def.columns||[]).find(function(c){return /이메일|메일|e-?mail|gmail|지메일/i.test(String(c.label));});
-    if(_emCol){
-      h+='<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:14px;margin-bottom:16px">';
-      h+='<label style="display:flex;align-items:flex-start;gap:9px;font-size:14px;color:#1e40af;font-weight:700;cursor:pointer"><input type="checkbox" id="_modGoogleChk" onchange="_modGoogleAuth(\''+_emCol.key+'\')" style="width:18px;height:18px;margin-top:1px;flex-shrink:0"><span>📧 내 구글 계정 이메일 공유<br><span style="font-size:11px;color:#64748b;font-weight:400">체크하면 구글 로그인 → 이메일이 자동 입력됩니다 (플레이스토어 테스터 등록용)</span></span></label>';
-      h+='<div id="_modGoogleStat" style="font-size:13px;margin-top:8px"></div>';
-      h+='</div>';
-    }
+    window.__modEmColKey=_emCol?_emCol.key:'';
+    h+='<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:16px;margin-bottom:18px">';
+    h+='<div style="font-size:14px;color:#1e40af;font-weight:800;margin-bottom:8px">📧 구글 계정 이메일</div>';
+    h+='<div style="font-size:12px;color:#64748b;margin-bottom:10px">플레이스토어 테스터 등록을 위해 구글 계정 이메일이 필요합니다.</div>';
+    h+='<button type="button" id="_modGBtn" onclick="_modGoogleAuth()" style="width:100%;padding:12px;border:none;border-radius:8px;background:#fff;border:1.5px solid #2563eb;color:#2563eb;font-size:14px;font-weight:800;cursor:pointer">🔵 구글 계정으로 이메일 가져오기</button>';
+    h+='<div id="_modGBox" style="display:none;margin-top:12px"></div>';
+    h+='</div>';
   }
   (def.columns||[]).forEach(function(c){
     if(c.auto||c.adminOnly||c.sysOnly||c.key==='status') return;
@@ -1692,28 +1694,48 @@ function _renderModApplyUI(def,evtId){
   document.getElementById('modApplyCard').innerHTML=h;
 }
 
-// 구글 로그인으로 이메일 자동 입력 (체크박스)
-function _modGoogleAuth(emailKey){
-  var cb=document.getElementById('_modGoogleChk');
-  var st=document.getElementById('_modGoogleStat');
-  var inp=document.getElementById('mod_f_'+emailKey);
-  if(cb && !cb.checked){ if(inp){inp.value='';inp.readOnly=false;inp.style.background='';} if(st)st.innerHTML=''; return; }
-  if(typeof firebase==='undefined'||typeof fbAuth==='undefined'){ if(st)st.innerHTML='<span style="color:#ef4444">구글 로그인을 쓸 수 없습니다</span>'; if(cb)cb.checked=false; return; }
-  if(st)st.innerHTML='<span style="color:#64748b">구글 로그인 중…</span>';
+// 구글 계정 인증 → 이메일 표시 → 동의 체크 (구글 폼 방식)
+function _modGoogleAuth(){
+  var btn=document.getElementById('_modGBtn');
+  var box=document.getElementById('_modGBox');
+  if(typeof firebase==='undefined'||typeof fbAuth==='undefined'){ if(box){box.style.display='block';box.innerHTML='<span style="color:#ef4444">구글 로그인을 쓸 수 없습니다</span>';} return; }
+  if(btn){ btn.disabled=true; btn.textContent='구글 로그인 중…'; btn.style.opacity='.6'; }
   try{
     var provider=new firebase.auth.GoogleAuthProvider();
+    provider.setCustomParameters({prompt:'select_account'});
     fbAuth.signInWithPopup(provider).then(function(res){
       var email=(res && res.user && res.user.email)||'';
-      if(!email){ if(st)st.innerHTML='<span style="color:#ef4444">이메일을 가져오지 못했습니다</span>'; if(cb)cb.checked=false; return; }
-      if(inp){ inp.value=email; inp.readOnly=true; inp.style.background='#f1f5f9'; }
-      if(st)st.innerHTML='✅ <b style="color:#16a34a">'+esc(email)+'</b> 확인됨';
+      if(btn){ btn.disabled=false; btn.style.opacity='1'; btn.textContent='🔵 다른 계정으로 변경'; }
+      if(!email){ if(box){box.style.display='block';box.innerHTML='<span style="color:#ef4444">이메일을 가져오지 못했습니다</span>';} return; }
+      _modSetGoogleEmail(email);
     }).catch(function(e){
-      if(cb)cb.checked=false;
+      if(btn){ btn.disabled=false; btn.style.opacity='1'; btn.textContent='🔵 구글 계정으로 이메일 가져오기'; }
       var m=(e&&e.message)||e;
       if(/operation-not-allowed|configuration/i.test(String(m))) m='Firebase 콘솔에서 Google 로그인을 켜야 합니다';
-      if(st)st.innerHTML='<span style="color:#ef4444">구글 로그인 실패: '+esc(m)+'</span>';
+      if(/popup-closed|cancelled-popup|popup_closed/i.test(String(m))) m='로그인 창이 닫혔습니다. 다시 시도하세요';
+      if(box){box.style.display='block';box.innerHTML='<span style="color:#ef4444">구글 로그인 실패: '+esc(m)+'</span>';}
     });
-  }catch(e){ if(cb)cb.checked=false; if(st)st.innerHTML='<span style="color:#ef4444">구글 로그인 불가</span>'; }
+  }catch(e){ if(btn){btn.disabled=false;btn.style.opacity='1';} if(box){box.style.display='block';box.innerHTML='<span style="color:#ef4444">구글 로그인 불가</span>';} }
+}
+// 가져온 이메일 표시 + 동의 체크박스
+function _modSetGoogleEmail(email){
+  window.__modGoogleEmail=email;
+  var box=document.getElementById('_modGBox'); if(!box) return;
+  box.style.display='block';
+  box.innerHTML='<div style="background:#fff;border:1px solid #cbd5e1;border-radius:8px;padding:11px 13px;font-size:15px;color:#0f172a;font-weight:700;word-break:break-all">📩 '+esc(email)+'</div>'
+    +'<label style="display:flex;align-items:flex-start;gap:9px;margin-top:11px;font-size:13px;color:#1e40af;font-weight:700;cursor:pointer">'
+    +'<input type="checkbox" id="_modEmConsent" checked onchange="_modConsentChg()" style="width:18px;height:18px;margin-top:1px;flex-shrink:0">'
+    +'<span>이 이메일을 신청에 사용하는 데 동의합니다<br><span style="font-size:11px;color:#64748b;font-weight:400">'+esc(email)+'을(를) 내 응답에 포함할 이메일로 기록합니다</span></span></label>';
+  _modConsentChg();
+}
+// 동의 체크 변경 → 이메일 컬럼 입력란에 채우기/비우기
+function _modConsentChg(){
+  var cb=document.getElementById('_modEmConsent');
+  var ok=cb?cb.checked:false;
+  var email=ok?(window.__modGoogleEmail||''):'';
+  window.__modEmailConsented=ok;
+  var k=window.__modEmColKey;
+  if(k){ var inp=document.getElementById('mod_f_'+k); if(inp){ inp.value=email; inp.readOnly=!!email; inp.style.background=email?'#f1f5f9':''; } }
 }
 function submitModApply(){
   var def=window.__modApplyDef, evtId=window.__modApplyEvt;
@@ -1739,6 +1761,16 @@ function submitModApply(){
     else { var verr=_modValidateField(c,v); if(verr){ valid=false; if(!firstBad)firstBad=verr; } }
     obj[c.key]=v;
   });
+  // 📧 구글 이메일: 동의했으면 이메일 컬럼 + 백업필드에 저장
+  if(def.features&&def.features.googleEmail){
+    var _gem=window.__modGoogleEmail||'';
+    if(!_gem){ valid=false; if(!firstBad)firstBad='구글 계정으로 이메일을 가져와 주세요'; }
+    else if(!window.__modEmailConsented){ valid=false; if(!firstBad)firstBad='이메일 사용 동의에 체크해 주세요'; }
+    else {
+      if(window.__modEmColKey) obj[window.__modEmColKey]=_gem;
+      obj._email=_gem;
+    }
+  }
   var msg=document.getElementById('modApplyMsg');
   if(!valid){ if(msg)msg.innerHTML='<span style="color:#ef4444">'+esc(firstBad)+'</span>'; return; }
   obj._id='m'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
