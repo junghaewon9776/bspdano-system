@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260610v67';
+var _MOD_ENGINE_VER='20260610v68';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -1365,6 +1365,11 @@ function saveModDef(keyOrNew){
   var formDesc=((document.getElementById('mdf_formDesc')||{}).value||'').trim();
   var downloadUrl=((document.getElementById('mdf_downloadUrl')||{}).value||'').trim();
 
+  // 구글 이메일 켜면 "이메일" 컬럼이 없을 때 자동 추가 (맨 앞)
+  if(googleEmail && !cols.some(function(c){return /이메일|메일|e-?mail|gmail|지메일/i.test(String(c.label));})){
+    cols.unshift({key:_modColKey(),label:'이메일',type:'text'});
+    toast('이메일 컬럼 자동 추가됨',false);
+  }
   // 신청폼 켜면 선정용 status 컬럼 자동 보장
   if(applyForm && !cols.some(function(c){return c.key==='status'})){
     cols.push({key:'status',label:'선정상태',type:'badge',adminOnly:true,filter:true,
