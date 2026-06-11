@@ -332,21 +332,13 @@ body{font-family:'Pretendard','Noto Sans KR',sans-serif;background:#1a1a2e;color
   <div id="multiBar" style="display:none;position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:60;background:rgba(15,23,42,0.95);border:1px solid #334155;border-radius:10px;padding:8px 12px;display:none;align-items:center;gap:6px;flex-wrap:wrap;box-shadow:0 4px 16px rgba(0,0,0,.4);max-width:94vw">
     <span id="multiCnt" style="color:#fff;font-size:12px;font-weight:700">0개 선택</span>
     <span style="color:#475569">|</span>
-    <span style="color:#94a3b8;font-size:11px">정렬</span>
-    <button onclick="multiAlign('left')" title="왼쪽 맞춤" style="background:#334155;color:#fff;border:none;border-radius:5px;padding:5px 8px;font-size:11px;cursor:pointer">⬅</button>
-    <button onclick="multiAlign('right')" title="오른쪽 맞춤" style="background:#334155;color:#fff;border:none;border-radius:5px;padding:5px 8px;font-size:11px;cursor:pointer">➡</button>
-    <button onclick="multiAlign('top')" title="위 맞춤" style="background:#334155;color:#fff;border:none;border-radius:5px;padding:5px 8px;font-size:11px;cursor:pointer">⬆</button>
-    <button onclick="multiAlign('bottom')" title="아래 맞춤" style="background:#334155;color:#fff;border:none;border-radius:5px;padding:5px 8px;font-size:11px;cursor:pointer">⬇</button>
-    <button onclick="multiAlign('hcenter')" title="가로 가운데(같은 세로선)" style="background:#334155;color:#fff;border:none;border-radius:5px;padding:5px 8px;font-size:11px;cursor:pointer">↕가운데</button>
-    <button onclick="multiAlign('vcenter')" title="세로 가운데(같은 가로선)" style="background:#334155;color:#fff;border:none;border-radius:5px;padding:5px 8px;font-size:11px;cursor:pointer">↔가운데</button>
-    <span style="color:#475569">|</span>
-    <span style="color:#94a3b8;font-size:11px">한 줄+균등</span>
-    <button onclick="multiRow('h')" title="가로 한 줄로 + 간격 균등" style="background:#0891b2;color:#fff;border:none;border-radius:5px;padding:5px 8px;font-size:11px;cursor:pointer;font-weight:700">↔ 가로줄</button>
-    <button onclick="multiRow('v')" title="세로 한 줄로 + 간격 균등" style="background:#0891b2;color:#fff;border:none;border-radius:5px;padding:5px 8px;font-size:11px;cursor:pointer;font-weight:700">↕ 세로줄</button>
+    <span style="color:#94a3b8;font-size:11px">딱붙여</span>
+    <button onclick="multiRow('h')" title="가로 한 줄로 딱 붙여 정렬" style="background:#0891b2;color:#fff;border:none;border-radius:5px;padding:5px 9px;font-size:11px;cursor:pointer;font-weight:700">↔ 가로</button>
+    <button onclick="multiRow('v')" title="세로 한 줄로 딱 붙여 정렬" style="background:#0891b2;color:#fff;border:none;border-radius:5px;padding:5px 9px;font-size:11px;cursor:pointer;font-weight:700">↕ 세로</button>
     <span style="color:#475569">|</span>
     <span style="color:#94a3b8;font-size:11px">간격</span>
-    <button onclick="multiDistribute('h')" title="가로 간격만 균등(세로 유지)" style="background:#334155;color:#fff;border:none;border-radius:5px;padding:5px 8px;font-size:11px;cursor:pointer">↔균등</button>
-    <button onclick="multiDistribute('v')" title="세로 간격만 균등(가로 유지)" style="background:#334155;color:#fff;border:none;border-radius:5px;padding:5px 8px;font-size:11px;cursor:pointer">↕균등</button>
+    <button onclick="multiDistribute('h')" title="가로 간격 균등" style="background:#334155;color:#fff;border:none;border-radius:5px;padding:5px 8px;font-size:11px;cursor:pointer">↔균등</button>
+    <button onclick="multiDistribute('v')" title="세로 간격 균등" style="background:#334155;color:#fff;border:none;border-radius:5px;padding:5px 8px;font-size:11px;cursor:pointer">↕균등</button>
     <span style="color:#475569">|</span>
     <button onclick="multiRotate(90)" title="모두 회전" style="background:#334155;color:#fff;border:none;border-radius:5px;padding:5px 8px;font-size:11px;cursor:pointer">↻회전</button>
     <button onclick="multiDelete()" style="background:#dc2626;color:#fff;border:none;border-radius:5px;padding:5px 8px;font-size:11px;cursor:pointer">🗑삭제</button>
@@ -608,8 +600,42 @@ var _drawDotsVisible=true;    // 점 미리보기 토글
 // ══ 드래그 전역 상태 ══
 var _drag={active:false,moved:false,idx:-1,sx:0,sy:0,slat:0,slng:0,sPath:null};
 
+// 아이템 mousedown 통합: 다중모드/Ctrl에서 선택된 도형이면 그룹드래그, 아니면 토글, 평소엔 단일드래그
+function _startItemDrag(idx, sx, sy, ctrl, sPath){
+  if(_multiMode||ctrl){
+    if(_multiSel.indexOf(idx)>=0 && _multiSel.length>0){
+      _drag={active:true,moved:false,idx:idx,sx:sx,sy:sy,group:true,
+        gpos:_multiSel.map(function(i){return {idx:i,lat:items[i].lat,lng:items[i].lng,path:items[i].path?items[i].path.map(function(p){return{lat:p.lat,lng:p.lng}}):null};})};
+      map.setDraggable(false);
+      return;
+    }
+    _multiClickItem(idx, true);
+    return;
+  }
+  _drag={active:true,moved:false,idx:idx,sx:sx,sy:sy,slat:items[idx].lat,slng:items[idx].lng,sPath:sPath||null,group:false};
+  map.setDraggable(false);
+}
+// 그룹 이동
+function _doGroupMove(mx,my){
+  var dx=mx-_drag.sx, dy=my-_drag.sy;
+  if(!_drag.moved && Math.abs(dx)<3 && Math.abs(dy)<3) return;
+  _drag.moved=true;
+  var proj=map.getProjection();
+  var ref=_drag.gpos[0];
+  var sp=proj.containerPointFromCoords(new kakao.maps.LatLng(ref.lat,ref.lng));
+  var nc=proj.coordsFromContainerPoint(new kakao.maps.Point(sp.x+dx, sp.y+dy));
+  var dLat=nc.getLat()-ref.lat, dLng=nc.getLng()-ref.lng;
+  _drag.gpos.forEach(function(g){
+    var it=items[g.idx]; if(!it)return;
+    it.lat=g.lat+dLat; it.lng=g.lng+dLng;
+    if(g.path) it.path=g.path.map(function(p){return{lat:p.lat+dLat,lng:p.lng+dLng}});
+    drawItem(g.idx);
+  });
+  _multiRefresh();
+}
 // ── 드래그 공용 함수 ──
 function _doDragMove(it,mx,my){
+  if(_drag.group){ _doGroupMove(mx,my); return; }
   var cat=categories.find(function(c){return c.id===it.catId});
   var dx=mx-_drag.sx,dy=my-_drag.sy;
   if(!_drag.moved&&Math.abs(dx)<3&&Math.abs(dy)<3)return;
@@ -644,8 +670,15 @@ function _doDragMove(it,mx,my){
 }
 
 function _doDragEnd(){
+  if(_drag.group){
+    var gmoved=_drag.moved; _drag.active=false; _drag.group=false;
+    map.setDraggable(!_multiMode);
+    if(!gmoved){ _multiClickItem(_drag.idx, true); }  // 클릭만 → 선택 토글
+    else { autoSave(); toast('그룹 이동'); }
+    return;
+  }
   var idx=_drag.idx,it=items[idx],moved=_drag.moved;
-  _drag.active=false;map.setDraggable(true);
+  _drag.active=false;map.setDraggable(!_multiMode);
   if(!moved){ selectItem(idx); return; }
   if(confirm(it.num+' 위치를 이동하시겠습니까?')){
     toast(it.num+' 이동됨');
@@ -1543,10 +1576,8 @@ function drawItem(idx){
       icWrap.appendChild(nmEl);
     }
     var _icDown=function(cx,cy,ctrl){
-      if(_multiClickItem(idx,ctrl)) return;
       var mapEl=document.getElementById('map'); var rect=mapEl.getBoundingClientRect();
-      _drag={active:true,moved:false,idx:idx,sx:cx-rect.left,sy:cy-rect.top,slat:it.lat,slng:it.lng,sPath:null};
-      map.setDraggable(false);
+      _startItemDrag(idx, cx-rect.left, cy-rect.top, ctrl, null);
     };
     icWrap.addEventListener('mousedown',function(ev){ if(ev.button===2)return; ev.preventDefault();ev.stopPropagation(); _icDown(ev.clientX,ev.clientY,ev.ctrlKey||ev.metaKey); });
     icWrap.addEventListener('touchstart',function(ev){ var t=ev.touches[0]; _icDown(t.clientX,t.clientY,false); },{passive:false});
@@ -1566,20 +1597,16 @@ function drawItem(idx){
     labelEl.addEventListener('mousedown',function(ev){
       if(ev.button===2)return;
       ev.preventDefault();ev.stopPropagation();
-      if(_multiClickItem(idx, ev.ctrlKey||ev.metaKey)) return;
       var mapEl=document.getElementById('map');
       var rect=mapEl.getBoundingClientRect();
-      _drag={active:true,moved:false,idx:idx,sx:ev.clientX-rect.left,sy:ev.clientY-rect.top,slat:it.lat,slng:it.lng,sPath:null};
-      map.setDraggable(false);
+      _startItemDrag(idx, ev.clientX-rect.left, ev.clientY-rect.top, ev.ctrlKey||ev.metaKey, null);
     });
     labelEl.addEventListener('contextmenu',function(ev){ ev.preventDefault();ev.stopPropagation(); _showItemCtxMenu(idx,ev.clientX,ev.clientY); });
     labelEl.addEventListener('touchstart',function(ev){
-      if(_multiClickItem(idx,false)) return;
       var touch=ev.touches[0];
       var mapEl=document.getElementById('map');
       var rect=mapEl.getBoundingClientRect();
-      _drag={active:true,moved:false,idx:idx,sx:touch.clientX-rect.left,sy:touch.clientY-rect.top,slat:it.lat,slng:it.lng,sPath:null};
-      map.setDraggable(false);
+      _startItemDrag(idx, touch.clientX-rect.left, touch.clientY-rect.top, false, null);
     },{passive:false});
     it._label=new kakao.maps.CustomOverlay({
       position:new kakao.maps.LatLng(it.lat,it.lng),
@@ -1651,21 +1678,17 @@ function drawItem(idx){
   labelEl.addEventListener('mousedown',function(ev){
     if(ev.button===2)return;
     ev.preventDefault();ev.stopPropagation();
-    if(_multiClickItem(idx, ev.ctrlKey||ev.metaKey)) return;
     var mapEl=document.getElementById('map');
     var rect=mapEl.getBoundingClientRect();
-    _drag={active:true,moved:false,idx:idx,sx:ev.clientX-rect.left,sy:ev.clientY-rect.top,slat:it.lat,slng:it.lng,sPath:it.path?it.path.map(function(p){return{lat:p.lat,lng:p.lng}}):null};
-    map.setDraggable(false);
+    _startItemDrag(idx, ev.clientX-rect.left, ev.clientY-rect.top, ev.ctrlKey||ev.metaKey, it.path?it.path.map(function(p){return{lat:p.lat,lng:p.lng}}):null);
   });
   labelEl.addEventListener('contextmenu',function(ev){ ev.preventDefault();ev.stopPropagation(); _showItemCtxMenu(idx,ev.clientX,ev.clientY); });
   // 드래그 시작 (터치)
   labelEl.addEventListener('touchstart',function(ev){
-    if(_multiClickItem(idx,false)) return;
     var touch=ev.touches[0];
     var mapEl=document.getElementById('map');
     var rect=mapEl.getBoundingClientRect();
-    _drag={active:true,moved:false,idx:idx,sx:touch.clientX-rect.left,sy:touch.clientY-rect.top,slat:it.lat,slng:it.lng,sPath:it.path?it.path.map(function(p){return{lat:p.lat,lng:p.lng}}):null};
-    map.setDraggable(false);
+    _startItemDrag(idx, touch.clientX-rect.left, touch.clientY-rect.top, false, it.path?it.path.map(function(p){return{lat:p.lat,lng:p.lng}}):null);
   },{passive:false});
 
   it._label=new kakao.maps.CustomOverlay({
@@ -1680,9 +1703,7 @@ function drawItem(idx){
     kakao.maps.event.addListener(it._poly,'mousedown',function(e){
       if(_drag.active)return;
       var ctrl=!!(e.originalEvent&&(e.originalEvent.ctrlKey||e.originalEvent.metaKey));
-      if(_multiClickItem(idx, ctrl)) return;
-      _drag={active:true,moved:false,idx:idx,sx:e.point.x,sy:e.point.y,slat:it.lat,slng:it.lng,sPath:it.path?it.path.map(function(p){return{lat:p.lat,lng:p.lng}}):null};
-      map.setDraggable(false);
+      _startItemDrag(idx, e.point.x, e.point.y, ctrl, it.path?it.path.map(function(p){return{lat:p.lat,lng:p.lng}}):null);
     });
     kakao.maps.event.addListener(it._poly,'rightclick',function(e){
       var x=_lastPtrX||window.innerWidth/2, y=_lastPtrY||window.innerHeight/2;
@@ -2321,30 +2342,26 @@ function multiDistribute(axis){
 // 아이템의 가로/세로 점유 폭(m)
 function _itemW(it){ if(it.shape==='rect')return it.w||3; if(it.shape==='circle')return it.diameter||5; return 2.5; }
 function _itemH(it){ if(it.shape==='rect')return it.h||6; if(it.shape==='circle')return it.diameter||5; return 2.5; }
-// 한 줄로 세우고 + 간격 균등 (가로줄/세로줄) — 겹쳐있어도 기본 간격으로 펼침
-function multiRow(axis){
+// 한 줄로 + 딱 붙여 정렬 (도형 크기대로 모서리 맞닿게). gap=간격(m, 기본 0)
+function multiRow(axis,gap){
+  gap=gap||0;
   var its=_multiItems(); if(its.length<2){toast('2개 이상 선택하세요',true);return}
   if(axis==='h'){
     var avgLat=its.reduce(function(a,b){return a+b.lat},0)/its.length;
     its.sort(function(a,b){return a.lng-b.lng});
-    var min=its[0].lng, max=its[its.length-1].lng;
-    var stepDeg=(max-min)/(its.length-1);
-    // 범위가 거의 0(겹침)이면 평균 폭+0.8m 간격으로 펼침
-    var avgW=its.reduce(function(a,b){return a+_itemW(b)},0)/its.length;
-    var minStep=(avgW+0.8)/mLng(avgLat);
-    if(!(stepDeg>minStep)) stepDeg=minStep;
-    its.forEach(function(i,k){_setItemPos(i,avgLat,min+stepDeg*k)});
+    var startLng=its[0].lng, mpl=mLng(avgLat);
+    _setItemPos(its[0],avgLat,startLng);
+    var cum=0, prevW=_itemW(its[0]);
+    for(var k=1;k<its.length;k++){ var w=_itemW(its[k]); cum+=prevW/2+gap+w/2; _setItemPos(its[k],avgLat,startLng+cum/mpl); prevW=w; }
   } else {
     var avgLng=its.reduce(function(a,b){return a+b.lng},0)/its.length;
-    its.sort(function(a,b){return b.lat-a.lat});
-    var maxL=its[0].lat, minL=its[its.length-1].lat;
-    var stDeg=(maxL-minL)/(its.length-1);
-    var avgH=its.reduce(function(a,b){return a+_itemH(b)},0)/its.length;
-    var minStepV=(avgH+0.8)/M_LAT;
-    if(!(stDeg>minStepV)) stDeg=minStepV;
-    its.forEach(function(i,k){_setItemPos(i,maxL-stDeg*k,avgLng)});
+    its.sort(function(a,b){return b.lat-a.lat}); // 위→아래
+    var startLat=its[0].lat;
+    _setItemPos(its[0],startLat,avgLng);
+    var cm=0, prevH=_itemH(its[0]);
+    for(var j=1;j<its.length;j++){ var hh=_itemH(its[j]); cm+=prevH/2+gap+hh/2; _setItemPos(its[j],startLat-cm/M_LAT,avgLng); prevH=hh; }
   }
-  _multiSel.forEach(function(idx){drawItem(idx)}); _multiRefresh(); autoSave(); toast('한 줄 정렬 완료');
+  _multiSel.forEach(function(idx){drawItem(idx)}); _multiRefresh(); autoSave(); toast(gap>0?'한 줄 정렬':'딱 붙여 정렬');
 }
 function multiRotate(deg){
   var its=_multiItems(); if(!its.length){return}
