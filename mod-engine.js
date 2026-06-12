@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260612v81';
+var _MOD_ENGINE_VER='20260612v82';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -1777,6 +1777,16 @@ function _renderModApplyUI(def,evtId){
     h+=_modFormField(c,'');
     h+='</div>';
   });
+  // 💳 입금 계좌 — 신청 전에 보이게 (버튼 위) + 복사 버튼
+  var _pi=(def.payInfo||'').trim();
+  if(_pi){
+    window.__modPayInfo=_pi;
+    h+='<div style="margin-top:18px;background:#f0fdf4;border:1.5px solid #86efac;border-radius:12px;padding:16px">'
+      +'<div style="font-size:12px;color:#15803d;font-weight:800;margin-bottom:8px">💳 입금 계좌 <span style="font-weight:600;color:#16a34a">(신청 후 입금해 주세요)</span></div>'
+      +'<div style="font-size:16px;font-weight:800;color:#0f172a;word-break:break-all;line-height:1.5">'+esc(_pi)+'</div>'
+      +'<button type="button" onclick="_modCopyPay(this)" style="margin-top:10px;padding:10px 22px;border:none;border-radius:9px;background:#16a34a;color:#fff;font-size:14px;font-weight:800;cursor:pointer">📋 계좌번호 복사</button>'
+      +'</div>';
+  }
   h+='<button id="modApplyBtn" onclick="submitModApply()" style="width:100%;padding:16px;border:none;border-radius:12px;background:#2563eb;color:#fff;font-size:17px;font-weight:800;cursor:pointer;margin-top:14px;box-shadow:0 4px 12px rgba(37,99,235,.3)">✓ '+esc(def.label)+' 신청하기</button>';
   h+='<div id="modApplyMsg" style="text-align:center;margin-top:12px;font-size:13px"></div>';
   document.getElementById('modApplyCard').innerHTML=h;
