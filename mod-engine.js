@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260612v76';
+var _MOD_ENGINE_VER='20260612v77';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -1730,7 +1730,18 @@ function _renderModApplyUI(def,evtId){
   _modApplyLoadStock(def,evtId);
 }
 
-// 옵션별 사용량 집계 — 탈락 계열만 제외(대기·선정은 차감) + 수량칼럼 연동(옵션). 재고 계산 단일 소스.
+// 상태값이 "탈락(빨강)"인지 — 이름(탈락/거부/반려) 또는 빨간 배지색으로 판정
+function _modIsRejected(statusCol, val){
+  var s=String(val==null?'':val);
+  if(/탈락|거부|취소|반려|불가|미선정/.test(s)) return true;
+  var bm=statusCol&&statusCol.badgeMap&&statusCol.badgeMap[val];
+  if(bm){
+    var c=String(bm.color||'').toLowerCase(), bg=String(bm.bg||'').toLowerCase();
+    if(/dc2626|ef4444|b91c1c|f87171|e11d48|#f00\b|(^|[^a-z])red/.test(c) || /fee2e2|fecaca|fca5a5|ffe4e6/.test(bg)) return true;
+  }
+  return false;
+}
+// 옵션별 사용량 집계 — 탈락(빨강)만 제외(대기·선정은 차감) + 수량칼럼 연동(옵션). 재고 계산 단일 소스.
 function _modStockUsed(def,col,arr){
   var statusCol=(def.columns||[]).find(function(c){return c.key==='status';});
   var exclRejected=(col.stockExclRejected!==false); // 기본: 탈락 제외
@@ -1739,10 +1750,7 @@ function _modStockUsed(def,col,arr){
   (arr||[]).forEach(function(r){
     if(!r) return;
     var v=r[col.key]; if(v==null||v==='') return;
-    if(exclRejected && statusCol){
-      var sv=String(r[statusCol.key]||'');
-      if(/탈락|거부|취소|반려/.test(sv)) return; // 탈락 계열만 재고에서 제외
-    }
+    if(exclRejected && statusCol && _modIsRejected(statusCol, r[statusCol.key])) return; // 탈락(빨강)만 제외
     var q=qtyKey?(parseInt(r[qtyKey],10)||1):1;
     used[v]=(used[v]||0)+q;
   });
