@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260612v75';
+var _MOD_ENGINE_VER='20260612v76';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -1230,6 +1230,15 @@ function _renderModDefCols(){
         });
         if(!(c.options||[]).length) h+='<div style="font-size:11px;color:#cbd5e1">먼저 선택 항목을 입력하세요</div>';
         h+='</div>';
+        // 탈락만 제외 (대기·선정은 차감)
+        h+='<label style="font-size:11px;display:flex;align-items:center;gap:5px;margin-top:8px;color:#475569;cursor:pointer"><input type="checkbox"'+(c.stockExclRejected!==false?' checked':'')+' onchange="_modDefEditCols['+i+'].stockExclRejected=this.checked"><b>🚫 탈락은 재고에서 제외</b> <span style="color:#94a3b8">— 대기·선정은 차감, 탈락만 복구</span></label>';
+        // 차감 수량 = 숫자칼럼 연동 (없으면 건당 1개)
+        var _numCols=_modDefEditCols.filter(function(cc){return cc.type==='number'&&cc.key&&cc.key!==c.key;});
+        h+='<div style="margin-top:6px;display:flex;align-items:center;gap:6px;font-size:11px;color:#475569"><span>차감 수량</span><select style="font-size:11px;padding:4px 6px;border:1px solid #cbd5e1;border-radius:5px" onchange="_modDefEditCols['+i+'].stockQtyKey=this.value">';
+        h+='<option value=""'+(!c.stockQtyKey?' selected':'')+'>건당 1개 (기본)</option>';
+        _numCols.forEach(function(cc){ h+='<option value="'+cc.key+'"'+(c.stockQtyKey===cc.key?' selected':'')+'>'+esc(cc.label||'숫자칸')+' 값만큼</option>'; });
+        h+='</select></div>';
+        h+='<div style="font-size:10px;color:#94a3b8;margin-top:3px">※ 수량칸(숫자 타입)을 따로 만들어 연결하면 관리자가 그 값을 고쳐 차감량을 조정할 수 있어요</div>';
       }
       h+='</div>';
     }
@@ -1721,6 +1730,25 @@ function _renderModApplyUI(def,evtId){
   _modApplyLoadStock(def,evtId);
 }
 
+// 옵션별 사용량 집계 — 탈락 계열만 제외(대기·선정은 차감) + 수량칼럼 연동(옵션). 재고 계산 단일 소스.
+function _modStockUsed(def,col,arr){
+  var statusCol=(def.columns||[]).find(function(c){return c.key==='status';});
+  var exclRejected=(col.stockExclRejected!==false); // 기본: 탈락 제외
+  var qtyKey=col.stockQtyKey||'';
+  var used={};
+  (arr||[]).forEach(function(r){
+    if(!r) return;
+    var v=r[col.key]; if(v==null||v==='') return;
+    if(exclRejected && statusCol){
+      var sv=String(r[statusCol.key]||'');
+      if(/탈락|거부|취소|반려/.test(sv)) return; // 탈락 계열만 재고에서 제외
+    }
+    var q=qtyKey?(parseInt(r[qtyKey],10)||1):1;
+    used[v]=(used[v]||0)+q;
+  });
+  return used;
+}
+
 // 재고 관리 select들: 현재 데이터 읽어 옵션별 남은수량 계산 → 드롭다운에 반영
 function _modApplyLoadStock(def,evtId){
   if(typeof fbDb==='undefined') return;
@@ -1731,8 +1759,7 @@ function _modApplyLoadStock(def,evtId){
     var arr=snap.val()||[]; if(!Array.isArray(arr))arr=Object.values(arr);
     window.__modStockData={path:path, arr:arr};
     stockCols.forEach(function(c){
-      var used={};
-      arr.forEach(function(r){ if(r){ var val=r[c.key]; if(val!=null&&val!==''){ used[val]=(used[val]||0)+1; } } });
+      var used=_modStockUsed(def,c,arr);
       var sel=document.getElementById('mod_f_'+c.key); if(!sel) return;
       var allSold=true;
       [].slice.call(sel.options).forEach(function(op){
@@ -1864,8 +1891,9 @@ function submitModApply(){
       if(chosen==null||chosen==='') continue;
       var cap=sc.stock[chosen];
       if(cap==null) continue; // 무제한
-      var u=0; arr.forEach(function(r){ if(r&&r[sc.key]===chosen) u++; });
-      if(u>=cap) throw new Error('"'+chosen+'" 항목이 품절되었습니다 (남은 수량 0)');
+      var u=(_modStockUsed(def,sc,arr)[chosen])||0;
+      var newQty=sc.stockQtyKey?(parseInt(obj[sc.stockQtyKey],10)||1):1;
+      if(u+newQty>cap) throw new Error('"'+chosen+'" 재고가 부족합니다 (남은 '+Math.max(0,cap-u)+'개)');
     }
     arr.push(obj);
     return fbDb.ref(path).set(arr);
@@ -3784,8 +3812,8 @@ function popModStock(key){
   var h='<div class="pop-head"><h3>📦 '+esc(def.label)+' 재고 현황</h3></div>';
   h+='<div style="padding:14px;max-height:78vh;overflow:auto">';
   stockCols.forEach(function(c){
-    var used={}; data.forEach(function(r){ if(r){ var v=r[c.key]; if(v!=null&&v!=='') used[v]=(used[v]||0)+1; } });
-    h+='<div style="font-weight:800;color:#0f766e;margin:6px 0 8px;font-size:15px">'+esc(c.label)+'</div>';
+    var used=_modStockUsed(def,c,data);
+    h+='<div style="font-weight:800;color:#0f766e;margin:6px 0 8px;font-size:15px">'+esc(c.label)+(c.stockQtyKey?' <span style="font-size:11px;color:#94a3b8">(수량칸 연동)</span>':'')+'</div>';
     h+='<table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:16px">';
     h+='<tr style="background:#f1f5f9;color:#475569"><th style="padding:7px 9px;text-align:left;border:1px solid #e2e8f0">항목</th><th style="padding:7px 9px;border:1px solid #e2e8f0">총 수량</th><th style="padding:7px 9px;border:1px solid #e2e8f0">신청</th><th style="padding:7px 9px;border:1px solid #e2e8f0">남음</th></tr>';
     (c.options||[]).forEach(function(o){
