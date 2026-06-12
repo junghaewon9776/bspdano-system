@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260612v73';
+var _MOD_ENGINE_VER='20260612v74';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -2188,23 +2188,26 @@ function _modPlain(c,v){ if(c.type==='number'&&c.comma) return Number(v).toLocal
 // free 배치 요소의 처리방식별 CSS + 폰트크기 계산
 // mode: 'line'(한줄) / 'wrap'(박스폭 넘으면 줄바꿈) / 'fit'(박스폭에 맞게 글자 축소)
 // 반환 {css, fs}. labelWmm=라벨 전체 가로(mm)
-function _mlElemFit(p, plain, baseFs, labelWmm){
+function _mlElemFit(p, plain, baseFs, labelWmm, labelHmm){
   p=p||{};
-  var w=(p.w>0?p.w:(100-(p.x||0)));
+  var vert=!!p.vert;
+  // 사용 가능한 길이(%) — 가로는 X기준 폭, 세로는 Y기준 높이
+  var w=(p.w>0?p.w:(100-((vert?p.y:p.x)||0)));
   var mode=p.mode||(p.wrap?'wrap':'line'); // 구버전 wrap 불린 호환
   var fs=baseFs, css;
   var alignCss=p.align?'text-align:'+p.align+';':'';
+  var dim=vert?'height':'width'; // 세로면 높이 박스
   if(mode==='fit'){
-    var wmm=w/100*(labelWmm||50);
+    var lenMm=w/100*((vert?labelHmm:labelWmm)||(vert?30:50));
     var n=(plain&&String(plain).length)||1;
-    fs=Math.min(baseFs, Math.max(4, wmm*2.83/n*1.7)); // 글자수·박스폭 기반 근사 축소
-    css='width:'+w+'%;white-space:nowrap;overflow:hidden;'+alignCss;
+    fs=Math.min(baseFs, Math.max(4, lenMm*2.83/n*1.7)); // 글자수·박스길이 기반 근사 축소
+    css=dim+':'+w+'%;white-space:nowrap;overflow:hidden;'+alignCss;
   } else if(mode==='wrap'){
-    css='width:'+w+'%;white-space:normal;word-break:keep-all;overflow-wrap:break-word;'+alignCss;
+    css=dim+':'+w+'%;white-space:normal;word-break:keep-all;overflow-wrap:break-word;'+alignCss;
   } else {
-    css=p.align?('width:'+w+'%;white-space:nowrap;overflow:hidden;'+alignCss):'white-space:nowrap;';
+    css=p.align?(dim+':'+w+'%;white-space:nowrap;overflow:hidden;'+alignCss):'white-space:nowrap;';
   }
-  if(p.vert) css='writing-mode:vertical-rl;text-orientation:upright;letter-spacing:0;'+css;
+  if(vert) css='writing-mode:vertical-rl;text-orientation:upright;letter-spacing:0;'+css;
   return {css:css, fs:fs};
 }
 
@@ -2232,7 +2235,7 @@ function _modLabelHtml(def,row,opt){
     if(showTitle){
       var tp=pos['_title']||{x:4,y:4,fs:14};
       var _tv=_modMaskVal(String(titleV),tp);
-      var tef=_mlElemFit(tp, _tv, tp.fs||14, opt.w);
+      var tef=_mlElemFit(tp, _tv, tp.fs||14, opt.w, opt.h);
       h+='<div style="position:absolute;left:'+tp.x+'%;top:'+tp.y+'%;font-size:'+tef.fs+'pt;font-weight:800;line-height:1.1;'+tef.css+'">'+esc(_tv)+'</div>';
     }
     cols.forEach(function(c){
@@ -2243,7 +2246,7 @@ function _modLabelHtml(def,row,opt){
       var pv=_modPlain(c,v);
       pv=_modMaskVal(pv,fp);
       var plain=c.label+(fp.colon?': ':' ')+pv;
-      var ef=_mlElemFit(fp, plain, fp.fs||7.5, opt.w);
+      var ef=_mlElemFit(fp, plain, fp.fs||7.5, opt.w, opt.h);
       var sep=fp.brk?((fp.colon?':':'')+'<br>'):(fp.colon?': ':' ');
       var lbl=fp.bold?esc(c.label):'<b>'+esc(c.label)+'</b>';
       h+='<div style="position:absolute;left:'+fp.x+'%;top:'+fp.y+'%;font-size:'+ef.fs+'pt;line-height:1.3;color:#222;'+(fp.bold?'font-weight:800;':'')+ef.css+'">'+lbl+sep+esc(pv)+'</div>';
@@ -3256,17 +3259,19 @@ function _mllRender(){
       html+='<div class="mll_el" data-id="'+it.id+'" style="position:absolute;left:'+left+'px;top:'+top+'px;width:'+qSize+'px;height:'+qSize+'px;border:2px dashed '+it.color+';border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:11px;color:'+it.color+';font-weight:700;cursor:move;background:rgba(51,65,85,.08)">QR</div>';
     } else {
       var fsPx=it.fs*SCALE*0.35;
-      var bw=(it.w>0?it.w:(100-(it.x||0)));
-      var bwpx=bw/100*cW;
+      var _vt=!!it.vert;
+      var bw=(it.w>0?it.w:(100-((_vt?it.y:it.x)||0)));
+      var bwpx=bw/100*cW, bhpx=bw/100*cH;
+      var _dimPx=_vt?('height:'+bhpx+'px'):('width:'+bwpx+'px');
       var box;
       if(it.mode==='fit'){
-        var wmm=bw/100*L.opt.w; var n=(String(it.text).length)||1;
-        fsPx=Math.min(it.fs, Math.max(4, wmm*2.83/n*1.7))*SCALE*0.35;
-        box='width:'+bwpx+'px;white-space:nowrap;overflow:hidden;'+(it.align?'text-align:'+it.align+';':'');
+        var lenmm=bw/100*(_vt?L.opt.h:L.opt.w); var n=(String(it.text).length)||1;
+        fsPx=Math.min(it.fs, Math.max(4, lenmm*2.83/n*1.7))*SCALE*0.35;
+        box=_dimPx+';white-space:nowrap;overflow:hidden;'+(it.align?'text-align:'+it.align+';':'');
       } else if(it.mode==='wrap'){
-        box='width:'+bwpx+'px;white-space:pre-line;word-break:keep-all;'+(it.align?'text-align:'+it.align+';':'');
+        box=_dimPx+';white-space:pre-line;word-break:keep-all;'+(it.align?'text-align:'+it.align+';':'');
       } else {
-        box=(it.align?'width:'+bwpx+'px;white-space:pre;overflow:hidden;text-align:'+it.align+';':'white-space:pre;');
+        box=(it.align?_dimPx+';white-space:pre;overflow:hidden;text-align:'+it.align+';':'white-space:pre;');
       }
       if(it.vert) box='writing-mode:vertical-rl;text-orientation:upright;'+box;
       html+='<div class="mll_el" data-id="'+it.id+'" style="position:absolute;left:'+left+'px;top:'+top+'px;border:1.5px dashed '+it.color+';border-radius:3px;padding:2px 4px;font-size:'+fsPx+'px;'+(it.bold?'font-weight:800;':'')+'color:'+it.color+';cursor:move;background:rgba(255,255,255,.85);box-sizing:border-box;'+box+'">'+esc(it.text)+'</div>';
