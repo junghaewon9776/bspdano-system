@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260612v86';
+var _MOD_ENGINE_VER='20260612v87';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -1184,8 +1184,8 @@ function popModDef(keyOrIdx){
   h+='<div style="font-size:10px;color:#94a3b8;margin-top:2px">포스터·안내 이미지 등. 자동 압축돼 저장되고, 신청폼 맨 위(안내문 아래)에 큼직하게 표시됩니다</div></div>';
   h+='<label style="font-size:12px;font-weight:700;color:#64748b">완료 후 다운로드 링크</label>';
   h+='<div><input id="mdf_downloadUrl" value="'+esc(def.downloadUrl||"")+'" placeholder="예: 플레이스토어 베타 링크 https://play.google.com/…" style="width:100%;font-family:monospace;font-size:11px"><div style="font-size:10px;color:#94a3b8;margin-top:2px">넣으면 신청 완료 화면에 「앱 다운로드」 버튼이 떠서 누르면 이 링크로 이동</div></div>';
-  h+='<label style="font-size:12px;font-weight:700;color:#64748b">완료 후 입금 계좌 (선택)</label>';
-  h+='<div><input id="mdf_payInfo" value="'+esc(def.payInfo||"")+'" placeholder="예: 농협 352-1234-5678-90 (예금주 법성포단오제)" style="width:100%;font-size:12px"><div style="font-size:10px;color:#94a3b8;margin-top:2px">넣으면 신청 완료 화면에 계좌번호 + 「복사」 버튼이 떠서 누르면 클립보드에 복사됩니다</div></div>';
+  h+='<label style="font-size:12px;font-weight:800;color:#0f766e">🧰 편의기능 — 입금 계좌 (선택)</label>';
+  h+='<div><input id="mdf_payInfo" value="'+esc(def.payInfo||"")+'" placeholder="예: 농협 352-1234-5678-90 (예금주 법성포단오제)" style="width:100%;font-size:12px"><div style="font-size:10px;color:#94a3b8;margin-top:2px">넣으면 <b>신청폼 + 완료 화면</b>에 계좌 + 「복사」 버튼이 떠요. 완료 화면엔 「공유하기」 버튼도 자동으로 같이 표시됩니다</div></div>';
   h+='<label style="font-size:12px;font-weight:700;color:#64748b">파일 업로드 URL</label>';
   var _curDrive=def.driveUploadUrl||(typeof DRIVE_UPLOAD_URL!=='undefined'?DRIVE_UPLOAD_URL:'')||'';
   h+='<div><input id="mdf_driveUrl" value="'+esc(_curDrive)+'" placeholder="파일첨부 컬럼 쓸 때만 — 신청 설정의 Drive URL 붙여넣기" style="width:100%;font-family:monospace;font-size:11px"><div style="font-size:10px;color:#94a3b8;margin-top:2px">신청폼에서 파일첨부를 받으려면 필요 (참가신청 설정의 📤 Drive 업로드 URL과 동일한 값)</div></div>';
@@ -1935,6 +1935,18 @@ function _modCopyText(btn){
   function fb(){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.opacity='0'; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); done(); }catch(e){} }
   if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(txt).then(done).catch(fb); } else fb();
 }
+// 신청 링크 공유 — 모바일은 공유시트(카톡 등), PC는 링크 복사
+function _modShareForm(btn){
+  var url=(window.location.href||'').split('#')[0];
+  var title=document.title||'신청하기';
+  if(navigator.share){
+    navigator.share({title:title, text:title+' — 함께 신청해요!', url:url}).catch(function(){});
+    return;
+  }
+  function done(){ if(btn){ var o=btn.innerHTML; btn.innerHTML='✅ 링크 복사됨!'; setTimeout(function(){ btn.innerHTML=o; },1600); } }
+  function fb(){ try{ var ta=document.createElement('textarea'); ta.value=url; ta.style.position='fixed'; ta.style.opacity='0'; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); done(); }catch(e){} }
+  if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(url).then(done).catch(fb); } else fb();
+}
 // 신청 완료 화면: 계좌번호 클립보드 복사
 function _modCopyPay(btn){
   var txt=window.__modPayInfo||'';
@@ -2098,7 +2110,8 @@ function submitModApply(){
         +'<button type="button" onclick="_modCopyPay(this)" style="margin-top:12px;padding:11px 24px;border:none;border-radius:10px;background:#16a34a;color:#fff;font-size:15px;font-weight:800;cursor:pointer">📋 계좌번호 복사</button>'
         +'</div>';
     }
-    document.getElementById('modApplyCard').innerHTML='<div style="text-align:center;padding:30px"><div style="font-size:48px">✅</div><h2 style="color:#16a34a;margin:12px 0;font-size:20px">신청 완료</h2><p style="color:#64748b;font-size:14px;line-height:1.6">신청이 정상 접수되었습니다.'+(def.downloadUrl?'':'<br>검토 후 개별 안내드리겠습니다.')+'</p>'+pay+dl+'</div>';
+    var share='<button type="button" onclick="_modShareForm(this)" style="display:inline-block;margin-top:16px;padding:13px 26px;border:none;border-radius:12px;background:#fbbf24;color:#78350f;font-size:15px;font-weight:800;cursor:pointer;box-shadow:0 3px 10px rgba(251,191,36,.35)">📤 이 신청 링크 공유하기</button><div style="font-size:12px;color:#94a3b8;margin-top:6px">친구·이웃에게 공유해 함께 신청하세요</div>';
+    document.getElementById('modApplyCard').innerHTML='<div style="text-align:center;padding:30px"><div style="font-size:48px">✅</div><h2 style="color:#16a34a;margin:12px 0;font-size:20px">신청 완료</h2><p style="color:#64748b;font-size:14px;line-height:1.6">신청이 정상 접수되었습니다.'+(def.downloadUrl?'':'<br>검토 후 개별 안내드리겠습니다.')+'</p>'+pay+dl+share+'</div>';
   }).catch(function(e){
     if(btn){btn.disabled=false;btn.textContent='신청하기';}
     if(msg)msg.innerHTML='<span style="color:#ef4444">제출 실패: '+esc(e.message||e)+'</span>';
