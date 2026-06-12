@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260612v89';
+var _MOD_ENGINE_VER='20260612v90';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -643,8 +643,8 @@ function _modFormField(col,val){
       // 🛒 다중선택 + 수량: 옵션마다 수량칸 (티셔츠 사이즈별 주문 등)
       if(col.multiQty){
         var _cur={}; _modParseMulti(val).forEach(function(it){ if(it&&it.o) _cur[it.o]=it.q; });
-        var mh='<div id="'+id+'" data-multiqty="1" style="border:1px solid #cbd5e1;border-radius:10px;overflow:hidden">';
         var _mp=col.maxPer||0;
+        var mh='<div id="'+id+'" data-multiqty="1"'+(_mp?' data-maxtotal="'+_mp+'"':'')+' style="border:1px solid #cbd5e1;border-radius:10px;overflow:hidden">';
         (col.options||[]).forEach(function(o,oi){
           var ov=String(typeof o==='object'?o.value:o), ovs=ov.replace(/"/g,'');
           var on=_cur[ov]>0;
@@ -652,10 +652,10 @@ function _modFormField(col,val){
             +'<label style="flex:1;display:flex;align-items:center;gap:8px;font-weight:700;color:#334155;cursor:pointer;min-width:0">'
               +'<input type="checkbox" class="mqchk" data-opt="'+esc(ovs)+'"'+(on?' checked':'')+' onchange="_modMqToggle(this)" style="width:18px;height:18px;flex-shrink:0">'
               +'<span style="min-width:0">'+esc(ov)+'<span class="mqleft" style="font-size:11px;font-weight:600;margin-left:7px"></span></span></label>'
-            +'<input type="number" class="mqnum" min="1"'+(_mp?' max="'+_mp+'"':'')+' value="'+(on?_cur[ov]:1)+'" data-opt="'+esc(ovs)+'"'+(on?'':' disabled')+' style="width:60px;text-align:center;padding:7px;border:1px solid #cbd5e1;border-radius:6px;font-weight:700;'+(on?'':'opacity:.4;background:#f1f5f9')+'" onfocus="this.select()" oninput="if(this.max!==\'\'&&this.max!=null&&parseInt(this.value,10)>parseInt(this.max,10))this.value=this.max">'
+            +'<input type="number" class="mqnum" min="1" value="'+(on?_cur[ov]:1)+'" data-opt="'+esc(ovs)+'"'+(on?'':' disabled')+' style="width:60px;text-align:center;padding:7px;border:1px solid #cbd5e1;border-radius:6px;font-weight:700;'+(on?'':'opacity:.4;background:#f1f5f9')+'" onfocus="this.select()" oninput="_modMqClampTotal(this)">'
             +'<span style="font-size:12px;color:#94a3b8">개</span></div>';
         });
-        mh+='</div><div style="font-size:11px;color:#94a3b8;margin-top:4px">원하는 품목을 체크하면 수량이 켜집니다'+(_mp?' · 한 품목당 최대 '+_mp+'개':'')+'</div>';
+        mh+='</div><div id="'+id+'_tot" style="font-size:11px;color:#94a3b8;margin-top:4px">원하는 품목을 체크하면 수량이 켜집니다'+(_mp?' · <b style="color:#0f766e">총 '+_mp+'개까지</b>':'')+'</div>';
         return mh;
       }
       var _sopts=col.options||[];
@@ -1278,8 +1278,8 @@ function _renderModDefCols(){
           h+='</select></div>';
           h+='<div style="font-size:10px;color:#94a3b8;margin-top:3px">※ 수량칸(숫자 타입)을 따로 만들어 연결하면 관리자가 그 값을 고쳐 차감량을 조정할 수 있어요</div>';
         } else {
-          h+='<div style="margin-top:6px;display:flex;align-items:center;gap:6px;font-size:11px;color:#475569"><span>1인당 최대</span><input type="number" min="0" value="'+(c.maxPer||'')+'" placeholder="제한없음" style="width:70px;font-size:11px;padding:4px 6px;border:1px solid #cbd5e1;border-radius:5px" onchange="_modDefEditCols['+i+'].maxPer=this.value?parseInt(this.value,10):0"><span>개</span></div>';
-          h+='<div style="font-size:10px;color:#0f766e;margin-top:3px">※ 다중선택 모드: 항목마다 수량칸. 1인당 최대를 정하면 한 품목당 그 수량까지만 신청 가능 (재고 남은 수와 함께 적용)</div>';
+          h+='<div style="margin-top:6px;display:flex;align-items:center;gap:6px;font-size:11px;color:#475569"><span>1인당 총 최대</span><input type="number" min="0" value="'+(c.maxPer||'')+'" placeholder="제한없음" style="width:70px;font-size:11px;padding:4px 6px;border:1px solid #cbd5e1;border-radius:5px" onchange="_modDefEditCols['+i+'].maxPer=this.value?parseInt(this.value,10):0"><span>개</span></div>';
+          h+='<div style="font-size:10px;color:#0f766e;margin-top:3px">※ 다중선택 모드: 항목마다 수량칸. 1인당 총 최대를 정하면 모든 품목 <b>합계</b>가 그 수량을 넘을 수 없습니다 (예: 총 2개면 블랙1+화이트1 까지)</div>';
         }
       }
       h+='</div>';
@@ -1864,8 +1864,44 @@ function _modCollectMultiQty(id){
 function _modMqToggle(chk){
   var row=chk.closest?chk.closest('[data-optrow]'):null; if(!row) return;
   var num=row.querySelector('.mqnum'); if(!num) return;
-  if(chk.checked){ num.disabled=false; num.style.opacity='1'; num.style.background=''; if(!(parseInt(num.value,10)>0)) num.value=1; try{num.focus();num.select();}catch(e){} }
-  else { num.disabled=true; num.style.opacity='.4'; num.style.background='#f1f5f9'; }
+  if(chk.checked){ num.disabled=false; num.style.opacity='1'; num.style.background=''; if(!(parseInt(num.value,10)>0)) num.value=1; _modMqClampTotal(num); try{num.focus();num.select();}catch(e){} }
+  else { num.disabled=true; num.style.opacity='.4'; num.style.background='#f1f5f9'; _modMqUpdateTotal(num); }
+}
+// 입력 시: 품목별 재고상한 + 전체 총합 제한 적용
+function _modMqClampTotal(inp){
+  var cont=inp.closest?inp.closest('[data-multiqty]'):null; if(!cont) return;
+  // 1) 품목별 재고 상한 (max 속성)
+  if(inp.max!==''&&inp.max!=null){ var im=parseInt(inp.max,10); if(im>=0&&(parseInt(inp.value,10)||0)>im) inp.value=im; }
+  // 2) 총합 제한 — "남은 자리"(max - 다른 품목 합계) 기준
+  var max=parseInt(cont.getAttribute('data-maxtotal'),10)||0;
+  if(max){
+    var others=0;
+    [].slice.call(cont.querySelectorAll('[data-optrow]')).forEach(function(row){
+      var c=row.querySelector('.mqchk'), n=row.querySelector('.mqnum');
+      if(c&&c.checked&&n&&!n.disabled&&n!==inp) others+=parseInt(n.value,10)||0;
+    });
+    var avail=max-others;
+    if(avail<=0){ // 자리 없음 → 이 품목 해제
+      var r=inp.closest('[data-optrow]'); var chk=r&&r.querySelector('.mqchk');
+      if(chk) chk.checked=false;
+      inp.disabled=true; inp.value=1; inp.style.opacity='.4'; inp.style.background='#f1f5f9';
+      toast('총 '+max+'개까지만 선택할 수 있어요',true);
+    } else if((parseInt(inp.value,10)||0)>avail){ inp.value=avail; }
+    else if((parseInt(inp.value,10)||0)<1) inp.value=1;
+  } else if((parseInt(inp.value,10)||0)<1) inp.value=1;
+  _modMqUpdateTotal(inp);
+}
+// 총합 안내 갱신
+function _modMqUpdateTotal(inp){
+  var cont=inp.closest?inp.closest('[data-multiqty]'):null; if(!cont) return;
+  var max=parseInt(cont.getAttribute('data-maxtotal'),10)||0; if(!max) return;
+  var sum=0;
+  [].slice.call(cont.querySelectorAll('[data-optrow]')).forEach(function(row){
+    var c=row.querySelector('.mqchk'), n=row.querySelector('.mqnum');
+    if(c&&c.checked&&n&&!n.disabled) sum+=parseInt(n.value,10)||0;
+  });
+  var note=document.getElementById(cont.id+'_tot');
+  if(note) note.innerHTML='선택 합계 <b style="color:'+(sum>=max?'#ef4444':'#0f766e')+'">'+sum+'</b> / 총 '+max+'개까지';
 }
 // 옵션별 사용량 집계 — 탈락(빨강)만 제외(대기·선정은 차감) + 수량칼럼/다중수량. 재고 계산 단일 소스.
 function _modStockUsed(def,col,arr){
@@ -1901,23 +1937,17 @@ function _modApplyLoadStock(def,evtId){
       var sel=document.getElementById('mod_f_'+c.key); if(!sel) return;
       // 🛒 다중선택+수량: 각 항목 행에 남은수량 표시 + 입력 상한
       if(c.multiQty){
-        var _mp=c.maxPer||0;
         [].slice.call(sel.querySelectorAll('[data-optrow]')).forEach(function(row){
           var opt=row.getAttribute('data-optrow');
           var cap=c.stock[opt];
           var span=row.querySelector('.mqleft');
           var num=row.querySelector('.mqnum');
           var chk=row.querySelector('.mqchk');
-          if(cap==null){
-            if(span){span.textContent=_mp?'(최대 '+_mp+')':'';span.style.color='#94a3b8';}
-            if(num&&_mp) num.max=_mp;
-            return;
-          }
-          var left=Math.max(0,cap-(used[opt]||0));
-          var lim=_mp?Math.min(left,_mp):left; // 재고남은 vs 1인당최대 중 작은 값
-          if(span){ span.textContent=left<=0?'(품절)':('(남은 '+left+(_mp?', 1인'+_mp:'')+')'); span.style.color=left<=0?'#ef4444':'#16a34a'; }
+          if(cap==null){ if(span){span.textContent='';} return; } // 무제한
+          var left=Math.max(0,cap-(used[opt]||0)); // 품목별 상한 = 재고 남은 수
+          if(span){ span.textContent=left<=0?'(품절)':('(남은 '+left+')'); span.style.color=left<=0?'#ef4444':'#16a34a'; }
           if(left<=0){ if(chk){chk.checked=false;chk.disabled=true;} if(num){num.disabled=true;num.value=1;num.style.opacity='.4';num.style.background='#f1f5f9';} }
-          else if(num){ num.max=lim; if(parseInt(num.value,10)>lim) num.value=lim; }
+          else if(num){ num.max=left; if((parseInt(num.value,10)||0)>left) num.value=left; }
         });
         return;
       }
@@ -2046,7 +2076,7 @@ function submitModApply(){
     if(c.type==='select'&&c.multiQty){
       var mv=_modCollectMultiQty('mod_f_'+c.key);
       if(c.required&&!mv){ valid=false; if(!firstBad)firstBad=c.label+'에서 수량을 1개 이상 입력하세요'; }
-      if(c.maxPer){ var _ov=_modParseMulti(mv).filter(function(it){return it.q>c.maxPer;})[0]; if(_ov){ valid=false; if(!firstBad)firstBad='"'+_ov.o+'"은(는) 1인당 최대 '+c.maxPer+'개까지입니다'; } }
+      if(c.maxPer){ var _tot=_modParseMulti(mv).reduce(function(s,it){return s+(it&&it.q>0?it.q:0);},0); if(_tot>c.maxPer){ valid=false; if(!firstBad)firstBad=c.label+'은(는) 총 '+c.maxPer+'개까지 신청 가능합니다 (현재 '+_tot+'개)'; } }
       obj[c.key]=mv; return;
     }
     var v=(el.value||'').trim();
@@ -2124,19 +2154,18 @@ function submitModApply(){
     if(_um) _dlUrl=_um[0];
     else if(_dlUrl) _dlUrl='https://'+_dlUrl.replace(/^[^\w]*/,'').replace(/\s+/g,'');
     var dl=_dlUrl?('<a href="'+esc(_dlUrl)+'" target="_blank" rel="noopener" style="display:inline-block;margin-top:18px;padding:15px 28px;background:#16a34a;color:#fff;border-radius:12px;text-decoration:none;font-size:16px;font-weight:800;box-shadow:0 4px 12px rgba(22,163,74,.3)">⬇ 앱 다운로드 / 설치하기</a><div style="font-size:12px;color:#94a3b8;margin-top:8px">버튼을 눌러 설치 페이지로 이동하세요</div>'):'';
-    // 💳 입금 계좌 + 복사 버튼
-    var pay='';
-    var _pi=(def.payInfo||'').trim();
+    // 🧰 편의기능 — 입금 계좌 복사 + 링크 공유 (버튼 작게)
+    var _pi=(def.payInfo||'').trim(); if(_pi) window.__modPayInfo=_pi;
+    var conv='<div style="margin-top:20px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:14px;text-align:left">'
+      +'<div style="font-size:12px;color:#0f766e;font-weight:800;margin-bottom:10px">🧰 편의기능</div>';
     if(_pi){
-      window.__modPayInfo=_pi;
-      pay='<div style="margin-top:20px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:16px">'
-        +'<div style="font-size:12px;color:#15803d;font-weight:700;margin-bottom:8px">💳 입금 계좌</div>'
-        +'<div style="font-size:16px;font-weight:800;color:#0f172a;word-break:break-all;line-height:1.5">'+esc(_pi)+'</div>'
-        +'<button type="button" onclick="_modCopyPay(this)" style="margin-top:12px;padding:11px 24px;border:none;border-radius:10px;background:#16a34a;color:#fff;font-size:15px;font-weight:800;cursor:pointer">📋 계좌번호 복사</button>'
-        +'</div>';
+      conv+='<div style="font-size:11px;color:#64748b;margin-bottom:3px">💳 입금 계좌</div>'
+        +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span style="font-size:14px;font-weight:800;color:#0f172a;word-break:break-all">'+esc(_pi)+'</span>'
+        +'<button type="button" onclick="_modCopyPay(this)" style="padding:5px 11px;border:none;border-radius:7px;background:#16a34a;color:#fff;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap">📋 복사</button></div>';
     }
-    var share='<button type="button" onclick="_modShareForm(this)" style="display:inline-block;margin-top:16px;padding:13px 26px;border:none;border-radius:12px;background:#fbbf24;color:#78350f;font-size:15px;font-weight:800;cursor:pointer;box-shadow:0 3px 10px rgba(251,191,36,.35)">📤 이 신청 링크 공유하기</button><div style="font-size:12px;color:#94a3b8;margin-top:6px">친구·이웃에게 공유해 함께 신청하세요</div>';
-    document.getElementById('modApplyCard').innerHTML='<div style="text-align:center;padding:30px"><div style="font-size:48px">✅</div><h2 style="color:#16a34a;margin:12px 0;font-size:20px">신청 완료</h2><p style="color:#64748b;font-size:14px;line-height:1.6">신청이 정상 접수되었습니다.'+(def.downloadUrl?'':'<br>검토 후 개별 안내드리겠습니다.')+'</p>'+pay+dl+share+'</div>';
+    conv+='<div style="margin-top:'+(_pi?'12':'0')+'px"><button type="button" onclick="_modShareForm(this)" style="padding:7px 14px;border:none;border-radius:8px;background:#fbbf24;color:#78350f;font-size:13px;font-weight:800;cursor:pointer">📤 신청 링크 공유</button> <span style="font-size:11px;color:#94a3b8">친구·이웃에게 함께 신청 권유</span></div>';
+    conv+='</div>';
+    document.getElementById('modApplyCard').innerHTML='<div style="text-align:center;padding:30px"><div style="font-size:48px">✅</div><h2 style="color:#16a34a;margin:12px 0;font-size:20px">신청 완료</h2><p style="color:#64748b;font-size:14px;line-height:1.6">신청이 정상 접수되었습니다.'+(def.downloadUrl?'':'<br>검토 후 개별 안내드리겠습니다.')+'</p>'+dl+conv+'</div>';
   }).catch(function(e){
     if(btn){btn.disabled=false;btn.textContent='신청하기';}
     if(msg)msg.innerHTML='<span style="color:#ef4444">제출 실패: '+esc(e.message||e)+'</span>';
