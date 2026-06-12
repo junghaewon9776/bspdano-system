@@ -923,7 +923,8 @@ async function uploadAll(files, ar, type){
 
 // ===== 로그인 =====
 var AUTH_KEY="cleanFarm_auth_v1";
-var IDLE_MS=(/Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent))?60*60*1000:10*60*1000; // 모바일 1시간 / PC 10분 무활동 → 연장 팝업
+var IS_MOBILE=/Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent); // 앱/모바일 여부 — 모바일은 로그아웃 전까지 유지
+var IDLE_MS=IS_MOBILE?60*60*1000:10*60*1000; // 모바일 1시간 / PC 10분 무활동 → 연장 팝업
 function _idleLabel(){ return IDLE_MS>=3600000 ? (Math.round(IDLE_MS/3600000))+'시간' : (Math.round(IDLE_MS/60000))+'분'; }
 var WARN_COUNT_MS=60*1000;  // 팝업 뜬 뒤 60초 내 응답 없으면 자동 로그아웃
 // 자동로그인 TTL — 마지막 활동 이후 이 시간이 지나면 자동로그인 X, 수동 로그인 필요
@@ -1022,8 +1023,8 @@ async function doLogin(id,pw,keep,silent){
   if(typeof loadModDefs==='function') loadModDefs(function(){modLoadAll();mkTabs();draw()});
   mkTabs();drawEventBar();draw();
   if(keep)saveAuth(id,pw); else clearAuth();
-  // 로그인 상태 유지(keep) 시 무활동 자동 로그아웃 안 함 — 로그아웃 누를 때까지 유지
-  if(!keep) startIdleWatch();
+  // 앱(모바일)은 무활동 자동 로그아웃 안 함 (로그아웃 누를 때까지 유지) / PC는 기존대로 자동 로그아웃
+  if(!IS_MOBILE) startIdleWatch();
   // 비밀번호가 1234면 변경할 때까지 상단 빨간 배너 + 메뉴이동마다 모달
   _pwIsDefault=(String(pw)==='1234');
   if(_pwIsDefault) _showPwWarnBanner(); else _hidePwWarnBanner();
@@ -1211,13 +1212,13 @@ function showEvtSwitchModal(){
 async function tryAutoLogin(){
   var a=loadAuth();
   if(!a||!a.id||!a.pw)return;
-  // 로그인 상태 유지 켜둔 세션은 시간 만료 없이 계속 자동 로그인 (로그아웃 전까지 유지)
+  // 앱(모바일)은 시간 만료 없이 계속 자동 로그인 (로그아웃 전까지) / PC는 1시간 TTL 유지
   // 자동로그인은 silent라 텔레그램 알림도 안 감
   var ts = Number(a.ts)||0;
-  if(!ts){
+  if(!ts || (!IS_MOBILE && (Date.now() - ts) > AUTO_LOGIN_TTL_MS)){
     clearAuth();
     var er0=document.getElementById("loginErr");
-    if(er0){ er0.style.color="#6b7280"; er0.textContent="다시 로그인해주세요."; }
+    if(er0){ er0.style.color="#6b7280"; er0.textContent=IS_MOBILE?"다시 로그인해주세요.":"세션이 만료되었습니다. 다시 로그인해주세요."; }
     return;
   }
   // 자동로그인 중 UI — 로그인 폼 잠금 + 풀스크린 로딩
