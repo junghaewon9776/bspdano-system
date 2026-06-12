@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260612v78';
+var _MOD_ENGINE_VER='20260612v79';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -1217,7 +1217,8 @@ function _renderModDefCols(){
     h+='</div>';
     // 타입별 추가 옵션
     if(c.type==='select'){
-      h+='<div style="margin-top:6px"><textarea rows="4" placeholder="선택 항목 — 한 줄에 하나씩 (문장 안에 쉼표 써도 안 잘림)&#10;예:&#10;올 한 해 건강하길&#10;소원 성취" style="width:100%;font-size:12px;padding:5px 8px;border:1px solid #cbd5e1;border-radius:6px;resize:vertical;line-height:1.5" onchange="_modDefEditCols['+i+'].options=this.value.split(String.fromCharCode(10)).map(function(s){return s.trim()}).filter(Boolean);if(_modDefEditCols['+i+'].stockOn)_modDefRefreshCols()">'+esc((c.options||[]).join('\n'))+'</textarea></div>';
+      var _optPh=c.stockOn?'선택 항목 — 한 줄에 하나씩 · &quot;옵션 = 수량&quot;도 가능&#10;예:&#10;블랙 90 = 95&#10;화이트 100 = 50':'선택 항목 — 한 줄에 하나씩 (문장 안에 쉼표 써도 안 잘림)&#10;예:&#10;올 한 해 건강하길&#10;소원 성취';
+      h+='<div style="margin-top:6px"><textarea rows="4" placeholder="'+_optPh+'" style="width:100%;font-size:12px;padding:5px 8px;border:1px solid #cbd5e1;border-radius:6px;resize:vertical;line-height:1.5" onchange="_modDefSetOptions('+i+',this.value)">'+esc((c.options||[]).join('\n'))+'</textarea></div>';
       // 📦 재고(수량) 관리 — 옵션별 수량, 신청 시 자동 차감(건수 기반)
       h+='<div style="margin-top:6px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:7px;padding:7px 9px">';
       h+='<label style="font-size:11px;display:flex;align-items:center;gap:5px;font-weight:700;color:#0f766e;cursor:pointer"><input type="checkbox"'+(c.stockOn?' checked':'')+' onchange="_modDefEditCols['+i+'].stockOn=this.checked;_modDefRefreshCols()">📦 재고(수량) 관리 — 신청 들어오면 자동 차감</label>';
@@ -1367,6 +1368,22 @@ function _modDefMoveCol(i,dir){
 function _modDefRefreshCols(){
   var el=document.getElementById('mdf_cols_area');
   if(el) el.innerHTML=_renderModDefCols();
+}
+// 선택 옵션 입력 — 재고 켜진 경우 "옵션 = 수량" 자동 분리
+function _modDefSetOptions(i,val){
+  var c=_modDefEditCols[i]; if(!c) return;
+  var lines=String(val||'').split(String.fromCharCode(10)).map(function(s){return s.trim();}).filter(Boolean);
+  var opts=[];
+  if(c.stockOn && !c.stock) c.stock={};
+  lines.forEach(function(ln){
+    var m=c.stockOn?ln.match(/^(.*\S)\s*=\s*(\d+)\s*$/):null;
+    if(m){ var name=m[1].trim(); opts.push(name); c.stock[name]=parseInt(m[2],10); }
+    else opts.push(ln);
+  });
+  c.options=opts;
+  // 옵션에서 없어진 재고 키 정리
+  if(c.stockOn && c.stock){ Object.keys(c.stock).forEach(function(k){ if(opts.indexOf(k)<0) delete c.stock[k]; }); }
+  if(c.stockOn) _modDefRefreshCols();
 }
 // 옵션별 재고 수량 설정 (비우면 해당 옵션 무제한)
 function _modDefSetStock(i,opt,val){
