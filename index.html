@@ -1022,7 +1022,8 @@ async function doLogin(id,pw,keep,silent){
   if(typeof loadModDefs==='function') loadModDefs(function(){modLoadAll();mkTabs();draw()});
   mkTabs();drawEventBar();draw();
   if(keep)saveAuth(id,pw); else clearAuth();
-  startIdleWatch();
+  // 로그인 상태 유지(keep) 시 무활동 자동 로그아웃 안 함 — 로그아웃 누를 때까지 유지
+  if(!keep) startIdleWatch();
   // 비밀번호가 1234면 변경할 때까지 상단 빨간 배너 + 메뉴이동마다 모달
   _pwIsDefault=(String(pw)==='1234');
   if(_pwIsDefault) _showPwWarnBanner(); else _hidePwWarnBanner();
@@ -1210,13 +1211,13 @@ function showEvtSwitchModal(){
 async function tryAutoLogin(){
   var a=loadAuth();
   if(!a||!a.id||!a.pw)return;
-  // TTL 체크 — 마지막 활동으로부터 AUTO_LOGIN_TTL_MS 초과 시 자동로그인 금지
-  // (수동 로그인 필요. 이렇게 안하면 며칠 지나도 페이지 열 때마다 텔레그램 알림 감)
+  // 로그인 상태 유지 켜둔 세션은 시간 만료 없이 계속 자동 로그인 (로그아웃 전까지 유지)
+  // 자동로그인은 silent라 텔레그램 알림도 안 감
   var ts = Number(a.ts)||0;
-  if(!ts || (Date.now() - ts) > AUTO_LOGIN_TTL_MS){
+  if(!ts){
     clearAuth();
     var er0=document.getElementById("loginErr");
-    if(er0){ er0.style.color="#6b7280"; er0.textContent="세션이 만료되었습니다. 다시 로그인해주세요."; }
+    if(er0){ er0.style.color="#6b7280"; er0.textContent="다시 로그인해주세요."; }
     return;
   }
   // 자동로그인 중 UI — 로그인 폼 잠금 + 풀스크린 로딩
