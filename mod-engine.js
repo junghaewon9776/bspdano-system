@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260612v84';
+var _MOD_ENGINE_VER='20260612v85';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -530,6 +530,9 @@ function _modFmtCell(col,val){
       }).join('<br>');
     case 'consent':
       return val==='동의'?'<span style="color:#16a34a;font-weight:700">✅ 동의</span>':'<span style="color:#cbd5e1">미동의</span>';
+    case 'account':
+      var av=String(val), avs=av.replace(/"/g,'');
+      return '<span style="display:inline-flex;align-items:center;gap:5px;white-space:nowrap"><b>'+esc(av)+'</b><button type="button" data-copy="'+esc(avs)+'" onclick="_modCopyText(this)" style="border:none;border-radius:5px;background:#16a34a;color:#fff;font-size:10px;font-weight:700;padding:2px 7px;cursor:pointer">📋복사</button></span>';
     default:
       return esc(String(val));
   }
@@ -1074,7 +1077,7 @@ function _mshImportAoa(key, aoa){
 var MOD_COL_TYPES=[
   {v:"text",l:"텍스트"},{v:"number",l:"숫자/금액"},{v:"date",l:"날짜"},{v:"tel",l:"연락처(하이픈)"},
   {v:"select",l:"선택(드롭다운)"},{v:"textarea",l:"긴 텍스트"},{v:"badge",l:"상태배지"},
-  {v:"file",l:"파일첨부"},{v:"consent",l:"개인정보 동의"}
+  {v:"file",l:"파일첨부"},{v:"consent",l:"개인정보 동의"},{v:"account",l:"계좌(복사버튼)"}
 ];
 function _modColKey(){ return 'c'+Date.now().toString(36)+Math.random().toString(36).slice(2,5); }
 
