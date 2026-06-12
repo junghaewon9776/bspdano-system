@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260612v85';
+var _MOD_ENGINE_VER='20260612v86';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -506,6 +506,7 @@ function modDelSel(key){
 // ─── 셀 포맷 ───
 function _modFmtCell(col,val){
   if(val==null||val==="") return '<span style="color:#cbd5e1">—</span>';
+  if(col.multiQty){ var _ms=_modMultiStr(val); return _ms?'<b>'+esc(_ms)+'</b>':'<span style="color:#cbd5e1">—</span>'; }
   switch(col.type){
     case 'number':
       return col.comma?'<b>'+Number(val).toLocaleString()+'</b>':String(val);
@@ -639,6 +640,20 @@ function _modFormField(col,val){
     case 'textarea':
       return '<textarea id="'+id+'" rows="3" style="'+_w+'resize:vertical"'+ph+'>'+ev+'</textarea>';
     case 'select':
+      // 🛒 다중선택 + 수량: 옵션마다 수량칸 (티셔츠 사이즈별 주문 등)
+      if(col.multiQty){
+        var _cur={}; _modParseMulti(val).forEach(function(it){ if(it&&it.o) _cur[it.o]=it.q; });
+        var mh='<div id="'+id+'" data-multiqty="1" style="border:1px solid #cbd5e1;border-radius:10px;overflow:hidden">';
+        (col.options||[]).forEach(function(o,oi){
+          var ov=String(typeof o==='object'?o.value:o), ovs=ov.replace(/"/g,'');
+          mh+='<div data-optrow="'+esc(ovs)+'" style="display:flex;align-items:center;gap:8px;padding:10px 12px;'+(oi>0?'border-top:1px solid #f1f5f9;':'')+'">'
+            +'<span style="flex:1;font-weight:700;color:#334155;min-width:0">'+esc(ov)+'<span class="mqleft" style="font-size:11px;font-weight:600;margin-left:7px"></span></span>'
+            +'<input type="number" min="0" value="'+(_cur[ov]||0)+'" data-opt="'+esc(ovs)+'" style="width:62px;text-align:center;padding:7px;border:1px solid #cbd5e1;border-radius:6px;font-weight:700" onfocus="this.select()">'
+            +'<span style="font-size:12px;color:#94a3b8">개</span></div>';
+        });
+        mh+='</div><div style="font-size:11px;color:#94a3b8;margin-top:4px">필요한 항목에 수량을 넣으세요 (0은 선택 안 함)</div>';
+        return mh;
+      }
       var _sopts=col.options||[];
       var _inList=false;
       var _etcId=id+'_etc';
@@ -711,6 +726,11 @@ function modSave(key,editId){
       if(el.files&&el.files.length){ fileTasks.push({col:c,files:Array.prototype.slice.call(el.files)}); }
       else { obj[c.key]=prev; if(c.required&&!prev){ toast(c.label+' 파일을 첨부하세요',true); valid=false; } }
       return;
+    }
+    if(c.type==='select'&&c.multiQty){
+      var mv=_modCollectMultiQty('mod_f_'+c.key);
+      if(c.required&&!mv){ toast(c.label+' 수량을 1개 이상 입력하세요',true); valid=false; }
+      obj[c.key]=mv; return;
     }
     var v=(el.value||"").trim();
     if(c.type==='select'&&v==='__etc__'){ var _et=document.getElementById('mod_f_'+c.key+'_etc'); v=_et?(_et.value||'').trim():''; }
@@ -1243,13 +1263,19 @@ function _renderModDefCols(){
         h+='</div>';
         // 탈락만 제외 (대기·선정은 차감)
         h+='<label style="font-size:11px;display:flex;align-items:center;gap:5px;margin-top:8px;color:#475569;cursor:pointer"><input type="checkbox"'+(c.stockExclRejected!==false?' checked':'')+' onchange="_modDefEditCols['+i+'].stockExclRejected=this.checked"><b>🚫 탈락은 재고에서 제외</b> <span style="color:#94a3b8">— 대기·선정은 차감, 탈락만 복구</span></label>';
-        // 차감 수량 = 숫자칼럼 연동 (없으면 건당 1개)
-        var _numCols=_modDefEditCols.filter(function(cc){return cc.type==='number'&&cc.key&&cc.key!==c.key;});
-        h+='<div style="margin-top:6px;display:flex;align-items:center;gap:6px;font-size:11px;color:#475569"><span>차감 수량</span><select style="font-size:11px;padding:4px 6px;border:1px solid #cbd5e1;border-radius:5px" onchange="_modDefEditCols['+i+'].stockQtyKey=this.value">';
-        h+='<option value=""'+(!c.stockQtyKey?' selected':'')+'>건당 1개 (기본)</option>';
-        _numCols.forEach(function(cc){ h+='<option value="'+cc.key+'"'+(c.stockQtyKey===cc.key?' selected':'')+'>'+esc(cc.label||'숫자칸')+' 값만큼</option>'; });
-        h+='</select></div>';
-        h+='<div style="font-size:10px;color:#94a3b8;margin-top:3px">※ 수량칸(숫자 타입)을 따로 만들어 연결하면 관리자가 그 값을 고쳐 차감량을 조정할 수 있어요</div>';
+        // 🛒 다중선택 + 수량 (여러 항목 각각 수량 → 재고도 각각 차감)
+        h+='<label style="font-size:11px;display:flex;align-items:center;gap:5px;margin-top:6px;color:#475569;cursor:pointer"><input type="checkbox"'+(c.multiQty?' checked':'')+' onchange="_modDefEditCols['+i+'].multiQty=this.checked;_modDefRefreshCols()"><b>🛒 다중선택 + 수량</b> <span style="color:#94a3b8">— 여러 사이즈 각각 수량 입력 (예: 블랙2 화이트1)</span></label>';
+        if(!c.multiQty){
+          // 차감 수량 = 숫자칼럼 연동 (없으면 건당 1개)
+          var _numCols=_modDefEditCols.filter(function(cc){return cc.type==='number'&&cc.key&&cc.key!==c.key;});
+          h+='<div style="margin-top:6px;display:flex;align-items:center;gap:6px;font-size:11px;color:#475569"><span>차감 수량</span><select style="font-size:11px;padding:4px 6px;border:1px solid #cbd5e1;border-radius:5px" onchange="_modDefEditCols['+i+'].stockQtyKey=this.value">';
+          h+='<option value=""'+(!c.stockQtyKey?' selected':'')+'>건당 1개 (기본)</option>';
+          _numCols.forEach(function(cc){ h+='<option value="'+cc.key+'"'+(c.stockQtyKey===cc.key?' selected':'')+'>'+esc(cc.label||'숫자칸')+' 값만큼</option>'; });
+          h+='</select></div>';
+          h+='<div style="font-size:10px;color:#94a3b8;margin-top:3px">※ 수량칸(숫자 타입)을 따로 만들어 연결하면 관리자가 그 값을 고쳐 차감량을 조정할 수 있어요</div>';
+        } else {
+          h+='<div style="font-size:10px;color:#0f766e;margin-top:3px">※ 다중선택 모드: 신청폼에서 항목마다 수량칸이 떠서, 넣은 수량만큼 각 항목 재고가 빠집니다</div>';
+        }
       }
       h+='</div>';
     }
@@ -1808,7 +1834,24 @@ function _modIsRejected(statusCol, val){
   }
   return false;
 }
-// 옵션별 사용량 집계 — 탈락(빨강)만 제외(대기·선정은 차감) + 수량칼럼 연동(옵션). 재고 계산 단일 소스.
+// 다중선택+수량 값: JSON 배열 [{o:옵션,q:수량}] 파싱/표시/수집
+function _modParseMulti(v){
+  if(!v) return [];
+  if(typeof v==='object') return Array.isArray(v)?v:[];
+  try{ var a=JSON.parse(v); return Array.isArray(a)?a:[]; }catch(e){ return []; }
+}
+function _modMultiStr(v){
+  return _modParseMulti(v).filter(function(it){return it&&it.q>0;}).map(function(it){return it.o+'×'+it.q;}).join(', ');
+}
+function _modCollectMultiQty(id){
+  var cont=document.getElementById(id); if(!cont) return '';
+  var items=[];
+  [].slice.call(cont.querySelectorAll('input[data-opt]')).forEach(function(inp){
+    var q=parseInt(inp.value,10)||0; if(q>0) items.push({o:inp.getAttribute('data-opt'),q:q});
+  });
+  return items.length?JSON.stringify(items):'';
+}
+// 옵션별 사용량 집계 — 탈락(빨강)만 제외(대기·선정은 차감) + 수량칼럼/다중수량. 재고 계산 단일 소스.
 function _modStockUsed(def,col,arr){
   var statusCol=(def.columns||[]).find(function(c){return c.key==='status';});
   var exclRejected=(col.stockExclRejected!==false); // 기본: 탈락 제외
@@ -1816,8 +1859,12 @@ function _modStockUsed(def,col,arr){
   var used={};
   (arr||[]).forEach(function(r){
     if(!r) return;
-    var v=r[col.key]; if(v==null||v==='') return;
     if(exclRejected && statusCol && _modIsRejected(statusCol, r[statusCol.key])) return; // 탈락(빨강)만 제외
+    if(col.multiQty){ // 다중선택+수량: 항목별 수량 합산
+      _modParseMulti(r[col.key]).forEach(function(it){ if(it&&it.o&&it.q>0) used[it.o]=(used[it.o]||0)+it.q; });
+      return;
+    }
+    var v=r[col.key]; if(v==null||v==='') return;
     var q=qtyKey?(parseInt(r[qtyKey],10)||1):1;
     used[v]=(used[v]||0)+q;
   });
@@ -1836,6 +1883,20 @@ function _modApplyLoadStock(def,evtId){
     stockCols.forEach(function(c){
       var used=_modStockUsed(def,c,arr);
       var sel=document.getElementById('mod_f_'+c.key); if(!sel) return;
+      // 🛒 다중선택+수량: 각 항목 행에 남은수량 표시 + 입력 상한
+      if(c.multiQty){
+        [].slice.call(sel.querySelectorAll('[data-optrow]')).forEach(function(row){
+          var opt=row.getAttribute('data-optrow');
+          var cap=c.stock[opt];
+          var span=row.querySelector('.mqleft');
+          var inp=row.querySelector('input[data-opt]');
+          if(cap==null){ if(span){span.textContent='(무제한)';span.style.color='#94a3b8';} return; }
+          var left=Math.max(0,cap-(used[opt]||0));
+          if(span){ span.textContent=left<=0?'(품절)':'(남은 '+left+')'; span.style.color=left<=0?'#ef4444':'#16a34a'; }
+          if(inp){ inp.max=left; if(left<=0){ inp.value=0; inp.disabled=true; } }
+        });
+        return;
+      }
       var allSold=true;
       [].slice.call(sel.options).forEach(function(op){
         if(!op.value||op.value==='__etc__') return;
@@ -1946,6 +2007,11 @@ function submitModApply(){
       else if(c.required){ valid=false; if(!firstBad)firstBad=c.label+' 파일을 첨부해 주세요'; }
       return;
     }
+    if(c.type==='select'&&c.multiQty){
+      var mv=_modCollectMultiQty('mod_f_'+c.key);
+      if(c.required&&!mv){ valid=false; if(!firstBad)firstBad=c.label+'에서 수량을 1개 이상 입력하세요'; }
+      obj[c.key]=mv; return;
+    }
     var v=(el.value||'').trim();
     if(c.type==='select'&&v==='__etc__'){ var _et=document.getElementById('mod_f_'+c.key+'_etc'); v=_et?(_et.value||'').trim():''; }
     if(c.type==='number'&&c.comma) v=v.replace(/,/g,'');
@@ -1993,11 +2059,23 @@ function submitModApply(){
     // 📦 재고 재확인 — 초과접수 방지 (최신 데이터로 카운트)
     var stockCols=(def.columns||[]).filter(function(c){return c.type==='select'&&c.stockOn&&c.stock;});
     for(var si=0;si<stockCols.length;si++){
-      var sc=stockCols[si], chosen=obj[sc.key];
+      var sc=stockCols[si];
+      var usedMap=_modStockUsed(def,sc,arr);
+      if(sc.multiQty){ // 다중선택+수량: 항목마다 남은수량 확인
+        var items=_modParseMulti(obj[sc.key]);
+        for(var mi=0;mi<items.length;mi++){
+          var it=items[mi]; if(!it||!(it.q>0)) continue;
+          var capM=sc.stock[it.o]; if(capM==null) continue;
+          var uM=usedMap[it.o]||0;
+          if(uM+it.q>capM) throw new Error('"'+it.o+'" 재고가 부족합니다 (남은 '+Math.max(0,capM-uM)+'개)');
+        }
+        continue;
+      }
+      var chosen=obj[sc.key];
       if(chosen==null||chosen==='') continue;
       var cap=sc.stock[chosen];
       if(cap==null) continue; // 무제한
-      var u=(_modStockUsed(def,sc,arr)[chosen])||0;
+      var u=usedMap[chosen]||0;
       var newQty=sc.stockQtyKey?(parseInt(obj[sc.stockQtyKey],10)||1):1;
       if(u+newQty>cap) throw new Error('"'+chosen+'" 재고가 부족합니다 (남은 '+Math.max(0,cap-u)+'개)');
     }
