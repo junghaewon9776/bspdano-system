@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260612v72';
+var _MOD_ENGINE_VER='20260612v73';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -2204,6 +2204,7 @@ function _mlElemFit(p, plain, baseFs, labelWmm){
   } else {
     css=p.align?('width:'+w+'%;white-space:nowrap;overflow:hidden;'+alignCss):'white-space:nowrap;';
   }
+  if(p.vert) css='writing-mode:vertical-rl;text-orientation:upright;letter-spacing:0;'+css;
   return {css:css, fs:fs};
 }
 
@@ -3236,14 +3237,14 @@ function _mllRender(){
   var items=[];
   var tp=pos['_title']||{x:4,y:4,fs:14};
   var _titleText=_modMaskVal(String(titleV),tp);
-  items.push({id:'_title',label:'제목',text:_titleText,x:tp.x,y:tp.y,fs:tp.fs||14,bold:true,mode:(tp.mode||(tp.wrap?'wrap':'line')),w:tp.w,align:tp.align,color:'#6366f1'});
+  items.push({id:'_title',label:'제목',text:_titleText,x:tp.x,y:tp.y,fs:tp.fs||14,bold:true,mode:(tp.mode||(tp.wrap?'wrap':'line')),w:tp.w,align:tp.align,vert:tp.vert,color:'#6366f1'});
   L.cols.forEach(function(c){
     if(c.key===L.opt.titleKey) return;
     var fp=pos[c.key]||{x:4,y:20,fs:7.5};
     ci=(ci+1)%colors.length;
     var v=_modMaskVal(row[c.key]||'샘플',fp);
     var sepC=fp.brk?((fp.colon?':':'')+'\n'):(fp.colon?': ':' ');
-    items.push({id:c.key,label:c.label,text:c.label+sepC+v,x:fp.x,y:fp.y,fs:fp.fs||7.5,bold:fp.bold,mode:(fp.mode||(fp.wrap?'wrap':'line')),w:fp.w,align:fp.align,color:colors[ci]});
+    items.push({id:c.key,label:c.label,text:c.label+sepC+v,x:fp.x,y:fp.y,fs:fp.fs||7.5,bold:fp.bold,mode:(fp.mode||(fp.wrap?'wrap':'line')),w:fp.w,align:fp.align,vert:fp.vert,color:colors[ci]});
   });
   var qp=pos['_qr']||{x:70,y:4,w:25};
   var qSize=Math.round((qp.w||25)*SCALE);
@@ -3267,6 +3268,7 @@ function _mllRender(){
       } else {
         box=(it.align?'width:'+bwpx+'px;white-space:pre;overflow:hidden;text-align:'+it.align+';':'white-space:pre;');
       }
+      if(it.vert) box='writing-mode:vertical-rl;text-orientation:upright;'+box;
       html+='<div class="mll_el" data-id="'+it.id+'" style="position:absolute;left:'+left+'px;top:'+top+'px;border:1.5px dashed '+it.color+';border-radius:3px;padding:2px 4px;font-size:'+fsPx+'px;'+(it.bold?'font-weight:800;':'')+'color:'+it.color+';cursor:move;background:rgba(255,255,255,.85);box-sizing:border-box;'+box+'">'+esc(it.text)+'</div>';
     }
   });
@@ -3366,6 +3368,7 @@ function _mllShowCtrl(id){
     h+='<div style="margin-top:8px;font-size:11px;color:#94a3b8;margin-bottom:5px">서식</div>';
     h+='<div style="display:flex;flex-wrap:wrap;gap:4px">';
     h+='<button onclick="_mllToggle(\''+id+'\',\'bold\')" style="'+bs(p.bold)+'">B 굵게</button>';
+    h+='<button onclick="_mllToggle(\''+id+'\',\'vert\')" style="'+bs(p.vert)+'">⬍ 세로쓰기</button>';
     if(id!=='_title'){ h+='<button onclick="_mllToggle(\''+id+'\',\'brk\')" style="'+bs(p.brk)+'">↵ 라벨/값</button>'; h+='<button onclick="_mllToggle(\''+id+'\',\'colon\')" style="'+bs(p.colon)+'">: 표시</button>'; }
     h+='</div>';
     h+='<div style="margin-top:6px;font-size:11px;color:#94a3b8;margin-bottom:4px">가리기 · 장식</div>';
