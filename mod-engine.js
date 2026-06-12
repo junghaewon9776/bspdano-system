@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260612v87';
+var _MOD_ENGINE_VER='20260612v88';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -644,14 +644,15 @@ function _modFormField(col,val){
       if(col.multiQty){
         var _cur={}; _modParseMulti(val).forEach(function(it){ if(it&&it.o) _cur[it.o]=it.q; });
         var mh='<div id="'+id+'" data-multiqty="1" style="border:1px solid #cbd5e1;border-radius:10px;overflow:hidden">';
+        var _mp=col.maxPer||0;
         (col.options||[]).forEach(function(o,oi){
           var ov=String(typeof o==='object'?o.value:o), ovs=ov.replace(/"/g,'');
           mh+='<div data-optrow="'+esc(ovs)+'" style="display:flex;align-items:center;gap:8px;padding:10px 12px;'+(oi>0?'border-top:1px solid #f1f5f9;':'')+'">'
             +'<span style="flex:1;font-weight:700;color:#334155;min-width:0">'+esc(ov)+'<span class="mqleft" style="font-size:11px;font-weight:600;margin-left:7px"></span></span>'
-            +'<input type="number" min="0" value="'+(_cur[ov]||0)+'" data-opt="'+esc(ovs)+'" style="width:62px;text-align:center;padding:7px;border:1px solid #cbd5e1;border-radius:6px;font-weight:700" onfocus="this.select()">'
+            +'<input type="number" min="0"'+(_mp?' max="'+_mp+'"':'')+' value="'+(_cur[ov]||0)+'" data-opt="'+esc(ovs)+'" style="width:62px;text-align:center;padding:7px;border:1px solid #cbd5e1;border-radius:6px;font-weight:700" onfocus="this.select()" oninput="if(this.max!==\'\'&&this.max!=null&&parseInt(this.value,10)>parseInt(this.max,10))this.value=this.max">'
             +'<span style="font-size:12px;color:#94a3b8">개</span></div>';
         });
-        mh+='</div><div style="font-size:11px;color:#94a3b8;margin-top:4px">필요한 항목에 수량을 넣으세요 (0은 선택 안 함)</div>';
+        mh+='</div><div style="font-size:11px;color:#94a3b8;margin-top:4px">필요한 항목에 수량을 넣으세요 (0은 선택 안 함)'+(_mp?' · 한 품목당 최대 '+_mp+'개':'')+'</div>';
         return mh;
       }
       var _sopts=col.options||[];
@@ -1274,7 +1275,8 @@ function _renderModDefCols(){
           h+='</select></div>';
           h+='<div style="font-size:10px;color:#94a3b8;margin-top:3px">※ 수량칸(숫자 타입)을 따로 만들어 연결하면 관리자가 그 값을 고쳐 차감량을 조정할 수 있어요</div>';
         } else {
-          h+='<div style="font-size:10px;color:#0f766e;margin-top:3px">※ 다중선택 모드: 신청폼에서 항목마다 수량칸이 떠서, 넣은 수량만큼 각 항목 재고가 빠집니다</div>';
+          h+='<div style="margin-top:6px;display:flex;align-items:center;gap:6px;font-size:11px;color:#475569"><span>1인당 최대</span><input type="number" min="0" value="'+(c.maxPer||'')+'" placeholder="제한없음" style="width:70px;font-size:11px;padding:4px 6px;border:1px solid #cbd5e1;border-radius:5px" onchange="_modDefEditCols['+i+'].maxPer=this.value?parseInt(this.value,10):0"><span>개</span></div>';
+          h+='<div style="font-size:10px;color:#0f766e;margin-top:3px">※ 다중선택 모드: 항목마다 수량칸. 1인당 최대를 정하면 한 품목당 그 수량까지만 신청 가능 (재고 남은 수와 함께 적용)</div>';
         }
       }
       h+='</div>';
@@ -1885,15 +1887,21 @@ function _modApplyLoadStock(def,evtId){
       var sel=document.getElementById('mod_f_'+c.key); if(!sel) return;
       // 🛒 다중선택+수량: 각 항목 행에 남은수량 표시 + 입력 상한
       if(c.multiQty){
+        var _mp=c.maxPer||0;
         [].slice.call(sel.querySelectorAll('[data-optrow]')).forEach(function(row){
           var opt=row.getAttribute('data-optrow');
           var cap=c.stock[opt];
           var span=row.querySelector('.mqleft');
           var inp=row.querySelector('input[data-opt]');
-          if(cap==null){ if(span){span.textContent='(무제한)';span.style.color='#94a3b8';} return; }
+          if(cap==null){
+            if(span){span.textContent=_mp?'(최대 '+_mp+')':'(무제한)';span.style.color='#94a3b8';}
+            if(inp&&_mp) inp.max=_mp;
+            return;
+          }
           var left=Math.max(0,cap-(used[opt]||0));
-          if(span){ span.textContent=left<=0?'(품절)':'(남은 '+left+')'; span.style.color=left<=0?'#ef4444':'#16a34a'; }
-          if(inp){ inp.max=left; if(left<=0){ inp.value=0; inp.disabled=true; } }
+          var lim=_mp?Math.min(left,_mp):left; // 재고남은 vs 1인당최대 중 작은 값
+          if(span){ span.textContent=left<=0?'(품절)':('(남은 '+left+(_mp?', 1인'+_mp:'')+')'); span.style.color=left<=0?'#ef4444':'#16a34a'; }
+          if(inp){ inp.max=lim; if(lim<=0){ inp.value=0; inp.disabled=true; } else if(parseInt(inp.value,10)>lim){ inp.value=lim; } }
         });
         return;
       }
@@ -2022,6 +2030,7 @@ function submitModApply(){
     if(c.type==='select'&&c.multiQty){
       var mv=_modCollectMultiQty('mod_f_'+c.key);
       if(c.required&&!mv){ valid=false; if(!firstBad)firstBad=c.label+'에서 수량을 1개 이상 입력하세요'; }
+      if(c.maxPer){ var _ov=_modParseMulti(mv).filter(function(it){return it.q>c.maxPer;})[0]; if(_ov){ valid=false; if(!firstBad)firstBad='"'+_ov.o+'"은(는) 1인당 최대 '+c.maxPer+'개까지입니다'; } }
       obj[c.key]=mv; return;
     }
     var v=(el.value||'').trim();
