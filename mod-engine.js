@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260612v74';
+var _MOD_ENGINE_VER='20260612v75';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -181,6 +181,7 @@ function dMod(key){
   if(isA()) h+='<button class="btn" style="background:#475569;color:#fff" onclick="popModLabel(\''+key+'\')">🖨 라벨 출력</button>';
   if(isA()) h+='<button class="btn btn-b" onclick="popModAdd(\''+key+'\')">➕ 추가</button>';
   if(isA()) h+='<button class="btn" style="background:#e67e22;color:#fff" onclick="popModStat(\''+key+'\')">📊 통계</button>';
+  if(isA() && (def.columns||[]).some(function(c){return c.type==='select'&&c.stockOn;})) h+='<button class="btn" style="background:#0f766e;color:#fff" onclick="popModStock(\''+key+'\')">📦 재고</button>';
   if(isA()) h+='<button class="btn" style="background:#16a34a;color:#fff" onclick="popModSheet(\''+key+'\')">📝 시트 편집</button>';
   if(isA()) h+='<button class="btn" style="background:#0d9488;color:#fff" onclick="modImportExcel(\''+key+'\')">📤 가져오기</button>';
   if(feat.excel!==false) h+='<button class="btn" onclick="modExportExcel(\''+key+'\')">📥 내보내기</button>';
@@ -1216,7 +1217,21 @@ function _renderModDefCols(){
     h+='</div>';
     // 타입별 추가 옵션
     if(c.type==='select'){
-      h+='<div style="margin-top:6px"><textarea rows="4" placeholder="선택 항목 — 한 줄에 하나씩 (문장 안에 쉼표 써도 안 잘림)&#10;예:&#10;올 한 해 건강하길&#10;소원 성취" style="width:100%;font-size:12px;padding:5px 8px;border:1px solid #cbd5e1;border-radius:6px;resize:vertical;line-height:1.5" onchange="_modDefEditCols['+i+'].options=this.value.split(String.fromCharCode(10)).map(function(s){return s.trim()}).filter(Boolean)">'+esc((c.options||[]).join('\n'))+'</textarea></div>';
+      h+='<div style="margin-top:6px"><textarea rows="4" placeholder="선택 항목 — 한 줄에 하나씩 (문장 안에 쉼표 써도 안 잘림)&#10;예:&#10;올 한 해 건강하길&#10;소원 성취" style="width:100%;font-size:12px;padding:5px 8px;border:1px solid #cbd5e1;border-radius:6px;resize:vertical;line-height:1.5" onchange="_modDefEditCols['+i+'].options=this.value.split(String.fromCharCode(10)).map(function(s){return s.trim()}).filter(Boolean);if(_modDefEditCols['+i+'].stockOn)_modDefRefreshCols()">'+esc((c.options||[]).join('\n'))+'</textarea></div>';
+      // 📦 재고(수량) 관리 — 옵션별 수량, 신청 시 자동 차감(건수 기반)
+      h+='<div style="margin-top:6px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:7px;padding:7px 9px">';
+      h+='<label style="font-size:11px;display:flex;align-items:center;gap:5px;font-weight:700;color:#0f766e;cursor:pointer"><input type="checkbox"'+(c.stockOn?' checked':'')+' onchange="_modDefEditCols['+i+'].stockOn=this.checked;_modDefRefreshCols()">📦 재고(수량) 관리 — 신청 들어오면 자동 차감</label>';
+      if(c.stockOn){
+        h+='<div style="margin-top:6px;font-size:11px;color:#94a3b8">옵션별 총 수량 (비우면 무제한)</div>';
+        h+='<div style="display:flex;flex-direction:column;gap:4px;margin-top:4px">';
+        (c.options||[]).forEach(function(o){
+          var q=(c.stock&&c.stock[o]!=null)?c.stock[o]:'';
+          h+='<div style="display:flex;align-items:center;gap:6px"><span style="flex:1;font-size:12px;color:#334155;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(o)+'</span><input type="number" min="0" value="'+q+'" placeholder="무제한" style="width:80px;font-size:12px;padding:4px 6px;border:1px solid #cbd5e1;border-radius:5px" onchange="_modDefSetStock('+i+',\''+esc(String(o)).replace(/'/g,"\\'")+'\',this.value)"><span style="font-size:11px;color:#94a3b8">개</span></div>';
+        });
+        if(!(c.options||[]).length) h+='<div style="font-size:11px;color:#cbd5e1">먼저 선택 항목을 입력하세요</div>';
+        h+='</div>';
+      }
+      h+='</div>';
     }
     if(c.type==='badge'){
       h+='<div style="margin-top:6px"><input placeholder="배지 (key:이름:배경색:글자색, 쉼표구분)" value="'+esc(_badgeMapToStr(c.badgeMap||{}))+'" style="width:100%;font-size:12px;padding:5px 8px;border:1px solid #cbd5e1;border-radius:6px" onchange="_modDefEditCols['+i+'].badgeMap=_strToBadgeMap(this.value)"></div>';
@@ -1343,6 +1358,13 @@ function _modDefMoveCol(i,dir){
 function _modDefRefreshCols(){
   var el=document.getElementById('mdf_cols_area');
   if(el) el.innerHTML=_renderModDefCols();
+}
+// 옵션별 재고 수량 설정 (비우면 해당 옵션 무제한)
+function _modDefSetStock(i,opt,val){
+  var c=_modDefEditCols[i]; if(!c) return;
+  if(!c.stock) c.stock={};
+  if(val===''||val==null) delete c.stock[opt];
+  else c.stock[opt]=Math.max(0,parseInt(val,10)||0);
 }
 
 function saveModDef(keyOrNew){
@@ -1695,6 +1717,41 @@ function _renderModApplyUI(def,evtId){
   h+='<button id="modApplyBtn" onclick="submitModApply()" style="width:100%;padding:16px;border:none;border-radius:12px;background:#2563eb;color:#fff;font-size:17px;font-weight:800;cursor:pointer;margin-top:14px;box-shadow:0 4px 12px rgba(37,99,235,.3)">✓ '+esc(def.label)+' 신청하기</button>';
   h+='<div id="modApplyMsg" style="text-align:center;margin-top:12px;font-size:13px"></div>';
   document.getElementById('modApplyCard').innerHTML=h;
+  // 📦 재고 관리 select 있으면 현재 신청수 세서 남은수량 표시 + 품절 비활성화
+  _modApplyLoadStock(def,evtId);
+}
+
+// 재고 관리 select들: 현재 데이터 읽어 옵션별 남은수량 계산 → 드롭다운에 반영
+function _modApplyLoadStock(def,evtId){
+  if(typeof fbDb==='undefined') return;
+  var stockCols=(def.columns||[]).filter(function(c){return c.type==='select'&&c.stockOn&&c.stock;});
+  if(!stockCols.length) return;
+  var path=def.global?'/main/'+def.fbPath:'/evtData/'+evtId+'/'+def.fbPath;
+  fbDb.ref(path).once('value').then(function(snap){
+    var arr=snap.val()||[]; if(!Array.isArray(arr))arr=Object.values(arr);
+    window.__modStockData={path:path, arr:arr};
+    stockCols.forEach(function(c){
+      var used={};
+      arr.forEach(function(r){ if(r){ var val=r[c.key]; if(val!=null&&val!==''){ used[val]=(used[val]||0)+1; } } });
+      var sel=document.getElementById('mod_f_'+c.key); if(!sel) return;
+      var allSold=true;
+      [].slice.call(sel.options).forEach(function(op){
+        if(!op.value||op.value==='__etc__') return;
+        var cap=c.stock[op.value];
+        if(cap==null){ allSold=false; return; } // 무제한
+        var left=Math.max(0, cap-(used[op.value]||0));
+        var base=op.getAttribute('data-base')||op.textContent.replace(/\s*\((품절|남은[^)]*|\d+개[^)]*)\)\s*$/,'');
+        op.setAttribute('data-base',base);
+        if(left<=0){ op.textContent=base+' (품절)'; op.disabled=true; }
+        else { op.textContent=base+' ('+left+'개 남음)'; op.disabled=false; allSold=false; }
+      });
+      // 안내 문구
+      var note=document.getElementById('_modStockNote_'+c.key);
+      if(!note){ note=document.createElement('div'); note.id='_modStockNote_'+c.key; note.style.cssText='font-size:11px;color:#0f766e;margin-top:4px;font-weight:700'; sel.parentNode.appendChild(note); }
+      note.textContent=allSold?'⚠ 모든 항목이 품절되었습니다':'📦 남은 수량이 표시됩니다 (실시간)';
+      note.style.color=allSold?'#ef4444':'#0f766e';
+    });
+  }).catch(function(){});
 }
 
 // 구글 계정 인증 → 이메일 표시 → 동의 체크 (구글 폼 방식)
@@ -1800,6 +1857,16 @@ function submitModApply(){
     return fbDb.ref(path).once('value');
   }).then(function(snap){
     var arr=snap.val()||[]; if(!Array.isArray(arr))arr=Object.values(arr);
+    // 📦 재고 재확인 — 초과접수 방지 (최신 데이터로 카운트)
+    var stockCols=(def.columns||[]).filter(function(c){return c.type==='select'&&c.stockOn&&c.stock;});
+    for(var si=0;si<stockCols.length;si++){
+      var sc=stockCols[si], chosen=obj[sc.key];
+      if(chosen==null||chosen==='') continue;
+      var cap=sc.stock[chosen];
+      if(cap==null) continue; // 무제한
+      var u=0; arr.forEach(function(r){ if(r&&r[sc.key]===chosen) u++; });
+      if(u>=cap) throw new Error('"'+chosen+'" 항목이 품절되었습니다 (남은 수량 0)');
+    }
     arr.push(obj);
     return fbDb.ref(path).set(arr);
   }).then(function(){
@@ -3707,6 +3774,39 @@ function _mvDoLogin(){
 // ═══════════════════════════════════════════
 // 📊 범용 통계
 // ═══════════════════════════════════════════
+
+// 📦 재고 현황 — 옵션별 총수량/신청수/남은수량
+function popModStock(key){
+  var def=_modDefs[key]; if(!def) return;
+  var data=(_modData[key]||[]).slice();
+  var stockCols=(def.columns||[]).filter(function(c){return c.type==='select'&&c.stockOn&&c.stock;});
+  if(!stockCols.length) return toast('재고 관리 중인 항목이 없습니다',true);
+  var h='<div class="pop-head"><h3>📦 '+esc(def.label)+' 재고 현황</h3></div>';
+  h+='<div style="padding:14px;max-height:78vh;overflow:auto">';
+  stockCols.forEach(function(c){
+    var used={}; data.forEach(function(r){ if(r){ var v=r[c.key]; if(v!=null&&v!=='') used[v]=(used[v]||0)+1; } });
+    h+='<div style="font-weight:800;color:#0f766e;margin:6px 0 8px;font-size:15px">'+esc(c.label)+'</div>';
+    h+='<table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:16px">';
+    h+='<tr style="background:#f1f5f9;color:#475569"><th style="padding:7px 9px;text-align:left;border:1px solid #e2e8f0">항목</th><th style="padding:7px 9px;border:1px solid #e2e8f0">총 수량</th><th style="padding:7px 9px;border:1px solid #e2e8f0">신청</th><th style="padding:7px 9px;border:1px solid #e2e8f0">남음</th></tr>';
+    (c.options||[]).forEach(function(o){
+      var cap=c.stock[o], u=used[o]||0;
+      var leftTxt, leftColor;
+      if(cap==null){ leftTxt='무제한'; leftColor='#64748b'; }
+      else { var left=Math.max(0,cap-u); leftTxt=left+'개'; leftColor=left<=0?'#ef4444':(left<=Math.max(1,cap*0.1)?'#d97706':'#16a34a'); }
+      h+='<tr><td style="padding:7px 9px;border:1px solid #e2e8f0;font-weight:700">'+esc(o)+'</td>'
+        +'<td style="padding:7px 9px;border:1px solid #e2e8f0;text-align:center">'+(cap==null?'∞':cap)+'</td>'
+        +'<td style="padding:7px 9px;border:1px solid #e2e8f0;text-align:center">'+u+'</td>'
+        +'<td style="padding:7px 9px;border:1px solid #e2e8f0;text-align:center;font-weight:800;color:'+leftColor+'">'+(cap!=null&&Math.max(0,cap-u)<=0?'품절':leftTxt)+'</td></tr>';
+    });
+    // 옵션 외 값(직접입력 등)도 표시
+    Object.keys(used).forEach(function(v){ if((c.options||[]).indexOf(v)<0){ h+='<tr style="color:#94a3b8"><td style="padding:7px 9px;border:1px solid #e2e8f0">'+esc(v)+' <span style="font-size:10px">(목록 외)</span></td><td style="border:1px solid #e2e8f0;text-align:center">-</td><td style="border:1px solid #e2e8f0;text-align:center">'+used[v]+'</td><td style="border:1px solid #e2e8f0;text-align:center">-</td></tr>'; } });
+    h+='</table>';
+  });
+  h+='<div style="font-size:11px;color:#94a3b8">※ 남은 수량 = 총 수량 − 신청 건수. 수량 변경은 모듈관리 → 해당 항목에서.</div>';
+  h+='<div style="text-align:right;margin-top:12px"><button class="btn" onclick="closePopup()">닫기</button></div>';
+  h+='</div>';
+  openPopup(h,560);
+}
 
 function popModStat(key){
   var def=_modDefs[key]; if(!def) return;
