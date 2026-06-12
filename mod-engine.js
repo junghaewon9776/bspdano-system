@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260612v70';
+var _MOD_ENGINE_VER='20260612v71';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -647,7 +647,9 @@ function _modFormField(col,val){
       var _etcOn=(!_inList && val!=null && val!=='');
       h+='<option value="__etc__"'+(_etcOn?' selected':'')+'>+ 직접 입력</option>';
       h+='</select>';
-      h+='<input id="'+_etcId+'" placeholder="직접 입력" value="'+(_etcOn?ev:'')+'" style="'+_w+'margin-top:4px;display:'+(_etcOn?'block':'none')+'">';
+      var _etcMax=(col.maxLen?' maxlength="'+col.maxLen+'"':'');
+      var _etcPh=col.maxLen?('직접 입력 (최대 '+col.maxLen+'자)'):'직접 입력';
+      h+='<input id="'+_etcId+'"'+_etcMax+' placeholder="'+_etcPh+'" value="'+(_etcOn?ev:'')+'" style="'+_w+'margin-top:4px;display:'+(_etcOn?'block':'none')+'">';
       return h;
     case 'badge':
       var h='<select id="'+id+'" style="'+_w+'"><option value="">— 선택 —</option>';
@@ -1254,12 +1256,13 @@ function _renderModDefCols(){
       h+='<label style="font-size:11px;display:flex;align-items:center;gap:3px;background:#eef2ff;padding:4px 7px;border-radius:5px;white-space:nowrap" title="체크 시 기본값으로 고정되고 입력칸에서 수정할 수 없습니다"><input type="checkbox"'+(c.fixed?' checked':'')+' onchange="_modDefEditCols['+i+'].fixed=this.checked"><b style="color:#4338ca">🔒 고정</b></label>';
       h+='</div>';
     }
-    // 글자수 제한 — 텍스트류 (예: 차량번호 최소 7자)
-    if(['text','tel','textarea'].indexOf(c.type)>=0){
-      h+='<div style="margin-top:6px;display:flex;gap:6px;align-items:center;flex-wrap:wrap"><span style="font-size:11px;color:#94a3b8">글자수</span>';
+    // 글자수 제한 — 텍스트류 + select(직접 입력 칸에 적용)
+    if(['text','tel','textarea','select'].indexOf(c.type)>=0){
+      var _llHint=(c.type==='select')?'(↑ 직접 입력 칸에 적용)':'(예: 차량번호 최소 7)';
+      h+='<div style="margin-top:6px;display:flex;gap:6px;align-items:center;flex-wrap:wrap"><span style="font-size:11px;color:#94a3b8">글자수'+(c.type==='select'?'<span style="color:#cbd5e1"> ·직접입력</span>':'')+'</span>';
       h+='<label style="font-size:11px;color:#475569">최소<input type="number" min="0" value="'+(c.minLen||'')+'" placeholder="0" style="width:58px;font-size:12px;padding:4px 6px;border:1px solid #cbd5e1;border-radius:5px;margin-left:3px" onchange="_modDefEditCols['+i+'].minLen=this.value?parseInt(this.value,10):0"></label>';
       h+='<label style="font-size:11px;color:#475569">최대<input type="number" min="0" value="'+(c.maxLen||'')+'" placeholder="제한없음" style="width:70px;font-size:12px;padding:4px 6px;border:1px solid #cbd5e1;border-radius:5px;margin-left:3px" onchange="_modDefEditCols['+i+'].maxLen=this.value?parseInt(this.value,10):0"></label>';
-      h+='<span style="font-size:10px;color:#94a3b8">(예: 차량번호 최소 7)</span>';
+      h+='<span style="font-size:10px;color:#94a3b8">'+_llHint+'</span>';
       h+='</div>';
     }
     // 숫자 값 범위 (number)
