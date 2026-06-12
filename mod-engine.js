@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260612v88';
+var _MOD_ENGINE_VER='20260612v89';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -647,12 +647,15 @@ function _modFormField(col,val){
         var _mp=col.maxPer||0;
         (col.options||[]).forEach(function(o,oi){
           var ov=String(typeof o==='object'?o.value:o), ovs=ov.replace(/"/g,'');
+          var on=_cur[ov]>0;
           mh+='<div data-optrow="'+esc(ovs)+'" style="display:flex;align-items:center;gap:8px;padding:10px 12px;'+(oi>0?'border-top:1px solid #f1f5f9;':'')+'">'
-            +'<span style="flex:1;font-weight:700;color:#334155;min-width:0">'+esc(ov)+'<span class="mqleft" style="font-size:11px;font-weight:600;margin-left:7px"></span></span>'
-            +'<input type="number" min="0"'+(_mp?' max="'+_mp+'"':'')+' value="'+(_cur[ov]||0)+'" data-opt="'+esc(ovs)+'" style="width:62px;text-align:center;padding:7px;border:1px solid #cbd5e1;border-radius:6px;font-weight:700" onfocus="this.select()" oninput="if(this.max!==\'\'&&this.max!=null&&parseInt(this.value,10)>parseInt(this.max,10))this.value=this.max">'
+            +'<label style="flex:1;display:flex;align-items:center;gap:8px;font-weight:700;color:#334155;cursor:pointer;min-width:0">'
+              +'<input type="checkbox" class="mqchk" data-opt="'+esc(ovs)+'"'+(on?' checked':'')+' onchange="_modMqToggle(this)" style="width:18px;height:18px;flex-shrink:0">'
+              +'<span style="min-width:0">'+esc(ov)+'<span class="mqleft" style="font-size:11px;font-weight:600;margin-left:7px"></span></span></label>'
+            +'<input type="number" class="mqnum" min="1"'+(_mp?' max="'+_mp+'"':'')+' value="'+(on?_cur[ov]:1)+'" data-opt="'+esc(ovs)+'"'+(on?'':' disabled')+' style="width:60px;text-align:center;padding:7px;border:1px solid #cbd5e1;border-radius:6px;font-weight:700;'+(on?'':'opacity:.4;background:#f1f5f9')+'" onfocus="this.select()" oninput="if(this.max!==\'\'&&this.max!=null&&parseInt(this.value,10)>parseInt(this.max,10))this.value=this.max">'
             +'<span style="font-size:12px;color:#94a3b8">개</span></div>';
         });
-        mh+='</div><div style="font-size:11px;color:#94a3b8;margin-top:4px">필요한 항목에 수량을 넣으세요 (0은 선택 안 함)'+(_mp?' · 한 품목당 최대 '+_mp+'개':'')+'</div>';
+        mh+='</div><div style="font-size:11px;color:#94a3b8;margin-top:4px">원하는 품목을 체크하면 수량이 켜집니다'+(_mp?' · 한 품목당 최대 '+_mp+'개':'')+'</div>';
         return mh;
       }
       var _sopts=col.options||[];
@@ -1848,10 +1851,21 @@ function _modMultiStr(v){
 function _modCollectMultiQty(id){
   var cont=document.getElementById(id); if(!cont) return '';
   var items=[];
-  [].slice.call(cont.querySelectorAll('input[data-opt]')).forEach(function(inp){
-    var q=parseInt(inp.value,10)||0; if(q>0) items.push({o:inp.getAttribute('data-opt'),q:q});
+  [].slice.call(cont.querySelectorAll('[data-optrow]')).forEach(function(row){
+    var chk=row.querySelector('.mqchk');
+    if(chk && !chk.checked) return; // 체크 안 한 품목 제외
+    var num=row.querySelector('.mqnum');
+    var q=num?(parseInt(num.value,10)||0):0;
+    if(q>0) items.push({o:row.getAttribute('data-optrow'), q:q});
   });
   return items.length?JSON.stringify(items):'';
+}
+// 품목 체크 → 그 줄 수량칸 활성/비활성
+function _modMqToggle(chk){
+  var row=chk.closest?chk.closest('[data-optrow]'):null; if(!row) return;
+  var num=row.querySelector('.mqnum'); if(!num) return;
+  if(chk.checked){ num.disabled=false; num.style.opacity='1'; num.style.background=''; if(!(parseInt(num.value,10)>0)) num.value=1; try{num.focus();num.select();}catch(e){} }
+  else { num.disabled=true; num.style.opacity='.4'; num.style.background='#f1f5f9'; }
 }
 // 옵션별 사용량 집계 — 탈락(빨강)만 제외(대기·선정은 차감) + 수량칼럼/다중수량. 재고 계산 단일 소스.
 function _modStockUsed(def,col,arr){
@@ -1892,16 +1906,18 @@ function _modApplyLoadStock(def,evtId){
           var opt=row.getAttribute('data-optrow');
           var cap=c.stock[opt];
           var span=row.querySelector('.mqleft');
-          var inp=row.querySelector('input[data-opt]');
+          var num=row.querySelector('.mqnum');
+          var chk=row.querySelector('.mqchk');
           if(cap==null){
-            if(span){span.textContent=_mp?'(최대 '+_mp+')':'(무제한)';span.style.color='#94a3b8';}
-            if(inp&&_mp) inp.max=_mp;
+            if(span){span.textContent=_mp?'(최대 '+_mp+')':'';span.style.color='#94a3b8';}
+            if(num&&_mp) num.max=_mp;
             return;
           }
           var left=Math.max(0,cap-(used[opt]||0));
           var lim=_mp?Math.min(left,_mp):left; // 재고남은 vs 1인당최대 중 작은 값
           if(span){ span.textContent=left<=0?'(품절)':('(남은 '+left+(_mp?', 1인'+_mp:'')+')'); span.style.color=left<=0?'#ef4444':'#16a34a'; }
-          if(inp){ inp.max=lim; if(lim<=0){ inp.value=0; inp.disabled=true; } else if(parseInt(inp.value,10)>lim){ inp.value=lim; } }
+          if(left<=0){ if(chk){chk.checked=false;chk.disabled=true;} if(num){num.disabled=true;num.value=1;num.style.opacity='.4';num.style.background='#f1f5f9';} }
+          else if(num){ num.max=lim; if(parseInt(num.value,10)>lim) num.value=lim; }
         });
         return;
       }
