@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260612v77';
+var _MOD_ENGINE_VER='20260612v78';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -1098,8 +1098,8 @@ function dModManager(){
       h+='<span style="color:#94a3b8;font-size:12px;margin-left:8px">key: '+esc(d.key)+'</span>';
       h+='<span style="color:#94a3b8;font-size:12px;margin-left:8px">컬럼 '+(d.columns||[]).length+'개</span></div></div>';
       h+='<div style="display:flex;gap:6px;align-items:center">';
-      h+='<button class="btn btn-s" onclick="_modMoveOrder(\''+esc(d.key)+'\',-1)" title="위로" '+(di===0?'disabled ':'')+'style="font-size:13px;padding:4px 8px'+(di===0?';opacity:.3':'')+'">▲</button>';
-      h+='<button class="btn btn-s" onclick="_modMoveOrder(\''+esc(d.key)+'\',1)" title="아래로" '+(di===defs.length-1?'disabled ':'')+'style="font-size:13px;padding:4px 8px'+(di===defs.length-1?';opacity:.3':'')+'">▼</button>';
+      h+='<button onclick="_modMoveOrder(\''+esc(d.key)+'\',-1)" title="위로" '+(di===0?'disabled ':'')+'style="font-size:14px;padding:4px 9px;border:none;border-radius:5px;background:#475569;color:#fff;font-weight:800;cursor:pointer'+(di===0?';opacity:.3':'')+'">▲</button>';
+      h+='<button onclick="_modMoveOrder(\''+esc(d.key)+'\',1)" title="아래로" '+(di===defs.length-1?'disabled ':'')+'style="font-size:14px;padding:4px 9px;border:none;border-radius:5px;background:#475569;color:#fff;font-weight:800;cursor:pointer'+(di===defs.length-1?';opacity:.3':'')+'">▼</button>';
       h+='<button class="btn btn-s" onclick="popModDef(\''+esc(d.key)+'\')" style="font-size:11px">✏️ 수정</button>';
       h+='<button class="btn btn-s" onclick="delModDef(\''+esc(d.key)+'\')" style="font-size:11px;color:#dc2626">🗑 삭제</button>';
       h+='</div></div>';
@@ -1211,8 +1211,8 @@ function _renderModDefCols(){
       +'<option value="sys"'+(_vis==='sys'?' selected':'')+'>🖥 시스템전용</option>'
       +'</select>';
     // 순서 / 삭제
-    if(i>0) h+='<button onclick="_modDefMoveCol('+i+',-1)" style="border:none;background:none;cursor:pointer;font-size:13px">▲</button>';
-    if(i<_modDefEditCols.length-1) h+='<button onclick="_modDefMoveCol('+i+',1)" style="border:none;background:none;cursor:pointer;font-size:13px">▼</button>';
+    if(i>0) h+='<button onclick="_modDefMoveCol('+i+',-1)" title="위로" style="border:none;border-radius:4px;background:#64748b;color:#fff;cursor:pointer;font-size:12px;padding:3px 7px;font-weight:800">▲</button>';
+    if(i<_modDefEditCols.length-1) h+='<button onclick="_modDefMoveCol('+i+',1)" title="아래로" style="border:none;border-radius:4px;background:#64748b;color:#fff;cursor:pointer;font-size:12px;padding:3px 7px;font-weight:800">▼</button>';
     h+='<button onclick="_modDefRemoveCol('+i+')" style="border:none;background:none;cursor:pointer;color:#dc2626;font-size:14px">✕</button>';
     h+='</div>';
     // 타입별 추가 옵션
