@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260612v80';
+var _MOD_ENGINE_VER='20260612v81';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -1128,6 +1128,7 @@ function popModDef(keyOrIdx){
   var def=isNew?{key:'',label:'',icon:'📦',cat:'custom',catLabel:'',catIcon:'📦',fbPath:'',global:false,columns:[],features:{search:true,excel:true}}:_modDefs[keyOrIdx];
   if(!def) return;
   _modDefEditCols=JSON.parse(JSON.stringify(def.columns||[]));
+  window.__modFormImgData=def.formImage||''; // 폼 상단 이미지(base64) 편집 상태
 
   var h='<div class="pop-head"><h3>'+(isNew?'➕ 새 모듈 만들기':'✏️ 모듈 수정: '+esc(def.label))+'</h3></div>';
   h+='<div style="padding:14px;max-height:70vh;overflow-y:auto">';
@@ -1154,6 +1155,10 @@ function popModDef(keyOrIdx){
   h+='<input id="mdf_formTitle" value="'+esc(def.formTitle||"")+'" placeholder="비우면 「'+esc(def.label||"모듈명")+' 신청」">';
   h+='<label style="font-size:12px;font-weight:700;color:#64748b">신청폼 안내문</label>';
   h+='<textarea id="mdf_formDesc" rows="5" placeholder="여러 줄 가능 — 베타테스트 안내 등 길게 작성하세요" style="width:100%;box-sizing:border-box;resize:vertical;font-size:13px;line-height:1.5">'+esc(def.formDesc||"")+'</textarea>';
+  h+='<label style="font-size:12px;font-weight:700;color:#64748b">신청폼 상단 이미지 (선택)</label>';
+  h+='<div><input type="file" id="mdf_formImgFile" accept="image/*" onchange="_modPickFormImg(this)" style="font-size:12px"><button type="button" onclick="_modClearFormImg()" style="margin-left:6px;padding:4px 10px;border:none;border-radius:5px;background:#ef4444;color:#fff;font-size:11px;font-weight:700;cursor:pointer">이미지 제거</button>';
+  h+='<div id="mdf_formImgPrev" style="margin-top:8px">'+(def.formImage?'<img src="'+esc(def.formImage)+'" style="max-width:200px;max-height:140px;border-radius:8px;border:1px solid #e2e8f0">':'')+'</div>';
+  h+='<div style="font-size:10px;color:#94a3b8;margin-top:2px">포스터·안내 이미지 등. 자동 압축돼 저장되고, 신청폼 맨 위(안내문 아래)에 큼직하게 표시됩니다</div></div>';
   h+='<label style="font-size:12px;font-weight:700;color:#64748b">완료 후 다운로드 링크</label>';
   h+='<div><input id="mdf_downloadUrl" value="'+esc(def.downloadUrl||"")+'" placeholder="예: 플레이스토어 베타 링크 https://play.google.com/…" style="width:100%;font-family:monospace;font-size:11px"><div style="font-size:10px;color:#94a3b8;margin-top:2px">넣으면 신청 완료 화면에 「앱 다운로드」 버튼이 떠서 누르면 이 링크로 이동</div></div>';
   h+='<label style="font-size:12px;font-weight:700;color:#64748b">완료 후 입금 계좌 (선택)</label>';
@@ -1371,6 +1376,32 @@ function _modDefRefreshCols(){
   var el=document.getElementById('mdf_cols_area');
   if(el) el.innerHTML=_renderModDefCols();
 }
+// 신청폼 상단 이미지: 파일 → 캔버스 리사이즈(최대 900px) → JPEG base64
+function _modPickFormImg(inp){
+  var f=inp&&inp.files&&inp.files[0]; if(!f) return;
+  if(!/^image\//.test(f.type)){ toast('이미지 파일만 가능합니다',true); return; }
+  var rd=new FileReader();
+  rd.onload=function(e){
+    var img=new Image();
+    img.onload=function(){
+      var MAX=900, w=img.width, h=img.height;
+      if(w>MAX){ h=Math.round(h*MAX/w); w=MAX; }
+      var cv=document.createElement('canvas'); cv.width=w; cv.height=h;
+      cv.getContext('2d').drawImage(img,0,0,w,h);
+      var data=cv.toDataURL('image/jpeg',0.78);
+      window.__modFormImgData=data;
+      var pv=document.getElementById('mdf_formImgPrev');
+      if(pv) pv.innerHTML='<img src="'+data+'" style="max-width:200px;max-height:140px;border-radius:8px;border:1px solid #e2e8f0"><div style="font-size:10px;color:#16a34a;margin-top:3px">✅ 이미지 준비됨 ('+Math.round(data.length/1024)+'KB) — 저장을 눌러야 반영</div>';
+    };
+    img.src=e.target.result;
+  };
+  rd.readAsDataURL(f);
+}
+function _modClearFormImg(){
+  window.__modFormImgData='';
+  var pv=document.getElementById('mdf_formImgPrev'); if(pv) pv.innerHTML='<div style="font-size:11px;color:#94a3b8">이미지 없음</div>';
+  var fi=document.getElementById('mdf_formImgFile'); if(fi) fi.value='';
+}
 // 선택 옵션 입력 — 재고 켜진 경우 "옵션 = 수량" 자동 분리
 function _modDefSetOptions(i,val){
   var c=_modDefEditCols[i]; if(!c) return;
@@ -1418,6 +1449,7 @@ function saveModDef(keyOrNew){
   var formDesc=((document.getElementById('mdf_formDesc')||{}).value||'').trim();
   var downloadUrl=((document.getElementById('mdf_downloadUrl')||{}).value||'').trim();
   var payInfo=((document.getElementById('mdf_payInfo')||{}).value||'').trim();
+  var formImage=window.__modFormImgData||'';
 
   // 구글 이메일 켜면 "이메일" 컬럼이 없을 때 자동 추가 (맨 앞)
   if(googleEmail && !cols.some(function(c){return /이메일|메일|e-?mail|gmail|지메일/i.test(String(c.label));})){
@@ -1444,7 +1476,7 @@ function saveModDef(keyOrNew){
     fbPath:'Mod_'+key, global:global, evtId:modEvtId,
     adminTab:adminTab,
     columns:cols,
-    formTitle:formTitle, formDesc:formDesc, downloadUrl:downloadUrl, payInfo:payInfo,
+    formTitle:formTitle, formDesc:formDesc, downloadUrl:downloadUrl, payInfo:payInfo, formImage:formImage,
     driveUploadUrl:driveUrl,
     features:{search:true,excel:true,applyForm:applyForm,googleEmail:googleEmail}
   };
@@ -1722,6 +1754,8 @@ function _renderModApplyUI(def,evtId){
   var h='<div style="text-align:center;margin-bottom:14px">';
   h+='<h2 style="color:#2563eb;margin:0 0 6px;font-size:26px;font-weight:800;line-height:1.25">'+title+'</h2>';
   h+='</div>';
+  // 🖼 상단 이미지 (포스터 등)
+  if(def.formImage) h+='<div style="text-align:center;margin-bottom:16px"><img src="'+esc(def.formImage)+'" style="max-width:100%;border-radius:12px;box-shadow:0 2px 10px rgba(0,0,0,.1)"></div>';
   // 안내문 — 길면 왼쪽 정렬 박스로
   if(hasDesc) h+='<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px 16px;margin-bottom:20px;font-size:13px;color:#334155;line-height:1.7;white-space:normal">'+desc+'</div>';
   else h+='<p style="text-align:center;color:#94a3b8;font-size:13px;margin:0 0 18px">'+desc+'</p>';
