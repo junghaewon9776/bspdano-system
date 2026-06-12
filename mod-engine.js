@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260612v83';
+var _MOD_ENGINE_VER='20260612v84';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -1749,7 +1749,7 @@ function _renderModApplyUI(def,evtId){
   try{ document.title=(def.formTitle||(def.label+' 신청하기')); }catch(e){}
   var title=def.formTitle?esc(def.formTitle):((def.icon||'📝')+' '+esc(def.label)+' 신청하기');
   var hasDesc=!!def.formDesc;
-  var desc=hasDesc?esc(def.formDesc).replace(/\n/g,'<br>'):'아래 내용을 작성하고 신청 버튼을 눌러주세요';
+  var desc=hasDesc?_modAcctify(esc(def.formDesc).replace(/\n/g,'<br>')):'아래 내용을 작성하고 신청 버튼을 눌러주세요';
   // 상단 제목 영역 (크고 직관적으로)
   var h='<div style="text-align:center;margin-bottom:14px">';
   h+='<h2 style="color:#2563eb;margin:0 0 6px;font-size:26px;font-weight:800;line-height:1.25">'+title+'</h2>';
@@ -1853,6 +1853,24 @@ function _modApplyLoadStock(def,evtId){
   }).catch(function(){});
 }
 
+// 안내문 속 계좌/긴 번호 자동 감지 → 옆에 「복사」 버튼 (숫자 10자리 이상만, 날짜 제외)
+function _modAcctify(html){
+  return String(html||'').replace(/(\d[\d-]{7,}\d)/g, function(m){
+    var digits=(m.match(/\d/g)||[]).length;
+    if(digits<10) return m; // 날짜(8자리) 등 제외
+    var safe=m.replace(/"/g,'');
+    return '<span style="display:inline-flex;align-items:center;gap:6px;background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:2px 5px 2px 9px;margin:1px 2px;font-weight:800;color:#0f172a;white-space:nowrap">'+m
+      +'<button type="button" data-copy="'+safe+'" onclick="_modCopyText(this)" style="border:none;border-radius:6px;background:#16a34a;color:#fff;font-size:11px;font-weight:700;padding:3px 8px;cursor:pointer">📋복사</button></span>';
+  });
+}
+// data-copy 값을 클립보드로 복사
+function _modCopyText(btn){
+  var txt=btn.getAttribute('data-copy')||'';
+  if(!txt) return;
+  function done(){ var o=btn.textContent; btn.textContent='✅복사됨'; setTimeout(function(){ btn.textContent=o; },1300); }
+  function fb(){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.opacity='0'; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); done(); }catch(e){} }
+  if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(txt).then(done).catch(fb); } else fb();
+}
 // 신청 완료 화면: 계좌번호 클립보드 복사
 function _modCopyPay(btn){
   var txt=window.__modPayInfo||'';
