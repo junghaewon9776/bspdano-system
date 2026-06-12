@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260612v71';
+var _MOD_ENGINE_VER='20260612v72';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -1216,7 +1216,7 @@ function _renderModDefCols(){
     h+='</div>';
     // 타입별 추가 옵션
     if(c.type==='select'){
-      h+='<div style="margin-top:6px"><input placeholder="선택 항목 (쉼표로 구분: 대기,승인,거부)" value="'+esc((c.options||[]).join(','))+'" style="width:100%;font-size:12px;padding:5px 8px;border:1px solid #cbd5e1;border-radius:6px" onchange="_modDefEditCols['+i+'].options=this.value.split(\',\').map(function(s){return s.trim()}).filter(Boolean)"></div>';
+      h+='<div style="margin-top:6px"><textarea rows="4" placeholder="선택 항목 — 한 줄에 하나씩 (문장 안에 쉼표 써도 안 잘림)&#10;예:&#10;올 한 해 건강하길&#10;소원 성취" style="width:100%;font-size:12px;padding:5px 8px;border:1px solid #cbd5e1;border-radius:6px;resize:vertical;line-height:1.5" onchange="_modDefEditCols['+i+'].options=this.value.split(String.fromCharCode(10)).map(function(s){return s.trim()}).filter(Boolean)">'+esc((c.options||[]).join('\n'))+'</textarea></div>';
     }
     if(c.type==='badge'){
       h+='<div style="margin-top:6px"><input placeholder="배지 (key:이름:배경색:글자색, 쉼표구분)" value="'+esc(_badgeMapToStr(c.badgeMap||{}))+'" style="width:100%;font-size:12px;padding:5px 8px;border:1px solid #cbd5e1;border-radius:6px" onchange="_modDefEditCols['+i+'].badgeMap=_strToBadgeMap(this.value)"></div>';
