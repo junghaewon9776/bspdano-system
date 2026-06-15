@@ -429,7 +429,7 @@ label{display:block;font-size:10px;color:#999;margin-bottom:3px}
 <div id="mainPage">
   <div class="topBar">
     <div><h2>🎎 법성포단오제 보존회 관리시스템</h2><small>법성포단오제보존회 | 축제 운영 통합시스템</small></div>
-    <div class="userArea"><span id="uBadge" class="badge2"></span><button id="vendorBtn" class="logoutBtn" style="background:#7c3aed;display:none" onclick="openVendorManage()" title="거래처 관리">🏢 거래처</button><button id="mainSSBtn" class="logoutBtn" style="background:#10b981;display:none" onclick="openSheet('Users')" title="데이터 시트 열기 (super 전용)">📊 시트</button><button class="logoutBtn" style="background:#0ea5e9" onclick="refreshData(true)" title="서버에서 최신 데이터 다시 가져오기">🔄 새로고침</button><button class="logoutBtn" onclick="logout()">로그아웃</button></div>
+    <div class="userArea"><span id="uBadge" class="badge2"></span><button id="vendorBtn" class="logoutBtn" style="background:#7c3aed;display:none" onclick="openVendorManage()" title="거래처 관리">🏢 거래처</button><button id="mainSSBtn" class="logoutBtn" style="background:#10b981;display:none" onclick="openSheet('Users')" title="데이터 시트 열기 (super 전용)">📊 시트</button><button class="logoutBtn" style="background:#0ea5e9" onclick="refreshData(true)" title="서버에서 최신 데이터 다시 가져오기">🔄 새로고침</button><button class="logoutBtn" style="background:#16a34a" onclick="_openPwModal()" title="비밀번호 변경">🔑 비번</button><button class="logoutBtn" onclick="logout()">로그아웃</button></div>
   </div>
   <div id="evtBar" class="evtBar"></div>
   <div class="tabs" id="tabBar"></div>
@@ -16054,7 +16054,9 @@ async function testAligo(){
   alert(okMsg);
 }
 async function chgMyPw(){
-  var cur=document.getElementById("myPwCur").value,nw=document.getElementById("myPwNew").value,nw2=document.getElementById("myPwNew2").value;
+  var inM=!!document.getElementById("_pwSelfModal");  // 헤더 모달에서 호출 시 모달 입력칸 사용
+  var idCur=inM?"mPwCur":"myPwCur", idNew=inM?"mPwNew":"myPwNew", idNew2=inM?"mPwNew2":"myPwNew2";
+  var cur=document.getElementById(idCur).value,nw=document.getElementById(idNew).value,nw2=document.getElementById(idNew2).value;
   if(!cur||!nw||!nw2){alert("모두 입력해주세요");return}
   if(nw.length<4){alert("새 비밀번호는 4자 이상");return}
   if(nw!==nw2){alert("새 비밀번호가 일치하지 않습니다");return}
@@ -16074,10 +16076,32 @@ async function chgMyPw(){
   hideLoading();
   if(!r||!r.ok){alert((r&&r.err)||"변경 실패");return}
   if(US[CID]) US[CID].pw=nw;
-  document.getElementById("myPwCur").value="";document.getElementById("myPwNew").value="";document.getElementById("myPwNew2").value="";
+  document.getElementById(idCur).value="";document.getElementById(idNew).value="";document.getElementById(idNew2).value="";
   if(String(nw)!=='1234'){ _pwIsDefault=false; _hidePwWarnBanner(); _pwCloseModal(); }
+  if(inM) _closePwModal();
   toast("비밀번호 변경 완료");
 }
+// 헤더 어디서든 비밀번호 변경 (모든 역할 공통)
+function _openPwModal(){
+  if(document.getElementById("_pwSelfModal")) return;
+  var d=document.createElement("div");
+  d.id="_pwSelfModal";
+  d.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px";
+  var ist="width:100%;box-sizing:border-box;padding:10px;border:1px solid #cbd5e1;border-radius:8px;margin:4px 0 12px;font-size:14px";
+  d.innerHTML='<div style="background:#fff;border-radius:14px;padding:22px;max-width:360px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.3)" onclick="event.stopPropagation()">'
+    +'<h3 style="margin:0 0 4px;color:#0f172a">🔑 비밀번호 변경</h3>'
+    +'<div style="font-size:12px;color:#64748b;margin-bottom:14px">아이디: <b>'+esc((ME&&ME.id)||"")+'</b>'+((ME&&ME.nm)?' · '+esc(ME.nm):'')+'</div>'
+    +'<label style="font-size:12px;color:#475569;font-weight:700">현재 비밀번호</label><input type="password" id="mPwCur" style="'+ist+'">'
+    +'<label style="font-size:12px;color:#475569;font-weight:700">새 비밀번호 (4자 이상)</label><input type="password" id="mPwNew" style="'+ist+'">'
+    +'<label style="font-size:12px;color:#475569;font-weight:700">새 비밀번호 확인</label><input type="password" id="mPwNew2" style="'+ist+'">'
+    +'<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:4px"><button onclick="_closePwModal()" style="background:#e2e8f0;color:#334155;border:none;border-radius:8px;padding:10px 16px;font-weight:700;cursor:pointer">취소</button>'
+    +'<button onclick="chgMyPw()" style="background:#2563eb;color:#fff;border:none;border-radius:8px;padding:10px 20px;font-weight:800;cursor:pointer">변경</button></div>'
+    +'</div>';
+  d.onclick=function(){ _closePwModal(); };
+  document.body.appendChild(d);
+  setTimeout(function(){ var f=document.getElementById("mPwCur"); if(f)f.focus(); },50);
+}
+function _closePwModal(){ var m=document.getElementById("_pwSelfModal"); if(m) m.remove(); }
 function popAddArea(){
   openPopup('<h3>부서 추가 <button class="close-x" onclick="closePopup()">&times;</button></h3>'+
     '<div class="frow fr3"><div><label>부서명 *</label><input type="text" id="naAr" placeholder="예: 사무국/홍보팀/운영팀"></div>'+
