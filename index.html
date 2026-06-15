@@ -12178,6 +12178,11 @@ function _assetRentSubmit(){
 // ============================================================
 // 📦 대여자산 (Rental) — 조직 공용 자산 관리
 // ============================================================
+// 분류/장소 목록 = 설정(assetCats/assetLocs) + 실제 자산값 합집합 (엑셀로 자산만 넣어도 자동 표시)
+function _assetCatList(){ var s={}; (assetCats||[]).forEach(function(r){if(r.category)s[r.category]=1;}); (assets||[]).forEach(function(a){if(a.category)s[a.category]=1;}); return Object.keys(s).sort(); }
+function _assetNameList(cat){ var s={}; (assetCats||[]).forEach(function(r){if(String(r.category||"")===String(cat)&&r.name)s[r.name]=1;}); (assets||[]).forEach(function(a){if(String(a.category||"")===String(cat)&&a.name)s[a.name]=1;}); return Object.keys(s).sort(); }
+function _assetLocList(){ var s={}; (assetLocs||[]).forEach(function(r){if(r.location)s[r.location]=1;}); (assets||[]).forEach(function(a){if(a.location)s[a.location]=1;}); return Object.keys(s).sort(); }
+function _assetLocDetailList(loc){ var s={}; (assetLocs||[]).forEach(function(r){if(String(r.location||"")===String(loc)&&r.detail)s[r.detail]=1;}); (assets||[]).forEach(function(a){if(String(a.location||"")===String(loc)&&a.locationDetail)s[a.locationDetail]=1;}); return Object.keys(s).sort(); }
 var RENTAL_SUBTAB = "assets";    // assets | rentals | calendar | stats
 var RENTAL_F = { cat:"", loc:"", st:"", lblOnly:false, lblDone:false, q:"" };   // 자산 필터
 var RENTAL_SEL = {};             // 선택된 자산 id 맵 (라벨 출력용)
@@ -13076,12 +13081,9 @@ function popAssetAdd(){
   openPopup(h, 1000);
 }
 function _assetRowHtml(n){
-  // 마스터에서 고유값 추출
-  var cats = {}, locs = {};
-  (assetCats||[]).forEach(function(r){ if(r.category) cats[r.category]=1; });
-  (assetLocs||[]).forEach(function(r){ if(r.location) locs[r.location]=1; });
-  var catList = Object.keys(cats).sort();
-  var locList = Object.keys(locs).sort();
+  // 분류/장소 = 설정 + 실제 자산 합집합 (엑셀 가져온 값도 자동 표시)
+  var catList = _assetCatList();
+  var locList = _assetLocList();
   var today = new Date().toISOString().slice(0,10);
   var lbl = 'display:block;font-size:13px;font-weight:700;margin-bottom:6px';
   var selStyle = 'width:100%;padding:12px;border:1.5px solid #cbd5e1;border-radius:8px;background:#fff;font-size:16px;box-sizing:border-box';
@@ -13169,27 +13171,23 @@ function _aaOpenPicker(field, n){
   if(field === "cat"){
     icon = "📂"; title = "자산분류 선택";
     placeholder = "예: 음향, 공예품, 식당...";
-    var cUniq = {}; (assetCats||[]).forEach(function(r){ if(r.category) cUniq[r.category]=1; });
-    items = Object.keys(cUniq).sort();
+    items = _assetCatList();
   } else if(field === "nm"){
     icon = "📦"; title = "자산명 선택";
     placeholder = "예: 마이크, 의자, 찻잔...";
     var selCat = document.getElementById("aa_cat_"+n).value.trim();
     if(!selCat){ toast("분류 먼저 선택",true); return; }
-    items = (assetCats||[]).filter(function(r){return String(r.category||"")===selCat && r.name;}).map(function(r){return r.name;});
-    items = items.filter(function(v,i){return items.indexOf(v)===i;}).sort();
+    items = _assetNameList(selCat);
   } else if(field === "loc"){
     icon = "📍"; title = "장소 선택";
     placeholder = "예: 다목적실, 창고...";
-    var lUniq = {}; (assetLocs||[]).forEach(function(r){ if(r.location) lUniq[r.location]=1; });
-    items = Object.keys(lUniq).sort();
+    items = _assetLocList();
   } else if(field === "locD"){
     icon = "📌"; title = "위치 선택";
     placeholder = "예: A-01, B-1...";
     var selLoc = document.getElementById("aa_loc_"+n).value.trim();
     if(!selLoc){ toast("장소 먼저 선택",true); return; }
-    items = (assetLocs||[]).filter(function(r){return String(r.location||"")===selLoc && r.detail;}).map(function(r){return r.detail;});
-    items = items.filter(function(v,i){return items.indexOf(v)===i;}).sort();
+    items = _assetLocDetailList(selLoc);
   }
   _aaPickerField = field;
   _aaPickerRow = n;
@@ -13483,24 +13481,20 @@ function _aeOpenPicker(field){
   var title, icon, items, placeholder;
   if(field === "category"){
     icon = "📂"; title = "자산분류 선택"; placeholder = "예: 음향";
-    var cs = {}; (assetCats||[]).forEach(function(r){ if(r.category) cs[r.category]=1; });
-    items = Object.keys(cs).sort();
+    items = _assetCatList();
   } else if(field === "name"){
     icon = "📦"; title = "자산명 선택"; placeholder = "예: 마이크";
     var curCat = (document.getElementById("ae_category")||{}).value||"";
     if(!curCat){ toast("분류 먼저 선택",true); return; }
-    items = (assetCats||[]).filter(function(r){return String(r.category||"")===curCat && r.name;}).map(function(r){return r.name;});
-    items = items.filter(function(v,i){return items.indexOf(v)===i;}).sort();
+    items = _assetNameList(curCat);
   } else if(field === "location"){
     icon = "📍"; title = "장소 선택"; placeholder = "예: 다목적실";
-    var ls = {}; (assetLocs||[]).forEach(function(r){ if(r.location) ls[r.location]=1; });
-    items = Object.keys(ls).sort();
+    items = _assetLocList();
   } else if(field === "locationDetail"){
     icon = "📌"; title = "위치 선택"; placeholder = "예: A-01";
     var curLoc = (document.getElementById("ae_location")||{}).value||"";
     if(!curLoc){ toast("장소 먼저 선택",true); return; }
-    items = (assetLocs||[]).filter(function(r){return String(r.location||"")===curLoc && r.detail;}).map(function(r){return r.detail;});
-    items = items.filter(function(v,i){return items.indexOf(v)===i;}).sort();
+    items = _assetLocDetailList(curLoc);
   }
   _aePickerField = field;
   _aePickerItems = items;
@@ -14037,10 +14031,8 @@ function popAssetBulkMove(){
   var sel = Object.keys(RENTAL_SEL).filter(function(k){return RENTAL_SEL[k];});
   if(!sel.length){ toast("자산을 선택하세요",true); return; }
   var picked = (assets||[]).filter(function(a){return sel.indexOf(a.id)>=0;});
-  // 장소/위치 드롭다운 소스
-  var locs = {};
-  (assetLocs||[]).forEach(function(r){ if(r.location) locs[r.location]=1; });
-  var locList = Object.keys(locs).sort();
+  // 장소 드롭다운 = 설정 + 실제 자산 합집합
+  var locList = _assetLocList();
   var h = '<h3 style="margin:0 0 12px">📍 위치 일괄 변경 — 선택한 '+picked.length+'건</h3>';
   h += '<div style="padding:10px;background:#f5f3ff;border:1px solid #c4b5fd;border-radius:6px;margin-bottom:10px;max-height:200px;overflow:auto;font-size:12px">';
   h += '<div style="font-weight:700;color:#7c3aed;margin-bottom:4px">이동할 자산 목록 (현재 선택된 것만):</div>';
