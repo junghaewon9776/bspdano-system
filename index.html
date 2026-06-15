@@ -516,6 +516,7 @@ var MODFORM_EVT_ID = "";
 var DEEP_TAB = "";   // ?tab= 딥링크 (로그인 후 해당 탭 자동 열기)
 var DEEP_EVT = "";   // ?evtId= 딥링크 (해당 행사 자동 선택)
 var IS_MODVIEW_MODE = false; var MODVIEW_KEY=""; var MODVIEW_ID=""; var MODVIEW_EVT="";  // QR 조회 페이지
+var IS_ASSETVIEW_MODE = false; var ASSETVIEW_ID="";  // 자산 QR 조회 페이지
 var DEEP_MOD_KEY = "";  // 모듈 바로가기(?modlist=) — 로그인 후 이동할 모듈 키
 (function(){
   try {
@@ -559,6 +560,14 @@ var DEEP_MOD_KEY = "";  // 모듈 바로가기(?modlist=) — 로그인 후 이�
       document.getElementById("mainPage").style.display = "none";
       document.title = "📋 정보 조회";
     }
+    // ===== 자산 QR 조회 페이지 (?assetview={id}) =====
+    if (sp.get("assetview")) {
+      IS_ASSETVIEW_MODE = true;
+      ASSETVIEW_ID = sp.get("assetview") || "";
+      document.getElementById("loginPage").style.display = "none";
+      document.getElementById("mainPage").style.display = "none";
+      document.title = "📦 자산 조회";
+    }
     // ===== 모듈 바로가기 (?modlist={key}) — 홈페이지(로그인) → 로그인 후 그 모듈 화면으로 이동 =====
     if (sp.get("modlist")) {
       DEEP_MOD_KEY = sp.get("modlist") || "";
@@ -598,6 +607,11 @@ document.addEventListener("DOMContentLoaded", function(){
     if (IS_MODVIEW_MODE) {
       // 일반인도 기본 정보는 조회 가능 / 관리자(로그인 토큰 있는 우리 기기)는 관리자전용까지 표시
       if (typeof renderModView === 'function') renderModView(MODVIEW_KEY, MODVIEW_ID, MODVIEW_EVT);
+      return; // 로그인 로직 스킵
+    }
+    // ===== 자산 QR 조회 페이지 =====
+    if (IS_ASSETVIEW_MODE) {
+      if (typeof renderAssetView === 'function') renderAssetView(ASSETVIEW_ID);
       return; // 로그인 로직 스킵
     }
 
@@ -12095,6 +12109,73 @@ function feeImport(){
 }
 
 // ============================================================
+// 📦 자산 QR 공개 조회 + 누구나 대여 신청 (?assetview={id})
+// ============================================================
+function _assetViewBase(){ return location.href.split('?')[0]; }
+function renderAssetView(id){
+  document.body.innerHTML='<div style="min-height:100vh;display:flex;align-items:flex-start;justify-content:center;background:linear-gradient(135deg,#334155,#0f172a);padding:24px 16px"><div id="avCard" style="background:#fff;border-radius:16px;padding:24px;width:440px;max-width:100%;box-shadow:0 20px 60px rgba(0,0,0,.3)"><div style="text-align:center;color:#94a3b8;padding:30px">불러오는 중...</div></div></div>';
+  if(typeof fbDb==='undefined'){ document.getElementById('avCard').innerHTML='<div style="text-align:center;color:#ef4444">시스템 오류</div>'; return; }
+  fbDb.ref('/main/Assets').once('value').then(function(s){
+    var arr=s.val()||[]; if(!Array.isArray(arr))arr=Object.values(arr);
+    var a=null; for(var i=0;i<arr.length;i++){ if(arr[i]&&(arr[i].id===id||arr[i].barcode===id)){a=arr[i];break;} }
+    if(!a){ document.getElementById('avCard').innerHTML='<div style="text-align:center;color:#64748b;padding:20px">자산을 찾을 수 없습니다</div>'; return; }
+    window.__avAsset=a;
+    _renderAssetViewUI(a);
+  }).catch(function(e){ document.getElementById('avCard').innerHTML='<div style="text-align:center;color:#ef4444">오류: '+esc(e.message||e)+'</div>'; });
+}
+function _renderAssetViewUI(a){
+  var avail=(a.qtyAvail!=null?a.qtyAvail:a.qtyIn)||0;
+  var soldOut=avail<=0;
+  var rowsHtml=function(rows){ return rows.filter(function(r){return r[1]!=null&&r[1]!=='';}).map(function(r){
+    return '<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f1f5f9"><span style="color:#94a3b8;font-size:13px">'+r[0]+'</span><span style="color:#0f172a;font-weight:700;font-size:14px;text-align:right">'+esc(String(r[1]))+'</span></div>';
+  }).join(''); };
+  var h='<div style="text-align:center;margin-bottom:14px"><div style="font-size:40px">📦</div><h2 style="color:#0f172a;margin:6px 0;font-size:20px">'+esc(a.name||'자산')+'</h2>'
+    +(a.category?'<div style="font-size:13px;color:#64748b">'+esc(a.category)+'</div>':'')+'</div>';
+  // 재고 상태 배너
+  h+='<div style="background:'+(soldOut?'#fee2e2':'#dcfce7')+';color:'+(soldOut?'#b91c1c':'#15803d')+';border-radius:12px;padding:13px;text-align:center;font-weight:800;font-size:16px;margin-bottom:14px">'+(soldOut?'⛔ 대여 가능 수량 없음':'✅ 대여 가능 '+avail+'개')+'</div>';
+  h+=rowsHtml([['품명/모델',a.model],['바코드',a.barcode],['입고 수량',a.qtyIn],['대여중',a.qtyOut],['보관 위치',(a.location||'')+(a.locationDetail?' '+a.locationDetail:'')],['비고',a.note]]);
+  // 대여 신청 (누구나)
+  if(!soldOut){
+    h+='<div style="margin-top:18px;border-top:2px solid #e2e8f0;padding-top:16px"><div style="font-size:15px;font-weight:800;color:#1d4ed8;margin-bottom:12px">🤝 대여 신청</div>';
+    var ist='width:100%;box-sizing:border-box;padding:10px;border:1px solid #cbd5e1;border-radius:8px;margin:3px 0 10px;font-size:14px';
+    h+='<label style="font-size:12px;color:#475569;font-weight:700">이름 *</label><input id="avNm" style="'+ist+'">';
+    h+='<label style="font-size:12px;color:#475569;font-weight:700">연락처 *</label><input id="avTel" type="tel" placeholder="010-0000-0000" style="'+ist+'">';
+    h+='<label style="font-size:12px;color:#475569;font-weight:700">소속/단체</label><input id="avOrg" style="'+ist+'">';
+    h+='<label style="font-size:12px;color:#475569;font-weight:700">수량 *</label><input id="avQty" type="number" min="1" max="'+avail+'" value="1" style="'+ist+'">';
+    h+='<div style="display:flex;gap:8px"><div style="flex:1"><label style="font-size:12px;color:#475569;font-weight:700">대여일</label><input id="avFrom" type="date" style="'+ist+'"></div><div style="flex:1"><label style="font-size:12px;color:#475569;font-weight:700">반납예정일</label><input id="avTo" type="date" style="'+ist+'"></div></div>';
+    h+='<label style="font-size:12px;color:#475569;font-weight:700">사용 행사/용도</label><input id="avEvt" style="'+ist+'">';
+    h+='<label style="font-size:12px;color:#475569;font-weight:700">비고</label><textarea id="avNote" rows="2" style="'+ist+'resize:vertical"></textarea>';
+    h+='<button id="avBtn" onclick="_assetRentSubmit()" style="width:100%;padding:14px;border:none;border-radius:12px;background:#2563eb;color:#fff;font-size:16px;font-weight:800;cursor:pointer;margin-top:6px">대여 신청하기</button>';
+    h+='<div id="avMsg" style="text-align:center;margin-top:10px;font-size:13px"></div></div>';
+  }
+  document.getElementById('avCard').innerHTML=h;
+}
+function _assetRentSubmit(){
+  var a=window.__avAsset; if(!a) return;
+  var g=function(id){ var e=document.getElementById(id); return e?(e.value||'').trim():''; };
+  var nm=g('avNm'), tel=g('avTel'), org=g('avOrg'), qty=parseInt(g('avQty'),10)||0, from=g('avFrom'), to=g('avTo'), evt=g('avEvt'), note=g('avNote');
+  var msg=document.getElementById('avMsg');
+  if(!nm||!tel){ if(msg)msg.innerHTML='<span style="color:#ef4444">이름·연락처를 입력하세요</span>'; return; }
+  var avail=(a.qtyAvail!=null?a.qtyAvail:a.qtyIn)||0;
+  if(qty<1){ if(msg)msg.innerHTML='<span style="color:#ef4444">수량을 입력하세요</span>'; return; }
+  if(qty>avail){ if(msg)msg.innerHTML='<span style="color:#ef4444">대여 가능 수량('+avail+')을 초과했습니다</span>'; return; }
+  var btn=document.getElementById('avBtn'); if(btn){btn.disabled=true;btn.textContent='신청 중...';}
+  var rec={ id:'r'+Date.now().toString(36)+Math.random().toString(36).slice(2,5), assetId:a.id||'', barcode:a.barcode||'',
+    qty:qty, rentDt:from, dueDt:to, renterType:'external', renterNm:nm, renterTel:tel, renterOrg:org, eventNm:evt,
+    note:note, status:'pending', createdAt:new Date().toISOString() };
+  fbDb.ref('/main/Rentals').once('value').then(function(s){
+    var arr=s.val()||[]; if(!Array.isArray(arr))arr=Object.values(arr);
+    arr.push(rec);
+    return fbDb.ref('/main/Rentals').set(arr);
+  }).then(function(){
+    document.getElementById('avCard').innerHTML='<div style="text-align:center;padding:34px"><div style="font-size:48px">✅</div><h2 style="color:#16a34a;margin:12px 0;font-size:20px">대여 신청 완료</h2><p style="color:#64748b;font-size:14px;line-height:1.6">'+esc(a.name||'자산')+' '+qty+'개 신청이 접수되었습니다.<br>담당자 확인 후 안내드립니다.</p></div>';
+  }).catch(function(e){
+    if(btn){btn.disabled=false;btn.textContent='대여 신청하기';}
+    if(msg)msg.innerHTML='<span style="color:#ef4444">신청 실패: '+esc(e.message||e)+'</span>';
+  });
+}
+
+// ============================================================
 // 📦 대여자산 (Rental) — 조직 공용 자산 관리
 // ============================================================
 var RENTAL_SUBTAB = "assets";    // assets | rentals | calendar | stats
@@ -14114,7 +14195,7 @@ async function _lpPrintQz(){
   var fontBase = Math.max(5, Math.min(11, Math.floor(Math.min(sz.w,sz.h)/6)));
   var fontHdr  = Math.max(6, fontBase+1);
   function qrSvgTag(a){
-    var qr = qrcode(0,"L"); qr.addData(String(a.barcode||a.id||"")); qr.make();
+    var qr = qrcode(0,"L"); qr.addData(location.href.split('?')[0]+'?assetview='+encodeURIComponent(a.id||a.barcode||'')); qr.make();
     return qr.createSvgTag({ cellSize:2, margin:0, scalable:true });
   }
   function barcodeSvgTag(a){
@@ -14428,8 +14509,8 @@ async function _lpPrint(){
          + '.lblSimple .txt b{font-size:'+(fontBase+1)+'pt;display:block}'
          + '.lblSimple .txt small{font-size:'+Math.max(5,fontBase-1)+'pt;color:#555;font-family:monospace}';
   function qrSvg(a){
-    // QR 안엔 바코드 값만 — 스캐너로 읽으면 바로 바코드 문자열
-    var qrData = String(a.barcode||a.id||"");
+    // QR 안엔 조회 URL — 스캔하면 자산 정보 페이지가 열림 (1D 바코드는 내부 스캔용으로 따로 있음)
+    var qrData = location.href.split('?')[0]+'?assetview='+encodeURIComponent(a.id||a.barcode||'');
     var qr = qrcode(0,"L"); qr.addData(qrData); qr.make();
     return qr.createSvgTag({ cellSize:2, margin:0, scalable:true });
   }
