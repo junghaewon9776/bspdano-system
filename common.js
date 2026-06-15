@@ -313,6 +313,7 @@ function _dispatch(p) {
         case "updateAsset":    _apiUpdateMainRow(p, "Assets").then(resolve); return;
         case "deleteAsset":    _apiDeleteMainRow(p, "Assets").then(resolve); return;
         case "bulkAddAssets":  _apiBulkAddMain(p, "Assets").then(resolve); return;
+        case "setAssetLabel":  _apiSetAssetLabel(p).then(resolve); return;
         case "listRentals":    _apiListMainNode(p, "Rentals").then(resolve); return;
         case "addRental":      _apiAddMainRow(p, "Rentals").then(resolve); return;
         case "updateRental":   _apiUpdateMainRow(p, "Rentals").then(resolve); return;
@@ -1761,6 +1762,23 @@ function _apiBulkAddMain(p, nodeName) {
   return saveMainNode(nodeName, arr).then(function() {
     _cache[nodeName] = arr;
     return {ok:true, added:newRows.length, count:newRows.length, reassigned:reassigned};
+  });
+}
+
+// 자산 라벨 출력 표시 + 출력 횟수 누적 (printed=true면 횟수+1, false면 출력상태 리셋)
+function _apiSetAssetLabel(p) {
+  var arr = (_cache.Assets || []).slice();
+  var ids = p.ids || (p.id ? [p.id] : []);
+  var idset = {}; ids.forEach(function(x){ idset[x]=1; });
+  arr.forEach(function(a){
+    if (a && idset[a.id]) {
+      if (p.printed === false) { a.labelPrinted = false; }
+      else { a.labelPrinted = true; a.labelPrintCount = (parseInt(a.labelPrintCount,10)||0) + 1; a.labelPrintAt = now_(); }
+    }
+  });
+  return saveMainNode("Assets", arr).then(function() {
+    _cache.Assets = arr;
+    return {ok:true, count:ids.length};
   });
 }
 
