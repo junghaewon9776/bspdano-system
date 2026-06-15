@@ -968,6 +968,15 @@ function _apiUpdateMainRow(p, nodeName) {
     if (arr[i].id === p.id) { idx = i; break; }
   }
   if (idx < 0) return Promise.resolve({ok:false, err:"항목을 찾을 수 없습니다"});
+  // 📦 자산 바코드 중복 방지 — 다른 자산과 같은 바코드로 바꾸려 하면 거부
+  if (nodeName === "Assets" && p.barcode != null && String(p.barcode).trim()) {
+    var bc = String(p.barcode).trim();
+    for (var j = 0; j < arr.length; j++) {
+      if (j !== idx && String(arr[j].barcode||"").trim() === bc) {
+        return Promise.resolve({ok:false, err:"이미 같은 바코드("+bc+")의 자산이 있습니다"});
+      }
+    }
+  }
   Object.keys(p).forEach(function(k) {
     if (k !== 'action' && k !== 'by') arr[idx][k] = p[k];
   });
@@ -1731,6 +1740,19 @@ function _apiDeleteApplyBySeq(p) {
 function _apiBulkAddMain(p, nodeName) {
   var arr = (_cache[nodeName] || []).slice();
   var newRows = p.rows || [];
+  var reassigned = 0;
+  // 📦 자산: 바코드 자동생성 + 중복 방지 (빈 값/중복이면 고유 13자리 자동 부여)
+  if (nodeName === "Assets") {
+    var used = {}, maxNum = 0;
+    arr.forEach(function(a){ var b=String(a&&a.barcode||"").trim(); if(b){ used[b]=1; var n=parseInt(b,10); if(!isNaN(n)&&n>maxNum) maxNum=n; } });
+    if (maxNum < 2600000000000) maxNum = 2600000000000; // 13자리 기준점
+    function _nextBarcode(){ do { maxNum++; } while (used[String(maxNum)]); used[String(maxNum)]=1; return String(maxNum); }
+    newRows.forEach(function(r){
+      var b = String(r.barcode||"").trim();
+      if (!b || used[b]) { r.barcode = _nextBarcode(); if(b) reassigned++; } // 빈값→생성 / 중복→새 번호 부여
+      else { used[b]=1; var n=parseInt(b,10); if(!isNaN(n)&&n>maxNum) maxNum=n; }
+    });
+  }
   newRows.forEach(function(r) {
     if (!r.id) r.id = uid();
     if (!r.createdAt) r.createdAt = now_();
@@ -1738,7 +1760,7 @@ function _apiBulkAddMain(p, nodeName) {
   });
   return saveMainNode(nodeName, arr).then(function() {
     _cache[nodeName] = arr;
-    return {ok:true, added:newRows.length, count:newRows.length};
+    return {ok:true, added:newRows.length, count:newRows.length, reassigned:reassigned};
   });
 }
 
