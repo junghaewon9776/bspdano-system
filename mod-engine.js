@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260612v90';
+var _MOD_ENGINE_VER='20260612v91';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -1361,8 +1361,12 @@ function _modValidateField(c, v){
       if(c.maxVal!=null&&c.maxVal!==''&&n>c.maxVal) return c.label+'은(는) '+c.maxVal+' 이하여야 합니다';
     }
   } else {
-    if(c.minLen&&s.length<c.minLen) return c.label+'은(는) 최소 '+c.minLen+'자 이상 입력하세요 (현재 '+s.length+'자)';
-    if(c.maxLen&&s.length>c.maxLen) return c.label+'은(는) 최대 '+c.maxLen+'자까지 가능합니다';
+    // select에서 목록 옵션을 고른 경우엔 글자수 제한 미적용 (제한은 "직접 입력"에만)
+    var _isSelOpt=(c.type==='select' && (c.options||[]).some(function(o){var ov=typeof o==='object'?o.value:o; return String(ov)===s;}));
+    if(!_isSelOpt){
+      if(c.minLen&&s.length<c.minLen) return c.label+'은(는) 최소 '+c.minLen+'자 이상 입력하세요 (현재 '+s.length+'자)';
+      if(c.maxLen&&s.length>c.maxLen) return c.label+'은(는) 최대 '+c.maxLen+'자까지 가능합니다';
+    }
     if(c.format==='email'&&!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(s)) return c.label+' 이메일 형식이 아닙니다';
     if(c.format==='num'&&!/^[0-9]+$/.test(s)) return c.label+'은(는) 숫자만 입력하세요';
     if(c.format==='alnum'&&!/^[A-Za-z0-9]+$/.test(s)) return c.label+'은(는) 영문/숫자만 입력하세요';
