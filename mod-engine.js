@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260612v91';
+var _MOD_ENGINE_VER='20260615v92';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -275,6 +275,14 @@ function _modListHtml(key){
   var feat=def.features||{};
   if(!data.length) return '<div class="empty2" style="padding:40px">데이터가 없습니다</div>';
 
+  // 👥 중복 표시 — dupCheck 켠 칼럼은 같은 값 몇 건인지 집계 (1명이 여러 건 등)
+  var dupCols=(def.columns||[]).filter(function(c){return c.dupCheck;});
+  var dupCounts={};
+  if(dupCols.length){
+    dupCols.forEach(function(c){ dupCounts[c.key]={}; });
+    data.forEach(function(r){ dupCols.forEach(function(c){ var val=String(r[c.key]==null?'':r[c.key]).trim(); if(val) dupCounts[c.key][val]=(dupCounts[c.key][val]||0)+1; }); });
+  }
+
   var statusCol=(def.columns||[]).find(function(c){return c.key==='status'&&c.type==='badge'});
   var hasSelect=feat.applyForm && statusCol;
 
@@ -333,7 +341,12 @@ function _modListHtml(key){
       var _ca=row._createdAt?_modFmtDateTime(row._createdAt):'';
       h+='<td style="white-space:nowrap;font-size:11px;color:#94a3b8" title="ID: '+esc(row._id||'')+'">'+esc(_ca)+'</td>';
     }
-    cols.forEach(function(c){ var raw=esc(String(row[c.key]==null?'':row[c.key])); h+='<td style="white-space:nowrap;max-width:260px;overflow:hidden;text-overflow:ellipsis" title="'+raw+'">'+_modFmtCell(c,row[c.key])+'</td>'; });
+    cols.forEach(function(c){
+      var raw=esc(String(row[c.key]==null?'':row[c.key]));
+      var cellHtml=_modFmtCell(c,row[c.key]);
+      if(c.dupCheck){ var dv=String(row[c.key]==null?'':row[c.key]).trim(); var dn=dv?(dupCounts[c.key][dv]||0):0; if(dn>1) cellHtml+=' <span style="display:inline-block;background:#fef3c7;color:#b45309;border:1px solid #fcd34d;border-radius:8px;padding:0 6px;font-size:10px;font-weight:800;white-space:nowrap" title="같은 값 '+dn+'건">총 '+dn+'건</span>'; }
+      h+='<td style="white-space:nowrap;max-width:260px;overflow:hidden;text-overflow:ellipsis" title="'+raw+'">'+cellHtml+'</td>';
+    });
     // 상태일시
     if(hasSelect && isA()){
       var _sa=row._statusAt?_modFmtDateTime(row._statusAt):'';
@@ -1236,6 +1249,8 @@ function _renderModDefCols(){
     if(['select','badge','text','tel','number','date'].indexOf(c.type)>=0) h+='<label style="font-size:11px;display:flex;align-items:center;gap:3px" title="체크하면 이 컬럼 값(예: 선정/대기)으로 거르는 필터 버튼이 생깁니다"><input type="checkbox"'+(c.filter?' checked':'')+' onchange="_modDefEditCols['+i+'].filter=this.checked">필터</label>';
     // 검색 (텍스트류만)
     if(['text','tel','textarea','number','select'].indexOf(c.type)>=0) h+='<label style="font-size:11px;display:flex;align-items:center;gap:3px"><input type="checkbox"'+(c.search?' checked':'')+' onchange="_modDefEditCols['+i+'].search=this.checked">검색</label>';
+    // 👥 중복 표시 (텍스트/연락처/선택) — 같은 값 여러 건이면 표에 "총 N건" 배지
+    if(['text','tel','select','number'].indexOf(c.type)>=0) h+='<label style="font-size:11px;display:flex;align-items:center;gap:3px" title="같은 값이 여러 건이면 표에 「총 N건」 배지 표시 (예: 1명이 차량 여러 대)"><input type="checkbox"'+(c.dupCheck?' checked':'')+' onchange="_modDefEditCols['+i+'].dupCheck=this.checked">👥중복</label>';
     // 관리자전용
     var _vis=c.sysOnly?'sys':c.adminOnly?'admin':c.qrAdmin?'qrAdmin':'';
     h+='<select style="font-size:11px;padding:2px 4px;border:1px solid #cbd5e1;border-radius:4px" onchange="_modDefColVis('+i+',this.value)">'
