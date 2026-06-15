@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260615v93';
+var _MOD_ENGINE_VER='20260615v94';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -338,8 +338,12 @@ function _modListHtml(key){
     var st=row.status||'';
     var sel=!!selMap[row._id];
     var mk=row._mark||'';
-    var rowBg = sel ? '#eff6ff' : (mk||'');
-    var mkBorder = mk ? ';border-left:5px solid '+_modMarkDot(mk) : '';
+    // 중복/묶음 줄 자동 색칠 (묶음=연파랑, 칼럼중복=연노랑)
+    var _grpDup = grpCols.length ? (function(){ var k=_grpKey(row); return k.replace(/␟/g,'') && (grpCounts[k]||0)>1; })() : false;
+    var _colDup = dupCols.length ? dupCols.some(function(c){ var v=String(row[c.key]==null?'':row[c.key]).trim(); return v && (dupCounts[c.key][v]||0)>1; }) : false;
+    var dupBg = _grpDup ? '#e0f2fe' : (_colDup ? '#fef9c3' : '');
+    var rowBg = sel ? '#eff6ff' : (mk || dupBg || '');
+    var mkBorder = mk ? ';border-left:5px solid '+_modMarkDot(mk) : (_grpDup ? ';border-left:4px solid #3b82f6' : (_colDup ? ';border-left:4px solid #f59e0b' : ''));
     h+='<tr'+' ondblclick="popModEdit(\''+key+'\',\''+esc(row._id||'')+'\');event.stopPropagation()" style="cursor:pointer'+(st==='탈락'?';opacity:.5':'')+(rowBg?';background:'+rowBg:'')+mkBorder+'">';
     if(isA()) h+='<td class="ctr"><input type="checkbox" class="_modChk" data-id="'+esc(row._id||'')+'" data-idx="'+idx+'"'+(sel?' checked':'')+' onclick="_modSelToggle(event,\''+key+'\',\''+esc(row._id||'')+'\','+idx+')"></td>';
     var _memoChip = row._markMemo ? ' <span style="display:inline-block;background:'+(mk||'#e2e8f0')+';color:#334155;border:1px solid '+_modMarkDot(mk||'#e2e8f0')+';border-radius:8px;padding:0 6px;font-size:10px;font-weight:700;white-space:nowrap;vertical-align:middle" title="메모">'+esc(row._markMemo)+'</span>' : '';
