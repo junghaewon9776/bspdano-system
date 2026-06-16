@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260615v96';
+var _MOD_ENGINE_VER='20260615v97';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -318,20 +318,22 @@ function _modListHtml(key){
     h+='</div>';
   }
 
-  h+='<div style="overflow-x:auto;border:1px solid #e5e7eb;border-radius:10px">';
+  // 표 영역: 최대 높이 제한 → 가로 스크롤바가 항상 보이는 위치(박스 하단)에 고정 + 제목줄(thead) 고정
+  var _hSticky='position:sticky;top:0;z-index:3;background:#f8fafc;';
+  h+='<div style="overflow:auto;max-height:72vh;border:1px solid #e5e7eb;border-radius:10px">';
   h+='<table class="tbl"><thead><tr>';
   if(isA()){
     var allOn=data.length>0 && selCount>=data.length;
-    h+='<th style="width:32px"><input type="checkbox" id="_modSelAll_'+key+'"'+(allOn?' checked':'')+' onclick="_modSelAll(\''+key+'\',this.checked)" title="전체 선택/해제"></th>';
+    h+='<th style="width:32px;'+_hSticky+'"><input type="checkbox" id="_modSelAll_'+key+'"'+(allOn?' checked':'')+' onclick="_modSelAll(\''+key+'\',this.checked)" title="전체 선택/해제"></th>';
   }
-  h+='<th style="width:36px">#</th>';
-  if(isA()) h+='<th style="white-space:nowrap;font-size:11px;color:#64748b">접수일</th>';
+  h+='<th style="width:36px;'+_hSticky+'">#</th>';
+  if(isA()) h+='<th style="white-space:nowrap;font-size:11px;color:#64748b;'+_hSticky+'">접수일</th>';
   cols.forEach(function(c){
     var arrow=sort.col===c.key?(sort.asc?' ▲':' ▼'):'';
-    h+='<th style="cursor:pointer;white-space:nowrap" onclick="_modToggleSort(\''+key+'\',\''+c.key+'\')">'+esc(c.label)+arrow+'</th>';
+    h+='<th style="cursor:pointer;white-space:nowrap;'+_hSticky+'" onclick="_modToggleSort(\''+key+'\',\''+c.key+'\')">'+esc(c.label)+arrow+'</th>';
   });
-  if(hasSelect && isA()) h+='<th style="white-space:nowrap;font-size:11px;color:#64748b">상태일시</th>';
-  if(isA()) h+='<th style="min-width:'+(hasSelect?'120':'100')+'px;position:sticky;right:0;background:#f8fafc;z-index:1;text-align:center;font-size:10px;color:#94a3b8">관리</th>';
+  if(hasSelect && isA()) h+='<th style="white-space:nowrap;font-size:11px;color:#64748b;'+_hSticky+'">상태일시</th>';
+  if(isA()) h+='<th style="min-width:'+(hasSelect?'120':'100')+'px;position:sticky;right:0;top:0;background:#f8fafc;z-index:4;text-align:center;font-size:10px;color:#94a3b8">관리</th>';
   h+='</tr></thead><tbody>';
 
   data.forEach(function(row,idx){
