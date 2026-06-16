@@ -451,7 +451,7 @@ label{display:block;font-size:10px;color:#999;margin-bottom:3px}
 <!-- firebase-storage 제거: 구글 드라이브 프록시로 대체 -->
 <script src="firebase-config.js"></script>
 <script src="common.js?v=20260615b"></script>
-<script src="mod-engine.js?v=20260615v94"></script>
+<script src="mod-engine.js?v=20260615v95"></script>
 
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" onerror="console.warn('XLSX CDN load failed')"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js" onerror="console.warn('xlsx-js-style CDN load failed')"></script>
@@ -14143,6 +14143,7 @@ function popAssetLabelPrint(){
   h += '</div>';
   h += '<div style="display:flex;gap:6px;margin-top:14px;flex-wrap:wrap;align-items:center">';
   h += '<button class="btn btn-out" onclick="closePopup()">취소</button>';
+  h += '<button class="btn" style="background:#7c3aed;color:#fff;font-weight:700" onclick="popAssetLabelLayout()" title="모듈처럼 드래그로 라벨 안 요소 위치를 자유 배치">📐 자유배치 편집</button>';
   h += '<span style="flex:1"></span>';
   h += '<button class="btn" style="background:#059669;color:#fff" onclick="_lpExcel()">⬇ 엑셀 다운</button>';
   h += '<button class="btn" style="background:#64748b;color:#fff" onclick="_lpPrint()">📄 브라우저 프리뷰</button>';
@@ -14539,10 +14540,13 @@ async function _lpPrint(){
   bodyH += '3. <b>일반 A4 프린터로 나오면</b>: 프린터 용지 크기가 라벨 크기와 안 맞는 것 → 라벨 프린터로 변경해야 정상 출력됨';
   bodyH += '</div>';
   bodyH += '<div class="preview">';
+  // 📐 이 프리셋에 자유배치가 저장돼 있으면 그걸로 인쇄
+  var _freeLO=(LABEL_PRESETS[_curLabelSizeKey()]||{}).layout; var _freePos=(_freeLO&&_freeLO.pos)?_freeLO.pos:null;
   picked.forEach(function(a){
     var qty = _lpQtyFor(a);
     for(var q=0;q<qty;q++){
       bodyH += '<div class="lbl">';
+      if(_freePos){ bodyH += _assetFreeLabelHtml(a,_freePos,w,hh,qrSvg) + '</div>'; continue; }
       // 왼쪽 표에 포함될 행 정의
       var leftRows = [];
       if(fields.purchaseDt)     leftRows.push(["구 입 일 자", dateKr(a.purchaseDt)]);
@@ -14592,6 +14596,74 @@ async function _lpPrint(){
     });
   }
   // 프리뷰 후에도 설정 팝업 유지 — 재조정 편하게
+}
+// ===== 📐 자산 라벨 자유배치(드래그) 편집 — 모듈 라벨 엔진 어댑터 =====
+var ASSET_LBL_COLS = [
+  {key:'category',label:'분류'},{key:'model',label:'품명'},
+  {key:'barcode',label:'바코드'},{key:'location',label:'장소'},
+  {key:'locationDetail',label:'위치'},{key:'managerNm',label:'관리자'}
+];
+var ASSET_LBL_LABELOF = {category:'분류',model:'품명',barcode:'바코드',location:'장소',locationDetail:'위치',managerNm:'관리자'};
+function _curLabelSizeKey(){ var el=document.getElementById('lp_size'); if(el&&el.value&&el.value!=='custom') return el.value; try{ return localStorage.getItem('RENTAL_LABEL_LAST')||'100x50'; }catch(e){ return '100x50'; } }
+function popAssetLabelLayout(){
+  if(typeof _mllRender!=='function'||typeof _mllBindEvents!=='function'){ toast('편집 엔진 로딩 중 — 잠시 후 다시',true); return; }
+  var sel=Object.keys(RENTAL_SEL).filter(function(k){return RENTAL_SEL[k];});
+  var sample=(assets||[]).filter(function(a){return sel.indexOf(a.id)>=0;})[0] || (assets||[])[0] || {name:'샘플자산',category:'분류',model:'모델',barcode:'2600000000001',location:'창고',locationDetail:'A-01',managerNm:'홍길동'};
+  var nm=_curLabelSizeKey();
+  var pr=LABEL_PRESETS[nm]||{w:100,h:50};
+  var w=pr.w||100, h=pr.h||50;
+  if(typeof _modData==='undefined'){ try{ window._modData={}; }catch(e){} }
+  try{ _modData['__assetlbl']=[{ name:sample.name||'', category:sample.category||'', model:sample.model||'', barcode:sample.barcode||'', location:sample.location||'', locationDetail:sample.locationDetail||'', managerNm:sample.managerNm||sample.regByNm||'', _id:'sample' }]; }catch(e){}
+  var pos=(pr.layout&&pr.layout.pos)?JSON.parse(JSON.stringify(pr.layout.pos)):{};
+  if(!pos['_qr']) pos['_qr']={x:72,y:6,w:24};
+  if(!pos['_title']) pos['_title']={x:5,y:6,fs:13};
+  var yOff=32;
+  ASSET_LBL_COLS.forEach(function(c){ if(!pos[c.key]){ pos[c.key]={x:5,y:yOff,fs:8}; yOff+=13; } });
+  var SCALE=Math.min(6, 320/w, 360/h); if(!(SCALE>0))SCALE=4;
+  var cW=Math.round(w*SCALE), cH=Math.round(h*SCALE);
+  window.__mlLayout={ key:'__assetlbl', def:{label:'자산 라벨',icon:'📦'}, opt:{w:w,h:h,titleKey:'name',__asset:true,__preset:nm}, mode:'free', cols:ASSET_LBL_COLS.slice(), pos:pos, SCALE:SCALE };
+  var hh='<div class="pop-head"><h3>📐 자산 라벨 배치편집 <span style="font-size:12px;color:#6366f1">('+w+'×'+h+'mm · '+esc(nm)+')</span></h3></div>';
+  hh+='<div style="padding:14px;max-height:80vh;overflow:auto">';
+  hh+='<div style="font-size:12px;color:#64748b;margin-bottom:10px">요소를 드래그해 위치 조정 · 클릭하면 크기/서식 조절. 저장하면 이 프리셋('+esc(nm)+')에 자유배치로 인쇄됩니다.</div>';
+  hh+='<div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start"><div style="flex-shrink:0">';
+  hh+='<div id="mll_canvas" style="position:relative;width:'+cW+'px;height:'+cH+'px;background:#fff;border:2px solid #334155;border-radius:4px;overflow:hidden;user-select:none;box-shadow:0 2px 10px rgba(0,0,0,.15)"></div></div>';
+  hh+='<div style="width:190px;flex-shrink:0"><div style="font-size:12px;font-weight:700;color:#334155;margin-bottom:6px">요소 선택하면 여기서 조절</div><div id="mll_ctrl" style="font-size:12px;color:#94a3b8">요소를 클릭하세요</div></div>';
+  hh+='</div>';
+  hh+='<div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px"><button class="btn" style="background:#ef4444;color:#fff;font-size:12px" onclick="_assetLayoutClear()">🔄 자유배치 해제(칸으로)</button><div><button class="btn" style="background:#64748b;color:#fff" onclick="closePopup()">취소</button> <button class="btn btn-b" style="background:#6366f1;color:#fff;font-weight:700" onclick="_mllSave()">💾 저장</button></div></div>';
+  hh+='</div>';
+  openPopup(hh, Math.max(640,cW+260));
+  setTimeout(function(){ _mllRender(); _mllBindEvents(); },50);
+}
+function _assetLayoutSave(pos){
+  var nm=(window.__mlLayout&&window.__mlLayout.opt&&window.__mlLayout.opt.__preset)||_curLabelSizeKey();
+  if(!LABEL_PRESETS[nm]) LABEL_PRESETS[nm]={w:100,h:50};
+  LABEL_PRESETS[nm].layout={mode:'free',pos:pos};
+  _saveLabelPresets(LABEL_PRESETS);
+}
+function _assetLayoutClear(){
+  var nm=(window.__mlLayout&&window.__mlLayout.opt&&window.__mlLayout.opt.__preset)||_curLabelSizeKey();
+  if(LABEL_PRESETS[nm]){ delete LABEL_PRESETS[nm].layout; _saveLabelPresets(LABEL_PRESETS); }
+  if(window.__mllCleanup) window.__mllCleanup();
+  closePopup(); toast('자유배치 해제됨 — 기본 칸(표)으로 인쇄');
+}
+// 자유배치 1장 렌더 (인쇄용) — 모듈 _mlElemFit 재사용
+function _assetFreeLabelHtml(a, pos, w, h, qrSvgFn){
+  var fv={ name:a.name||'', category:a.category||'', model:a.model||'', barcode:a.barcode||'', location:a.location||'', locationDetail:a.locationDetail||'', managerNm:a.managerNm||a.regByNm||'' };
+  var html='<div class="lblCard" style="width:100%;height:100%;position:relative;box-sizing:border-box">';
+  var tp=pos['_title'];
+  if(tp){ var tef=(typeof _mlElemFit==='function')?_mlElemFit(tp,fv.name,tp.fs||13,w,h):{css:'white-space:nowrap;',fs:(tp.fs||13)}; html+='<div style="position:absolute;left:'+tp.x+'%;top:'+tp.y+'%;font-size:'+tef.fs+'pt;font-weight:800;line-height:1.1;'+tef.css+'">'+esc(fv.name)+'</div>'; }
+  var qp=pos['_qr'];
+  if(qp){ html+='<div style="position:absolute;left:'+qp.x+'%;top:'+qp.y+'%;width:'+(qp.w||24)+'mm;height:'+(qp.w||24)+'mm">'+(qrSvgFn?qrSvgFn(a):'')+'</div>'; }
+  ASSET_LBL_COLS.forEach(function(c){
+    var fp=pos[c.key]; if(!fp) return; var v=fv[c.key]; if(v==null||v==='') return;
+    var lbl=ASSET_LBL_LABELOF[c.key]||c.label;
+    var plain=lbl+(fp.colon?': ':' ')+v;
+    var ef=(typeof _mlElemFit==='function')?_mlElemFit(fp,plain,fp.fs||8,w,h):{css:'white-space:nowrap;',fs:(fp.fs||8)};
+    var sep=fp.brk?'<br>':(fp.colon?': ':' ');
+    html+='<div style="position:absolute;left:'+fp.x+'%;top:'+fp.y+'%;font-size:'+ef.fs+'pt;line-height:1.3;color:#000;'+(fp.bold?'font-weight:800;':'')+ef.css+'"><b>'+esc(lbl)+'</b>'+sep+esc(v)+'</div>';
+  });
+  html+='</div>';
+  return html;
 }
 async function _lpExcel(){
   if(typeof XLSX==="undefined"){ toast("엑셀 로딩 중",true); return; }

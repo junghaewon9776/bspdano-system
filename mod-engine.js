@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260615v94';
+var _MOD_ENGINE_VER='20260615v95';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -3867,6 +3867,14 @@ function _mllClearLayout(){
 
 function _mllSave(){
   var L=window.__mlLayout; if(!L) return;
+  // 📦 자산 라벨 배치 — 모듈이 아니라 자산 라벨 프리셋에 저장 (어댑터)
+  if(L.opt&&L.opt.__asset){
+    if(typeof _assetLayoutSave==='function') _assetLayoutSave(L.pos);
+    if(window.__mllCleanup) window.__mllCleanup();
+    closePopup();
+    toast('자산 라벨 배치 저장됨');
+    return;
+  }
   var layout={mode:'free',pos:L.pos};
   _saveModLabelLayout(L.key,L.mode,layout);
   // 재오픈 시 같은 모드로 열려 이 배치가 보이도록 opt의 mode도 못박음
