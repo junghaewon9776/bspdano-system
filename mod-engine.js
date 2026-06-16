@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260615v95';
+var _MOD_ENGINE_VER='20260615v96';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -1267,9 +1267,10 @@ function _renderModDefCols(){
     // 🔗 묶음(조합) — 체크한 칼럼들이 모두 같아야 동일인. 예: 이름+연락처 둘 다 체크
     if(['text','tel','select','number'].indexOf(c.type)>=0) h+='<label style="font-size:11px;display:flex;align-items:center;gap:3px;color:#1d4ed8" title="🔗묶음 켠 칼럼들이 모두 같을 때만 동일인으로 묶어 「👤 N건」 표시 (예: 이름+연락처 둘 다 켜기)"><input type="checkbox"'+(c.dupGroup?' checked':'')+' onchange="_modDefEditCols['+i+'].dupGroup=this.checked">🔗묶음</label>';
     // 관리자전용
-    var _vis=c.sysOnly?'sys':c.adminOnly?'admin':c.qrAdmin?'qrAdmin':'';
+    var _vis=c.sysOnly?'sys':c.adminOnly?'admin':c.qrPublic?'qrpub':c.qrAdmin?'qrAdmin':'';
     h+='<select style="font-size:11px;padding:2px 4px;border:1px solid #cbd5e1;border-radius:4px" onchange="_modDefColVis('+i+',this.value)">'
       +'<option value=""'+(!_vis?' selected':'')+'>공개</option>'
+      +'<option value="qrpub"'+(_vis==='qrpub'?' selected':'')+'>📱 QR만 공개(신청 숨김)</option>'
       +'<option value="qrAdmin"'+(_vis==='qrAdmin'?' selected':'')+'>🔑 QR관리자만</option>'
       +'<option value="admin"'+(_vis==='admin'?' selected':'')+'>관리자전용</option>'
       +'<option value="sys"'+(_vis==='sys'?' selected':'')+'>🖥 시스템전용</option>'
@@ -1430,9 +1431,10 @@ function _modDefRemoveCol(i){
   _modDefRefreshCols();
 }
 function _modDefColVis(i,v){
-  var c=_modDefEditCols[i]; c.adminOnly=false; c.qrAdmin=false; c.sysOnly=false;
+  var c=_modDefEditCols[i]; c.adminOnly=false; c.qrAdmin=false; c.sysOnly=false; c.qrPublic=false;
   if(v==='admin') c.adminOnly=true;
   else if(v==='qrAdmin') c.qrAdmin=true;
+  else if(v==='qrpub') c.qrPublic=true;
   else if(v==='sys') c.sysOnly=true;
 }
 function _modDefMoveCol(i,dir){
@@ -1840,7 +1842,7 @@ function _renderModApplyUI(def,evtId){
     h+='</div>';
   }
   (def.columns||[]).forEach(function(c){
-    if(c.auto||c.adminOnly||c.sysOnly||c.key==='status') return;
+    if(c.auto||c.adminOnly||c.sysOnly||c.qrPublic||c.key==='status') return;
     h+='<div style="margin-bottom:16px"><label style="display:block;font-size:14px;color:#334155;font-weight:700;margin-bottom:6px">'+esc(c.label)+(c.required?' <span style="color:#ef4444">*</span>':'')+'</label>';
     h+=_modFormField(c,'');
     h+='</div>';
@@ -2096,7 +2098,7 @@ function submitModApply(){
   if(!def) return;
   var obj={}, valid=true, firstBad=null, fileTasks=[];
   (def.columns||[]).forEach(function(c){
-    if(c.auto||c.adminOnly||c.sysOnly||c.key==='status') return;
+    if(c.auto||c.adminOnly||c.sysOnly||c.qrPublic||c.key==='status') return;
     var el=document.getElementById('mod_f_'+c.key); if(!el) return;
     if(c.type==='consent'){
       if(c.required&&!el.checked){ valid=false; if(!firstBad)firstBad=c.label+'에 동의해 주세요'; }
