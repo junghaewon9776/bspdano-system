@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260615v101';
+var _MOD_ENGINE_VER='20260615v102';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -255,11 +255,15 @@ function _modFilteredData(key){
     Object.keys(filter).forEach(function(ck){
       var fv=filter[ck]; if(fv==='') return;
       var vals=Array.isArray(fv)?fv:[fv]; if(!vals.length) return;
+      var _fcol=(def.columns||[]).find(function(c){return c.key===ck;});
+      var _cdef=(_fcol&&_fcol.type==='badge')?_modBadgeDefault(_fcol):'';  // 배지 기본값
       data=data.filter(function(row){
+        var rv=String(row[ck]||'');
         return vals.some(function(v){  // 같은 칼럼 내 여러 값은 OR
-          if(v==='__has__') return String(row[ck]||'').trim()!=='';
-          if(v==='__none__') return String(row[ck]||'').trim()==='';
-          return String(row[ck]||'')===String(v);
+          if(v==='__has__') return rv.trim()!=='';
+          if(v==='__none__') return rv.trim()==='';
+          if(rv==='' && _cdef && String(_cdef)===String(v)) return true; // 빈값=기본값(대기)으로 매칭
+          return rv===String(v);
         });
       });
     });
@@ -572,7 +576,11 @@ function modDelSel(key){
 }
 
 // ─── 셀 포맷 ───
+// 배지 칼럼 기본값 (defVal 없으면 첫 배지 = 보통 '대기') — 빈값을 이걸로 취급
+function _modBadgeDefault(col){ return (col&&col.defVal) || (col&&col.badgeMap?Object.keys(col.badgeMap)[0]:'') || ''; }
 function _modFmtCell(col,val){
+  // 빈 상태배지는 기본값(대기 등)으로 표시
+  if((val==null||val==="") && col.type==='badge'){ var _bd=_modBadgeDefault(col); if(_bd) val=_bd; }
   if(val==null||val==="") return '<span style="color:#cbd5e1">—</span>';
   if(col.multiQty){ var _ms=_modMultiStr(val); return _ms?'<b>'+esc(_ms)+'</b>':'<span style="color:#cbd5e1">—</span>'; }
   switch(col.type){
