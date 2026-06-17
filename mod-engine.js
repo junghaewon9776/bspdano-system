@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260615v97';
+var _MOD_ENGINE_VER='20260615v98';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -320,7 +320,7 @@ function _modListHtml(key){
 
   // 표 영역: 최대 높이 제한 → 가로 스크롤바가 항상 보이는 위치(박스 하단)에 고정 + 제목줄(thead) 고정
   var _hSticky='position:sticky;top:0;z-index:3;background:#f8fafc;';
-  h+='<div style="overflow:auto;max-height:72vh;border:1px solid #e5e7eb;border-radius:10px">';
+  h+='<div id="_modScroll_'+key+'" style="overflow:auto;max-height:72vh;border:1px solid #e5e7eb;border-radius:10px">';
   h+='<table class="tbl"><thead><tr>';
   if(isA()){
     var allOn=data.length>0 && selCount>=data.length;
@@ -456,7 +456,13 @@ function _modSelIds(key){ return Object.keys(_modSel[key]||{}); }
 // 목록 영역만 다시 그려 체크 상태/작업바 반영
 function _modSelRefresh(key){
   var b=document.getElementById('_modBody_'+key);
-  if(b) b.innerHTML=_modListHtml(key);
+  if(!b) return;
+  // 스크롤 위치 보존 (재렌더 시 맨 위로 튀는 것 방지)
+  var sc=document.getElementById('_modScroll_'+key);
+  var st=sc?sc.scrollTop:0, sl=sc?sc.scrollLeft:0;
+  b.innerHTML=_modListHtml(key);
+  var sc2=document.getElementById('_modScroll_'+key);
+  if(sc2){ sc2.scrollTop=st; sc2.scrollLeft=sl; }
 }
 // 선택 항목 → 라벨 출력
 function popModLabelSel(key){
