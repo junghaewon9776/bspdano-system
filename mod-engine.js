@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260615v98';
+var _MOD_ENGINE_VER='20260615v99';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -244,6 +244,8 @@ function _modFilteredData(key){
     // 다중 필터 (모든 조건 AND)
     Object.keys(filter).forEach(function(ck){
       var fv=filter[ck]; if(fv==='') return;
+      if(fv==='__has__'){ data=data.filter(function(row){return String(row[ck]||'').trim()!=='';}); return; }       // 등록됨(값 있음)
+      if(fv==='__none__'){ data=data.filter(function(row){return String(row[ck]||'').trim()==='';}); return; }      // 미등록(값 없음)
       data=data.filter(function(row){return String(row[ck]||'')===String(fv)});
     });
   } else if(filter){
@@ -417,6 +419,7 @@ function _modSearchTyped(key,val){
 function _modFilterOpts(key,fc){
   if(fc.type==='select') return (fc.options||[]).map(function(o){ return {v:typeof o==='object'?o.value:o, l:typeof o==='object'?o.label:o}; });
   if(fc.type==='badge') return Object.keys(fc.badgeMap||{}).map(function(k){ return {v:k, l:(fc.badgeMap[k].label||k)}; });
+  if(fc.type==='file'||fc.type==='consent') return [{v:'__has__',l:'✅ 등록됨'},{v:'__none__',l:'⬜ 미등록'}];
   // 그 외(텍스트 등) → 실제 데이터의 고유값 자동 수집
   var seen={}, out=[];
   (_modData[key]||[]).forEach(function(r){ var v=String(r[fc.key]||''); if(v&&!seen[v]){seen[v]=1;out.push({v:v,l:v});} });
@@ -1267,7 +1270,7 @@ function _renderModDefCols(){
     // 콤마 (숫자/금액만)
     if(c.type==='number') h+='<label style="font-size:11px;display:flex;align-items:center;gap:3px"><input type="checkbox"'+(c.comma?' checked':'')+' onchange="_modDefEditCols['+i+'].comma=this.checked">금액(콤마)</label>';
     // 필터 (긴글·파일·동의 제외한 모든 타입) — 체크하면 그 컬럼 값으로 거르는 버튼 자동 생성
-    if(['select','badge','text','tel','number','date'].indexOf(c.type)>=0) h+='<label style="font-size:11px;display:flex;align-items:center;gap:3px" title="체크하면 이 컬럼 값(예: 선정/대기)으로 거르는 필터 버튼이 생깁니다"><input type="checkbox"'+(c.filter?' checked':'')+' onchange="_modDefEditCols['+i+'].filter=this.checked">필터</label>';
+    if(['select','badge','text','tel','number','date','file','consent'].indexOf(c.type)>=0) h+='<label style="font-size:11px;display:flex;align-items:center;gap:3px" title="체크하면 이 컬럼으로 거르는 필터 버튼이 생깁니다 (파일/동의는 첨부됨·미첨부)"><input type="checkbox"'+(c.filter?' checked':'')+' onchange="_modDefEditCols['+i+'].filter=this.checked">필터</label>';
     // 검색 (텍스트류만)
     if(['text','tel','textarea','number','select'].indexOf(c.type)>=0) h+='<label style="font-size:11px;display:flex;align-items:center;gap:3px"><input type="checkbox"'+(c.search?' checked':'')+' onchange="_modDefEditCols['+i+'].search=this.checked">검색</label>';
     // 👥 중복 표시 (텍스트/연락처/선택) — 같은 값 여러 건이면 표에 "총 N건" 배지 (칼럼별 독립)
