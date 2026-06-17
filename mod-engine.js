@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260615v100';
+var _MOD_ENGINE_VER='20260615v101';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -322,13 +322,17 @@ function _modListHtml(key){
     h+='<b style="color:#2563eb;font-size:13px"><span id="_modSelCnt_'+key+'">'+selCount+'</span>개 선택</b>';
     h+='<button class="btn btn-s" style="background:#475569;color:#fff" onclick="popModLabelSel(\''+key+'\')">🖨 라벨 출력</button>';
     if((def.columns||[]).some(function(c){return c.type==='tel';})) h+='<button class="btn btn-s" style="background:#8b5cf6;color:#fff" onclick="popModSmsSel(\''+key+'\')">💬 문자 발송</button>';
-    if(statusCol){
-      Object.keys(statusCol.badgeMap||{}).forEach(function(sk){
-        if(sk==='대기') return;
-        var bm=statusCol.badgeMap[sk]||{};
-        h+='<button class="btn btn-s" onclick="modSetStatusSel(\''+key+'\',\''+esc(sk)+'\')" style="background:'+(bm.bg||'#f1f5f9')+';color:'+(bm.color||'#475569')+';border:1px solid '+(bm.bg||'#cbd5e1')+';font-weight:700">'+esc(bm.label||sk)+' 처리</button>';
+    // 상태배지 칼럼 전부 처리 버튼 표시 (2개 이상이면 칼럼명 prefix)
+    var _badgeCols=(def.columns||[]).filter(function(c){return c.type==='badge'&&c.badgeMap;});
+    var _multiBadge=_badgeCols.length>1;
+    _badgeCols.forEach(function(bc){
+      Object.keys(bc.badgeMap||{}).forEach(function(sk){
+        if(sk==='대기') return; // 기본값(대기)은 처리버튼 제외
+        var bm=bc.badgeMap[sk]||{};
+        var pre=_multiBadge?(esc(bc.label)+' '):'';
+        h+='<button class="btn btn-s" onclick="modSetStatusSel(\''+key+'\',\''+esc(bc.key)+'\',\''+esc(sk)+'\')" style="background:'+(bm.bg||'#f1f5f9')+';color:'+(bm.color||'#475569')+';border:1px solid '+(bm.bg||'#cbd5e1')+';font-weight:700">'+pre+esc(bm.label||sk)+' 처리</button>';
       });
-    }
+    });
     h+='<button class="btn btn-s" style="background:#0891b2;color:#fff" onclick="popModMarkSel(\''+key+'\')">🎨 색칠</button>';
     h+='<button class="btn btn-s" style="background:#dc2626;color:#fff" onclick="modDelSel(\''+key+'\')">🗑 선택 삭제</button>';
     h+='<button class="btn btn-s" style="margin-left:auto;background:#64748b;color:#fff" onclick="_modSelClear(\''+key+'\')">선택 해제</button>';
@@ -500,18 +504,19 @@ function popModLabelSel(key){
   popModLabel(key,null,ids);
 }
 // 선택 항목 → 일괄 상태 변경
-function modSetStatusSel(key,statusKey){
+function modSetStatusSel(key,colKey,statusKey){
+  if(statusKey===undefined){ statusKey=colKey; colKey='status'; } // 구버전 2인자 호환
   var ids=_modSelIds(key);
   if(!ids.length) return toast('선택된 항목이 없습니다',true);
   var path=_modFbPath(key); if(!path) return;
   var def=_modDefs[key];
-  var bm=(def.columns.find(function(c){return c.key==='status';})||{}).badgeMap||{};
+  var bm=(def.columns.find(function(c){return c.key===colKey;})||{}).badgeMap||{};
   var lbl=(bm[statusKey]&&bm[statusKey].label)||statusKey;
   var actor=_modActor();
-  if(!confirm(ids.length+'개 항목을 '+lbl+' 처리하시겠습니까?'+(actor?'\n\n처리자: '+actor:''))) return;
+  if(!confirm(ids.length+'개 항목을 "'+lbl+'" 처리하시겠습니까?'+(actor?'\n\n처리자: '+actor:''))) return;
   var data=(_modData[key]||[]).slice();
   var now=new Date().toISOString();
-  data.forEach(function(r){ if(ids.indexOf(r._id)>=0){ r.status=statusKey; r._updatedAt=now; r._statusBy=(typeof CID!=='undefined'?CID:''); r._statusByName=actor; r._statusAt=now; } });
+  data.forEach(function(r){ if(ids.indexOf(r._id)>=0){ r[colKey]=statusKey; r._updatedAt=now; if(colKey==='status'){ r._statusBy=(typeof CID!=='undefined'?CID:''); r._statusByName=actor; r._statusAt=now; } } });
   showLoading('처리 중...');
   fbDb.ref(path).set(data).then(function(){ hideLoading(); toast('✅ '+ids.length+'개 "'+lbl+'" 처리'+(actor?' · '+actor:'')); _modLogAdd(key,lbl,'','('+ids.length+'개 일괄)','상태변경'); _modSel[key]={}; })
     .catch(function(e){ hideLoading(); toast('실패: '+(e.message||e),true); });
