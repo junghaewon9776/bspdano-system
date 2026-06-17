@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260615v99';
+var _MOD_ENGINE_VER='20260615v100';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -200,14 +200,24 @@ function dMod(key){
     fcols.forEach(function(fc){
       var fopts=_modFilterOpts(key,fc);
       if(!fopts.length) return;
-      var cur=fcur[fc.key]||'';
-      if(cur) anyActive=true;
-      h+='<select onchange="_modSetFilter(\''+key+'\',\''+esc(fc.key)+'\',this.value)" style="padding:7px 10px;border:1px solid '+(cur?'#2563eb':'#d1d5db')+';border-radius:8px;font-size:13px;background:'+(cur?'#eff6ff':'#fff')+';color:#334155;font-weight:'+(cur?'700':'400')+'">';
-      h+='<option value="">'+esc(fc.label)+' 전체</option>';
+      var raw=fcur[fc.key];
+      var selArr=Array.isArray(raw)?raw.slice():(raw?[raw]:[]);  // 다중값 지원
+      if(selArr.length) anyActive=true;
+      var on=selArr.length>0;
+      // 드롭다운: 아직 안 고른 값만 (고르면 칩으로 추가)
+      h+='<select onchange="_modSetFilter(\''+key+'\',\''+esc(fc.key)+'\',this.value);this.value=\'\'" style="padding:7px 10px;border:1px solid '+(on?'#2563eb':'#d1d5db')+';border-radius:8px;font-size:13px;background:'+(on?'#eff6ff':'#fff')+';color:#334155;font-weight:'+(on?'700':'400')+'">';
+      h+='<option value="">'+esc(fc.label)+(on?' +추가':' 전체')+'</option>';
       fopts.forEach(function(o){
-        h+='<option value="'+esc(String(o.v))+'"'+(String(cur)===String(o.v)?' selected':'')+'>'+esc(o.l)+'</option>';
+        if(selArr.indexOf(String(o.v))>=0) return; // 이미 선택된 건 제외
+        h+='<option value="'+esc(String(o.v))+'">'+esc(o.l)+'</option>';
       });
       h+='</select>';
+      // 선택된 값 칩 (클릭하면 제거)
+      selArr.forEach(function(v){
+        var lo=fopts.filter(function(o){return String(o.v)===String(v);})[0];
+        var lbl=lo?lo.l:v;
+        h+='<span onclick="_modRemoveFilter(\''+key+'\',\''+esc(fc.key)+'\',\''+esc(String(v))+'\')" style="display:inline-flex;align-items:center;gap:4px;background:#dbeafe;color:#1d4ed8;border:1px solid #93c5fd;border-radius:14px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer" title="클릭하면 제거">'+esc(lbl)+' ✕</span>';
+      });
     });
     // 출력 필터
     var _pf=_modPrintFilter[key]||'';
@@ -244,9 +254,14 @@ function _modFilteredData(key){
     // 다중 필터 (모든 조건 AND)
     Object.keys(filter).forEach(function(ck){
       var fv=filter[ck]; if(fv==='') return;
-      if(fv==='__has__'){ data=data.filter(function(row){return String(row[ck]||'').trim()!=='';}); return; }       // 등록됨(값 있음)
-      if(fv==='__none__'){ data=data.filter(function(row){return String(row[ck]||'').trim()==='';}); return; }      // 미등록(값 없음)
-      data=data.filter(function(row){return String(row[ck]||'')===String(fv)});
+      var vals=Array.isArray(fv)?fv:[fv]; if(!vals.length) return;
+      data=data.filter(function(row){
+        return vals.some(function(v){  // 같은 칼럼 내 여러 값은 OR
+          if(v==='__has__') return String(row[ck]||'').trim()!=='';
+          if(v==='__none__') return String(row[ck]||'').trim()==='';
+          return String(row[ck]||'')===String(v);
+        });
+      });
     });
   } else if(filter){
     // 레거시 단일 문자열 호환
@@ -428,7 +443,18 @@ function _modFilterOpts(key,fc){
 }
 function _modSetFilter(key,colKey,val){
   if(!_modFilter[key]||typeof _modFilter[key]!=='object') _modFilter[key]={};
-  if(val==='') delete _modFilter[key][colKey]; else _modFilter[key][colKey]=val;
+  if(val===''){ draw(); return; }
+  var cur=_modFilter[key][colKey];
+  var arr=Array.isArray(cur)?cur.slice():(cur?[cur]:[]);
+  if(arr.indexOf(String(val))<0) arr.push(String(val));  // 다중값 추가
+  _modFilter[key][colKey]=arr;
+  draw();
+}
+function _modRemoveFilter(key,colKey,val){
+  var cur=(_modFilter[key]||{})[colKey];
+  var arr=Array.isArray(cur)?cur.slice():(cur?[cur]:[]);
+  arr=arr.filter(function(v){return String(v)!==String(val);});
+  if(arr.length) _modFilter[key][colKey]=arr; else delete _modFilter[key][colKey];
   draw();
 }
 function _modClearFilter(key){ _modFilter[key]={}; _modPrintFilter[key]=''; draw(); }
