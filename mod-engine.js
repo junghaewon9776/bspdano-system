@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260615v104';
+var _MOD_ENGINE_VER='20260615v105';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -935,7 +935,7 @@ function modDel(key,id){
 
 function modExportExcel(key){
   var def=_modDefs[key]; if(!def) return;
-  var data=_modData[key]||[];
+  var data=_modFilteredData(key);  // 현재 검색·필터·정렬 적용된 것만 내보내기
   var cols=(def.columns||[]).filter(function(c){return !c.hideTable});
   // 첫 열은 고유번호(QR id) — 다시 가져올 때 기존 행을 식별/업데이트하기 위함
   var rows=[['고유번호'].concat(cols.map(function(c){return c.label}))];
