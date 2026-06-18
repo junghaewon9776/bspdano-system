@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260619v120';
+var _MOD_ENGINE_VER='20260619v121';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -762,7 +762,7 @@ function _modFormField(col,val){
           var _custom=null; _modParseMulti(val).forEach(function(it){ if(it&&it.o&&(it.raw||!_optset[it.o])) _custom=it; });
           mh+='<div data-optrow="__etc__" style="display:flex;align-items:center;gap:8px;padding:10px 12px;border-top:1px solid #f1f5f9;background:#fffbeb">'
             +'<span style="font-size:12px;font-weight:700;color:#92400e;flex-shrink:0">✏️ 직접입력</span>'
-            +'<input type="text" class="mqetcname" placeholder="예: 특수굴비30미 2개" value="'+(_custom?esc(_custom.o):'')+'" style="flex:1;min-width:0;padding:8px;border:1px solid #cbd5e1;border-radius:6px;font-weight:700">'
+            +'<input type="text" class="mqetcname" placeholder="'+esc(col.etcPlaceholder||'예: 특수굴비30미 2개')+'" value="'+(_custom?esc(_custom.o):'')+'" style="flex:1;min-width:0;padding:8px;border:1px solid #cbd5e1;border-radius:6px;font-weight:700">'
             +'</div>';
         }
         mh+='</div><div id="'+id+'_tot" style="font-size:11px;color:#94a3b8;margin-top:4px">원하는 품목을 체크하면 수량이 켜집니다'+(_mp?' · <b style="color:#0f766e">총 '+_mp+'개까지</b>':'')+'</div>';
@@ -785,7 +785,7 @@ function _modFormField(col,val){
       h+='</select>';
       if(_etcAllow){
         var _etcMax=(col.maxLen?' maxlength="'+col.maxLen+'"':'');
-        var _etcPh=col.maxLen?('직접 입력 (최대 '+col.maxLen+'자)'):'직접 입력';
+        var _etcPh=col.etcPlaceholder||(col.maxLen?('직접 입력 (최대 '+col.maxLen+'자)'):'직접 입력');
         h+='<input id="'+_etcId+'"'+_etcMax+' placeholder="'+_etcPh+'" value="'+(_etcOn?ev:'')+'" style="'+_w+'margin-top:6px;padding:11px;font-size:15px;border:1px solid #cbd5e1;border-radius:8px;display:'+(_etcOn?'block':'none')+'">';
       }
       return h;
@@ -1652,6 +1652,9 @@ function _renderModDefCols(){
       h+='<div style="margin-top:6px"><textarea rows="4" placeholder="'+_optPh+'" style="width:100%;font-size:12px;padding:5px 8px;border:1px solid #cbd5e1;border-radius:6px;resize:vertical;line-height:1.5" onchange="_modDefSetOptions('+i+',this.value)">'+esc((c.options||[]).join('\n'))+'</textarea></div>';
       var _etcChk=(c.multiQty? !!c.allowEtc : (c.allowEtc!==false));
       h+='<label style="font-size:11px;display:flex;align-items:center;gap:5px;margin-top:5px;color:#475569;cursor:pointer"><input type="checkbox"'+(_etcChk?' checked':'')+' onchange="_modDefEditCols['+i+'].allowEtc=this.checked;_modDefRefreshCols()">✏️ <b>직접 입력 허용</b> <span style="color:#94a3b8">— 목록에 없는 항목을 직접 타이핑('+(c.multiQty?'품명+수량':'기타')+')</span></label>';
+      if(_etcChk){
+        h+='<div style="margin-top:4px;display:flex;align-items:center;gap:6px;font-size:11px;color:#475569"><span>직접입력 예시</span><input value="'+esc(c.etcPlaceholder||'')+'" placeholder="'+(c.multiQty?'예: 특수굴비30미 2개':'직접 입력')+'" style="flex:1;min-width:0;font-size:11px;padding:4px 6px;border:1px solid #cbd5e1;border-radius:5px" onchange="_modDefEditCols['+i+'].etcPlaceholder=this.value"></div>';
+      }
       // 📦 재고(수량) 관리 — 옵션별 수량, 신청 시 자동 차감(건수 기반)
       h+='<div style="margin-top:6px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:7px;padding:7px 9px">';
       h+='<label style="font-size:11px;display:flex;align-items:center;gap:5px;font-weight:700;color:#0f766e;cursor:pointer"><input type="checkbox"'+(c.stockOn?' checked':'')+' onchange="_modDefEditCols['+i+'].stockOn=this.checked;_modDefRefreshCols()">📦 재고(수량) 관리 — 신청 들어오면 자동 차감</label>';
