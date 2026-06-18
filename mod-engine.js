@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260618v118';
+var _MOD_ENGINE_VER='20260619v120';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -756,6 +756,15 @@ function _modFormField(col,val){
             +'<input type="number" class="mqnum" min="1" value="'+(on?_cur[ov]:1)+'" data-opt="'+esc(ovs)+'"'+(on?'':' disabled')+' style="width:60px;text-align:center;padding:7px;border:1px solid #cbd5e1;border-radius:6px;font-weight:700;'+(on?'':'opacity:.4;background:#f1f5f9')+'" onfocus="this.select()" oninput="_modMqClampTotal(this)">'
             +'<span style="font-size:12px;color:#94a3b8">개</span></div>';
         });
+        // ✏️ 직접 입력 행 — 자유 텍스트 한 칸 (수량까지 직접 작성, 별도 수량칸 없음)
+        if(col.allowEtc){
+          var _optset={}; (col.options||[]).forEach(function(o){ _optset[String(typeof o==='object'?o.value:o)]=1; });
+          var _custom=null; _modParseMulti(val).forEach(function(it){ if(it&&it.o&&(it.raw||!_optset[it.o])) _custom=it; });
+          mh+='<div data-optrow="__etc__" style="display:flex;align-items:center;gap:8px;padding:10px 12px;border-top:1px solid #f1f5f9;background:#fffbeb">'
+            +'<span style="font-size:12px;font-weight:700;color:#92400e;flex-shrink:0">✏️ 직접입력</span>'
+            +'<input type="text" class="mqetcname" placeholder="예: 특수굴비30미 2개" value="'+(_custom?esc(_custom.o):'')+'" style="flex:1;min-width:0;padding:8px;border:1px solid #cbd5e1;border-radius:6px;font-weight:700">'
+            +'</div>';
+        }
         mh+='</div><div id="'+id+'_tot" style="font-size:11px;color:#94a3b8;margin-top:4px">원하는 품목을 체크하면 수량이 켜집니다'+(_mp?' · <b style="color:#0f766e">총 '+_mp+'개까지</b>':'')+'</div>';
         return mh;
       }
@@ -769,11 +778,16 @@ function _modFormField(col,val){
         h+='<option value="'+esc(ov)+'"'+(String(ov)==String(val)?' selected':'')+'>'+esc(ol)+'</option>';
       });
       var _etcOn=(!_inList && val!=null && val!=='');
-      h+='<option value="__etc__"'+(_etcOn?' selected':'')+'>+ 직접 입력</option>';
+      var _etcAllow=(col.allowEtc!==false) || _etcOn;   // 직접입력 허용(기본 켜짐) — 끄면 옵션만
+      if(_etcAllow){
+        h+='<option value="__etc__"'+(_etcOn?' selected':'')+'>+ 직접 입력</option>';
+      }
       h+='</select>';
-      var _etcMax=(col.maxLen?' maxlength="'+col.maxLen+'"':'');
-      var _etcPh=col.maxLen?('직접 입력 (최대 '+col.maxLen+'자)'):'직접 입력';
-      h+='<input id="'+_etcId+'"'+_etcMax+' placeholder="'+_etcPh+'" value="'+(_etcOn?ev:'')+'" style="'+_w+'margin-top:6px;padding:11px;font-size:15px;border:1px solid #cbd5e1;border-radius:8px;display:'+(_etcOn?'block':'none')+'">';
+      if(_etcAllow){
+        var _etcMax=(col.maxLen?' maxlength="'+col.maxLen+'"':'');
+        var _etcPh=col.maxLen?('직접 입력 (최대 '+col.maxLen+'자)'):'직접 입력';
+        h+='<input id="'+_etcId+'"'+_etcMax+' placeholder="'+_etcPh+'" value="'+(_etcOn?ev:'')+'" style="'+_w+'margin-top:6px;padding:11px;font-size:15px;border:1px solid #cbd5e1;border-radius:8px;display:'+(_etcOn?'block':'none')+'">';
+      }
       return h;
     case 'badge':
       var h='<select id="'+id+'" style="'+_w+'"><option value="">— 선택 —</option>';
@@ -1008,7 +1022,14 @@ function modSave(key,editId){
       obj._createdAt=new Date().toISOString();
       var data=(_modData[key]||[]).slice();
       data.push(obj);
-      return fbDb.ref(path).set(data).then(function(){hideLoading();toast('✅ 추가됨');closePopup()});
+      return fbDb.ref(path).set(data).then(function(){
+        hideLoading();toast('✅ 추가됨');closePopup();
+        // 📱 관리자 직접 추가도 접수 문자 발송 (신청폼과 동일)
+        if(def.smsApply){
+          var _tels=_modTelsFor(def,obj,def.smsApplyTo||'both');
+          if(_tels.length) _modSmsGlobal(_tels,_modSmsFill(def.smsApplyTpl||'주문이 정상 접수되었습니다.',def,obj)).then(function(r){ if(r&&r.ok) toast('📱 접수 문자 발송 ('+_tels.length+'건)'); });
+        }
+      });
     }
   }).catch(function(e){hideLoading();toast('실패: '+(e.message||e),true)});
 }
@@ -1629,6 +1650,8 @@ function _renderModDefCols(){
     if(c.type==='select'){
       var _optPh=c.stockOn?'선택 항목 — 한 줄에 하나씩 · &quot;옵션 = 수량&quot;도 가능&#10;예:&#10;블랙 90 = 95&#10;화이트 100 = 50':'선택 항목 — 한 줄에 하나씩 (문장 안에 쉼표 써도 안 잘림)&#10;예:&#10;올 한 해 건강하길&#10;소원 성취';
       h+='<div style="margin-top:6px"><textarea rows="4" placeholder="'+_optPh+'" style="width:100%;font-size:12px;padding:5px 8px;border:1px solid #cbd5e1;border-radius:6px;resize:vertical;line-height:1.5" onchange="_modDefSetOptions('+i+',this.value)">'+esc((c.options||[]).join('\n'))+'</textarea></div>';
+      var _etcChk=(c.multiQty? !!c.allowEtc : (c.allowEtc!==false));
+      h+='<label style="font-size:11px;display:flex;align-items:center;gap:5px;margin-top:5px;color:#475569;cursor:pointer"><input type="checkbox"'+(_etcChk?' checked':'')+' onchange="_modDefEditCols['+i+'].allowEtc=this.checked;_modDefRefreshCols()">✏️ <b>직접 입력 허용</b> <span style="color:#94a3b8">— 목록에 없는 항목을 직접 타이핑('+(c.multiQty?'품명+수량':'기타')+')</span></label>';
       // 📦 재고(수량) 관리 — 옵션별 수량, 신청 시 자동 차감(건수 기반)
       h+='<div style="margin-top:6px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:7px;padding:7px 9px">';
       h+='<label style="font-size:11px;display:flex;align-items:center;gap:5px;font-weight:700;color:#0f766e;cursor:pointer"><input type="checkbox"'+(c.stockOn?' checked':'')+' onchange="_modDefEditCols['+i+'].stockOn=this.checked;_modDefRefreshCols()">📦 재고(수량) 관리 — 신청 들어오면 자동 차감</label>';
@@ -2274,7 +2297,8 @@ function _modParseMulti(v){
 }
 function _modMultiStr(v, sep, noQty, kae){
   sep = (sep==null) ? ', ' : sep;
-  return _modParseMulti(v).filter(function(it){return it&&it.q>0;}).map(function(it){
+  return _modParseMulti(v).filter(function(it){return it&&(it.raw?String(it.o||'').trim():it.q>0);}).map(function(it){
+    if(it.raw) return it.o;          // 직접입력: 사용자가 쓴 그대로 (수량 포함해서 직접 작성)
     if(noQty) return it.o;
     return kae ? (it.o+' '+it.q+'개') : (it.o+'×'+it.q);
   }).join(sep);
@@ -2283,11 +2307,18 @@ function _modCollectMultiQty(id){
   var cont=document.getElementById(id); if(!cont) return '';
   var items=[];
   [].slice.call(cont.querySelectorAll('[data-optrow]')).forEach(function(row){
+    var oname=row.getAttribute('data-optrow');
+    if(oname==='__etc__'){ // 직접입력: 자유 텍스트 그대로 저장(수량도 본문에 포함)
+      var nm=row.querySelector('.mqetcname'); var t=nm?(nm.value||'').trim():'';
+      if(t) items.push({o:t, q:1, raw:true});
+      return;
+    }
     var chk=row.querySelector('.mqchk');
     if(chk && !chk.checked) return; // 체크 안 한 품목 제외
     var num=row.querySelector('.mqnum');
     var q=num?(parseInt(num.value,10)||0):0;
-    if(q>0) items.push({o:row.getAttribute('data-optrow'), q:q});
+    if(q<=0) return;
+    items.push({o:oname, q:q});
   });
   return items.length?JSON.stringify(items):'';
 }
