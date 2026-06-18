@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260615v109';
+var _MOD_ENGINE_VER='20260615v110';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -1821,11 +1821,34 @@ function popModFormLink(key){
   h+='<div style="text-align:center;margin-top:16px;padding-top:14px;border-top:1px dashed #e2e8f0">';
   h+='<img src="'+qrPrev+'" style="width:160px;height:160px;border:1px solid #e2e8f0;border-radius:8px"><div style="font-size:11px;color:#94a3b8;margin-top:4px">스캔하면 신청폼으로 연결</div>';
   h+='<div style="margin-top:10px;display:flex;gap:6px;justify-content:center;flex-wrap:wrap"><button class="btn btn-b" style="background:#16a34a;color:#fff" onclick="_saveQrJpg(window.__modFormUrl, window.__modFormName+\'_신청폼QR\')">🖼 QR 이미지 저장 (JPG)</button>';
-  h+='<button class="btn btn-b" style="background:#2563eb;color:#fff" onclick="_modFormPoster(\''+key+'\')">🖨 A4 신청 안내문 출력</button></div>';
+  h+='<button class="btn btn-b" style="background:#2563eb;color:#fff" onclick="_modFormPoster(\''+key+'\')">🖨 A4 신청 안내문 출력</button>';
+  h+='<button class="btn btn-b" style="background:#475569;color:#fff" onclick="_modFormReceipt(\''+key+'\')">🧾 영수증 QR 인쇄</button></div>';
   h+='</div>';
   h+='<div style="margin-top:14px;text-align:right"><button class="btn" style="background:#64748b;color:#fff" onclick="closePopup()">닫기</button></div>';
   h+='</div>';
   openPopup(h,520);
+}
+// 🧾 영수증(소형 프린터 80mm)용 신청폼 QR 인쇄
+function _modFormReceipt(key){
+  var def=_modDefs[key]; if(!def) return;
+  var url=window.__modFormUrl||''; if(!url) return toast('신청폼 링크를 먼저 여세요',true);
+  var qr='https://api.qrserver.com/v1/create-qr-code/?size=500x500&margin=8&data='+encodeURIComponent(url);
+  var win=window.open('','_modrcpt','width=380,height=640');
+  if(!win){ toast('팝업 차단을 해제해 주세요',true); return; }
+  var e2=function(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
+  var org=(typeof SYS_NAME!=='undefined'?SYS_NAME:'');
+  var css='@page{size:80mm auto;margin:0}html,body{margin:0;padding:0;font-family:"Malgun Gothic","맑은 고딕",sans-serif;background:#e5e7eb}'
+    +'.bar{padding:12px;text-align:center;background:#1e40af;position:sticky;top:0}.bar button{padding:9px 18px;font-weight:700;border:none;border-radius:6px;cursor:pointer;margin:0 4px;font-size:13px}'
+    +'.r{width:80mm;box-sizing:border-box;padding:7mm 4mm;text-align:center;background:#fff;margin:10px auto}'
+    +'.r h2{font-size:15pt;margin:0 0 1mm;font-weight:800}.r .sub{font-size:10pt;color:#333;margin-bottom:4mm;line-height:1.5}'
+    +'.r img{width:55mm;height:55mm;display:block;margin:0 auto}.r .u{font-size:7pt;color:#888;word-break:break-all;margin-top:3mm}'
+    +'@media print{.bar{display:none}.r{margin:0}body{background:#fff}}';
+  var body='<div class="bar"><button onclick="window.print()" style="background:#10b981;color:#fff">🖨 인쇄</button><button onclick="window.close()" style="background:#fff">닫기</button></div>'
+    +'<div class="r"><h2>'+e2(def.label)+'</h2><div class="sub">'+e2(org)+'<br>📱 휴대폰으로 아래 QR을 스캔하면<br><b>신청/주문 페이지</b>로 연결됩니다</div>'
+    +'<img src="'+qr+'"><div class="u">'+e2(url)+'</div></div>';
+  win.document.open();
+  win.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>'+e2(def.label)+' QR</title><style>'+css+'</style></head><body>'+body+'</body></html>');
+  win.document.close();
 }
 // QR 코드를 JPG 파일로 저장 (URL → QR 이미지 → canvas → jpeg 다운로드)
 function _saveQrJpg(url, filename){
