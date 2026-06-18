@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260619v121';
+var _MOD_ENGINE_VER='20260619v122';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -412,6 +412,7 @@ function _modListHtml(key){
       h+='<button onclick="modPrintOne(\''+key+'\',\''+esc(row._id||'')+'\')" title="'+(_pc?'재출력('+_pc+'회 출력됨)':'라벨 출력')+'" style="'+(_pc?'min-width:32px;':'width:24px;')+'height:22px;border-radius:4px;border:1px solid '+(_pc?'#475569':'#e2e8f0')+';cursor:pointer;font-size:11px;background:'+(_pc?'#475569':'#f8fafc')+';color:'+(_pc?'#fff':'#334155')+';padding:0 2px;line-height:1">🖨'+(_pc?'<b>'+_pc+'</b>':'')+'</button>';
       if(typeof isSuper==='function'&&isSuper()) h+='<button onclick="popModLog(\''+key+'\',\''+esc(row._id||'')+'\')" title="로그" style="width:24px;height:22px;border-radius:4px;border:1px solid #e2e8f0;cursor:pointer;font-size:11px;background:#f8fafc;color:#334155;padding:0;line-height:1">📋</button>';
       h+='<button onclick="popModEdit(\''+key+'\',\''+esc(row._id||'')+'\')" title="수정" style="width:24px;height:22px;border-radius:4px;border:1px solid #e2e8f0;cursor:pointer;font-size:11px;background:#f8fafc;color:#334155;padding:0;line-height:1">✏️</button>';
+      h+='<button onclick="modDupRow(\''+key+'\',\''+esc(row._id||'')+'\')" title="복제 — 같은 주문자로 새 박스(받는분만 수정)" style="width:24px;height:22px;border-radius:4px;border:1px solid #c7d2fe;cursor:pointer;font-size:11px;background:#eef2ff;color:#4338ca;padding:0;line-height:1">📑</button>';
       h+='<button onclick="modDel(\''+key+'\',\''+esc(row._id||'')+'\')" title="삭제" style="width:24px;height:22px;border-radius:4px;border:1px solid #fecaca;cursor:pointer;font-size:11px;background:#fef2f2;color:#dc2626;padding:0;line-height:1">🗑</button>';
       h+='</div>';
       h+='</td>';
@@ -690,6 +691,27 @@ function popModEdit(key,id){
   h+='<div style="padding:10px 14px;border-top:1px solid #e2e8f0;text-align:right;background:#f8fafc;border-radius:0 0 12px 12px">';
   h+='<button class="btn" style="background:#64748b;color:#fff" onclick="closePopup()">취소</button> ';
   h+='<button class="btn btn-b" onclick="modSave(\''+key+'\',\''+esc(id)+'\')">저장</button>';
+  h+='</div>';
+  openPopup(h,460);
+}
+
+// 📑 행 복제 — 같은 주문자로 새 박스(받는분만 수정). 배송 진행정보(송장·상태·출력)는 비움
+function modDupRow(key,id){
+  var def=_modDefs[key]; if(!def) return;
+  var row=(_modData[key]||[]).find(function(r){return r._id===id;});
+  if(!row) return toast('원본을 찾을 수 없습니다',true);
+  var src=JSON.parse(JSON.stringify(row));
+  delete src._id; delete src._createdAt; delete src._updatedAt; delete src._printCount; delete src._mark; delete src._markMemo; delete src.labelPrinted;
+  // 새 박스: 배송/상태 정보는 초기화 (송장번호·배지·상태)
+  (def.columns||[]).forEach(function(c){ if(c.type==='badge'||/송장/.test(c.label||'')||c.key==='status') src[c.key]=''; });
+  var h='<div class="pop-head"><h3>📑 '+esc(def.label)+' 복제 — 같은 주문자, 받는분·품명만 수정</h3></div>';
+  h+='<div style="padding:14px;max-height:65vh;overflow-y:auto">';
+  h+='<div style="font-size:12px;color:#4338ca;background:#eef2ff;border:1px solid #c7d2fe;border-radius:8px;padding:8px 10px;margin-bottom:10px">주문자 정보는 그대로예요. <b>받는분·주소·품명</b>만 새 분으로 고쳐서 저장하면 새 행(새 박스)으로 추가됩니다.</div>';
+  h+=_modAdminFields(def, src);
+  h+='</div>';
+  h+='<div style="padding:10px 14px;border-top:1px solid #e2e8f0;text-align:right;background:#f8fafc;border-radius:0 0 12px 12px">';
+  h+='<button class="btn" style="background:#64748b;color:#fff" onclick="closePopup()">취소</button> ';
+  h+='<button class="btn btn-b" onclick="modSave(\''+key+'\')">새 박스로 추가</button>';
   h+='</div>';
   openPopup(h,460);
 }
