@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260618v112';
+var _MOD_ENGINE_VER='20260618v113';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -184,6 +184,7 @@ function dMod(key){
   if(isA() && (def.columns||[]).some(function(c){return c.type==='select'&&c.stockOn;})) h+='<button class="btn" style="background:#0f766e;color:#fff" onclick="popModStock(\''+key+'\')">📦 재고</button>';
   if(isA()) h+='<button class="btn" style="background:#16a34a;color:#fff" onclick="popModSheet(\''+key+'\')">📝 시트 편집</button>';
   if(isA()) h+='<button class="btn" style="background:#0d9488;color:#fff" onclick="modImportExcel(\''+key+'\')">📤 가져오기</button>';
+  if(isA() && _modTrackingCol(def)) h+='<button class="btn" style="background:#7c3aed;color:#fff" onclick="popModTrackImport(\''+key+'\')">📦 송장 일괄등록</button>';
   if(feat.excel!==false) h+='<button class="btn" onclick="modExportExcel(\''+key+'\')">📥 내보내기</button>';
   if(typeof isSuper==='function'&&isSuper()) h+='<button class="btn" style="background:#7c3aed;color:#fff" onclick="popModLog(\''+key+'\')">📋 로그</button>';
   if(typeof isSuper==='function'&&isSuper()) h+='<button class="btn" style="background:#dc2626;color:#fff" onclick="modResetPrintCount(\''+key+'\')">🖨 출력횟수 초기화</button>';
@@ -1262,6 +1263,121 @@ function _mshImportAoa(key, aoa){
   showLoading('가져오는 중...');
   fbDb.ref(path).set(data).then(function(){ hideLoading(); toast('✅ 신규 '+nNew+' / 수정 '+nUpd+'행 반영'); })
     .catch(function(e){ hideLoading(); toast('실패: '+(e.message||e),true); });
+}
+
+// ═══════════════════════════════════════════
+// 📦 송장 일괄등록 (붙여넣기/엑셀) — 매칭 후 송장 입력 + 문자 자동발송
+// ═══════════════════════════════════════════
+// 식별값으로 주문 행 찾기
+function _modTrackMatch(def, data, idv, basis){
+  idv=String(idv||'').trim(); if(!idv) return -1;
+  if(basis==='id'){ for(var i=0;i<data.length;i++){ if(String(data[i]._id||'')===idv) return i; } return -1; }
+  if(basis==='tel'){
+    var d=idv.replace(/[^0-9]/g,''); if(d.length<8) return -1; var tail=d.slice(-8);
+    for(var i=0;i<data.length;i++){ var tels=_modAllTels(def,data[i]); for(var t=0;t<tels.length;t++){ if(tels[t]===d || tels[t].slice(-8)===tail) return i; } }
+    return -1;
+  }
+  var nameCol=(def.columns||[]).find(function(c){return c.type==='text';});
+  if(!nameCol) return -1;
+  for(var j=0;j<data.length;j++){ if(String(data[j][nameCol.key]||'').trim()===idv) return j; }
+  return -1;
+}
+function popModTrackImport(key){
+  var def=_modDefs[key]; if(!def) return;
+  var trk=_modTrackingCol(def); if(!trk) return toast('이 모듈엔 「송장」 컬럼이 없습니다',true);
+  if(!_modFbPath(key)) return toast('행사를 선택하세요',true);
+  var smsOn=!!def.smsTracking;
+  var h='<div style="max-width:560px">';
+  h+='<h3 style="margin:0 0 4px">📦 송장 일괄등록</h3>';
+  h+='<div style="font-size:12px;color:#64748b;margin-bottom:12px">택배사 엑셀을 불러오거나, 두 칸(식별값 · 송장번호)을 복사해 붙여넣으세요. 매칭된 주문의 「'+esc(trk.label)+'」에 입력됩니다.'+(smsOn?' 새로 입력된 건은 <b style="color:#7c3aed">주문자/받는분에게 문자 발송</b>(건당 요금)됩니다.':' (이 모듈은 송장 문자발송 OFF)')+'</div>';
+  h+='<label style="font-size:12px;font-weight:700">매칭 기준</label>';
+  h+='<select id="_mtiBasis" style="width:100%;padding:9px;margin:4px 0 10px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px"><option value="tel">연락처 (주문자/받는분 번호로 매칭)</option><option value="name">주문자명 (첫 이름 칸으로 매칭)</option><option value="id">고유번호 (_id)</option></select>';
+  h+='<button class="btn" style="background:#0d9488;color:#fff;margin-bottom:10px" onclick="_modTrackImportFile(\''+key+'\')">📤 택배사 엑셀 파일 불러오기</button>';
+  h+='<label style="font-size:12px;font-weight:700">붙여넣기 — 한 줄에 「식별값 [Tab] 송장번호」</label>';
+  h+='<textarea id="_mtiText" rows="8" placeholder="010-1234-5678\t1234567890&#10;홍길동\t9876543210" style="width:100%;box-sizing:border-box;font-family:monospace;font-size:13px;padding:10px;border:1px solid #cbd5e1;border-radius:8px;margin-top:4px"></textarea>';
+  h+='<div style="display:flex;gap:8px;margin-top:14px"><button class="btn" style="flex:1;background:#7c3aed;color:#fff;font-weight:800" onclick="_modTrackImportRun(\''+key+'\')">✅ 송장 등록'+(smsOn?' + 문자발송':'')+'</button><button class="btn" onclick="closePopup()">취소</button></div>';
+  h+='</div>';
+  openPopup(h,600);
+}
+// 택배사 엑셀 → 텍스트영역에 「식별값[Tab]송장」으로 채워줌 (검토 후 등록)
+function _modTrackImportFile(key){
+  if(typeof XLSX==='undefined') return toast('엑셀 라이브러리 로딩 중입니다. 잠시 후 다시',true);
+  var inp=document.createElement('input'); inp.type='file'; inp.accept='.xlsx,.xls,.csv';
+  inp.onchange=function(){
+    var f=inp.files&&inp.files[0]; if(!f) return;
+    var rd=new FileReader();
+    rd.onload=function(ev){
+      try{
+        var wb=XLSX.read(ev.target.result,{type:'array'});
+        var ws=wb.Sheets[wb.SheetNames[0]];
+        var aoa=XLSX.utils.sheet_to_json(ws,{header:1,defval:''}).filter(function(r){return r&&r.some(function(v){return String(v).trim()!=='';});});
+        if(!aoa.length) return toast('빈 파일입니다',true);
+        var basis=(document.getElementById('_mtiBasis')||{}).value||'tel';
+        var header=aoa[0].map(function(s){return String(s).trim();});
+        var trkRe=/송장|운송장|등기|운송장번호|invoice|운송/i;
+        var idRe= basis==='tel'?/연락|전화|휴대|핸드폰|번호|tel|phone|hp/i : (basis==='name'?/이름|성명|주문자|받는|수령|고객|성함/i : /고유|_id|qr/i);
+        var trkCol=-1, idCol=-1;
+        header.forEach(function(hl,i){ if(trkCol<0&&trkRe.test(hl)) trkCol=i; if(idCol<0&&idRe.test(hl)) idCol=i; });
+        var start=1;
+        if(trkCol<0||idCol<0){ idCol=0; trkCol=Math.max(1,aoa[0].length-1); start=0; }
+        var lines=[];
+        for(var r=start;r<aoa.length;r++){
+          var idv=String(aoa[r][idCol]==null?'':aoa[r][idCol]).trim();
+          var tk=String(aoa[r][trkCol]==null?'':aoa[r][trkCol]).trim();
+          if(idv&&tk&&!/송장|운송장/.test(tk)) lines.push(idv+'\t'+tk);
+        }
+        if(!lines.length) return toast('식별값/송장 열을 못 찾았어요. 붙여넣기로 시도하세요',true);
+        var ta=document.getElementById('_mtiText'); if(ta) ta.value=lines.join('\n');
+        toast('📤 '+lines.length+'행 불러옴 — 확인 후 [등록] 누르세요');
+      }catch(e){ toast('파일 읽기 실패: '+(e.message||e),true); }
+    };
+    rd.readAsArrayBuffer(f);
+  };
+  inp.click();
+}
+function _modTrackImportRun(key){
+  var def=_modDefs[key]; if(!def) return;
+  var trk=_modTrackingCol(def); if(!trk) return toast('송장 컬럼이 없습니다',true);
+  var basis=(document.getElementById('_mtiBasis')||{}).value||'tel';
+  var raw=(document.getElementById('_mtiText')||{}).value||'';
+  var pairs=[];
+  raw.split(/\r?\n/).forEach(function(line){
+    line=line.replace(/\s+$/,''); if(!line.trim()) return;
+    var parts=line.split(/\t|,|\s{2,}/).map(function(s){return s.trim();}).filter(function(s){return s!=='';});
+    if(parts.length<2) return;
+    pairs.push({idv:parts[0], track:parts[parts.length-1]});
+  });
+  if(!pairs.length) return toast('붙여넣은 데이터가 없습니다 (식별값[Tab]송장번호)',true);
+  var data=(_modData[key]||[]).slice();
+  var now=new Date().toISOString();
+  var matched=0, misses=[], sendList=[];
+  pairs.forEach(function(p){
+    var idx=_modTrackMatch(def,data,p.idv,basis);
+    if(idx<0){ misses.push(p.idv); return; }
+    var old=String(data[idx][trk.key]||'').trim();
+    var merged={}; for(var k in data[idx]) merged[k]=data[idx][k];
+    merged[trk.key]=p.track; merged._updatedAt=now;
+    data[idx]=merged; matched++;
+    if(def.smsTracking && p.track && p.track!==old) sendList.push(merged);
+  });
+  if(!matched) return toast('매칭된 주문이 없습니다. 매칭 기준을 확인하세요',true);
+  var conf='송장 일괄등록\n\n• 매칭: '+matched+'건\n• 미매칭: '+misses.length+'건'+(misses.length?'\n   ('+misses.slice(0,8).join(', ')+(misses.length>8?' 외 '+(misses.length-8)+'개':'')+')':'')+'\n'+(def.smsTracking?('• 문자발송 예정: '+sendList.length+'건 (건당 요금 발생)\n'):'• 문자발송: OFF\n')+'\n적용할까요?';
+  if(!confirm(conf)) return;
+  var path=_modFbPath(key); if(!path) return toast('행사를 선택하세요',true);
+  showLoading('송장 등록 중...');
+  fbDb.ref(path).set(data).then(function(){
+    hideLoading(); closePopup(); toast('✅ 송장 '+matched+'건 등록'+(misses.length?' ('+misses.length+'건 미매칭)':''));
+    if(sendList.length){
+      var sent=0, chain=Promise.resolve();
+      sendList.forEach(function(row){
+        chain=chain.then(function(){
+          var tels=_modAllTels(def,row); if(!tels.length) return;
+          return _modSmsGlobal(tels,_modSmsFill(def.smsTrackingTpl||'상품이 발송되었습니다. 송장번호: {'+trk.label+'}',def,row)).then(function(r){ if(r&&r.ok) sent++; });
+        });
+      });
+      chain.then(function(){ toast('📱 송장 문자 '+sent+'/'+sendList.length+'건 발송'); });
+    }
+  }).catch(function(e){ hideLoading(); toast('실패: '+(e.message||e),true); });
 }
 
 // ═══════════════════════════════════════════
