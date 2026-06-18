@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260618v114';
+var _MOD_ENGINE_VER='20260618v115';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -569,10 +569,12 @@ function modDelSel(key){
   var ids=_modSelIds(key);
   if(!ids.length) return toast('선택된 항목이 없습니다',true);
   var path=_modFbPath(key); if(!path) return;
-  if(!confirm(ids.length+'개 항목을 삭제할까요? (되돌릴 수 없습니다)')) return;
+  var def=_modDefs[key];
+  if(!confirm(ids.length+'개 항목을 삭제할까요? (되돌릴 수 없습니다)'+(def&&def.smsCancel?'\n(주문자/받는분에게 취소 문자가 발송됩니다)':''))) return;
+  var delRows=(_modData[key]||[]).filter(function(r){ return ids.indexOf(r._id)>=0; });
   var data=(_modData[key]||[]).filter(function(r){ return ids.indexOf(r._id)<0; });
   showLoading('삭제 중...');
-  fbDb.ref(path).set(data).then(function(){ hideLoading(); toast('🗑 '+ids.length+'개 삭제됨'); _modLogAdd(key,'삭제','','('+ids.length+'개 일괄)','행 삭제'); _modSel[key]={}; })
+  fbDb.ref(path).set(data).then(function(){ hideLoading(); toast('🗑 '+ids.length+'개 삭제됨'); _modLogAdd(key,'삭제','','('+ids.length+'개 일괄)','행 삭제'); _modSel[key]={}; _modSendCancelSms(def,delRows); })
     .catch(function(e){ hideLoading(); toast('실패: '+(e.message||e),true); });
 }
 
@@ -1003,12 +1005,26 @@ function modResetPrintCount(key){
 }
 function modDel(key,id){
   var def=_modDefs[key]; if(!def) return;
-  if(!confirm(def.label+' 항목을 삭제할까요?')) return;
+  var row=(_modData[key]||[]).find(function(r){return r._id===id;});
+  if(!confirm(def.label+' 항목을 삭제할까요?'+(def.smsCancel?'\n(주문자/받는분에게 취소 문자가 발송됩니다)':''))) return;
   var path=_modFbPath(key); if(!path) return;
   var data=(_modData[key]||[]).filter(function(r){return r._id!==id});
   showLoading('삭제 중...');
-  fbDb.ref(path).set(data).then(function(){hideLoading();toast('삭제됨')})
+  fbDb.ref(path).set(data).then(function(){hideLoading();toast('삭제됨'); _modSendCancelSms(def,row?[row]:[]);})
     .catch(function(e){hideLoading();toast('실패: '+e.message,true)});
+}
+// 🗑 삭제(취소) 문자 — smsCancel 켜진 모듈에서 삭제된 행들의 주문자/받는분에게
+function _modSendCancelSms(def, rows){
+  if(!def || !def.smsCancel || !rows || !rows.length) return;
+  var sent=0, chain=Promise.resolve();
+  rows.forEach(function(row){
+    if(!row) return;
+    chain=chain.then(function(){
+      var tels=_modAllTels(def,row); if(!tels.length) return;
+      return _modSmsGlobal(tels,_modSmsFill(def.smsCancelTpl||'주문이 취소되었습니다.',def,row)).then(function(r){ if(r&&r.ok) sent++; });
+    });
+  });
+  chain.then(function(){ if(sent) toast('📱 취소 문자 '+sent+'건 발송'); });
 }
 
 // ═══════════════════════════════════════════
@@ -1506,7 +1522,9 @@ function popModDef(keyOrIdx){
   h+='<label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600"><input type="checkbox" id="mdf_smsApply" '+(def.smsApply?'checked':'')+'> 신청 접수 시 문자 보내기</label>';
   h+='<input id="mdf_smsApplyTpl" value="'+esc(def.smsApplyTpl||'[가문굴비] 주문이 정상 접수되었습니다. 감사합니다.')+'" style="width:100%;font-size:12px;margin:4px 0 10px;padding:8px;border:1px solid #cbd5e1;border-radius:6px">';
   h+='<label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600"><input type="checkbox" id="mdf_smsTracking" '+(def.smsTracking?'checked':'')+'> 송장번호 입력 시 문자 보내기</label>';
-  h+='<input id="mdf_smsTrackingTpl" value="'+esc(def.smsTrackingTpl||'[가문굴비] 상품이 발송되었습니다. 송장번호: {송장번호}')+'" style="width:100%;font-size:12px;margin:4px 0 2px;padding:8px;border:1px solid #cbd5e1;border-radius:6px">';
+  h+='<input id="mdf_smsTrackingTpl" value="'+esc(def.smsTrackingTpl||'[가문굴비] 상품이 발송되었습니다. 송장번호: {송장번호}')+'" style="width:100%;font-size:12px;margin:4px 0 10px;padding:8px;border:1px solid #cbd5e1;border-radius:6px">';
+  h+='<label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600"><input type="checkbox" id="mdf_smsCancel" '+(def.smsCancel?'checked':'')+'> 삭제(취소) 시 문자 보내기</label>';
+  h+='<input id="mdf_smsCancelTpl" value="'+esc(def.smsCancelTpl||'[가문굴비] 주문이 취소되었습니다. 문의: 매장으로 연락주세요.')+'" style="width:100%;font-size:12px;margin:4px 0 2px;padding:8px;border:1px solid #cbd5e1;border-radius:6px">';
   h+='<div style="font-size:10px;color:#94a3b8;margin-top:2px">연락처(tel) 칸이 있는 모든 사람(주문자+받는분)에게 발송돼요. 본문에 <b>{컬럼명}</b>을 쓰면 그 값이 들어갑니다 (예: {송장번호}). 송장 칸은 라벨에 \'송장\'이 들어간 칸을 자동 인식합니다. <b style="color:#dc2626">건당 문자요금이 나갑니다.</b></div>';
   h+='</div>';
   h+='<label style="font-size:12px;font-weight:700;color:#64748b">파일 업로드 URL</label>';
@@ -1825,6 +1843,8 @@ function saveModDef(keyOrNew){
   var smsApplyTpl=((document.getElementById('mdf_smsApplyTpl')||{}).value||'').trim();
   var smsTracking=((document.getElementById('mdf_smsTracking')||{}).checked)||false;
   var smsTrackingTpl=((document.getElementById('mdf_smsTrackingTpl')||{}).value||'').trim();
+  var smsCancel=((document.getElementById('mdf_smsCancel')||{}).checked)||false;
+  var smsCancelTpl=((document.getElementById('mdf_smsCancelTpl')||{}).value||'').trim();
   var formImage=window.__modFormImgData||'';
 
   // 구글 이메일 켜면 "이메일" 컬럼이 없을 때 자동 추가 (맨 앞)
@@ -1853,7 +1873,7 @@ function saveModDef(keyOrNew){
     adminTab:adminTab,
     columns:cols,
     formTitle:formTitle, formDesc:formDesc, downloadUrl:downloadUrl, payInfo:payInfo, formImage:formImage,
-    smsApply:smsApply, smsApplyTpl:smsApplyTpl, smsTracking:smsTracking, smsTrackingTpl:smsTrackingTpl,
+    smsApply:smsApply, smsApplyTpl:smsApplyTpl, smsTracking:smsTracking, smsTrackingTpl:smsTrackingTpl, smsCancel:smsCancel, smsCancelTpl:smsCancelTpl,
     driveUploadUrl:driveUrl,
     features:{search:true,excel:true,applyForm:applyForm,googleEmail:googleEmail}
   };
