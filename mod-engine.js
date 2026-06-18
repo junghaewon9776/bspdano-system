@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260615v106';
+var _MOD_ENGINE_VER='20260615v107';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -748,7 +748,7 @@ function _modFormField(col,val){
       h+='</select>';
       var _etcMax=(col.maxLen?' maxlength="'+col.maxLen+'"':'');
       var _etcPh=col.maxLen?('직접 입력 (최대 '+col.maxLen+'자)'):'직접 입력';
-      h+='<input id="'+_etcId+'"'+_etcMax+' placeholder="'+_etcPh+'" value="'+(_etcOn?ev:'')+'" style="'+_w+'margin-top:4px;display:'+(_etcOn?'block':'none')+'">';
+      h+='<input id="'+_etcId+'"'+_etcMax+' placeholder="'+_etcPh+'" value="'+(_etcOn?ev:'')+'" style="'+_w+'margin-top:6px;padding:11px;font-size:15px;border:1px solid #cbd5e1;border-radius:8px;display:'+(_etcOn?'block':'none')+'">';
       return h;
     case 'badge':
       var h='<select id="'+id+'" style="'+_w+'"><option value="">— 선택 —</option>';
