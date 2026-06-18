@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260618v117';
+var _MOD_ENGINE_VER='20260618v118';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -585,7 +585,7 @@ function _modFmtCell(col,val){
   // 빈 상태배지는 기본값(대기 등)으로 표시
   if((val==null||val==="") && col.type==='badge'){ var _bd=_modBadgeDefault(col); if(_bd) val=_bd; }
   if(val==null||val==="") return '<span style="color:#cbd5e1">—</span>';
-  if(col.multiQty){ var _ms=_modMultiStr(val,col.multiSep,col.multiNoQty); return _ms?'<b>'+esc(_ms)+'</b>':'<span style="color:#cbd5e1">—</span>'; }
+  if(col.multiQty){ var _ms=_modMultiStr(val,col.multiSep,col.multiNoQty,col.multiQtyKae); return _ms?'<b>'+esc(_ms)+'</b>':'<span style="color:#cbd5e1">—</span>'; }
   switch(col.type){
     case 'number':
       return col.comma?'<b>'+Number(val).toLocaleString()+'</b>':String(val);
@@ -1061,7 +1061,7 @@ function modExportExcel(key){
   data.forEach(function(row){
     rows.push([row._id||''].concat(cols.map(function(c){
       var v=row[c.key]; if(v==null) return '';
-      if(c.multiQty) return _modMultiStr(v,c.multiSep,c.multiNoQty);
+      if(c.multiQty) return _modMultiStr(v,c.multiSep,c.multiNoQty,c.multiQtyKae);
       if(c.type==='badge'&&c.badgeMap&&c.badgeMap[v]) return c.badgeMap[v].label||v;
       return v;
     })));
@@ -1656,8 +1656,9 @@ function _renderModDefCols(){
         } else {
           h+='<div style="margin-top:6px;display:flex;align-items:center;gap:6px;font-size:11px;color:#475569"><span>1인당 총 최대</span><input type="number" min="0" value="'+(c.maxPer||'')+'" placeholder="제한없음" style="width:70px;font-size:11px;padding:4px 6px;border:1px solid #cbd5e1;border-radius:5px" onchange="_modDefEditCols['+i+'].maxPer=this.value?parseInt(this.value,10):0"><span>개</span></div>';
           h+='<div style="font-size:10px;color:#0f766e;margin-top:3px">※ 다중선택 모드: 항목마다 수량칸. 1인당 총 최대를 정하면 모든 품목 <b>합계</b>가 그 수량을 넘을 수 없습니다 (예: 총 2개면 블랙1+화이트1 까지)</div>';
-          h+='<div style="margin-top:6px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:11px;color:#475569"><span>품명 합치기 구분자</span><input value="'+esc(c.multiSep==null?', ':c.multiSep)+'" placeholder=", " style="width:70px;font-size:11px;padding:4px 6px;border:1px solid #cbd5e1;border-radius:5px;text-align:center" onchange="_modDefEditCols['+i+'].multiSep=this.value"><label style="display:flex;align-items:center;gap:3px;cursor:pointer"><input type="checkbox"'+(c.multiNoQty?' checked':'')+' onchange="_modDefEditCols['+i+'].multiNoQty=this.checked"> 수량(×N) 빼고 품명만</label></div>';
-          h+='<div style="font-size:10px;color:#94a3b8;margin-top:3px">여러 품목을 한 칸에 합칠 때 구분자(표·내보내기 공통). 롯데 일괄등록은 「<b>_</b>」(밑줄). 예: 사과_배</div>';
+          h+='<div style="margin-top:6px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:11px;color:#475569"><span>품명 합치기 구분자</span><input value="'+esc(c.multiSep==null?', ':c.multiSep)+'" placeholder=", " style="width:70px;font-size:11px;padding:4px 6px;border:1px solid #cbd5e1;border-radius:5px;text-align:center" onchange="_modDefEditCols['+i+'].multiSep=this.value"></div>';
+          h+='<div style="margin-top:6px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;font-size:11px;color:#475569"><label style="display:flex;align-items:center;gap:3px;cursor:pointer"><input type="checkbox"'+(c.multiNoQty?' checked':'')+' onchange="_modDefEditCols['+i+'].multiNoQty=this.checked;_modDefRefreshCols()"> 수량 빼고 품명만</label><label style="display:flex;align-items:center;gap:3px;cursor:pointer'+(c.multiNoQty?';opacity:.4':'')+'"><input type="checkbox"'+(c.multiQtyKae?' checked':'')+(c.multiNoQty?' disabled':'')+' onchange="_modDefEditCols['+i+'].multiQtyKae=this.checked"> 수량을 「N개」로 표기</label></div>';
+          h+='<div style="font-size:10px;color:#94a3b8;margin-top:3px">합치기 구분자: 롯데 일괄등록은 「<b>_</b>」(밑줄). 「N개」 체크 시 <b>보리굴비10미 1개_참굴비20미 1개</b>, 해제 시 <b>보리굴비10미×1_…</b></div>';
         }
       }
       h+='</div>';
@@ -2271,9 +2272,12 @@ function _modParseMulti(v){
   if(typeof v==='object') return Array.isArray(v)?v:[];
   try{ var a=JSON.parse(v); return Array.isArray(a)?a:[]; }catch(e){ return []; }
 }
-function _modMultiStr(v, sep, noQty){
+function _modMultiStr(v, sep, noQty, kae){
   sep = (sep==null) ? ', ' : sep;
-  return _modParseMulti(v).filter(function(it){return it&&it.q>0;}).map(function(it){return noQty?it.o:(it.o+'×'+it.q);}).join(sep);
+  return _modParseMulti(v).filter(function(it){return it&&it.q>0;}).map(function(it){
+    if(noQty) return it.o;
+    return kae ? (it.o+' '+it.q+'개') : (it.o+'×'+it.q);
+  }).join(sep);
 }
 function _modCollectMultiQty(id){
   var cont=document.getElementById(id); if(!cont) return '';
