@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260615v105';
+var _MOD_ENGINE_VER='20260615v106';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -792,11 +792,12 @@ function _modFormField(col,val){
       return '<input id="'+id+'" type="text" value="'+ev+'"'+(col.placeholder?' placeholder="'+esc(col.placeholder)+'"':'')+' style="'+_w+'">';
   }
 }
-// 🎁 조건 토글 — 켜면 조건부 칸(받는분 등) 표시
-function _modCondToggle(on){
-  window.__modCondOn=!!on;
+// 조건 토글 — 일반:체크 시 표시 / 반대(invert):체크 시 숨김(주문자와 동일)
+function _modCondToggle(checked, invert){
+  var show = invert ? !checked : !!checked;
+  window.__modCondOn=show;
   var els=document.querySelectorAll('[data-condfield]');
-  for(var i=0;i<els.length;i++) els[i].style.display=on?'':'none';
+  for(var i=0;i<els.length;i++) els[i].style.display=show?'':'none';
 }
 // 주소 검색 — 다음 우편번호 서비스(무료, 키 불필요) 동적 로드 후 팝업
 function _modAddrSearch(inputId){
@@ -1355,6 +1356,7 @@ function _renderModDefCols(){
     if(['text','tel','select','number'].indexOf(c.type)>=0) h+='<label style="font-size:11px;display:flex;align-items:center;gap:3px;color:#1d4ed8" title="🔗묶음 켠 칼럼들이 모두 같을 때만 동일인으로 묶어 「👤 N건」 표시 (예: 이름+연락처 둘 다 켜기)"><input type="checkbox"'+(c.dupGroup?' checked':'')+' onchange="_modDefEditCols['+i+'].dupGroup=this.checked">🔗묶음</label>';
     // 🎁 조건 토글 (이 체크칸이 켜지면 '조건부' 칸들 표시) — consent 타입에 권장
     h+='<label style="font-size:11px;display:flex;align-items:center;gap:3px;color:#b45309" title="신청폼에서 이 칸을 켜면 「🎁조건부」 표시한 칸들이 나타남 (예: 선물로 보내기)"><input type="checkbox"'+(c.condToggle?' checked':'')+' onchange="_modDefEditCols['+i+'].condToggle=this.checked">🎁토글</label>';
+    h+='<label style="font-size:11px;display:flex;align-items:center;gap:3px;color:#b45309" title="반대 방식: 체크 시 조건부 칸이 숨겨짐. 기본 체크됨 (예: 「받는분=주문자와 동일」 — 체크하면 받는분 칸 숨김)"><input type="checkbox"'+(c.condInvert?' checked':'')+' onchange="_modDefEditCols['+i+'].condInvert=this.checked">↔반대(동일)</label>';
     // 🎁 조건부 표시 (토글 켤 때만 신청폼에 나타남) — 받는사람 성함/주소/연락처 등
     h+='<label style="font-size:11px;display:flex;align-items:center;gap:3px;color:#b45309" title="위 🎁토글이 켜졌을 때만 신청폼에 나타나는 칸 (예: 받는분 성함/주소/연락처)"><input type="checkbox"'+(c.condOnly?' checked':'')+' onchange="_modDefEditCols['+i+'].condOnly=this.checked">🎁조건부</label>';
     // 관리자전용
@@ -1934,8 +1936,12 @@ function _renderModApplyUI(def,evtId){
   }
   (def.columns||[]).forEach(function(c){
     if(c.auto||c.adminOnly||c.sysOnly||c.qrPublic||c.key==='status') return;
-    if(c.condToggle){ // 🎁 조건 토글 (체크 시 조건부 칸 표시)
-      h+='<div style="margin-bottom:16px;background:#fffbeb;border:1.5px solid #fde68a;border-radius:10px;padding:13px"><label style="display:flex;align-items:center;gap:9px;font-size:15px;font-weight:800;color:#92400e;cursor:pointer"><input type="checkbox" id="mod_f_'+c.key+'" onchange="_modCondToggle(this.checked)" style="width:19px;height:19px;flex-shrink:0">🎁 '+esc(c.label)+'</label></div>';
+    if(c.condToggle){ // 조건 토글 — 일반:체크 시 표시 / 반대(condInvert):체크 시 숨김(주문자와 동일)
+      var _inv=!!c.condInvert;
+      var _chk=_inv?' checked':'';            // 동일방식은 기본 체크(=받는분 숨김)
+      if(_inv) window.__modCondOn=false;
+      var _bg=_inv?'#eff6ff':'#fffbeb', _bd=_inv?'#bfdbfe':'#fde68a', _col=_inv?'#1d4ed8':'#92400e', _ic=_inv?'✅':'🎁';
+      h+='<div style="margin-bottom:16px;background:'+_bg+';border:1.5px solid '+_bd+';border-radius:10px;padding:13px"><label style="display:flex;align-items:center;gap:9px;font-size:15px;font-weight:800;color:'+_col+';cursor:pointer"><input type="checkbox" id="mod_f_'+c.key+'"'+_chk+' onchange="_modCondToggle(this.checked,'+_inv+')" style="width:19px;height:19px;flex-shrink:0">'+_ic+' '+esc(c.label)+'</label></div>';
       return;
     }
     var _cf=c.condOnly?' data-condfield="1"':'';
@@ -2197,7 +2203,7 @@ function submitModApply(){
   (def.columns||[]).forEach(function(c){
     if(c.auto||c.adminOnly||c.sysOnly||c.qrPublic||c.key==='status') return;
     var el=document.getElementById('mod_f_'+c.key); if(!el) return;
-    if(c.condToggle){ obj[c.key]=el.checked?'선물':'본인구매'; return; }   // 🎁 조건 토글 값
+    if(c.condToggle){ obj[c.key]= c.condInvert ? (el.checked?'주문자와 동일':'받는분 별도') : (el.checked?'선물':'본인구매'); return; }   // 조건 토글 값
     if(c.condOnly && !window.__modCondOn){ obj[c.key]=''; return; }       // 조건 꺼져있으면(숨김) 빈값·검증 스킵
     if(c.type==='consent'){
       if(c.required&&!el.checked){ valid=false; if(!firstBad)firstBad=c.label+'에 동의해 주세요'; }
