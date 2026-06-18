@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260615v103';
+var _MOD_ENGINE_VER='20260615v104';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -792,6 +792,12 @@ function _modFormField(col,val){
       return '<input id="'+id+'" type="text" value="'+ev+'"'+(col.placeholder?' placeholder="'+esc(col.placeholder)+'"':'')+' style="'+_w+'">';
   }
 }
+// 🎁 조건 토글 — 켜면 조건부 칸(받는분 등) 표시
+function _modCondToggle(on){
+  window.__modCondOn=!!on;
+  var els=document.querySelectorAll('[data-condfield]');
+  for(var i=0;i<els.length;i++) els[i].style.display=on?'':'none';
+}
 // 주소 검색 — 다음 우편번호 서비스(무료, 키 불필요) 동적 로드 후 팝업
 function _modAddrSearch(inputId){
   function open(){
@@ -1347,6 +1353,10 @@ function _renderModDefCols(){
     if(['text','tel','select','number'].indexOf(c.type)>=0) h+='<label style="font-size:11px;display:flex;align-items:center;gap:3px" title="이 칼럼 값이 같으면 「총 N건」 배지 (칼럼별 독립)"><input type="checkbox"'+(c.dupCheck?' checked':'')+' onchange="_modDefEditCols['+i+'].dupCheck=this.checked">👥중복</label>';
     // 🔗 묶음(조합) — 체크한 칼럼들이 모두 같아야 동일인. 예: 이름+연락처 둘 다 체크
     if(['text','tel','select','number'].indexOf(c.type)>=0) h+='<label style="font-size:11px;display:flex;align-items:center;gap:3px;color:#1d4ed8" title="🔗묶음 켠 칼럼들이 모두 같을 때만 동일인으로 묶어 「👤 N건」 표시 (예: 이름+연락처 둘 다 켜기)"><input type="checkbox"'+(c.dupGroup?' checked':'')+' onchange="_modDefEditCols['+i+'].dupGroup=this.checked">🔗묶음</label>';
+    // 🎁 조건 토글 (이 체크칸이 켜지면 '조건부' 칸들 표시) — consent 타입에 권장
+    h+='<label style="font-size:11px;display:flex;align-items:center;gap:3px;color:#b45309" title="신청폼에서 이 칸을 켜면 「🎁조건부」 표시한 칸들이 나타남 (예: 선물로 보내기)"><input type="checkbox"'+(c.condToggle?' checked':'')+' onchange="_modDefEditCols['+i+'].condToggle=this.checked">🎁토글</label>';
+    // 🎁 조건부 표시 (토글 켤 때만 신청폼에 나타남) — 받는사람 성함/주소/연락처 등
+    h+='<label style="font-size:11px;display:flex;align-items:center;gap:3px;color:#b45309" title="위 🎁토글이 켜졌을 때만 신청폼에 나타나는 칸 (예: 받는분 성함/주소/연락처)"><input type="checkbox"'+(c.condOnly?' checked':'')+' onchange="_modDefEditCols['+i+'].condOnly=this.checked">🎁조건부</label>';
     // 관리자전용
     var _vis=c.sysOnly?'sys':c.adminOnly?'admin':c.qrPublic?'qrpub':c.qrAdmin?'qrAdmin':'';
     h+='<select style="font-size:11px;padding:2px 4px;border:1px solid #cbd5e1;border-radius:4px" onchange="_modDefColVis('+i+',this.value)">'
@@ -1895,7 +1905,7 @@ function renderModApplyForm(key,evtId){
 }
 
 function _renderModApplyUI(def,evtId){
-  window.__modApplyDef=def; window.__modApplyEvt=evtId;
+  window.__modApplyDef=def; window.__modApplyEvt=evtId; window.__modCondOn=false;
   // 탭/공유 제목을 이 신청폼 이름으로 (시스템명 대신)
   try{ document.title=(def.formTitle||(def.label+' 신청하기')); }catch(e){}
   var title=def.formTitle?esc(def.formTitle):((def.icon||'📝')+' '+esc(def.label)+' 신청하기');
@@ -1924,7 +1934,13 @@ function _renderModApplyUI(def,evtId){
   }
   (def.columns||[]).forEach(function(c){
     if(c.auto||c.adminOnly||c.sysOnly||c.qrPublic||c.key==='status') return;
-    h+='<div style="margin-bottom:16px"><label style="display:block;font-size:14px;color:#334155;font-weight:700;margin-bottom:6px">'+esc(c.label)+(c.required?' <span style="color:#ef4444">*</span>':'')+'</label>';
+    if(c.condToggle){ // 🎁 조건 토글 (체크 시 조건부 칸 표시)
+      h+='<div style="margin-bottom:16px;background:#fffbeb;border:1.5px solid #fde68a;border-radius:10px;padding:13px"><label style="display:flex;align-items:center;gap:9px;font-size:15px;font-weight:800;color:#92400e;cursor:pointer"><input type="checkbox" id="mod_f_'+c.key+'" onchange="_modCondToggle(this.checked)" style="width:19px;height:19px;flex-shrink:0">🎁 '+esc(c.label)+'</label></div>';
+      return;
+    }
+    var _cf=c.condOnly?' data-condfield="1"':'';
+    var _cs=c.condOnly?';display:none':'';
+    h+='<div'+_cf+' style="margin-bottom:16px'+_cs+'"><label style="display:block;font-size:14px;color:#334155;font-weight:700;margin-bottom:6px">'+esc(c.label)+(c.required?' <span style="color:#ef4444">*</span>':'')+'</label>';
     h+=_modFormField(c,'');
     h+='</div>';
   });
@@ -2181,6 +2197,8 @@ function submitModApply(){
   (def.columns||[]).forEach(function(c){
     if(c.auto||c.adminOnly||c.sysOnly||c.qrPublic||c.key==='status') return;
     var el=document.getElementById('mod_f_'+c.key); if(!el) return;
+    if(c.condToggle){ obj[c.key]=el.checked?'선물':'본인구매'; return; }   // 🎁 조건 토글 값
+    if(c.condOnly && !window.__modCondOn){ obj[c.key]=''; return; }       // 조건 꺼져있으면(숨김) 빈값·검증 스킵
     if(c.type==='consent'){
       if(c.required&&!el.checked){ valid=false; if(!firstBad)firstBad=c.label+'에 동의해 주세요'; }
       obj[c.key]=el.checked?'동의':''; return;
