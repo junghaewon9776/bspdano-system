@@ -467,7 +467,14 @@ function _apiRefresh(p) {
       p.evtId = CUR_EVT.evtId;
     }
     if (!p.evtId) {
-      resolve({ok:true, acts:[], purs:[], exps:[], mems:[], notices:[], pays:[], dpst:[], inc:[], incTypes:[], expBG:[], expTypes:[], gwanTypes:[], incCards:[], awards:[], memGroups:[], fees:[]});
+      // 행사 없는 시스템 → 전역 /main/Config 에서 시스템 토글(현장/연동 등) 읽기
+      var _empty = {ok:true, acts:[], purs:[], exps:[], mems:[], notices:[], pays:[], dpst:[], inc:[], incTypes:[], expBG:[], expTypes:[], gwanTypes:[], incCards:[], awards:[], memGroups:[], fees:[]};
+      fbDb.ref('/main/Config').once('value').then(function(s){
+        var g = s.val() || {};
+        _empty.fieldMenu = g.FIELD_MENU || "on";
+        _empty.linkTabs  = g.LINK_TABS  || "on";
+        resolve(_empty);
+      }).catch(function(){ resolve(_empty); });
       return;
     }
     // shareMems 체크: 현재 행사가 shareMems면 메인(첫 번째) 행사의 Mems/Groups 사용
@@ -1159,7 +1166,13 @@ function _apiDeleteAcctEvt(p) {
 // ───────── Config ─────────
 function _apiSetConfig(p) {
   var evtId = _getEvtId(p);
-  if (!evtId) return Promise.resolve({ok:false, err:"행사 미선택"});
+  if (!evtId) {
+    // 행사 없는 시스템(가문굴비 등) → 전역 /main/Config(객체)에 저장
+    var upd = {}; upd[p.key] = p.value;
+    return fbDb.ref('/main/Config').update(upd)
+      .then(function(){ return {ok:true, global:true}; })
+      .catch(function(e){ return {ok:false, err:(e&&e.message)||String(e)}; });
+  }
   return loadEvtData(evtId).then(function(data) {
     var cfg = data.Config || [];
     var found = false;
