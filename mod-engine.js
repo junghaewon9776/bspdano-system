@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260618v113';
+var _MOD_ENGINE_VER='20260618v114';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -628,16 +628,43 @@ function _modToggleSort(key,col){
 // 폼 (추가/수정)
 // ═══════════════════════════════════════════
 
+// 관리자 추가/수정 폼 필드 렌더 — 조건토글(주문자와 동일)/조건부칸 로직 포함
+function _modAdminFields(def, row){
+  row = row || {};
+  var h='';
+  // 1) 조건토글 현재 상태 계산 → 조건부칸 초기 표시여부(condShow) + __modCondOn
+  var condShow=true, hasCond=false;
+  (def.columns||[]).forEach(function(c){
+    if(!c.condToggle) return;
+    hasCond=true;
+    var inv=!!c.condInvert, val=row[c.key];
+    var checked = (val==null||val==='') ? inv : (inv?(val==='주문자와 동일'):(val==='선물'));
+    condShow = inv ? !checked : !!checked;
+  });
+  window.__modCondOn = hasCond ? condShow : true;
+  // 2) 컬럼 렌더
+  (def.columns||[]).forEach(function(c){
+    if(c.auto) return;
+    if(c.condToggle){
+      var inv=!!c.condInvert, val=row[c.key];
+      var checked = (val==null||val==='') ? inv : (inv?(val==='주문자와 동일'):(val==='선물'));
+      var _bg=inv?'#eff6ff':'#fffbeb', _bd=inv?'#bfdbfe':'#fde68a', _col=inv?'#1d4ed8':'#92400e', _ic=inv?'✅':'🎁';
+      h+='<div style="margin:0 0 14px;background:'+_bg+';border:1.5px solid '+_bd+';border-radius:10px;padding:12px"><label style="display:flex;align-items:center;gap:9px;font-size:14px;font-weight:800;color:'+_col+';cursor:pointer"><input type="checkbox" id="mod_f_'+c.key+'"'+(checked?' checked':'')+' onchange="_modCondToggle(this.checked,'+inv+')" style="width:18px;height:18px;flex-shrink:0">'+_ic+' '+esc(c.label)+'</label></div>';
+      return;
+    }
+    var _cf=c.condOnly?' data-condfield="1"':'';
+    var _cs=(c.condOnly && !condShow)?';display:none':'';
+    h+='<div class="fr"'+_cf+' style="'+_cs.replace(/^;/,'')+'"><label>'+esc(c.label)+(c.required?' <span style="color:#ef4444">*</span>':'')+'</label>';
+    h+=_modFormField(c, row[c.key]==null?'':row[c.key]);
+    h+='</div>';
+  });
+  return h;
+}
 function popModAdd(key){
   var def=_modDefs[key]; if(!def) return;
   var h='<div class="pop-head"><h3>➕ '+esc(def.label)+' 추가</h3></div>';
   h+='<div style="padding:14px;max-height:65vh;overflow-y:auto">';
-  (def.columns||[]).forEach(function(c){
-    if(c.auto) return;
-    h+='<div class="fr"><label>'+esc(c.label)+(c.required?' <span style="color:#ef4444">*</span>':'')+'</label>';
-    h+=_modFormField(c,'');
-    h+='</div>';
-  });
+  h+=_modAdminFields(def,'');
   h+='</div>';
   h+='<div style="padding:10px 14px;border-top:1px solid #e2e8f0;text-align:right;background:#f8fafc;border-radius:0 0 12px 12px">';
   h+='<button class="btn" style="background:#64748b;color:#fff" onclick="closePopup()">취소</button> ';
@@ -654,12 +681,7 @@ function popModEdit(key,id){
   var h='<div class="pop-head"><h3>✏️ '+esc(def.label)+' 수정</h3></div>';
   h+='<div style="padding:14px;max-height:65vh;overflow-y:auto">';
   h+='<input type="hidden" id="mod_edit_id" value="'+esc(id)+'">';
-  (def.columns||[]).forEach(function(c){
-    if(c.auto) return;
-    h+='<div class="fr"><label>'+esc(c.label)+(c.required?' <span style="color:#ef4444">*</span>':'')+'</label>';
-    h+=_modFormField(c,row[c.key]||'');
-    h+='</div>';
-  });
+  h+=_modAdminFields(def,row);
   // 🎨 색칠 + 메모 (저장 버튼으로 같이 저장)
   h+=_modMarkEditSection(row);
   h+='</div>';
@@ -872,6 +894,8 @@ function modSave(key,editId){
   var obj={}, valid=true, fileTasks=[];
   (def.columns||[]).forEach(function(c){
     if(c.auto) return;
+    if(c.condToggle){ var _ce=document.getElementById('mod_f_'+c.key); var _ck=_ce?_ce.checked:false; obj[c.key]= c.condInvert?(_ck?'주문자와 동일':'받는분 별도'):(_ck?'선물':'본인구매'); return; }   // 조건 토글 값
+    if(c.condOnly && !window.__modCondOn){ obj[c.key]= c.copyFrom?(obj[c.copyFrom]||''):''; return; }   // 숨김(주문자와 동일)이면 복사출처 값 복사 → 필수검증 건너뜀
     var el=document.getElementById('mod_f_'+c.key); if(!el) return;
     if(c.type==='consent'){
       var ok=el.checked;
