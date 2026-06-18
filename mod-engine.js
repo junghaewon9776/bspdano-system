@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260615v111';
+var _MOD_ENGINE_VER='20260618v112';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -794,6 +794,47 @@ function _modFormField(col,val){
       return '<input id="'+id+'" type="text" value="'+ev+'"'+(col.placeholder?' placeholder="'+esc(col.placeholder)+'"':'')+' style="'+_w+'">';
   }
 }
+// 📱 전역 문자발송 — main/Config(객체)의 네이버 SENS + GAS프록시로 발송 (행사 없는 글로벌 모듈용)
+function _modSmsGlobal(tels, msg){
+  if(typeof fbDb==='undefined') return Promise.resolve({ok:false,err:'no db'});
+  tels=(tels||[]).map(function(t){return String(t||'').replace(/[^0-9]/g,'');}).filter(function(t){return t.length>=10;});
+  if(!tels.length) return Promise.resolve({ok:false,err:'수신번호 없음'});
+  return fbDb.ref('/main/Config').once('value').then(function(s){
+    var cfg=s.val()||{};
+    var proxy=cfg.SMS_PROXY_URL, sender=cfg.NAVER_SENS_SENDER;
+    if(!proxy||!sender||!cfg.NAVER_SENS_SECRET_KEY) return {ok:false,err:'문자 설정 미완료(main Config)'};
+    var body={ action:'send', serviceId:cfg.NAVER_SENS_SERVICE_ID, accessKey:cfg.NAVER_SENS_ACCESS_KEY, secretKey:cfg.NAVER_SENS_SECRET_KEY, sender:sender, tels:tels, msg:String(msg||'') };
+    return fetch(proxy,{method:'POST',redirect:'follow',body:JSON.stringify(body)}).then(function(r){return r.json();}).catch(function(e){return {ok:false,err:'프록시 통신오류: '+(e.message||e)};});
+  });
+}
+// 템플릿의 {라벨} → 해당 컬럼 값으로 치환
+function _modSmsFill(tpl, def, row){
+  var s=String(tpl||'');
+  (def.columns||[]).forEach(function(c){
+    var re=new RegExp('\\{'+(c.label||'').replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\}','g');
+    s=s.replace(re, String(row[c.key]==null?'':row[c.key]));
+  });
+  return s;
+}
+// 모듈의 발신대상(주문자) 연락처 컬럼 값
+function _modOrdererTel(def, row){
+  var tc=(def.columns||[]).find(function(c){return c.type==='tel';});
+  return tc?String(row[tc.key]||'').replace(/[^0-9]/g,''):'';
+}
+// 모듈의 모든 연락처(tel) 컬럼 값 — 주문자+받는분 등 전부, 중복 제거
+function _modAllTels(def, row){
+  var out=[];
+  (def.columns||[]).forEach(function(c){
+    if(c.type!=='tel') return;
+    var t=String(row[c.key]||'').replace(/[^0-9]/g,'');
+    if(t.length>=10 && out.indexOf(t)<0) out.push(t);
+  });
+  return out;
+}
+// 송장번호 컬럼 자동감지 (라벨에 '송장' 포함, 배지 아님)
+function _modTrackingCol(def){
+  return (def.columns||[]).find(function(c){return /송장/.test(c.label||'') && c.type!=='badge';});
+}
 // 조건 토글 — 일반:체크 시 표시 / 반대(invert):체크 시 숨김(주문자와 동일)
 function _modCondToggle(checked, invert){
   var show = invert ? !checked : !!checked;
@@ -898,9 +939,22 @@ function modSave(key,editId){
       if(idx<0){hideLoading();toast('데이터를 찾을 수 없습니다',true);return}
       obj._id=editId;
       obj._updatedAt=new Date().toISOString();
+      // 📱 송장번호 신규입력 감지 (저장 전 비교)
+      var _trk=def.smsTracking?_modTrackingCol(def):null;
+      var _trkOld=_trk?String(data[idx][_trk.key]||'').trim():'';
       var merged={}; for(var k in data[idx])merged[k]=data[idx][k]; for(var k in obj)merged[k]=obj[k];
       data[idx]=merged;
-      return fbDb.ref(path).set(data).then(function(){hideLoading();toast('✅ 수정됨');closePopup()});
+      return fbDb.ref(path).set(data).then(function(){
+        hideLoading();toast('✅ 수정됨');closePopup();
+        // 📱 송장번호가 새로 채워졌으면 문자 발송
+        if(_trk){
+          var _trkNew=String(merged[_trk.key]||'').trim();
+          if(_trkNew && _trkNew!==_trkOld){
+            var _tels=_modAllTels(def,merged);
+            if(_tels.length){ _modSmsGlobal(_tels,_modSmsFill(def.smsTrackingTpl||'상품이 발송되었습니다. 송장번호: {'+_trk.label+'}',def,merged)).then(function(r){ if(r&&r.ok) toast('📱 송장 문자 발송 ('+_tels.length+'건)'); }); }
+          }
+        }
+      });
     } else {
       obj._id=_modId();
       obj._createdAt=new Date().toISOString();
@@ -1306,6 +1360,15 @@ function popModDef(keyOrIdx){
   h+='<div><input id="mdf_downloadUrl" value="'+esc(def.downloadUrl||"")+'" placeholder="예: 플레이스토어 베타 링크 https://play.google.com/…" style="width:100%;font-family:monospace;font-size:11px"><div style="font-size:10px;color:#94a3b8;margin-top:2px">넣으면 신청 완료 화면에 「앱 다운로드」 버튼이 떠서 누르면 이 링크로 이동</div></div>';
   h+='<label style="font-size:12px;font-weight:800;color:#0f766e">🧰 편의기능 — 입금 계좌 (선택)</label>';
   h+='<div><input id="mdf_payInfo" value="'+esc(def.payInfo||"")+'" placeholder="예: 농협 352-1234-5678-90 (예금주 법성포단오제)" style="width:100%;font-size:12px"><div style="font-size:10px;color:#94a3b8;margin-top:2px">넣으면 <b>신청폼 + 완료 화면</b>에 계좌 + 「복사」 버튼이 떠요. 완료 화면엔 「공유하기」 버튼도 자동으로 같이 표시됩니다</div></div>';
+  // 📱 문자 자동발송
+  h+='<label style="font-size:12px;font-weight:800;color:#7c3aed">📱 문자 자동발송 (주문자·받는분 연락처)</label>';
+  h+='<div style="padding:10px;border:1px solid #e9d5ff;border-radius:8px;background:#faf5ff">';
+  h+='<label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600"><input type="checkbox" id="mdf_smsApply" '+(def.smsApply?'checked':'')+'> 신청 접수 시 문자 보내기</label>';
+  h+='<input id="mdf_smsApplyTpl" value="'+esc(def.smsApplyTpl||'[가문굴비] 주문이 정상 접수되었습니다. 감사합니다.')+'" style="width:100%;font-size:12px;margin:4px 0 10px;padding:8px;border:1px solid #cbd5e1;border-radius:6px">';
+  h+='<label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600"><input type="checkbox" id="mdf_smsTracking" '+(def.smsTracking?'checked':'')+'> 송장번호 입력 시 문자 보내기</label>';
+  h+='<input id="mdf_smsTrackingTpl" value="'+esc(def.smsTrackingTpl||'[가문굴비] 상품이 발송되었습니다. 송장번호: {송장번호}')+'" style="width:100%;font-size:12px;margin:4px 0 2px;padding:8px;border:1px solid #cbd5e1;border-radius:6px">';
+  h+='<div style="font-size:10px;color:#94a3b8;margin-top:2px">연락처(tel) 칸이 있는 모든 사람(주문자+받는분)에게 발송돼요. 본문에 <b>{컬럼명}</b>을 쓰면 그 값이 들어갑니다 (예: {송장번호}). 송장 칸은 라벨에 \'송장\'이 들어간 칸을 자동 인식합니다. <b style="color:#dc2626">건당 문자요금이 나갑니다.</b></div>';
+  h+='</div>';
   h+='<label style="font-size:12px;font-weight:700;color:#64748b">파일 업로드 URL</label>';
   var _curDrive=def.driveUploadUrl||(typeof DRIVE_UPLOAD_URL!=='undefined'?DRIVE_UPLOAD_URL:'')||'';
   h+='<div><input id="mdf_driveUrl" value="'+esc(_curDrive)+'" placeholder="파일첨부 컬럼 쓸 때만 — 신청 설정의 Drive URL 붙여넣기" style="width:100%;font-family:monospace;font-size:11px"><div style="font-size:10px;color:#94a3b8;margin-top:2px">신청폼에서 파일첨부를 받으려면 필요 (참가신청 설정의 📤 Drive 업로드 URL과 동일한 값)</div></div>';
@@ -1618,6 +1681,10 @@ function saveModDef(keyOrNew){
   var formDesc=((document.getElementById('mdf_formDesc')||{}).value||'').trim();
   var downloadUrl=((document.getElementById('mdf_downloadUrl')||{}).value||'').trim();
   var payInfo=((document.getElementById('mdf_payInfo')||{}).value||'').trim();
+  var smsApply=((document.getElementById('mdf_smsApply')||{}).checked)||false;
+  var smsApplyTpl=((document.getElementById('mdf_smsApplyTpl')||{}).value||'').trim();
+  var smsTracking=((document.getElementById('mdf_smsTracking')||{}).checked)||false;
+  var smsTrackingTpl=((document.getElementById('mdf_smsTrackingTpl')||{}).value||'').trim();
   var formImage=window.__modFormImgData||'';
 
   // 구글 이메일 켜면 "이메일" 컬럼이 없을 때 자동 추가 (맨 앞)
@@ -1646,6 +1713,7 @@ function saveModDef(keyOrNew){
     adminTab:adminTab,
     columns:cols,
     formTitle:formTitle, formDesc:formDesc, downloadUrl:downloadUrl, payInfo:payInfo, formImage:formImage,
+    smsApply:smsApply, smsApplyTpl:smsApplyTpl, smsTracking:smsTracking, smsTrackingTpl:smsTrackingTpl,
     driveUploadUrl:driveUrl,
     features:{search:true,excel:true,applyForm:applyForm,googleEmail:googleEmail}
   };
@@ -2324,6 +2392,11 @@ function submitModApply(){
     arr.push(obj);
     return fbDb.ref(path).set(arr);
   }).then(function(){
+    // 📱 신청 접수 문자 — 주문자+받는분 연락처 모두에게
+    if(def.smsApply){
+      var _tels=_modAllTels(def,obj);
+      if(_tels.length) _modSmsGlobal(_tels, _modSmsFill(def.smsApplyTpl||'주문이 정상 접수되었습니다.',def,obj));
+    }
     var _dlUrl=(def.downloadUrl||'').trim();
     var _um=_dlUrl.match(/https?:\/\/\S+/i);          // 앞에 글자 섞여 있어도 URL만 추출
     if(_um) _dlUrl=_um[0];
