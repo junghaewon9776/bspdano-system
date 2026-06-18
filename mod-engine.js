@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260615v110';
+var _MOD_ENGINE_VER='20260615v111';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -1837,12 +1837,12 @@ function _modFormReceipt(key){
   if(!win){ toast('팝업 차단을 해제해 주세요',true); return; }
   var e2=function(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
   var org=(typeof SYS_NAME!=='undefined'?SYS_NAME:'');
-  var css='@page{size:80mm auto;margin:0}html,body{margin:0;padding:0;font-family:"Malgun Gothic","맑은 고딕",sans-serif;background:#e5e7eb}'
+  var css='@page{size:80mm auto;margin:0}html,body{margin:0;padding:0;font-family:"Malgun Gothic","맑은 고딕",sans-serif;background:#e5e7eb;color:#000}'
     +'.bar{padding:12px;text-align:center;background:#1e40af;position:sticky;top:0}.bar button{padding:9px 18px;font-weight:700;border:none;border-radius:6px;cursor:pointer;margin:0 4px;font-size:13px}'
-    +'.r{width:80mm;box-sizing:border-box;padding:7mm 4mm;text-align:center;background:#fff;margin:10px auto}'
-    +'.r h2{font-size:15pt;margin:0 0 1mm;font-weight:800}.r .sub{font-size:10pt;color:#333;margin-bottom:4mm;line-height:1.5}'
-    +'.r img{width:55mm;height:55mm;display:block;margin:0 auto}.r .u{font-size:7pt;color:#888;word-break:break-all;margin-top:3mm}'
-    +'@media print{.bar{display:none}.r{margin:0}body{background:#fff}}';
+    +'.r{width:80mm;box-sizing:border-box;padding:7mm 4mm;text-align:center;background:#fff;margin:10px auto;color:#000}'
+    +'.r h2{font-size:16pt;margin:0 0 2mm;font-weight:900;color:#000}.r .sub{font-size:11pt;color:#000;font-weight:700;margin-bottom:4mm;line-height:1.5}'
+    +'.r img{width:58mm;height:58mm;display:block;margin:0 auto;image-rendering:pixelated}.r .u{font-size:8pt;color:#000;font-weight:700;word-break:break-all;margin-top:3mm}'
+    +'@media print{.bar{display:none}.r{margin:0}body{background:#fff} *{-webkit-print-color-adjust:exact;print-color-adjust:exact}}';
   var body='<div class="bar"><button onclick="window.print()" style="background:#10b981;color:#fff">🖨 인쇄</button><button onclick="window.close()" style="background:#fff">닫기</button></div>'
     +'<div class="r"><h2>'+e2(def.label)+'</h2><div class="sub">'+e2(org)+'<br>📱 휴대폰으로 아래 QR을 스캔하면<br><b>신청/주문 페이지</b>로 연결됩니다</div>'
     +'<img src="'+qr+'"><div class="u">'+e2(url)+'</div></div>';
