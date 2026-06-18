@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260618v115';
+var _MOD_ENGINE_VER='20260618v116';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -856,6 +856,27 @@ function _modAllTels(def, row){
   });
   return out;
 }
+// 발송 대상별 연락처 — target: 'orderer'(주문자) | 'recipient'(받는분) | 'both'(둘다, 기본)
+// 받는분 = 라벨에 받는/수령/수신 포함된 tel 컬럼, 나머지 tel = 주문자
+function _modTelsFor(def, row, target){
+  target = target || 'both';
+  var ord=[], rcp=[];
+  (def.columns||[]).forEach(function(c){
+    if(c.type!=='tel') return;
+    var t=String(row[c.key]||'').replace(/[^0-9]/g,''); if(t.length<10) return;
+    if(/받는|수령|수신/.test(c.label||'')) rcp.push(t); else ord.push(t);
+  });
+  var pick = target==='orderer' ? ord : (target==='recipient' ? rcp : ord.concat(rcp));
+  var out=[]; pick.forEach(function(t){ if(out.indexOf(t)<0) out.push(t); });
+  return out;
+}
+// 편집기용 "보낼 대상" 드롭다운
+function _modToSelHtml(id, cur){
+  cur = cur || 'both';
+  function o(v,l){ return '<option value="'+v+'"'+(cur===v?' selected':'')+'>'+l+'</option>'; }
+  return '<select id="'+id+'" style="font-size:12px;margin:0 0 10px;padding:6px;border:1px solid #cbd5e1;border-radius:6px;background:#fff">'
+    + o('both','↳ 보낼 대상: 주문자+받는분') + o('orderer','↳ 주문자만') + o('recipient','↳ 받는분만') + '</select>';
+}
 // 송장번호 컬럼 자동감지 (라벨에 '송장' 포함, 배지 아님)
 function _modTrackingCol(def){
   return (def.columns||[]).find(function(c){return /송장/.test(c.label||'') && c.type!=='badge';});
@@ -977,7 +998,7 @@ function modSave(key,editId){
         if(_trk){
           var _trkNew=String(merged[_trk.key]||'').trim();
           if(_trkNew && _trkNew!==_trkOld){
-            var _tels=_modAllTels(def,merged);
+            var _tels=_modTelsFor(def,merged,def.smsTrackingTo||'both');
             if(_tels.length){ _modSmsGlobal(_tels,_modSmsFill(def.smsTrackingTpl||'상품이 발송되었습니다. 송장번호: {'+_trk.label+'}',def,merged)).then(function(r){ if(r&&r.ok) toast('📱 송장 문자 발송 ('+_tels.length+'건)'); }); }
           }
         }
@@ -1020,7 +1041,7 @@ function _modSendCancelSms(def, rows){
   rows.forEach(function(row){
     if(!row) return;
     chain=chain.then(function(){
-      var tels=_modAllTels(def,row); if(!tels.length) return;
+      var tels=_modTelsFor(def,row,def.smsCancelTo||'both'); if(!tels.length) return;
       return _modSmsGlobal(tels,_modSmsFill(def.smsCancelTpl||'주문이 취소되었습니다.',def,row)).then(function(r){ if(r&&r.ok) sent++; });
     });
   });
@@ -1411,7 +1432,7 @@ function _modTrackImportRun(key){
       var sent=0, chain=Promise.resolve();
       sendList.forEach(function(row){
         chain=chain.then(function(){
-          var tels=_modAllTels(def,row); if(!tels.length) return;
+          var tels=_modTelsFor(def,row,def.smsTrackingTo||'both'); if(!tels.length) return;
           return _modSmsGlobal(tels,_modSmsFill(def.smsTrackingTpl||'상품이 발송되었습니다. 송장번호: {'+trk.label+'}',def,row)).then(function(r){ if(r&&r.ok) sent++; });
         });
       });
@@ -1520,12 +1541,15 @@ function popModDef(keyOrIdx){
   h+='<label style="font-size:12px;font-weight:800;color:#7c3aed">📱 문자 자동발송 (주문자·받는분 연락처)</label>';
   h+='<div style="padding:10px;border:1px solid #e9d5ff;border-radius:8px;background:#faf5ff">';
   h+='<label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600"><input type="checkbox" id="mdf_smsApply" '+(def.smsApply?'checked':'')+'> 신청 접수 시 문자 보내기</label>';
-  h+='<input id="mdf_smsApplyTpl" value="'+esc(def.smsApplyTpl||'[가문굴비] 주문이 정상 접수되었습니다. 감사합니다.')+'" style="width:100%;font-size:12px;margin:4px 0 10px;padding:8px;border:1px solid #cbd5e1;border-radius:6px">';
+  h+='<input id="mdf_smsApplyTpl" value="'+esc(def.smsApplyTpl||'[가문굴비] 주문이 정상 접수되었습니다. 감사합니다.')+'" style="width:100%;box-sizing:border-box;font-size:12px;margin:4px 0;padding:8px;border:1px solid #cbd5e1;border-radius:6px">';
+  h+=_modToSelHtml('mdf_smsApplyTo', def.smsApplyTo);
   h+='<label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600"><input type="checkbox" id="mdf_smsTracking" '+(def.smsTracking?'checked':'')+'> 송장번호 입력 시 문자 보내기</label>';
-  h+='<input id="mdf_smsTrackingTpl" value="'+esc(def.smsTrackingTpl||'[가문굴비] 상품이 발송되었습니다. 송장번호: {송장번호}')+'" style="width:100%;font-size:12px;margin:4px 0 10px;padding:8px;border:1px solid #cbd5e1;border-radius:6px">';
+  h+='<input id="mdf_smsTrackingTpl" value="'+esc(def.smsTrackingTpl||'[가문굴비] 상품이 발송되었습니다. 송장번호: {송장번호}')+'" style="width:100%;box-sizing:border-box;font-size:12px;margin:4px 0;padding:8px;border:1px solid #cbd5e1;border-radius:6px">';
+  h+=_modToSelHtml('mdf_smsTrackingTo', def.smsTrackingTo);
   h+='<label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600"><input type="checkbox" id="mdf_smsCancel" '+(def.smsCancel?'checked':'')+'> 삭제(취소) 시 문자 보내기</label>';
-  h+='<input id="mdf_smsCancelTpl" value="'+esc(def.smsCancelTpl||'[가문굴비] 주문이 취소되었습니다. 문의: 매장으로 연락주세요.')+'" style="width:100%;font-size:12px;margin:4px 0 2px;padding:8px;border:1px solid #cbd5e1;border-radius:6px">';
-  h+='<div style="font-size:10px;color:#94a3b8;margin-top:2px">연락처(tel) 칸이 있는 모든 사람(주문자+받는분)에게 발송돼요. 본문에 <b>{컬럼명}</b>을 쓰면 그 값이 들어갑니다 (예: {송장번호}). 송장 칸은 라벨에 \'송장\'이 들어간 칸을 자동 인식합니다. <b style="color:#dc2626">건당 문자요금이 나갑니다.</b></div>';
+  h+='<input id="mdf_smsCancelTpl" value="'+esc(def.smsCancelTpl||'[가문굴비] 주문이 취소되었습니다. 문의: 매장으로 연락주세요.')+'" style="width:100%;box-sizing:border-box;font-size:12px;margin:4px 0;padding:8px;border:1px solid #cbd5e1;border-radius:6px">';
+  h+=_modToSelHtml('mdf_smsCancelTo', def.smsCancelTo);
+  h+='<div style="font-size:10px;color:#94a3b8;margin-top:2px">각 문자 아래 <b>보낼 대상</b>을 고르세요(주문자만/받는분만/둘다). 받는분이 주문자와 같으면 한 번만 발송돼요. 본문에 <b>{컬럼명}</b>을 쓰면 그 값이 들어갑니다 (예: {송장번호}). 송장 칸은 라벨에 \'송장\'이 들어간 칸을 자동 인식합니다. <b style="color:#dc2626">건당 문자요금이 나갑니다.</b></div>';
   h+='</div>';
   h+='<label style="font-size:12px;font-weight:700;color:#64748b">파일 업로드 URL</label>';
   var _curDrive=def.driveUploadUrl||(typeof DRIVE_UPLOAD_URL!=='undefined'?DRIVE_UPLOAD_URL:'')||'';
@@ -1845,6 +1869,9 @@ function saveModDef(keyOrNew){
   var smsTrackingTpl=((document.getElementById('mdf_smsTrackingTpl')||{}).value||'').trim();
   var smsCancel=((document.getElementById('mdf_smsCancel')||{}).checked)||false;
   var smsCancelTpl=((document.getElementById('mdf_smsCancelTpl')||{}).value||'').trim();
+  var smsApplyTo=((document.getElementById('mdf_smsApplyTo')||{}).value)||'both';
+  var smsTrackingTo=((document.getElementById('mdf_smsTrackingTo')||{}).value)||'both';
+  var smsCancelTo=((document.getElementById('mdf_smsCancelTo')||{}).value)||'both';
   var formImage=window.__modFormImgData||'';
 
   // 구글 이메일 켜면 "이메일" 컬럼이 없을 때 자동 추가 (맨 앞)
@@ -1873,7 +1900,7 @@ function saveModDef(keyOrNew){
     adminTab:adminTab,
     columns:cols,
     formTitle:formTitle, formDesc:formDesc, downloadUrl:downloadUrl, payInfo:payInfo, formImage:formImage,
-    smsApply:smsApply, smsApplyTpl:smsApplyTpl, smsTracking:smsTracking, smsTrackingTpl:smsTrackingTpl, smsCancel:smsCancel, smsCancelTpl:smsCancelTpl,
+    smsApply:smsApply, smsApplyTpl:smsApplyTpl, smsTracking:smsTracking, smsTrackingTpl:smsTrackingTpl, smsCancel:smsCancel, smsCancelTpl:smsCancelTpl, smsApplyTo:smsApplyTo, smsTrackingTo:smsTrackingTo, smsCancelTo:smsCancelTo,
     driveUploadUrl:driveUrl,
     features:{search:true,excel:true,applyForm:applyForm,googleEmail:googleEmail}
   };
@@ -2554,7 +2581,7 @@ function submitModApply(){
   }).then(function(){
     // 📱 신청 접수 문자 — 주문자+받는분 연락처 모두에게
     if(def.smsApply){
-      var _tels=_modAllTels(def,obj);
+      var _tels=_modTelsFor(def,obj,def.smsApplyTo||'both');
       if(_tels.length) _modSmsGlobal(_tels, _modSmsFill(def.smsApplyTpl||'주문이 정상 접수되었습니다.',def,obj));
     }
     var _dlUrl=(def.downloadUrl||'').trim();
