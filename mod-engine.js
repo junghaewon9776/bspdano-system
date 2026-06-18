@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260615v108';
+var _MOD_ENGINE_VER='20260615v109';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -782,11 +782,13 @@ function _modFormField(col,val){
     case 'consent':
       return '<label style="display:flex;align-items:flex-start;gap:8px;font-size:13px;color:#475569;cursor:pointer;line-height:1.5"><input type="checkbox" id="'+id+'" style="margin-top:3px;flex-shrink:0"'+(val==='동의'?' checked':'')+'> <span>'+esc(col.consentText||col.label||'개인정보 수집·이용에 동의합니다')+'</span></label>';
     case 'address':
-      // 주소 검색(다음 우편번호) + 상세주소. 저장값: "기본주소 | 상세주소"
-      var _ap=String(val||'').split('|'); var _abase=(_ap[0]||'').trim(), _adet=(_ap[1]||'').trim();
-      var ah='<div style="display:flex;gap:6px"><input id="'+id+'" readonly value="'+esc(_abase)+'" placeholder="주소 검색을 눌러주세요" style="flex:1;min-width:0;box-sizing:border-box;background:#f8fafc;cursor:pointer" onclick="_modAddrSearch(\''+id+'\')">';
-      ah+='<button type="button" onclick="_modAddrSearch(\''+id+'\')" style="flex-shrink:0;padding:8px 12px;border:none;border-radius:8px;background:#2563eb;color:#fff;font-weight:700;cursor:pointer;white-space:nowrap">🔍 주소검색</button></div>';
-      ah+='<input id="'+id+'_detail" value="'+esc(_adet)+'" placeholder="상세주소 (동·호수 등)" style="'+_w+'margin-top:4px">';
+      // 주소 검색(다음 우편번호) + 상세주소. 저장값: "기본주소 상세주소" (공백 연결)
+      var _av=String(val||''); var _bar=_av.indexOf('|'); // 구버전 "|" 구분자 호환
+      var _abase=(_bar>=0?_av.slice(0,_bar):_av).trim(), _adet=(_bar>=0?_av.slice(_bar+1):'').trim();
+      var _ais='box-sizing:border-box;padding:11px;font-size:15px;border:1px solid #cbd5e1;border-radius:8px';
+      var ah='<div style="display:flex;gap:6px"><input id="'+id+'" readonly value="'+esc(_abase)+'" placeholder="주소 검색을 눌러주세요" style="flex:1;min-width:0;'+_ais+';background:#f8fafc;cursor:pointer" onclick="_modAddrSearch(\''+id+'\')">';
+      ah+='<button type="button" onclick="_modAddrSearch(\''+id+'\')" style="flex-shrink:0;padding:11px 15px;border:none;border-radius:8px;background:#2563eb;color:#fff;font-weight:700;cursor:pointer;white-space:nowrap">🔍 주소검색</button></div>';
+      ah+='<input id="'+id+'_detail" value="'+esc(_adet)+'" placeholder="상세주소 (동·호수 등)" style="width:100%;'+_ais+';margin-top:6px">';
       return ah;
     default:
       return '<input id="'+id+'" type="text" value="'+ev+'"'+(col.placeholder?' placeholder="'+esc(col.placeholder)+'"':'')+' style="'+_w+'">';
@@ -848,7 +850,7 @@ function modSave(key,editId){
     if(c.type==='address'){
       var _ab=(el.value||'').trim(); var _ad=document.getElementById('mod_f_'+c.key+'_detail'); var _adv=_ad?(_ad.value||'').trim():'';
       if(c.required&&!_ab){ toast(c.label+'을(를) 검색하세요',true); valid=false; }
-      obj[c.key]=_ab+(_adv?' | '+_adv:''); return;
+      obj[c.key]=_ab+(_adv?' '+_adv:''); return;
     }
     var v=(el.value||"").trim();
     if(c.type==='select'&&v==='__etc__'){ var _et=document.getElementById('mod_f_'+c.key+'_etc'); v=_et?(_et.value||'').trim():''; }
@@ -2227,7 +2229,7 @@ function submitModApply(){
     if(c.type==='address'){
       var _ab=(el.value||'').trim(); var _ad=document.getElementById('mod_f_'+c.key+'_detail'); var _adv=_ad?(_ad.value||'').trim():'';
       if(c.required&&!_ab){ valid=false; if(!firstBad)firstBad=c.label+'을(를) 검색해 주세요'; }
-      obj[c.key]=_ab+(_adv?' | '+_adv:''); return;
+      obj[c.key]=_ab+(_adv?' '+_adv:''); return;
     }
     var v=(el.value||'').trim();
     if(c.type==='select'&&v==='__etc__'){ var _et=document.getElementById('mod_f_'+c.key+'_etc'); v=_et?(_et.value||'').trim():''; }
