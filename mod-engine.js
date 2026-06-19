@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260619v125';
+var _MOD_ENGINE_VER='20260619v126';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -1551,41 +1551,49 @@ function popModDef(keyOrIdx){
   var h='<div class="pop-head"><h3>'+(isNew?'➕ 새 모듈 만들기':'✏️ 모듈 수정: '+esc(def.label))+'</h3></div>';
   h+='<div style="padding:14px;max-height:70vh;overflow-y:auto">';
 
-  // 기본 정보
-  h+='<div style="display:grid;grid-template-columns:auto 1fr;gap:8px 12px;align-items:center;margin-bottom:16px">';
-  h+='<label style="font-size:12px;font-weight:700;color:#64748b">아이콘</label>';
-  h+=_emojiSelect("mdf_icon",def.icon||"📦");
+  // ── 레이아웃 헬퍼 (섹션 제목 / 라벨 / 힌트 / 입력칸 스타일) ──
+  var _secH=function(t){ return '<div style="font-size:13px;font-weight:800;color:#0f172a;margin:20px 0 10px;padding-bottom:6px;border-bottom:2px solid #e2e8f0">'+t+'</div>'; };
+  var _lab=function(t){ return '<div style="font-size:12px;font-weight:700;color:#64748b;margin:10px 0 4px">'+t+'</div>'; };
+  var _hint=function(t){ return '<div style="font-size:10px;color:#94a3b8;margin-top:3px">'+t+'</div>'; };
+  var _fs='width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid #cbd5e1;border-radius:7px;font-size:13px';
+  var _tog=function(id,on,inner){ return '<label style="display:flex;align-items:flex-start;gap:8px;font-size:12px;color:#334155;cursor:pointer;padding:7px 0"><input type="checkbox" id="'+id+'"'+(on?' checked':'')+' style="margin-top:2px;flex-shrink:0;width:16px;height:16px"><span style="line-height:1.45">'+inner+'</span></label>'; };
+
+  // ── 섹션: 기본 정보 ──
+  h+='<div style="font-size:14px;font-weight:800;color:#0f172a;margin:0 0 10px">📋 기본 정보</div>';
+  h+='<div style="display:grid;grid-template-columns:auto 1fr;gap:10px 12px;align-items:center">';
+  h+='<label style="font-size:12px;font-weight:700;color:#64748b">아이콘</label>'+_emojiSelect("mdf_icon",def.icon||"📦");
   h+='<label style="font-size:12px;font-weight:700;color:#64748b">이름 <span style="color:#ef4444">*</span></label>';
-  h+='<input id="mdf_label" value="'+esc(def.label||"")+'" placeholder="예: 행사차량">';
+  h+='<input id="mdf_label" value="'+esc(def.label||"")+'" placeholder="예: 행사차량" style="'+_fs+'">';
   h+='<label style="font-size:12px;font-weight:700;color:#64748b">카테고리</label>';
-  h+='<input id="mdf_catLabel" value="'+esc(def.catLabel||"")+'" placeholder="비우면 기본 커스텀 (이모지 제외)">';
+  h+='<input id="mdf_catLabel" value="'+esc(def.catLabel||"")+'" placeholder="비우면 기본 커스텀" style="'+_fs+'">';
   h+='<label style="font-size:12px;font-weight:700;color:#64748b">데이터 범위</label>';
-  h+='<select id="mdf_global"><option value="false"'+(def.global?'':' selected')+'>행사별 (각 행사 데이터 분리)</option><option value="true"'+(def.global?' selected':'')+'>공통 (전체 행사 공유)</option></select>';
-  h+='<label style="font-size:12px;font-weight:700;color:#64748b">탭 노출 권한</label>';
-  h+='<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#475569"><input type="checkbox" id="mdf_adminTab"'+(def.adminTab?' checked':'')+'> 관리자(SUBADMIN 이상)만 이 탭 보기 <span style="color:#94a3b8">(체크 안 하면 모든 사용자에게 표시)</span></label>';
-  h+='<label style="font-size:12px;font-weight:700;color:#64748b">공개 신청폼</label>';
+  h+='<select id="mdf_global" style="'+_fs+'"><option value="false"'+(def.global?'':' selected')+'>행사별 (각 행사 데이터 분리)</option><option value="true"'+(def.global?' selected':'')+'>공통 (전체 행사 공유)</option></select>';
+  h+='</div>';
+  h+=_tog('mdf_adminTab',def.adminTab,'🔒 <b>관리자만 이 탭 보기</b> <span style="color:#94a3b8">(SUBADMIN 이상 / 체크 안 하면 모두에게 표시)</span>');
+
+  // ── 섹션: 공개 신청폼 ──
+  h+=_secH('📝 공개 신청폼');
   var afOn=def.features&&def.features.applyForm;
-  h+='<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#475569"><input type="checkbox" id="mdf_applyForm"'+(afOn?' checked':'')+'> 켜면 신청폼 링크가 생기고 외부에서 신청 → 선정/탈락 처리 가능</label>';
-  h+='<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#475569"><input type="checkbox" id="mdf_multiRecipient"'+(def.multiRecipient?' checked':'')+'> 👥 <b>여러 받는분 받기</b> — 한 주문자가 여러 명에게(받는분마다 「➕ 추가」, 제출 시 받는분 수만큼 행 자동 생성·같은 묶음번호). 아래 컬럼에서 「👥받는분별」 표시한 칸이 반복됩니다</label>';
-  h+='<label style="font-size:12px;font-weight:700;color:#64748b">구글 이메일</label>';
   var geOn=def.features&&def.features.googleEmail;
-  h+='<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#475569"><input type="checkbox" id="mdf_googleEmail"'+(geOn?' checked':'')+'> 📧 신청폼에 「구글 이메일 공유」 체크박스 표시 → 구글 로그인으로 이메일 자동 입력 <span style="color:#94a3b8">(이름에 "이메일/메일/gmail" 들어간 컬럼이 있어야 함)</span></label>';
-  h+='<label style="font-size:12px;font-weight:700;color:#64748b">신청폼 제목</label>';
-  h+='<input id="mdf_formTitle" value="'+esc(def.formTitle||"")+'" placeholder="비우면 「'+esc(def.label||"모듈명")+' 신청」">';
-  h+='<label style="font-size:12px;font-weight:700;color:#64748b">신청폼 안내문</label>';
-  h+='<textarea id="mdf_formDesc" rows="5" placeholder="여러 줄 가능 — 베타테스트 안내 등 길게 작성하세요" style="width:100%;box-sizing:border-box;resize:vertical;font-size:13px;line-height:1.5">'+esc(def.formDesc||"")+'</textarea>';
-  h+='<label style="font-size:12px;font-weight:700;color:#64748b">신청폼 하단 문의 (작게)</label>';
-  h+='<input id="mdf_formFooter" value="'+esc(def.formFooter||"")+'" placeholder="예: 문의 정해원 010-0000-0000" style="width:100%;box-sizing:border-box;font-size:12px"><div style="font-size:10px;color:#94a3b8;margin-top:2px">신청폼 맨 아래에 작은 회색 글씨로 표시 (전화번호는 자동으로 누르면 통화돼요)</div>';
-  h+='<label style="font-size:12px;font-weight:700;color:#64748b">신청폼 상단 이미지 (선택)</label>';
-  h+='<div><input type="file" id="mdf_formImgFile" accept="image/*" onchange="_modPickFormImg(this)" style="font-size:12px"><button type="button" onclick="_modClearFormImg()" style="margin-left:6px;padding:4px 10px;border:none;border-radius:5px;background:#ef4444;color:#fff;font-size:11px;font-weight:700;cursor:pointer">이미지 제거</button>';
-  h+='<div id="mdf_formImgPrev" style="margin-top:8px">'+(def.formImage?'<img src="'+esc(def.formImage)+'" style="max-width:200px;max-height:140px;border-radius:8px;border:1px solid #e2e8f0">':'')+'</div>';
-  h+='<div style="font-size:10px;color:#94a3b8;margin-top:2px">포스터·안내 이미지 등. 자동 압축돼 저장되고, 신청폼 맨 위(안내문 아래)에 큼직하게 표시됩니다</div></div>';
-  h+='<label style="font-size:12px;font-weight:700;color:#64748b">완료 후 다운로드 링크</label>';
-  h+='<div><input id="mdf_downloadUrl" value="'+esc(def.downloadUrl||"")+'" placeholder="예: 플레이스토어 베타 링크 https://play.google.com/…" style="width:100%;font-family:monospace;font-size:11px"><div style="font-size:10px;color:#94a3b8;margin-top:2px">넣으면 신청 완료 화면에 「앱 다운로드」 버튼이 떠서 누르면 이 링크로 이동</div></div>';
-  h+='<label style="font-size:12px;font-weight:800;color:#0f766e">🧰 편의기능 — 입금 계좌 (선택)</label>';
-  h+='<div><input id="mdf_payInfo" value="'+esc(def.payInfo||"")+'" placeholder="예: 농협 352-1234-5678-90 (예금주 법성포단오제)" style="width:100%;font-size:12px"><div style="font-size:10px;color:#94a3b8;margin-top:2px">넣으면 <b>신청폼 + 완료 화면</b>에 계좌 + 「복사」 버튼이 떠요. 완료 화면엔 「공유하기」 버튼도 자동으로 같이 표시됩니다</div></div>';
-  // 📱 문자 자동발송
-  h+='<label style="font-size:12px;font-weight:800;color:#7c3aed">📱 문자 자동발송 (주문자·받는분 연락처)</label>';
+  h+='<div style="padding:4px 12px;border:1px solid #e2e8f0;border-radius:10px;background:#f8fafc">';
+  h+=_tog('mdf_applyForm',afOn,'<b>공개 신청폼 켜기</b> — 신청폼 링크 생성, 외부 신청 → 선정/탈락 처리');
+  h+=_tog('mdf_multiRecipient',def.multiRecipient,'👥 <b>여러 받는분 받기</b> — 한 주문자가 여러 명에게(➕추가 → 받는분 수만큼 행+같은 묶음번호). 컬럼에서 「👥받는분별」 표시 칸이 반복됩니다');
+  h+=_tog('mdf_googleEmail',geOn,'📧 <b>구글 이메일 공유</b> — 구글 로그인으로 이메일 자동 입력 <span style="color:#94a3b8">(「이메일」 컬럼 필요)</span>');
+  h+='</div>';
+  h+=_lab('신청폼 제목')+'<input id="mdf_formTitle" value="'+esc(def.formTitle||"")+'" placeholder="비우면 「'+esc(def.label||"모듈명")+' 신청」" style="'+_fs+'">';
+  h+=_lab('신청폼 안내문')+'<textarea id="mdf_formDesc" rows="4" placeholder="여러 줄 가능 — 안내 문구" style="'+_fs+';resize:vertical;line-height:1.5">'+esc(def.formDesc||"")+'</textarea>';
+  h+=_lab('신청폼 하단 문의 (작게)')+'<input id="mdf_formFooter" value="'+esc(def.formFooter||"")+'" placeholder="예: 문의 정해원 010-0000-0000" style="'+_fs+'">'+_hint('맨 아래 회색 작은 글씨, 전화번호는 누르면 통화');
+  h+=_lab('신청폼 상단 이미지 (선택)')+'<div><input type="file" id="mdf_formImgFile" accept="image/*" onchange="_modPickFormImg(this)" style="font-size:12px"><button type="button" onclick="_modClearFormImg()" style="margin-left:6px;padding:4px 10px;border:none;border-radius:5px;background:#ef4444;color:#fff;font-size:11px;font-weight:700;cursor:pointer">제거</button><div id="mdf_formImgPrev" style="margin-top:8px">'+(def.formImage?'<img src="'+esc(def.formImage)+'" style="max-width:200px;max-height:140px;border-radius:8px;border:1px solid #e2e8f0">':'')+'</div></div>';
+  h+=_lab('완료 후 다운로드 링크')+'<input id="mdf_downloadUrl" value="'+esc(def.downloadUrl||"")+'" placeholder="예: 플레이스토어 링크" style="'+_fs+';font-family:monospace;font-size:11px">'+_hint('완료 화면에 「앱 다운로드」 버튼 표시');
+
+  // ── 섹션: 편의기능 · 연동 ──
+  h+=_secH('🧰 편의기능 · 연동');
+  h+=_lab('입금 계좌 (선택)')+'<input id="mdf_payInfo" value="'+esc(def.payInfo||"")+'" placeholder="예: 농협 352-1234-5678-90 (예금주)" style="'+_fs+'">'+_hint('신청폼+완료화면에 계좌+「복사」 버튼 표시');
+  var _curDrive=def.driveUploadUrl||(typeof DRIVE_UPLOAD_URL!=='undefined'?DRIVE_UPLOAD_URL:'')||'';
+  h+=_lab('파일 업로드 URL')+'<input id="mdf_driveUrl" value="'+esc(_curDrive)+'" placeholder="파일첨부 컬럼 쓸 때만 — Drive URL" style="'+_fs+';font-family:monospace;font-size:11px">'+_hint('신청폼에서 파일첨부 받으려면 필요');
+
+  // ── 섹션: 문자 자동발송 ──
+  h+=_secH('📱 문자 자동발송 (주문자·받는분 연락처)');
   h+='<div style="padding:10px;border:1px solid #e9d5ff;border-radius:8px;background:#faf5ff">';
   h+='<label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600"><input type="checkbox" id="mdf_smsApply" '+(def.smsApply?'checked':'')+'> 신청 접수 시 문자 보내기</label>';
   h+='<input id="mdf_smsApplyTpl" value="'+esc(def.smsApplyTpl||'[가문굴비] 주문이 정상 접수되었습니다. 감사합니다.')+'" style="width:100%;box-sizing:border-box;font-size:12px;margin:4px 0;padding:8px;border:1px solid #cbd5e1;border-radius:6px">';
@@ -1598,13 +1606,9 @@ function popModDef(keyOrIdx){
   h+=_modToSelHtml('mdf_smsCancelTo', def.smsCancelTo);
   h+='<div style="font-size:10px;color:#94a3b8;margin-top:2px">각 문자 아래 <b>보낼 대상</b>을 고르세요(주문자만/받는분만/둘다). 받는분이 주문자와 같으면 한 번만 발송돼요. 본문에 <b>{컬럼명}</b>을 쓰면 그 값이 들어갑니다 (예: {송장번호}). 송장 칸은 라벨에 \'송장\'이 들어간 칸을 자동 인식합니다. <b style="color:#dc2626">건당 문자요금이 나갑니다.</b></div>';
   h+='</div>';
-  h+='<label style="font-size:12px;font-weight:700;color:#64748b">파일 업로드 URL</label>';
-  var _curDrive=def.driveUploadUrl||(typeof DRIVE_UPLOAD_URL!=='undefined'?DRIVE_UPLOAD_URL:'')||'';
-  h+='<div><input id="mdf_driveUrl" value="'+esc(_curDrive)+'" placeholder="파일첨부 컬럼 쓸 때만 — 신청 설정의 Drive URL 붙여넣기" style="width:100%;font-family:monospace;font-size:11px"><div style="font-size:10px;color:#94a3b8;margin-top:2px">신청폼에서 파일첨부를 받으려면 필요 (참가신청 설정의 📤 Drive 업로드 URL과 동일한 값)</div></div>';
-  h+='</div>';
 
-  // 컬럼 섹션
-  h+='<div style="border-top:1px solid #e5e7eb;padding-top:12px;margin-bottom:8px">';
+  // ── 섹션: 컬럼 정의 ──
+  h+='<div style="border-top:2px solid #e2e8f0;padding-top:14px;margin-top:20px;margin-bottom:8px">';
   h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">';
   h+='<span style="font-size:14px;font-weight:700">📋 컬럼 정의</span>';
   h+='<button class="btn btn-s" onclick="_modDefAddCol()" style="font-size:11px;color:#2563eb">➕ 컬럼 추가</button>';
