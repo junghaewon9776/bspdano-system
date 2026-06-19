@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260619v123';
+var _MOD_ENGINE_VER='20260619v124';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -1574,6 +1574,8 @@ function popModDef(keyOrIdx){
   h+='<input id="mdf_formTitle" value="'+esc(def.formTitle||"")+'" placeholder="비우면 「'+esc(def.label||"모듈명")+' 신청」">';
   h+='<label style="font-size:12px;font-weight:700;color:#64748b">신청폼 안내문</label>';
   h+='<textarea id="mdf_formDesc" rows="5" placeholder="여러 줄 가능 — 베타테스트 안내 등 길게 작성하세요" style="width:100%;box-sizing:border-box;resize:vertical;font-size:13px;line-height:1.5">'+esc(def.formDesc||"")+'</textarea>';
+  h+='<label style="font-size:12px;font-weight:700;color:#64748b">신청폼 하단 문의 (작게)</label>';
+  h+='<input id="mdf_formFooter" value="'+esc(def.formFooter||"")+'" placeholder="예: 문의 정해원 010-0000-0000" style="width:100%;box-sizing:border-box;font-size:12px"><div style="font-size:10px;color:#94a3b8;margin-top:2px">신청폼 맨 아래에 작은 회색 글씨로 표시 (전화번호는 자동으로 누르면 통화돼요)</div>';
   h+='<label style="font-size:12px;font-weight:700;color:#64748b">신청폼 상단 이미지 (선택)</label>';
   h+='<div><input type="file" id="mdf_formImgFile" accept="image/*" onchange="_modPickFormImg(this)" style="font-size:12px"><button type="button" onclick="_modClearFormImg()" style="margin-left:6px;padding:4px 10px;border:none;border-radius:5px;background:#ef4444;color:#fff;font-size:11px;font-weight:700;cursor:pointer">이미지 제거</button>';
   h+='<div id="mdf_formImgPrev" style="margin-top:8px">'+(def.formImage?'<img src="'+esc(def.formImage)+'" style="max-width:200px;max-height:140px;border-radius:8px;border:1px solid #e2e8f0">':'')+'</div>';
@@ -1916,6 +1918,7 @@ function saveModDef(keyOrNew){
   var adminTab=((document.getElementById('mdf_adminTab')||{}).checked)||false;
   var formTitle=((document.getElementById('mdf_formTitle')||{}).value||'').trim();
   var formDesc=((document.getElementById('mdf_formDesc')||{}).value||'').trim();
+  var formFooter=((document.getElementById('mdf_formFooter')||{}).value||'').trim();
   var downloadUrl=((document.getElementById('mdf_downloadUrl')||{}).value||'').trim();
   var payInfo=((document.getElementById('mdf_payInfo')||{}).value||'').trim();
   var smsApply=((document.getElementById('mdf_smsApply')||{}).checked)||false;
@@ -1954,7 +1957,7 @@ function saveModDef(keyOrNew){
     fbPath:'Mod_'+key, global:global, evtId:modEvtId,
     adminTab:adminTab,
     columns:cols,
-    formTitle:formTitle, formDesc:formDesc, downloadUrl:downloadUrl, payInfo:payInfo, formImage:formImage,
+    formTitle:formTitle, formDesc:formDesc, formFooter:formFooter, downloadUrl:downloadUrl, payInfo:payInfo, formImage:formImage,
     smsApply:smsApply, smsApplyTpl:smsApplyTpl, smsTracking:smsTracking, smsTrackingTpl:smsTrackingTpl, smsCancel:smsCancel, smsCancelTpl:smsCancelTpl, smsApplyTo:smsApplyTo, smsTrackingTo:smsTrackingTo, smsCancelTo:smsCancelTo, multiRecipient:multiRecipient,
     driveUploadUrl:driveUrl,
     features:{search:true,excel:true,applyForm:applyForm,googleEmail:googleEmail}
@@ -2345,6 +2348,7 @@ function _renderModApplyUI(def,evtId){
   }
   h+='<button id="modApplyBtn" onclick="submitModApply()" style="width:100%;padding:16px;border:none;border-radius:12px;background:#2563eb;color:#fff;font-size:17px;font-weight:800;cursor:pointer;margin-top:14px;box-shadow:0 4px 12px rgba(37,99,235,.3)">✓ '+esc(def.label)+' 신청하기</button>';
   h+='<div id="modApplyMsg" style="text-align:center;margin-top:12px;font-size:13px"></div>';
+  if(def.formFooter){ var _ff=esc(def.formFooter).replace(/(01[0-9][-\s]?\d{3,4}[-\s]?\d{4})/g,function(m){return '<a href="tel:'+m.replace(/[^0-9]/g,'')+'" style="color:#64748b;font-weight:700">'+m+'</a>';}); h+='<div style="text-align:center;margin-top:18px;padding-top:12px;border-top:1px solid #f1f5f9;font-size:11px;color:#94a3b8">'+_ff+'</div>'; }
   document.getElementById('modApplyCard').innerHTML=h;
   if(_multiRcp){ _modAddRecipient(); }   // 받는분 1명 기본 표시
   // 📦 재고 관리 select 있으면 현재 신청수 세서 남은수량 표시 + 품절 비활성화
