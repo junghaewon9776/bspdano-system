@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260619v128';
+var _MOD_ENGINE_VER='20260619v129';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -80,6 +80,13 @@ function _modDriveViewUrl(url){
   if(m && m[1]) return 'https://drive.google.com/file/d/'+m[1]+'/view';
   return url;
 }
+// Drive 썸네일 URL (이미지 미리보기용, 가벼움). 파일이 '링크 가진 모두' 공개여야 보임
+function _modDriveThumb(url, sz){
+  if(!url) return '';
+  var m = url.match(/\/d\/([-\w]{20,})/) || url.match(/[?&]id=([-\w]{20,})/) || url.match(/([-\w]{25,})/);
+  return (m&&m[1]) ? 'https://drive.google.com/thumbnail?id='+m[1]+'&sz=w'+(sz||120) : '';
+}
+function _modIsImg(s){ return /\.(jpe?g|png|gif|webp|bmp|heic|heif)(\?|$)/i.test(String(s||'')); }
 
 // ─── 모듈 정의 등록 ───
 function defMod(cfg){
@@ -121,7 +128,16 @@ function modLoadData(key){
     // 현재 이 모듈 탭을 보고 있을 때만 다시 그림 (modLoadData 재호출 없이 dMod만)
     if(typeof CTAB!=='undefined' && CTAB==='mod_'+key){
       var el=document.getElementById('mc');
-      if(el) el.innerHTML=dMod(key);
+      if(el){
+        // 스크롤 위치 보존 (저장/처리 후 맨 위로 튀는 것 방지)
+        var _sc=document.getElementById('_modScroll_'+key);
+        var _st=_sc?_sc.scrollTop:0, _sl=_sc?_sc.scrollLeft:0;
+        var _wy=window.scrollY||window.pageYOffset||0;
+        el.innerHTML=dMod(key);
+        var _sc2=document.getElementById('_modScroll_'+key);
+        if(_sc2){ _sc2.scrollTop=_st; _sc2.scrollLeft=_sl; }
+        try{ window.scrollTo(0,_wy); }catch(e){}
+      }
     }
   };
   fbDb.ref(path).on('value',cb);
@@ -607,8 +623,13 @@ function _modFmtCell(col,val){
         var bi=p.indexOf('|');
         var nm=bi>=0?p.slice(0,bi).trim():'';
         var u =bi>=0?p.slice(bi+1).trim():p.trim();
-        return '<a href="'+esc(_modDriveViewUrl(u))+'" target="_blank" style="color:#2563eb;text-decoration:none;white-space:nowrap">📎'+(nm?' <span style="color:#94a3b8;font-weight:400;font-size:11px">'+esc(nm)+'</span>':'')+'</a>';
-      }).join('<br>');
+        var vw=esc(_modDriveViewUrl(u));
+        if(_modIsImg(nm)||_modIsImg(u)){   // 🖼 이미지 썸네일 (느리면 lazy 로드, 실패 시 📎로)
+          var th=_modDriveThumb(u,120);
+          if(th) return '<a href="'+vw+'" target="_blank" title="'+esc(nm)+'"><img src="'+esc(th)+'" loading="lazy" onerror="this.replaceWith(document.createTextNode(\'📎\'))" style="height:44px;max-width:90px;object-fit:cover;border-radius:5px;border:1px solid #e2e8f0;vertical-align:middle;margin:1px"></a>';
+        }
+        return '<a href="'+vw+'" target="_blank" style="color:#2563eb;text-decoration:none;white-space:nowrap">📎'+(nm?' <span style="color:#94a3b8;font-weight:400;font-size:11px">'+esc(nm)+'</span>':'')+'</a>';
+      }).join(' ');
     case 'consent':
       return val==='동의'?'<span style="color:#16a34a;font-weight:700">✅ 동의</span>':'<span style="color:#cbd5e1">미동의</span>';
     case 'account':
