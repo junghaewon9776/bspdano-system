@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260619v126';
+var _MOD_ENGINE_VER='20260619v128';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -985,6 +985,7 @@ function modSave(key,editId){
     else { var verr=_modValidateField(c,v); if(verr){ toast(verr,true); valid=false; } }
     obj[c.key]=v;
   });
+  _modApplyCopyFrom(def, obj);   // 주문자와 동일 → 받는분 등 copyFrom 복사 (컬럼 순서 무관)
   if(!valid) return;
   // 🎨 색칠+메모 (수정 팝업에 있을 때만)
   var _mkEl=document.getElementById('_modEditMark');
@@ -1559,9 +1560,10 @@ function popModDef(keyOrIdx){
   var _tog=function(id,on,inner){ return '<label style="display:flex;align-items:flex-start;gap:8px;font-size:12px;color:#334155;cursor:pointer;padding:7px 0"><input type="checkbox" id="'+id+'"'+(on?' checked':'')+' style="margin-top:2px;flex-shrink:0;width:16px;height:16px"><span style="line-height:1.45">'+inner+'</span></label>'; };
 
   // ── 섹션: 기본 정보 ──
-  h+='<div style="font-size:14px;font-weight:800;color:#0f172a;margin:0 0 10px">📋 기본 정보</div>';
-  h+='<div style="display:grid;grid-template-columns:auto 1fr;gap:10px 12px;align-items:center">';
-  h+='<label style="font-size:12px;font-weight:700;color:#64748b">아이콘</label>'+_emojiSelect("mdf_icon",def.icon||"📦");
+  h+='<div style="font-size:14px;font-weight:800;color:#0f172a;margin:0 0 6px">📋 기본 정보</div>';
+  // 아이콘은 이모지 그리드가 커서 그리드 밖에 단독으로 (라벨 위)
+  h+=_lab('아이콘')+'<div>'+_emojiSelect("mdf_icon",def.icon||"📦")+'</div>';
+  h+='<div style="display:grid;grid-template-columns:auto 1fr;gap:10px 12px;align-items:center;margin-top:10px">';
   h+='<label style="font-size:12px;font-weight:700;color:#64748b">이름 <span style="color:#ef4444">*</span></label>';
   h+='<input id="mdf_label" value="'+esc(def.label||"")+'" placeholder="예: 행사차량" style="'+_fs+'">';
   h+='<label style="font-size:12px;font-weight:700;color:#64748b">카테고리</label>';
@@ -2600,6 +2602,11 @@ function _modConsentChg(){
   var k=window.__modEmColKey;
   if(k){ var inp=document.getElementById('mod_f_'+k); if(inp){ inp.value=email; inp.readOnly=!!email; inp.style.background=email?'#f1f5f9':''; } }
 }
+// 조건부칸 copyFrom 2차 해결 — '주문자와 동일'(숨김)이면 컬럼 순서와 무관하게 출처 값 복사
+function _modApplyCopyFrom(def, obj){
+  if(window.__modCondOn) return;   // 표시(별도) 상태면 실제 입력값 유지
+  (def.columns||[]).forEach(function(c){ if(c.condOnly){ obj[c.key]= c.copyFrom?(obj[c.copyFrom]||''):''; } });
+}
 // 신청폼 컬럼 1개 읽기 — fid=필드 id, ctx={valid,firstBad,fileTasks}, target=값 채울 객체
 function _modReadField(c, fid, ctx, target){
   var el=document.getElementById(fid);
@@ -2648,6 +2655,7 @@ function submitModApply(){
     var val=_modReadField(c,'mod_f_'+c.key,ctx,base);
     if(val!==undefined) base[c.key]=val;
   });
+  if(!_multi) _modApplyCopyFrom(def, base);   // 단일모드: 주문자와 동일 → 받는분 copyFrom 복사 (순서 무관)
   // 📧 구글 이메일 (공통)
   if(def.features&&def.features.googleEmail){
     var _gem=window.__modGoogleEmail||'';
