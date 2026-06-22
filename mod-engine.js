@@ -2,7 +2,7 @@
 // mod-engine.js — 범용 CRUD 모듈 엔진  v1.0
 // 설정(columns/features)만 정의하면 테이블+폼+CRUD+검색+엑셀 자동 생성
 // ═══════════════════════════════════════════════════════════════
-var _MOD_ENGINE_VER='20260619v130';
+var _MOD_ENGINE_VER='20260619v131';
 console.log('%c[mod-engine] v='+_MOD_ENGINE_VER+' loaded','color:#6366f1;font-weight:bold;font-size:14px');
 // 일회성 로컬 초기화 (v20260609v2)
 try{if(!localStorage.getItem('_mlClear0609v2')){var _ks=Object.keys(localStorage);_ks.forEach(function(k){if(/^modLabel/.test(k))localStorage.removeItem(k);});localStorage.setItem('_mlClear0609v2','1');console.log('[mod-engine] 라벨 로컬설정 초기화 완료');}}catch(e){}
@@ -607,8 +607,8 @@ function _modFmtCell(col,val){
     case 'number':
       return col.comma?'<b>'+Number(val).toLocaleString()+'</b>':String(val);
     case 'tel':
-      var cl=String(val).replace(/[^0-9+]/g,'');
-      return '<a href="tel:'+cl+'" style="color:#2563eb;text-decoration:none">'+esc(String(val))+'</a>';
+      var _tparts=String(val).split(/[,\/;\n·|]+/).map(function(s){return s.trim();}).filter(Boolean);
+      return _tparts.map(function(p){ var cl=p.replace(/[^0-9+]/g,''); return '<a href="tel:'+cl+'" style="color:#2563eb;text-decoration:none;white-space:nowrap">'+esc(p)+'</a>'; }).join('<br>');
     case 'badge':
       if(col.badgeMap&&col.badgeMap[val]){
         var bm=col.badgeMap[val];
@@ -898,30 +898,33 @@ function _modSmsFill(tpl, def, row){
   });
   return s;
 }
+// 한 칸에 여러 번호(콤마/슬러시/줄바꿈/세미콜론 구분) → 정규화된 번호 배열
+function _modSplitTels(val){
+  return String(val||'').split(/[,\/;\n·|]+/).map(function(s){return s.replace(/[^0-9]/g,'');}).filter(function(t){return t.length>=9;});
+}
 // 모듈의 발신대상(주문자) 연락처 컬럼 값
 function _modOrdererTel(def, row){
   var tc=(def.columns||[]).find(function(c){return c.type==='tel';});
-  return tc?String(row[tc.key]||'').replace(/[^0-9]/g,''):'';
+  return tc?(_modSplitTels(row[tc.key])[0]||''):'';
 }
-// 모듈의 모든 연락처(tel) 컬럼 값 — 주문자+받는분 등 전부, 중복 제거
+// 모듈의 모든 연락처(tel) 컬럼 값 — 주문자+받는분 등 전부(한 칸 다중번호 분리), 중복 제거
 function _modAllTels(def, row){
   var out=[];
   (def.columns||[]).forEach(function(c){
     if(c.type!=='tel') return;
-    var t=String(row[c.key]||'').replace(/[^0-9]/g,'');
-    if(t.length>=10 && out.indexOf(t)<0) out.push(t);
+    _modSplitTels(row[c.key]).forEach(function(t){ if(out.indexOf(t)<0) out.push(t); });
   });
   return out;
 }
 // 발송 대상별 연락처 — target: 'orderer'(주문자) | 'recipient'(받는분) | 'both'(둘다, 기본)
-// 받는분 = 라벨에 받는/수령/수신 포함된 tel 컬럼, 나머지 tel = 주문자
+// 받는분 = 라벨에 받는/수령/수신 포함된 tel 컬럼, 나머지 tel = 주문자. 한 칸 다중번호 분리.
 function _modTelsFor(def, row, target){
   target = target || 'both';
   var ord=[], rcp=[];
   (def.columns||[]).forEach(function(c){
     if(c.type!=='tel') return;
-    var t=String(row[c.key]||'').replace(/[^0-9]/g,''); if(t.length<10) return;
-    if(/받는|수령|수신/.test(c.label||'')) rcp.push(t); else ord.push(t);
+    var ts=_modSplitTels(row[c.key]); if(!ts.length) return;
+    if(/받는|수령|수신/.test(c.label||'')) rcp=rcp.concat(ts); else ord=ord.concat(ts);
   });
   var pick = target==='orderer' ? ord : (target==='recipient' ? rcp : ord.concat(rcp));
   var out=[]; pick.forEach(function(t){ if(out.indexOf(t)<0) out.push(t); });
