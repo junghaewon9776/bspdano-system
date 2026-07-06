@@ -688,13 +688,26 @@ function popModAdd(key){
   var def=_modDefs[key]; if(!def) return;
   var h='<div class="pop-head"><h3>➕ '+esc(def.label)+' 추가</h3></div>';
   h+='<div style="padding:14px;max-height:65vh;overflow-y:auto">';
-  h+=_modAdminFields(def,'');
+  if(def.multiRecipient){
+    // 👥 다중 받는분 모듈 — 신청폼과 동일하게 주문자 칸 + 받는분 블록 반복 (한 번에 여러 박스 등록)
+    window.__modApplyDef=def;
+    (def.columns||[]).forEach(function(c){
+      if(c.auto||c.perRecipient||c.condToggle) return;
+      h+='<div class="fr"><label>'+esc(c.label)+(c.required?' <span style="color:#ef4444">*</span>':'')+'</label>'+_modFormField(c,'')+'</div>';
+    });
+    h+='<div style="margin:14px 0 8px;font-weight:800;color:#7c3aed;font-size:14px">📦 받는 분</div>';
+    h+='<div id="modRcpList"></div>';
+    h+='<button type="button" onclick="_modAddRecipient()" style="width:100%;padding:12px;border:none;border-radius:10px;background:#7c3aed;color:#fff;font-weight:800;font-size:14px;cursor:pointer;margin-top:2px;box-shadow:0 3px 10px rgba(124,58,237,.3)">➕ 받는 분 추가 (다른 주소로 더 보내기)</button>';
+  } else {
+    h+=_modAdminFields(def,'');
+  }
   h+='</div>';
   h+='<div style="padding:10px 14px;border-top:1px solid #e2e8f0;text-align:right;background:#f8fafc;border-radius:0 0 12px 12px">';
   h+='<button class="btn" style="background:#64748b;color:#fff" onclick="closePopup()">취소</button> ';
   h+='<button class="btn btn-b" onclick="modSave(\''+key+'\')">저장</button>';
   h+='</div>';
   openPopup(h,460);
+  if(def.multiRecipient){ window.__modRcpN=0; var _rl=document.getElementById('modRcpList'); if(_rl) _rl.innerHTML=''; _modAddRecipient(); }
 }
 
 function popModEdit(key,id){
@@ -981,9 +994,12 @@ function _modAddrSearch(inputId){
 
 function modSave(key,editId){
   var def=_modDefs[key]; if(!def) return;
+  // 👥 관리자 다중 받는분 추가 모드 — popModAdd가 받는분 블록(#modRcpList)으로 열렸을 때
+  var _multiAdd = !editId && !!def.multiRecipient && !!document.getElementById('modRcpList');
   var obj={}, valid=true, fileTasks=[];
   (def.columns||[]).forEach(function(c){
     if(c.auto) return;
+    if(_multiAdd && (c.perRecipient||c.condToggle)) return;   // 받는분별/동일토글 칸은 아래 블록에서
     if(c.condToggle){ var _ce=document.getElementById('mod_f_'+c.key); var _ck=_ce?_ce.checked:false; obj[c.key]= c.condInvert?(_ck?'주문자와 동일':'받는분 별도'):(_ck?'선물':'본인구매'); return; }   // 조건 토글 값
     if(c.condOnly && !window.__modCondOn){ obj[c.key]= c.copyFrom?(obj[c.copyFrom]||''):''; return; }   // 숨김(주문자와 동일)이면 복사출처 값 복사 → 필수검증 건너뜀
     var el=document.getElementById('mod_f_'+c.key); if(!el) return;
@@ -1017,8 +1033,30 @@ function modSave(key,editId){
     else { var verr=_modValidateField(c,v); if(verr){ toast(verr,true); valid=false; } }
     obj[c.key]=v;
   });
-  _modApplyCopyFrom(def, obj);   // 주문자와 동일 → 받는분 등 copyFrom 복사 (컬럼 순서 무관)
+  if(!_multiAdd) _modApplyCopyFrom(def, obj);   // 주문자와 동일 → 받는분 등 copyFrom 복사 (컬럼 순서 무관)
   if(!valid) return;
+  // 👥 다중 받는분 블록 수집 — 블록마다 행 1개 (신청폼과 동일 로직)
+  var _blockObjs=null, _mCtx=null;
+  if(_multiAdd){
+    _mCtx={valid:true, firstBad:null, fileTasks:[]};
+    _blockObjs=[];
+    var _blocks=document.querySelectorAll('#modRcpList .modRcpBlock');
+    if(!_blocks.length) return toast('받는 분을 한 명 이상 추가하세요',true);
+    var _tcCol=(def.columns||[]).find(function(c){return c.condToggle;});
+    [].slice.call(_blocks).forEach(function(blk){
+      var rn=blk.getAttribute('data-rcp'); var bo={};
+      var _sameEl=document.getElementById('mod_f_same__r'+rn); var _same=!!(_sameEl&&_sameEl.checked);
+      (def.columns||[]).forEach(function(c){
+        if(!c.perRecipient||c.auto) return;
+        if(_same&&c.condOnly){ bo[c.key]= c.copyFrom?(obj[c.copyFrom]||''):''; return; }   // ✅ 주문자와 동일 → 주문자 값 복사
+        var val=_modReadField(c,'mod_f_'+c.key+'__r'+rn,_mCtx,bo);
+        if(val!==undefined) bo[c.key]=val;
+      });
+      if(_tcCol) bo[_tcCol.key]=_same?'주문자와 동일':'받는분 별도';
+      _blockObjs.push(bo);
+    });
+    if(!_mCtx.valid) return toast(_mCtx.firstBad||'입력을 확인하세요',true);
+  }
   // 🎨 색칠+메모 (수정 팝업에 있을 때만)
   var _mkEl=document.getElementById('_modEditMark');
   if(_mkEl){ obj._mark=_mkEl.value||''; }
@@ -1047,6 +1085,18 @@ function modSave(key,editId){
       return sub.then(function(){ obj[t.col.key]=urls.join('\n'); });
     });
   });
+  // 👥 받는분 블록의 파일첨부 (target=블록 객체)
+  if(_mCtx&&_mCtx.fileTasks.length){
+    _mCtx.fileTasks.forEach(function(t){
+      upChain=upChain.then(function(){
+        var urls=[]; var sub=Promise.resolve();
+        t.files.forEach(function(f){
+          sub=sub.then(function(){ return _uploadToDrive(f,'mod_'+key,t.col.label).then(function(url){ urls.push(f.name.replace(/[|\n]/g,' ')+'|'+url); }); });
+        });
+        return sub.then(function(){ t.target[t.col.key]=urls.join('\n'); });
+      });
+    });
+  }
 
   upChain.then(function(){
     if(editId){
@@ -1070,6 +1120,31 @@ function modSave(key,editId){
             var _tels=_modTelsFor(def,merged,def.smsTrackingTo||'both');
             if(_tels.length){ _modSmsGlobal(_tels,_modSmsFill(def.smsTrackingTpl||'상품이 발송되었습니다. 송장번호: {'+_trk.label+'}',def,merged)).then(function(r){ if(r&&r.ok) toast('📱 송장 문자 발송 ('+_tels.length+'건)'); }); }
           }
+        }
+      });
+    } else if(_multiAdd){
+      // 👥 블록마다 행 1개 — 2건 이상이면 같은 묶음번호(_grpId)
+      var _now=new Date().toISOString();
+      var _grp=(_blockObjs.length>1)?('g'+Date.now().toString(36)+Math.random().toString(36).slice(2,5)):'';
+      var data=(_modData[key]||[]).slice();
+      var _rows=[];
+      _blockObjs.forEach(function(bo,i){
+        var r={}; for(var k in obj) r[k]=obj[k]; for(var k2 in bo) r[k2]=bo[k2];
+        r._id=_modId()+i; r._createdAt=_now;
+        if(_grp) r._grpId=_grp;
+        _rows.push(r); data.push(r);
+      });
+      return fbDb.ref(path).set(data).then(function(){
+        hideLoading();toast('✅ '+_rows.length+'건 추가됨');closePopup();
+        // 📱 접수 문자 — 모든 행의 대상 연락처 모아 번호당 1번만
+        if(def.smsApply){
+          var seen={};
+          _rows.forEach(function(r){
+            _modTelsFor(def,r,def.smsApplyTo||'both').forEach(function(t){
+              if(seen[t]) return; seen[t]=1;
+              _modSmsGlobal([t],_modSmsFill(def.smsApplyTpl||'주문이 정상 접수되었습니다.',def,r));
+            });
+          });
         }
       });
     } else {
