@@ -1570,6 +1570,7 @@ function dModManager(){
       h+='<button onclick="_modMoveOrder(\''+esc(d.key)+'\',-1)" title="위로" '+(di===0?'disabled ':'')+'style="font-size:14px;padding:4px 9px;border:none;border-radius:5px;background:#475569;color:#fff;font-weight:800;cursor:pointer'+(di===0?';opacity:.3':'')+'">▲</button>';
       h+='<button onclick="_modMoveOrder(\''+esc(d.key)+'\',1)" title="아래로" '+(di===defs.length-1?'disabled ':'')+'style="font-size:14px;padding:4px 9px;border:none;border-radius:5px;background:#475569;color:#fff;font-weight:800;cursor:pointer'+(di===defs.length-1?';opacity:.3':'')+'">▼</button>';
       h+='<button class="btn btn-s" onclick="popModDef(\''+esc(d.key)+'\')" style="font-size:11px">✏️ 수정</button>';
+      h+='<button class="btn btn-s" onclick="cloneModDef(\''+esc(d.key)+'\')" style="font-size:11px;color:#2563eb">📋 복제</button>';
       h+='<button class="btn btn-s" onclick="delModDef(\''+esc(d.key)+'\')" style="font-size:11px;color:#dc2626">🗑 삭제</button>';
       h+='</div></div>';
 
@@ -2063,6 +2064,34 @@ function delModDef(key){
   _saveModDefs().then(function(){
     hideLoading();toast('삭제됨');mkTabs();draw();
   }).catch(function(e){hideLoading();toast('실패: '+e.message,true)});
+}
+
+// 모듈 복제 — 정의(컬럼·신청폼·문자설정 전부)를 그대로 복사, 이름만 새로 입력. 데이터는 복사 안 함
+function cloneModDef(key){
+  var src=_modDefs[key]; if(!src) return;
+  var name=prompt('새 모듈 이름을 입력하세요\n(구조·설정이 그대로 복사되고, 입력된 데이터는 복사되지 않습니다)', src.label+'2');
+  if(name===null) return;
+  name=name.trim();
+  if(!name) return toast('이름을 입력하세요',true);
+  var dup=Object.keys(_modDefs).some(function(k){ return _modDefs[k].label===name; });
+  if(dup && !confirm('이미 "'+name+'" 이름의 모듈이 있습니다. 그래도 만들까요?')) return;
+  var newKey='m'+Date.now().toString(36);
+  var def=JSON.parse(JSON.stringify(src));
+  def.key=newKey;
+  def.label=name;
+  def.fbPath='Mod_'+newKey;   // 데이터 저장 경로 분리 (원본 데이터와 안 섞임)
+  // 신청폼 제목이 원본 이름 그대로면 새 이름 기준 기본값을 쓰도록 비움
+  if(def.formTitle===src.label+' 신청') def.formTitle='';
+  showLoading('복제 중...');
+  defMod(def);
+  _saveModDefs().then(function(){
+    hideLoading(); toast('✅ "'+src.label+'" → "'+name+'" 복제됨');
+    mkTabs(); draw();
+    modLoadData(newKey);
+  }).catch(function(e){
+    delete _modDefs[newKey]; delete _modData[newKey];
+    hideLoading(); toast('실패: '+(e.message||e),true);
+  });
 }
 
 // ═══════════════════════════════════════════
