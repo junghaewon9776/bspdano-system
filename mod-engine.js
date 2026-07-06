@@ -1497,6 +1497,12 @@ function _modTrackMatch(def, data, idv, basis, used, trkKey){
     else nameCol=(def.columns||[]).find(function(c){return c.type==='text' && !/받는|수령|수취/.test(c.label||'');}) || (def.columns||[]).find(function(c){return c.type==='text';});
     if(!nameCol) return -1;
     for(var j=0;j<data.length;j++){ if(String(data[j][nameCol.key]||'').trim()===idv) cand.push(j); }
+    // 정확 일치가 없으면 정규화 비교 — 택배사 파일의 "홍길동 님", "홍길동 목사님" 같은 호칭/공백 제거
+    if(!cand.length){
+      var _nrm=function(s){ s=String(s||'').trim().split(/\s+/)[0]; return s.replace(/(님|씨|귀하)$/,''); };
+      var nidv=_nrm(idv);
+      if(nidv){ for(var j2=0;j2<data.length;j2++){ if(_nrm(data[j2][nameCol.key])===nidv) cand.push(j2); } }
+    }
   }
   if(!cand.length) return -1;
   // 같은 식별값이 여러 행(한 주문자→여러 받는분 묶음)일 때: 이번 배치에서 아직 안 쓴 행 중 송장 빈 행 우선
@@ -1537,22 +1543,38 @@ function _modTrackImportFile(key){
         var ws=wb.Sheets[wb.SheetNames[0]];
         var aoa=XLSX.utils.sheet_to_json(ws,{header:1,defval:''}).filter(function(r){return r&&r.some(function(v){return String(v).trim()!=='';});});
         if(!aoa.length) return toast('빈 파일입니다',true);
+        var trkRe=/송장|운송장|등기|invoice/i;   // "번호" 단독 제외 (운송장번호만 잡히게)
+        // 택배사 파일 위쪽에 제목/안내 줄이 있는 경우 — 처음 10행에서 송장/수취인 헤더가 있는 행을 찾아 거기부터 사용
+        var hdrRow=-1;
+        for(var hr=0;hr<Math.min(aoa.length,10);hr++){
+          var _cells=aoa[hr].map(function(s){return String(s).trim();});
+          if(_cells.some(function(s){return trkRe.test(s);}) || _cells.some(function(s){return /수취인|받는\s*분|받는사람/.test(s);})){ hdrRow=hr; break; }
+        }
+        if(hdrRow>0) aoa=aoa.slice(hdrRow);
         window.__mtiAoa=aoa;
         var basis=(document.getElementById('_mtiBasis')||{}).value||'tel';
         var header=aoa[0].map(function(s){return String(s).trim();});
         // 자동 추정 (기본 선택값) — 사용자가 바꿀 수 있음
-        var trkRe=/송장|운송장|등기|invoice/i;   // "번호" 단독 제외 (운송장번호만 잡히게)
-        // 식별값 열 추정 — 1순위(수취인 쪽) 먼저, 없으면 2순위(일반)
-        var idRe1,idRe2;
-        if(basis==='tel'){ idRe1=/수취.{0,4}(전화|휴대|연락)|받는.{0,4}(전화|휴대|연락)/i; idRe2=/휴대|핸드폰|전화|연락/i; }
-        else if(basis==='rname'){ idRe1=/수취인|수령인|받는/i; idRe2=/성명|성함|이름/i; }
-        else if(basis==='name'){ idRe1=/구매자|주문자|보내는/i; idRe2=/성명|성함|고객|이름/i; }
-        else { idRe1=/고유|주문\s*번호|주문번호|_id|qr|order/i; idRe2=null; }
         var trkGuess=-1;
         header.forEach(function(hl,i){ if(trkGuess<0&&trkRe.test(hl)) trkGuess=i; });   // 송장 열 먼저
-        var idGuess=-1;
-        header.forEach(function(hl,i){ if(idGuess<0 && i!==trkGuess && idRe1 && idRe1.test(hl)) idGuess=i; });   // 식별은 송장 열 제외
-        if(idGuess<0 && idRe2) header.forEach(function(hl,i){ if(idGuess<0 && i!==trkGuess && idRe2.test(hl)) idGuess=i; });
+        // 식별값 열 추정 — 1순위(수취인/수하인 쪽) 먼저, 없으면 2순위(일반)
+        var _guessId=function(bs){
+          var r1,r2;
+          if(bs==='tel'){ r1=/(수취|수하|받는).{0,4}(전화|휴대|연락)/i; r2=/휴대|핸드폰|전화|연락/i; }
+          else if(bs==='rname'){ r1=/(수취인|수하인|수령인|받는\s*분|받는\s*사람)\s*(명|성함|이름)?$/i; r2=/성명|성함|이름/i; }   // '고정수하인코드' 같은 코드/주소 열 제외 ($ 앵커)
+          else if(bs==='name'){ r1=/(구매자|주문자|보내는\s*분|송하인)\s*(명|성함|이름)?$/i; r2=/성명|성함|고객|이름/i; }
+          else { r1=/고유|주문\s*번호|주문번호|_id|qr|order/i; r2=null; }
+          var g=-1;
+          header.forEach(function(hl,i){ if(g<0 && i!==trkGuess && r1 && r1.test(hl)) g=i; });   // 식별은 송장 열 제외
+          if(g<0&&r2) header.forEach(function(hl,i){ if(g<0 && i!==trkGuess && r2.test(hl)) g=i; });
+          return g;
+        };
+        var idGuess=_guessId(basis);
+        // 롯데 등 전화번호 열이 아예 없는 파일 → 받는분(수하인) 이름 기준으로 자동 전환
+        if(idGuess<0 && basis==='tel'){
+          var g2=_guessId('rname');
+          if(g2>=0){ basis='rname'; idGuess=g2; var _bs=document.getElementById('_mtiBasis'); if(_bs)_bs.value='rname'; toast('이 파일엔 연락처 열이 없어 「받는분 이름」 기준으로 전환했어요'); }
+        }
         if(trkGuess<0) trkGuess=Math.max(0,header.length-1);
         if(idGuess<0) idGuess=(trkGuess===0?1:0);
         var sample=aoa[1]||[];
