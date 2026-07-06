@@ -867,12 +867,14 @@ function _modFormField(col,val,idOverride){
     case 'consent':
       return '<label style="display:flex;align-items:flex-start;gap:8px;font-size:13px;color:#475569;cursor:pointer;line-height:1.5"><input type="checkbox" id="'+id+'" style="margin-top:3px;flex-shrink:0"'+(val==='동의'?' checked':'')+'> <span>'+esc(col.consentText||col.label||'개인정보 수집·이용에 동의합니다')+'</span></label>';
     case 'address':
-      // 주소 검색(다음 우편번호) + 상세주소. 저장값: "기본주소 상세주소" (공백 연결)
+      // 주소 검색(다음 우편번호) + 상세주소. 저장값: "(우편번호) 기본주소 상세주소" — 화면에선 우편번호를 별도 칸으로 분리 표시
       var _av=String(val||''); var _bar=_av.indexOf('|'); // 구버전 "|" 구분자 호환
       var _abase=(_bar>=0?_av.slice(0,_bar):_av).trim(), _adet=(_bar>=0?_av.slice(_bar+1):'').trim();
+      var _azip=''; var _zm=_abase.match(/^\((\d{5})\)\s*/); if(_zm){ _azip=_zm[1]; _abase=_abase.slice(_zm[0].length); }
       var _ais='box-sizing:border-box;padding:11px;font-size:15px;border:1px solid #cbd5e1;border-radius:8px';
-      var ah='<div style="display:flex;gap:6px"><input id="'+id+'" readonly value="'+esc(_abase)+'" placeholder="주소 검색을 눌러주세요" style="flex:1;min-width:0;'+_ais+';background:#f8fafc;cursor:pointer" onclick="_modAddrSearch(\''+id+'\')">';
+      var ah='<div style="display:flex;gap:6px"><input id="'+id+'_zip" readonly value="'+esc(_azip)+'" placeholder="우편번호" style="width:105px;flex-shrink:0;text-align:center;'+_ais+';background:#f8fafc;cursor:pointer" onclick="_modAddrSearch(\''+id+'\')">';
       ah+='<button type="button" onclick="_modAddrSearch(\''+id+'\')" style="flex-shrink:0;padding:11px 15px;border:none;border-radius:8px;background:#2563eb;color:#fff;font-weight:700;cursor:pointer;white-space:nowrap">🔍 주소검색</button></div>';
+      ah+='<input id="'+id+'" readonly value="'+esc(_abase)+'" placeholder="주소 검색을 눌러주세요" style="width:100%;'+_ais+';background:#f8fafc;cursor:pointer;margin-top:6px" onclick="_modAddrSearch(\''+id+'\')">';
       ah+='<input id="'+id+'_detail" value="'+esc(_adet)+'" placeholder="상세주소 (동·호수 등)" style="width:100%;'+_ais+';margin-top:6px">';
       return ah;
     default:
@@ -957,7 +959,9 @@ function _modAddrSearch(inputId){
     try{
       new daum.Postcode({ oncomplete:function(data){
         var addr=data.roadAddress||data.jibunAddress||data.address||'';
-        if(data.zonecode) addr='('+data.zonecode+') '+addr;
+        var z=document.getElementById(inputId+'_zip');
+        if(z){ z.value=data.zonecode||''; }                       // 우편번호 별도 칸
+        else if(data.zonecode){ addr='('+data.zonecode+') '+addr; } // 구형 위젯 호환 (칸 없으면 합쳐서)
         var el=document.getElementById(inputId); if(el) el.value=addr;
         var d=document.getElementById(inputId+'_detail'); if(d){ try{d.focus();}catch(e){} }
       }}).open();
@@ -1001,8 +1005,9 @@ function modSave(key,editId){
     }
     if(c.type==='address'){
       var _ab=(el.value||'').trim(); var _ad=document.getElementById('mod_f_'+c.key+'_detail'); var _adv=_ad?(_ad.value||'').trim():'';
+      var _az=document.getElementById('mod_f_'+c.key+'_zip'); var _azv=_az?(_az.value||'').trim():'';
       if(c.required&&!_ab){ toast(c.label+'을(를) 검색하세요',true); valid=false; }
-      obj[c.key]=_ab+(_adv?' '+_adv:''); return;
+      obj[c.key]=(_azv?'('+_azv+') ':'')+_ab+(_adv?' '+_adv:''); return;
     }
     var v=(el.value||"").trim();
     if(c.type==='select'&&v==='__etc__'){ var _et=document.getElementById('mod_f_'+c.key+'_etc'); v=_et?(_et.value||'').trim():''; }
@@ -2340,16 +2345,27 @@ function renderModApplyForm(key,evtId){
 function _modRecipientBlockHtml(def,n){
   var h='<div class="modRcpBlock" data-rcp="'+n+'" style="border:1.5px solid #e9d5ff;border-radius:12px;padding:14px;margin-bottom:10px;background:#fcfaff">';
   h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><span style="font-weight:800;color:#7c3aed;font-size:14px">받는 분 <span class="modRcpNo"></span></span><button type="button" onclick="_modRemoveRecipient('+n+')" class="modRcpDel" style="border:none;background:#fee2e2;color:#dc2626;border-radius:6px;padding:3px 10px;font-size:12px;font-weight:700;cursor:pointer;display:none">✕ 삭제</button></div>';
+  // ✅ 주문자와 동일 — 체크하면 이 블록의 copyFrom 칸(성함·연락처 등)을 숨기고 제출 시 주문자 값 복사
+  var _tc=(def.columns||[]).find(function(c){return c.condToggle;});
+  var _hasCond=(def.columns||[]).some(function(c){return c.perRecipient&&c.condOnly;});
+  if(_tc&&_hasCond){
+    h+='<div style="margin-bottom:12px;background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:9px;padding:10px 12px"><label style="display:flex;align-items:center;gap:8px;font-size:14px;font-weight:800;color:#1d4ed8;cursor:pointer"><input type="checkbox" id="mod_f_same__r'+n+'" onchange="_modRcpSame('+n+',this.checked)" style="width:18px;height:18px;flex-shrink:0">✅ '+esc(_tc.label||'받는 분이 주문자와 동일')+'</label></div>';
+  }
   (def.columns||[]).forEach(function(c){
     if(!c.perRecipient) return;
     if(c.auto||c.adminOnly||c.sysOnly||c.qrPublic||c.key==='status') return;
     var fid='mod_f_'+c.key+'__r'+n;
-    h+='<div style="margin-bottom:12px"><label style="display:block;font-size:14px;color:#334155;font-weight:700;margin-bottom:6px">'+esc(c.label)+(c.required?' <span style="color:#ef4444">*</span>':'')+'</label>';
+    h+='<div'+((_tc&&c.condOnly)?' data-condrcp="1"':'')+' style="margin-bottom:12px"><label style="display:block;font-size:14px;color:#334155;font-weight:700;margin-bottom:6px">'+esc(c.label)+(c.required?' <span style="color:#ef4444">*</span>':'')+'</label>';
     h+=_modFormField(c,'',fid);
     h+='</div>';
   });
   h+='</div>';
   return h;
+}
+// ✅ 받는분 블록 '주문자와 동일' 토글 — 체크 시 그 블록의 copyFrom 칸 숨김 (제출 때 주문자 값이 복사됨)
+function _modRcpSame(n, same){
+  var blk=document.querySelector('#modRcpList .modRcpBlock[data-rcp="'+n+'"]'); if(!blk) return;
+  [].slice.call(blk.querySelectorAll('[data-condrcp]')).forEach(function(el){ el.style.display=same?'none':''; });
 }
 function _modAddRecipient(){
   var list=document.getElementById('modRcpList'); var def=window.__modApplyDef; if(!list||!def) return;
@@ -2709,8 +2725,9 @@ function _modReadField(c, fid, ctx, target){
   }
   if(c.type==='address'){
     var _ab=(el?el.value:'').trim(); var _ad=document.getElementById(fid+'_detail'); var _adv=_ad?(_ad.value||'').trim():'';
+    var _az=document.getElementById(fid+'_zip'); var _azv=_az?(_az.value||'').trim():'';
     if(c.required&&!_ab){ ctx.valid=false; if(!ctx.firstBad)ctx.firstBad=c.label+'을(를) 검색해 주세요'; }
-    return _ab+(_adv?' '+_adv:'');
+    return (_azv?'('+_azv+') ':'')+_ab+(_adv?' '+_adv:'');
   }
   if(!el) return undefined;
   var v=(el.value||'').trim();
@@ -2750,14 +2767,18 @@ function submitModApply(){
   if(_multi){
     var blocks=document.querySelectorAll('#modRcpList .modRcpBlock');
     if(!blocks.length){ ctx.valid=false; if(!ctx.firstBad)ctx.firstBad='받는 분을 한 명 이상 추가하세요'; }
+    var _tcCol=(def.columns||[]).find(function(c){return c.condToggle;});
     [].slice.call(blocks).forEach(function(blk){
       var rn=blk.getAttribute('data-rcp'); var bo={};
+      var _sameEl=document.getElementById('mod_f_same__r'+rn); var _same=!!(_sameEl&&_sameEl.checked);
       (def.columns||[]).forEach(function(c){
         if(!c.perRecipient) return;
         if(c.auto||c.adminOnly||c.sysOnly||c.qrPublic||c.key==='status') return;
+        if(_same&&c.condOnly){ bo[c.key]= c.copyFrom?(base[c.copyFrom]||''):''; return; }   // ✅ 주문자와 동일 → 주문자 값 복사 (필수검증 건너뜀)
         var val=_modReadField(c,'mod_f_'+c.key+'__r'+rn,ctx,bo);
         if(val!==undefined) bo[c.key]=val;
       });
+      if(_tcCol) bo[_tcCol.key]=_same?'주문자와 동일':'받는분 별도';
       blockObjs.push(bo);
     });
   } else {
