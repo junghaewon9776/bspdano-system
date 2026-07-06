@@ -789,6 +789,17 @@ function _modFormField(col,val,idOverride){
         var _cur={}; _modParseMulti(val).forEach(function(it){ if(it&&it.o) _cur[it.o]=it.q; });
         var _mp=col.maxPer||0;
         var mh='<div id="'+id+'" data-multiqty="1"'+(_mp?' data-maxtotal="'+_mp+'"':'')+' style="border:1px solid #cbd5e1;border-radius:10px;overflow:hidden">';
+        // ✏️ 직접 입력 행 — 맨 위 고정. 자유 텍스트 한 칸 (수량까지 직접 작성, 별도 수량칸 없음)
+        if(col.allowEtc){
+          var _optset={}; (col.options||[]).forEach(function(o){ _optset[String(typeof o==='object'?o.value:o)]=1; });
+          var _custom=null; _modParseMulti(val).forEach(function(it){ if(it&&it.o&&(it.raw||!_optset[it.o])) _custom=it; });
+          mh+='<div data-optrow="__etc__" style="display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid #fde68a;background:#fffbeb">'
+            +'<span style="font-size:12px;font-weight:700;color:#92400e;flex-shrink:0">✏️ 직접입력</span>'
+            +'<input type="text" class="mqetcname" placeholder="'+esc(col.etcPlaceholder||'예: 특수굴비30미 2개')+'" value="'+(_custom?esc(_custom.o):'')+'" style="flex:1;min-width:0;padding:8px;border:1px solid #cbd5e1;border-radius:6px;font-weight:700">'
+            +'</div>';
+        }
+        // 품목 목록 — 길어도 박스 안에서 스크롤 (화면 전체를 차지하지 않게)
+        mh+='<div style="max-height:270px;overflow-y:auto">';
         (col.options||[]).forEach(function(o,oi){
           var ov=String(typeof o==='object'?o.value:o), ovs=ov.replace(/"/g,'');
           var on=_cur[ov]>0;
@@ -799,16 +810,8 @@ function _modFormField(col,val,idOverride){
             +'<input type="number" class="mqnum" min="1" value="'+(on?_cur[ov]:1)+'" data-opt="'+esc(ovs)+'"'+(on?'':' disabled')+' style="width:60px;text-align:center;padding:7px;border:1px solid #cbd5e1;border-radius:6px;font-weight:700;'+(on?'':'opacity:.4;background:#f1f5f9')+'" onfocus="this.select()" oninput="_modMqClampTotal(this)">'
             +'<span style="font-size:12px;color:#94a3b8">개</span></div>';
         });
-        // ✏️ 직접 입력 행 — 자유 텍스트 한 칸 (수량까지 직접 작성, 별도 수량칸 없음)
-        if(col.allowEtc){
-          var _optset={}; (col.options||[]).forEach(function(o){ _optset[String(typeof o==='object'?o.value:o)]=1; });
-          var _custom=null; _modParseMulti(val).forEach(function(it){ if(it&&it.o&&(it.raw||!_optset[it.o])) _custom=it; });
-          mh+='<div data-optrow="__etc__" style="display:flex;align-items:center;gap:8px;padding:10px 12px;border-top:1px solid #f1f5f9;background:#fffbeb">'
-            +'<span style="font-size:12px;font-weight:700;color:#92400e;flex-shrink:0">✏️ 직접입력</span>'
-            +'<input type="text" class="mqetcname" placeholder="'+esc(col.etcPlaceholder||'예: 특수굴비30미 2개')+'" value="'+(_custom?esc(_custom.o):'')+'" style="flex:1;min-width:0;padding:8px;border:1px solid #cbd5e1;border-radius:6px;font-weight:700">'
-            +'</div>';
-        }
-        mh+='</div><div id="'+id+'_tot" style="font-size:11px;color:#94a3b8;margin-top:4px">원하는 품목을 체크하면 수량이 켜집니다'+(_mp?' · <b style="color:#0f766e">총 '+_mp+'개까지</b>':'')+'</div>';
+        mh+='</div>';
+        mh+='</div><div id="'+id+'_tot" style="font-size:11px;color:#94a3b8;margin-top:4px">원하는 품목을 체크하면 수량이 켜집니다'+((col.options||[]).length>6?' · 목록은 위아래로 스크롤':'')+(_mp?' · <b style="color:#0f766e">총 '+_mp+'개까지</b>':'')+'</div>';
         return mh;
       }
       var _sopts=col.options||[];
@@ -2851,7 +2854,9 @@ function submitModApply(){
     }
     conv+='<div style="margin-top:'+(_pi?'12':'0')+'px"><button type="button" onclick="_modShareForm(this)" style="padding:7px 14px;border:none;border-radius:8px;background:#fbbf24;color:#78350f;font-size:13px;font-weight:800;cursor:pointer">📤 신청 링크 공유</button> <span style="font-size:11px;color:#94a3b8">친구·이웃에게 함께 신청 권유</span></div>';
     conv+='</div>';
-    document.getElementById('modApplyCard').innerHTML='<div style="text-align:center;padding:30px"><div style="font-size:48px">✅</div><h2 style="color:#16a34a;margin:12px 0;font-size:20px">신청 완료</h2><p style="color:#64748b;font-size:14px;line-height:1.6">신청이 정상 접수되었습니다.'+(def.downloadUrl?'':'<br>검토 후 개별 안내드리겠습니다.')+'</p>'+dl+conv+'</div>';
+    // 📝 새로 작성하기 — 새로고침으로 빈 신청서 다시 열기 (추가 주문용)
+    var again='<div style="margin-top:18px"><button type="button" onclick="location.reload()" style="padding:14px 28px;border:none;background:#2563eb;color:#fff;border-radius:12px;font-size:15px;font-weight:800;cursor:pointer;box-shadow:0 4px 12px rgba(37,99,235,.3)">📝 새로 작성하기</button><div style="font-size:11px;color:#94a3b8;margin-top:6px">추가 주문이 있으면 눌러서 새 신청서를 작성하세요</div></div>';
+    document.getElementById('modApplyCard').innerHTML='<div style="text-align:center;padding:30px"><div style="font-size:48px">✅</div><h2 style="color:#16a34a;margin:12px 0;font-size:20px">신청 완료</h2><p style="color:#64748b;font-size:14px;line-height:1.6">신청이 정상 접수되었습니다.'+(def.downloadUrl?'':'<br>검토 후 개별 안내드리겠습니다.')+'</p>'+dl+again+conv+'</div>';
   }).catch(function(e){
     if(btn){btn.disabled=false;btn.textContent='신청하기';}
     if(msg)msg.innerHTML='<span style="color:#ef4444">제출 실패: '+esc(e.message||e)+'</span>';
