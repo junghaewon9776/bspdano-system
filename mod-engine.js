@@ -2438,7 +2438,7 @@ function _renderModApplyUI(def,evtId){
     window.__modRcpN=0;
     h+='<div style="margin:20px 0 8px;font-weight:800;color:#7c3aed;font-size:16px">📦 받는 분</div>';
     h+='<div id="modRcpList"></div>';
-    h+='<button type="button" onclick="_modAddRecipient()" style="width:100%;padding:12px;border:1.5px dashed #c4b5fd;border-radius:10px;background:#faf5ff;color:#7c3aed;font-weight:800;font-size:14px;cursor:pointer;margin-top:2px">➕ 받는 분 추가</button>';
+    h+='<button type="button" onclick="_modAddRecipient()" style="width:100%;padding:14px;border:none;border-radius:10px;background:#7c3aed;color:#fff;font-weight:800;font-size:15px;cursor:pointer;margin-top:2px;box-shadow:0 3px 10px rgba(124,58,237,.3)">➕ 받는 분 추가 (다른 주소로 더 보내기)</button>';
   }
   // 💳 입금 계좌 — 신청 전에 보이게 (버튼 위) + 복사 버튼
   var _pi=(def.payInfo||'').trim();
