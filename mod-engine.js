@@ -1482,18 +1482,28 @@ function _mshImportAoa(key, aoa){
 // 📦 송장 일괄등록 (붙여넣기/엑셀) — 매칭 후 송장 입력 + 문자 자동발송
 // ═══════════════════════════════════════════
 // 식별값으로 주문 행 찾기
-function _modTrackMatch(def, data, idv, basis){
+function _modTrackMatch(def, data, idv, basis, used, trkKey){
   idv=String(idv||'').trim(); if(!idv) return -1;
-  if(basis==='id'){ for(var i=0;i<data.length;i++){ if(String(data[i]._id||'')===idv) return i; } return -1; }
-  if(basis==='tel'){
+  var cand=[];
+  if(basis==='id'){ for(var i=0;i<data.length;i++){ if(String(data[i]._id||'')===idv) cand.push(i); } }
+  else if(basis==='tel'){
     var d=idv.replace(/[^0-9]/g,''); if(d.length<8) return -1; var tail=d.slice(-8);
-    for(var i=0;i<data.length;i++){ var tels=_modAllTels(def,data[i]); for(var t=0;t<tels.length;t++){ if(tels[t]===d || tels[t].slice(-8)===tail) return i; } }
-    return -1;
+    for(var i2=0;i2<data.length;i2++){ var tels=_modAllTels(def,data[i2]); for(var t=0;t<tels.length;t++){ if(tels[t]===d || tels[t].slice(-8)===tail){ cand.push(i2); break; } } }
   }
-  var nameCol=(def.columns||[]).find(function(c){return c.type==='text';});
-  if(!nameCol) return -1;
-  for(var j=0;j<data.length;j++){ if(String(data[j][nameCol.key]||'').trim()===idv) return j; }
-  return -1;
+  else{
+    // rname=받는분(수취인) 이름 / name=주문자(구매자) 이름 — 라벨의 받는/수령/수취로 구분
+    var nameCol;
+    if(basis==='rname') nameCol=(def.columns||[]).find(function(c){return c.type==='text' && /받는|수령|수취/.test(c.label||'');});
+    else nameCol=(def.columns||[]).find(function(c){return c.type==='text' && !/받는|수령|수취/.test(c.label||'');}) || (def.columns||[]).find(function(c){return c.type==='text';});
+    if(!nameCol) return -1;
+    for(var j=0;j<data.length;j++){ if(String(data[j][nameCol.key]||'').trim()===idv) cand.push(j); }
+  }
+  if(!cand.length) return -1;
+  // 같은 식별값이 여러 행(한 주문자→여러 받는분 묶음)일 때: 이번 배치에서 아직 안 쓴 행 중 송장 빈 행 우선
+  var free=used?cand.filter(function(ci){ return !used[ci]; }):cand;
+  if(!free.length) return -1;
+  if(trkKey){ var empty=free.filter(function(ci){ return !String(data[ci][trkKey]||'').trim(); }); if(empty.length) return empty[0]; }
+  return free[0];
 }
 function popModTrackImport(key){
   var def=_modDefs[key]; if(!def) return;
@@ -1504,7 +1514,8 @@ function popModTrackImport(key){
   h+='<h3 style="margin:0 0 4px">📦 송장 일괄등록</h3>';
   h+='<div style="font-size:12px;color:#64748b;margin-bottom:12px">택배사 엑셀을 불러오거나, 두 칸(식별값 · 송장번호)을 복사해 붙여넣으세요. 매칭된 주문의 「'+esc(trk.label)+'」에 입력됩니다.'+(smsOn?' 새로 입력된 건은 <b style="color:#7c3aed">주문자/받는분에게 문자 발송</b>(건당 요금)됩니다.':' (이 모듈은 송장 문자발송 OFF)')+'</div>';
   h+='<label style="font-size:12px;font-weight:700">매칭 기준</label>';
-  h+='<select id="_mtiBasis" style="width:100%;padding:9px;margin:4px 0 10px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px"><option value="tel">연락처 (주문자/받는분 번호로 매칭)</option><option value="name">주문자명 (첫 이름 칸으로 매칭)</option><option value="id">고유번호 (_id)</option></select>';
+  h+='<select id="_mtiBasis" style="width:100%;padding:9px;margin:4px 0 10px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px"><option value="tel">연락처 (주문자/받는분 번호 모두 비교)</option><option value="rname">받는분(수취인) 이름</option><option value="name">주문자(구매자) 이름</option><option value="id">고유번호 (_id)</option></select>';
+  h+='<div style="font-size:11px;color:#94a3b8;margin:-6px 0 10px">한 주문자가 여러 받는분에게 보낸 묶음도 순서대로 나눠 매칭됩니다 (송장 빈 행 우선)</div>';
   h+='<button class="btn" style="background:#0d9488;color:#fff;margin-bottom:6px" onclick="_modTrackImportFile(\''+key+'\')">📤 택배사 엑셀 파일 불러오기</button>';
   h+='<div id="_mtiColPick" style="margin-bottom:10px"></div>';
   h+='<label style="font-size:12px;font-weight:700">붙여넣기 / 미리보기 — 한 줄에 「식별값 [Tab] 송장번호」</label>';
@@ -1531,11 +1542,17 @@ function _modTrackImportFile(key){
         var header=aoa[0].map(function(s){return String(s).trim();});
         // 자동 추정 (기본 선택값) — 사용자가 바꿀 수 있음
         var trkRe=/송장|운송장|등기|invoice/i;   // "번호" 단독 제외 (운송장번호만 잡히게)
-        var idRe= basis==='tel'?/휴대|핸드폰|전화|연락/i : (basis==='name'?/수령|받는|주문자|성명|성함|고객|이름/i : /고유|주문\s*번호|주문번호|_id|qr|order/i);
+        // 식별값 열 추정 — 1순위(수취인 쪽) 먼저, 없으면 2순위(일반)
+        var idRe1,idRe2;
+        if(basis==='tel'){ idRe1=/수취.{0,4}(전화|휴대|연락)|받는.{0,4}(전화|휴대|연락)/i; idRe2=/휴대|핸드폰|전화|연락/i; }
+        else if(basis==='rname'){ idRe1=/수취인|수령인|받는/i; idRe2=/성명|성함|이름/i; }
+        else if(basis==='name'){ idRe1=/구매자|주문자|보내는/i; idRe2=/성명|성함|고객|이름/i; }
+        else { idRe1=/고유|주문\s*번호|주문번호|_id|qr|order/i; idRe2=null; }
         var trkGuess=-1;
         header.forEach(function(hl,i){ if(trkGuess<0&&trkRe.test(hl)) trkGuess=i; });   // 송장 열 먼저
         var idGuess=-1;
-        header.forEach(function(hl,i){ if(idGuess<0 && i!==trkGuess && idRe.test(hl)) idGuess=i; });   // 식별은 송장 열 제외
+        header.forEach(function(hl,i){ if(idGuess<0 && i!==trkGuess && idRe1 && idRe1.test(hl)) idGuess=i; });   // 식별은 송장 열 제외
+        if(idGuess<0 && idRe2) header.forEach(function(hl,i){ if(idGuess<0 && i!==trkGuess && idRe2.test(hl)) idGuess=i; });
         if(trkGuess<0) trkGuess=Math.max(0,header.length-1);
         if(idGuess<0) idGuess=(trkGuess===0?1:0);
         var sample=aoa[1]||[];
@@ -1543,7 +1560,7 @@ function _modTrackImportFile(key){
         var ph='<div style="padding:10px;border:1px solid #99f6e4;border-radius:8px;background:#f0fdfa">';
         ph+='<div style="font-size:11px;color:#0f766e;font-weight:800;margin-bottom:7px">📋 어느 열을 쓸지 골라주세요 (총 '+aoa.length+'행)</div>';
         ph+='<div style="display:flex;gap:8px;flex-wrap:wrap">';
-        ph+='<label style="font-size:11px;font-weight:700;flex:1;min-width:150px">식별값 열 <span style="color:#94a3b8;font-weight:400">('+(basis==='tel'?'연락처':basis==='name'?'이름':'고유번호')+')</span><select id="_mtiIdCol" onchange="_modTrackBuildPairs()" style="width:100%;padding:7px;margin-top:3px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px">'+opts(idGuess)+'</select></label>';
+        ph+='<label style="font-size:11px;font-weight:700;flex:1;min-width:150px">식별값 열 <span style="color:#94a3b8;font-weight:400">('+(basis==='tel'?'연락처':basis==='rname'?'받는분(수취인) 이름':basis==='name'?'주문자(구매자) 이름':'고유번호')+')</span><select id="_mtiIdCol" onchange="_modTrackBuildPairs()" style="width:100%;padding:7px;margin-top:3px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px">'+opts(idGuess)+'</select></label>';
         ph+='<label style="font-size:11px;font-weight:700;flex:1;min-width:150px">송장번호 열<select id="_mtiTrkCol" onchange="_modTrackBuildPairs()" style="width:100%;padding:7px;margin-top:3px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px">'+opts(trkGuess)+'</select></label>';
         ph+='</div>';
         ph+='<label style="display:flex;align-items:center;gap:5px;font-size:11px;margin-top:7px;cursor:pointer"><input type="checkbox" id="_mtiHdr" checked onchange="_modTrackBuildPairs()"> 첫 행은 제목(건너뜀)</label>';
@@ -1589,10 +1606,11 @@ function _modTrackImportRun(key){
   if(!pairs.length) return toast('붙여넣은 데이터가 없습니다 (식별값[Tab]송장번호)',true);
   var data=(_modData[key]||[]).slice();
   var now=new Date().toISOString();
-  var matched=0, misses=[], sendList=[];
+  var matched=0, misses=[], sendList=[], used={};
   pairs.forEach(function(p){
-    var idx=_modTrackMatch(def,data,p.idv,basis);
+    var idx=_modTrackMatch(def,data,p.idv,basis,used,trk.key);
     if(idx<0){ misses.push(p.idv); return; }
+    used[idx]=1;   // 같은 식별값 여러 박스 → 다음 줄은 다음 행에 매칭
     var old=String(data[idx][trk.key]||'').trim();
     var merged={}; for(var k in data[idx]) merged[k]=data[idx][k];
     merged[trk.key]=p.track; merged._updatedAt=now;
