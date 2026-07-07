@@ -1530,13 +1530,13 @@ function _modTrackMatchAuto(def, data, idvs, used, trkKey){
 }
 // ─── 🚚 택배사 인식 프로파일 — 파일명 포함 문자열 → 열 이름 매핑 (/main/CourierProfiles, ⚙ 설정에서 편집) ───
 var _COURIER_DEFAULTS=[
-  {name:'롯데택배', file:'PIDPIC', trk:'운송장번호', ord:'주문번호', rname:'수하인명', tel:''}
+  {name:'롯데택배', file:'PIDPIC, 롯데, 현대', trk:'운송장번호', ord:'주문번호', rname:'수하인명', tel:''}
 ];
 function popCourierProfiles(key){
   window.__cpEdit=JSON.parse(JSON.stringify((window.__courierProfiles&&window.__courierProfiles.length)?window.__courierProfiles:_COURIER_DEFAULTS));
   var h='<div style="max-width:640px">';
   h+='<h3 style="margin:0 0 4px">🚚 택배사 인식 설정</h3>';
-  h+='<div style="font-size:12px;color:#64748b;margin-bottom:10px">송장 파일명에 <b>포함 문자열</b>이 들어 있으면 그 택배사로 인식하고, 아래 <b>열 이름</b>으로 송장·주문번호·받는분 열을 바로 잡습니다. 열 이름은 택배사 파일 첫 행(제목) 그대로 적으세요. 비워둔 항목은 자동 추정합니다.</div>';
+  h+='<div style="font-size:12px;color:#64748b;margin-bottom:10px">송장 파일명에 <b>포함 문자열</b>이 들어 있으면 그 택배사로 인식하고, 아래 <b>열 이름</b>으로 송장·주문번호·받는분 열을 바로 잡습니다. 포함 문자열은 <b>쉼표(,)로 여러 개</b> 등록 — 예: <b>PIDPIC, 롯데, 현대</b> (타업체가 보내주는 파일명이 달라도 하나만 맞으면 인식). 열 이름은 택배사 파일 첫 행(제목) 그대로 적으세요. 비워둔 항목은 자동 추정합니다.</div>';
   h+='<div id="_cpList"></div>';
   h+='<button class="btn" style="background:#0d9488;color:#fff;margin-top:6px" onclick="_cpAdd()">➕ 택배사 추가</button>';
   h+='<div style="display:flex;gap:8px;margin-top:14px"><button class="btn" style="flex:1;background:#2563eb;color:#fff;font-weight:800" onclick="_cpSave(\''+key+'\')">💾 저장</button><button class="btn" style="background:#64748b;color:#fff" onclick="popModTrackImport(\''+key+'\')">← 돌아가기</button></div>';
@@ -1552,7 +1552,7 @@ function _cpRender(){
   (window.__cpEdit||[]).forEach(function(p,i){
     h+='<div style="border:1px solid #e2e8f0;border-radius:9px;padding:10px;margin-bottom:8px;background:#f8fafc">';
     h+='<div style="display:flex;gap:6px;align-items:flex-end;margin-bottom:6px"><div style="flex:1"><div style="'+lb+'">택배사 이름</div><input value="'+esc(p.name||'')+'" placeholder="롯데택배" style="'+is+'" onchange="__cpEdit['+i+'].name=this.value"></div>';
-    h+='<div style="flex:1"><div style="'+lb+'">파일명에 포함되는 문자열</div><input value="'+esc(p.file||'')+'" placeholder="PIDPIC" style="'+is+'" onchange="__cpEdit['+i+'].file=this.value"></div>';
+    h+='<div style="flex:1"><div style="'+lb+'">파일명 포함 문자열 (쉼표로 여러 개)</div><input value="'+esc(p.file||'')+'" placeholder="PIDPIC, 롯데, 현대" style="'+is+'" onchange="__cpEdit['+i+'].file=this.value"></div>';
     h+='<button onclick="_cpDel('+i+')" style="border:none;background:#fee2e2;color:#dc2626;border-radius:6px;padding:7px 10px;font-size:12px;font-weight:700;cursor:pointer;flex-shrink:0">🗑</button></div>';
     h+='<div style="display:flex;gap:6px;flex-wrap:wrap">';
     h+='<div style="flex:1;min-width:110px"><div style="'+lb+'">송장 열 이름</div><input value="'+esc(p.trk||'')+'" placeholder="운송장번호" style="'+is+'" onchange="__cpEdit['+i+'].trk=this.value"></div>';
@@ -1608,10 +1608,14 @@ function _modTrackImportFile(key){
   var inp=document.createElement('input'); inp.type='file'; inp.accept='.xlsx,.xls,.csv';
   inp.onchange=function(){
     var f=inp.files&&inp.files[0]; if(!f) return;
-    // 🚚 택배사 인식 — 파일명에 등록된 문자열이 포함되면 그 택배사의 열 매핑 사용 (⚙ 설정에서 추가)
+    // 🚚 택배사 인식 — 파일명에 등록된 문자열(쉼표로 여러 개)이 하나라도 포함되면 그 택배사의 열 매핑 사용 (⚙ 설정에서 추가)
+    var _fnU=String(f.name||'').toUpperCase();
     var _prof=null;
     (window.__courierProfiles||_COURIER_DEFAULTS).some(function(p){
-      if(p&&p.file&&String(f.name||'').toUpperCase().indexOf(String(p.file).toUpperCase())>=0){ _prof=p; return true; }
+      if(!p||!p.file) return false;
+      var hit=String(p.file).split(/[,，]/).map(function(s){return s.trim().toUpperCase();}).filter(function(s){return s!=='';})
+        .some(function(pt){ return _fnU.indexOf(pt)>=0; });
+      if(hit){ _prof=p; return true; }
       return false;
     });
     var rd=new FileReader();
