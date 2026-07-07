@@ -991,7 +991,7 @@ function _modToSelHtml(id, cur){
   cur = cur || 'both';
   function o(v,l){ return '<option value="'+v+'"'+(cur===v?' selected':'')+'>'+l+'</option>'; }
   return '<select id="'+id+'" style="font-size:12px;margin:0 0 10px;padding:6px;border:1px solid #cbd5e1;border-radius:6px;background:#fff">'
-    + o('both','↳ 보낼 대상: 주문자+받는분') + o('orderer','↳ 주문자만') + o('recipient','↳ 받는분만') + '</select>';
+    + o('both','↳ 보낼 대상: 주문한 사람 + 택배 받는 사람 둘다') + o('orderer','↳ 주문한 사람(구매자)만') + o('recipient','↳ 택배 받는 사람(수취인)만') + '</select>';
 }
 // 송장번호 컬럼 자동감지 (라벨에 '송장' 포함, 배지 아님)
 function _modTrackingCol(def){
@@ -1652,7 +1652,17 @@ function popModTrackImport(key){
   h+='<label style="font-size:12px;font-weight:700">붙여넣기 / 미리보기 — 한 줄에 「식별값 [Tab] 송장번호」</label>';
   h+='<textarea id="_mtiText" rows="8" placeholder="010-1234-5678\t1234567890&#10;홍길동\t9876543210" style="width:100%;box-sizing:border-box;font-family:monospace;font-size:13px;padding:10px;border:1px solid #cbd5e1;border-radius:8px;margin-top:4px"></textarea>';
   if(smsOn){
-    h+='<label style="display:flex;align-items:center;gap:8px;margin-top:12px;padding:10px 12px;background:#faf5ff;border:1.5px solid #e9d5ff;border-radius:9px;font-size:13px;font-weight:700;color:#6d28d9;cursor:pointer"><input type="checkbox" id="_mtiSms" style="width:17px;height:17px;flex-shrink:0">📱 이번 파일 등록 건 문자 발송 <span style="font-weight:400;color:#94a3b8">— 요청한 업체 파일만 체크 (건당 요금)</span></label>';
+    var _toLbl=(def.smsTrackingTo==='orderer')?'주문한 사람(구매자)':((def.smsTrackingTo==='recipient')?'택배 받는 사람(수취인)':'주문한 사람 + 택배 받는 사람 모두');
+    h+='<div style="margin-top:12px;padding:12px;border:1.5px solid #e9d5ff;border-radius:10px;background:#faf5ff">';
+    h+='<div style="font-size:13px;font-weight:800;color:#6d28d9;margin-bottom:6px">📱 발송 안내 문자</div>';
+    h+='<label style="display:flex;align-items:center;gap:8px;font-size:14px;font-weight:700;color:#334155;padding:5px 0;cursor:pointer"><input type="radio" name="_mtiSms" value="no" checked style="width:17px;height:17px;flex-shrink:0">🚫 문자 안 보냄 <span style="color:#94a3b8;font-weight:400">(기본 — 송장만 등록)</span></label>';
+    h+='<label style="display:flex;align-items:center;gap:8px;font-size:14px;font-weight:700;color:#7c3aed;padding:5px 0;cursor:pointer"><input type="radio" name="_mtiSms" value="yes" style="width:17px;height:17px;flex-shrink:0">📨 문자 보냄 <span style="color:#dc2626;font-weight:700">(건당 요금)</span></label>';
+    // 뭘 누구한테 보내는지 그대로 표시
+    h+='<div style="margin-top:8px;padding:10px;background:#fff;border:1px solid #e9d5ff;border-radius:8px;font-size:12px;color:#334155;line-height:1.8">';
+    h+='<div>👤 <b>누구에게:</b> '+_toLbl+' 휴대폰</div>';
+    h+='<div>💬 <b>보내는 내용:</b> <span style="color:#6d28d9;font-weight:700">'+esc(def.smsTrackingTpl||'상품이 발송되었습니다. 송장번호: {송장번호}')+'</span></div>';
+    h+='<div style="color:#94a3b8;font-size:11px;margin-top:2px">{ } 부분은 각 주문의 실제 값으로 자동 치환 · 한 사람이 여러 박스 보냈으면 <b>박스(송장번호)마다 한 통씩</b> 감 · 이미 송장이 있던 주문은 발송 안 함</div>';
+    h+='</div></div>';
   }
   h+='<div style="display:flex;gap:8px;margin-top:14px"><button class="btn" style="flex:1;background:#7c3aed;color:#fff;font-weight:800" onclick="_modTrackImportRun(\''+key+'\')">✅ 송장 등록</button><button class="btn" onclick="closePopup()">취소</button></div>';
   h+='</div>';
