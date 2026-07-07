@@ -1815,8 +1815,9 @@ function _modTrackImportRun(key){
   if(!pairs.length) return toast('붙여넣은 데이터가 없습니다 (식별값[Tab]송장번호)',true);
   var data=(_modData[key]||[]).slice();
   var now=new Date().toISOString();
-  // 📱 파일(배치)별 문자 발송 — 팝업의 체크박스를 켠 경우에만 이번 등록 건 발송
-  var smsThis = !!def.smsTracking && !!((document.getElementById('_mtiSms')||{}).checked);
+  // 📱 파일(배치)별 문자 발송 — 팝업에서 「문자 보냄」을 선택한 경우에만 이번 등록 건 발송
+  var _smsSel=document.querySelector('input[name="_mtiSms"]:checked');
+  var smsThis = !!def.smsTracking && !!(_smsSel && _smsSel.value==='yes');
   var matched=0, misses=[], sendList=[], used={};
   pairs.forEach(function(p){
     var idx= basis==='auto' ? _modTrackMatchAuto(def,data,p.idvs,used,trk.key) : _modTrackMatch(def,data,p.idv,basis,used,trk.key);
