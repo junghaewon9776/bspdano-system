@@ -1528,10 +1528,65 @@ function _modTrackMatchAuto(def, data, idvs, used, trkKey){
   }
   return -1;
 }
+// ─── 🚚 택배사 인식 프로파일 — 파일명 포함 문자열 → 열 이름 매핑 (/main/CourierProfiles, ⚙ 설정에서 편집) ───
+var _COURIER_DEFAULTS=[
+  {name:'롯데택배', file:'PIDPIC', trk:'운송장번호', ord:'주문번호', rname:'수하인명', tel:''}
+];
+function popCourierProfiles(key){
+  window.__cpEdit=JSON.parse(JSON.stringify((window.__courierProfiles&&window.__courierProfiles.length)?window.__courierProfiles:_COURIER_DEFAULTS));
+  var h='<div style="max-width:640px">';
+  h+='<h3 style="margin:0 0 4px">🚚 택배사 인식 설정</h3>';
+  h+='<div style="font-size:12px;color:#64748b;margin-bottom:10px">송장 파일명에 <b>포함 문자열</b>이 들어 있으면 그 택배사로 인식하고, 아래 <b>열 이름</b>으로 송장·주문번호·받는분 열을 바로 잡습니다. 열 이름은 택배사 파일 첫 행(제목) 그대로 적으세요. 비워둔 항목은 자동 추정합니다.</div>';
+  h+='<div id="_cpList"></div>';
+  h+='<button class="btn" style="background:#0d9488;color:#fff;margin-top:6px" onclick="_cpAdd()">➕ 택배사 추가</button>';
+  h+='<div style="display:flex;gap:8px;margin-top:14px"><button class="btn" style="flex:1;background:#2563eb;color:#fff;font-weight:800" onclick="_cpSave(\''+key+'\')">💾 저장</button><button class="btn" style="background:#64748b;color:#fff" onclick="popModTrackImport(\''+key+'\')">← 돌아가기</button></div>';
+  h+='</div>';
+  openPopup(h,640);
+  _cpRender();
+}
+function _cpRender(){
+  var box=document.getElementById('_cpList'); if(!box) return;
+  var is='box-sizing:border-box;width:100%;padding:7px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px';
+  var lb='font-size:10px;color:#64748b;font-weight:700';
+  var h='';
+  (window.__cpEdit||[]).forEach(function(p,i){
+    h+='<div style="border:1px solid #e2e8f0;border-radius:9px;padding:10px;margin-bottom:8px;background:#f8fafc">';
+    h+='<div style="display:flex;gap:6px;align-items:flex-end;margin-bottom:6px"><div style="flex:1"><div style="'+lb+'">택배사 이름</div><input value="'+esc(p.name||'')+'" placeholder="롯데택배" style="'+is+'" onchange="__cpEdit['+i+'].name=this.value"></div>';
+    h+='<div style="flex:1"><div style="'+lb+'">파일명에 포함되는 문자열</div><input value="'+esc(p.file||'')+'" placeholder="PIDPIC" style="'+is+'" onchange="__cpEdit['+i+'].file=this.value"></div>';
+    h+='<button onclick="_cpDel('+i+')" style="border:none;background:#fee2e2;color:#dc2626;border-radius:6px;padding:7px 10px;font-size:12px;font-weight:700;cursor:pointer;flex-shrink:0">🗑</button></div>';
+    h+='<div style="display:flex;gap:6px;flex-wrap:wrap">';
+    h+='<div style="flex:1;min-width:110px"><div style="'+lb+'">송장 열 이름</div><input value="'+esc(p.trk||'')+'" placeholder="운송장번호" style="'+is+'" onchange="__cpEdit['+i+'].trk=this.value"></div>';
+    h+='<div style="flex:1;min-width:110px"><div style="'+lb+'">주문번호 열 이름</div><input value="'+esc(p.ord||'')+'" placeholder="주문번호" style="'+is+'" onchange="__cpEdit['+i+'].ord=this.value"></div>';
+    h+='<div style="flex:1;min-width:110px"><div style="'+lb+'">받는분 열 이름</div><input value="'+esc(p.rname||'')+'" placeholder="수하인명" style="'+is+'" onchange="__cpEdit['+i+'].rname=this.value"></div>';
+    h+='<div style="flex:1;min-width:110px"><div style="'+lb+'">연락처 열 이름</div><input value="'+esc(p.tel||'')+'" placeholder="(있으면)" style="'+is+'" onchange="__cpEdit['+i+'].tel=this.value"></div>';
+    h+='</div></div>';
+  });
+  if(!(window.__cpEdit||[]).length) h='<div style="color:#94a3b8;font-size:12px;padding:14px;text-align:center">등록된 택배사가 없습니다 — ➕로 추가하세요</div>';
+  box.innerHTML=h;
+}
+function _cpAdd(){ (window.__cpEdit=window.__cpEdit||[]).push({name:'',file:'',trk:'',ord:'',rname:'',tel:''}); _cpRender(); }
+function _cpDel(i){ window.__cpEdit.splice(i,1); _cpRender(); }
+function _cpSave(key){
+  var list=(window.__cpEdit||[]).filter(function(p){return (p.name||'').trim()||(p.file||'').trim();});
+  list=JSON.parse(JSON.stringify(list));
+  showLoading('저장 중...');
+  fbDb.ref('/main/CourierProfiles').set(list).then(function(){
+    hideLoading(); window.__courierProfiles=list; toast('✅ 택배사 인식 설정 저장됨');
+    popModTrackImport(key);
+  }).catch(function(e){ hideLoading(); toast('실패: '+(e.message||e),true); });
+}
 function popModTrackImport(key){
   var def=_modDefs[key]; if(!def) return;
   var trk=_modTrackingCol(def); if(!trk) return toast('이 모듈엔 「송장」 컬럼이 없습니다',true);
   if(!_modFbPath(key)) return toast('행사를 선택하세요',true);
+  // 택배사 인식 프로파일 로드 (최초 1회, 없으면 기본값=롯데)
+  if(!window.__courierProfiles && typeof fbDb!=='undefined'){
+    fbDb.ref('/main/CourierProfiles').once('value').then(function(s){
+      var v=s.val();
+      if(v){ if(!Array.isArray(v)) v=Object.values(v); window.__courierProfiles=v; }
+      else window.__courierProfiles=_COURIER_DEFAULTS.slice();
+    }).catch(function(){ window.__courierProfiles=_COURIER_DEFAULTS.slice(); });
+  }
   var smsOn=!!def.smsTracking;
   var h='<div style="max-width:560px">';
   h+='<h3 style="margin:0 0 4px">📦 송장 일괄등록</h3>';
@@ -1539,7 +1594,7 @@ function popModTrackImport(key){
   h+='<label style="font-size:12px;font-weight:700">매칭 기준</label>';
   h+='<select id="_mtiBasis" style="width:100%;padding:9px;margin:4px 0 10px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px"><option value="auto" selected>자동 (추천) — 주문번호 → 연락처 → 받는분 이름 순서로 시도</option><option value="tel">연락처 (주문자/받는분 번호 모두 비교)</option><option value="rname">받는분(수취인) 이름</option><option value="name">주문자(구매자) 이름</option><option value="id">고유번호 (_id)</option></select>';
   h+='<div style="font-size:11px;color:#94a3b8;margin:-6px 0 10px">매칭 안 되는 줄은 건너뛰고 나머지만 등록됩니다 · 한 주문자의 여러 박스도 순서대로 분배 (송장 빈 행 우선)</div>';
-  h+='<button class="btn" style="background:#0d9488;color:#fff;margin-bottom:6px" onclick="_modTrackImportFile(\''+key+'\')">📤 택배사 엑셀 파일 불러오기</button>';
+  h+='<div style="display:flex;gap:6px;align-items:center;margin-bottom:6px"><button class="btn" style="background:#0d9488;color:#fff" onclick="_modTrackImportFile(\''+key+'\')">📤 택배사 엑셀 파일 불러오기</button><button class="btn" style="background:#475569;color:#fff;font-size:12px" onclick="popCourierProfiles(\''+key+'\')" title="파일명으로 택배사 자동 인식 규칙 등록">🚚 택배사 인식 설정</button></div>';
   h+='<div id="_mtiColPick" style="margin-bottom:10px"></div>';
   h+='<label style="font-size:12px;font-weight:700">붙여넣기 / 미리보기 — 한 줄에 「식별값 [Tab] 송장번호」</label>';
   h+='<textarea id="_mtiText" rows="8" placeholder="010-1234-5678\t1234567890&#10;홍길동\t9876543210" style="width:100%;box-sizing:border-box;font-family:monospace;font-size:13px;padding:10px;border:1px solid #cbd5e1;border-radius:8px;margin-top:4px"></textarea>';
@@ -1553,6 +1608,12 @@ function _modTrackImportFile(key){
   var inp=document.createElement('input'); inp.type='file'; inp.accept='.xlsx,.xls,.csv';
   inp.onchange=function(){
     var f=inp.files&&inp.files[0]; if(!f) return;
+    // 🚚 택배사 인식 — 파일명에 등록된 문자열이 포함되면 그 택배사의 열 매핑 사용 (⚙ 설정에서 추가)
+    var _prof=null;
+    (window.__courierProfiles||_COURIER_DEFAULTS).some(function(p){
+      if(p&&p.file&&String(f.name||'').toUpperCase().indexOf(String(p.file).toUpperCase())>=0){ _prof=p; return true; }
+      return false;
+    });
     var rd=new FileReader();
     rd.onload=function(ev){
       try{
@@ -1574,6 +1635,12 @@ function _modTrackImportFile(key){
         // 자동 추정 (기본 선택값) — 사용자가 바꿀 수 있음
         var trkGuess=-1;
         header.forEach(function(hl,i){ if(trkGuess<0&&trkRe.test(hl)) trkGuess=i; });   // 송장 열 먼저
+        // 🚚 인식된 택배사 프로파일 — 열 이름을 헤더에서 정확히 찾아 고정 (추정보다 우선)
+        var _pFind=function(nm){ if(!nm) return -1; return header.indexOf(String(nm).trim()); };
+        if(_prof){
+          var _pt=_pFind(_prof.trk); if(_pt>=0) trkGuess=_pt;
+          toast('🚚 '+(_prof.name||'택배사')+' 파일로 인식했어요');
+        }
         // 식별값 열 추정 — 1순위(수취인/수하인 쪽) 먼저, 없으면 2순위(일반)
         var _guessId=function(bs){
           var r1,r2;
@@ -1603,6 +1670,7 @@ function _modTrackImportFile(key){
         if(basis==='auto'){
           // 자동 — 주문번호/연락처/이름 열을 각각 잡고, 있는 것부터 순서대로 시도 (없는 열은 '없음')
           var ordG=_guessId('id'), telG=_guessId('tel'), nameG=_guessId('rname');
+          if(_prof){ var _pv; _pv=_pFind(_prof.ord); if(_pv>=0) ordG=_pv; _pv=_pFind(_prof.tel); if(_pv>=0) telG=_pv; _pv=_pFind(_prof.rname); if(_pv>=0) nameG=_pv; }
           ph+='<label style="font-size:11px;font-weight:700;flex:1;min-width:140px">주문번호 열<select id="_mtiOrdCol" onchange="_modTrackBuildPairs()" style="'+_selS+'">'+optsN(ordG)+'</select></label>';
           ph+='<label style="font-size:11px;font-weight:700;flex:1;min-width:140px">연락처 열<select id="_mtiTelCol" onchange="_modTrackBuildPairs()" style="'+_selS+'">'+optsN(telG)+'</select></label>';
           ph+='<label style="font-size:11px;font-weight:700;flex:1;min-width:140px">받는분 이름 열<select id="_mtiNameCol" onchange="_modTrackBuildPairs()" style="'+_selS+'">'+optsN(nameG)+'</select></label>';
