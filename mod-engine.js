@@ -1640,7 +1640,7 @@ function popModTrackImport(key){
   var smsOn=!!def.smsTracking;
   var h='<div style="max-width:560px">';
   h+='<h3 style="margin:0 0 4px">📦 송장 일괄등록</h3>';
-  h+='<div style="font-size:12px;color:#64748b;margin-bottom:12px">택배사 엑셀을 불러오거나, 두 칸(식별값 · 송장번호)을 복사해 붙여넣으세요. 매칭된 주문의 「'+esc(trk.label)+'」에 입력됩니다.'+(smsOn?' 새로 입력된 건은 <b style="color:#7c3aed">주문자/받는분에게 문자 발송</b>(건당 요금)됩니다.':' (이 모듈은 송장 문자발송 OFF)')+'</div>';
+  h+='<div style="font-size:12px;color:#64748b;margin-bottom:12px">택배사 엑셀을 불러오거나, 두 칸(식별값 · 송장번호)을 복사해 붙여넣으세요. 매칭된 주문의 「'+esc(trk.label)+'」에 입력됩니다.</div>';
   h+='<label style="font-size:12px;font-weight:700">매칭 기준</label>';
   h+='<select id="_mtiBasis" style="width:100%;padding:9px;margin:4px 0 10px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px"><option value="auto" selected>자동 (추천) — 주문번호 → 연락처 → 받는분 이름 순서로 시도</option><option value="tel">연락처 (주문자/받는분 번호 모두 비교)</option><option value="rname">받는분(수취인) 이름</option><option value="name">주문자(구매자) 이름</option><option value="id">고유번호 (_id)</option></select>';
   h+='<div style="font-size:11px;color:#94a3b8;margin:-6px 0 10px">매칭 안 되는 줄은 건너뛰고 나머지만 등록됩니다 · 한 주문자의 여러 박스도 순서대로 분배 (송장 빈 행 우선)</div>';
@@ -1651,7 +1651,10 @@ function popModTrackImport(key){
   h+='<div id="_mtiColPick" style="margin-bottom:10px"></div>';
   h+='<label style="font-size:12px;font-weight:700">붙여넣기 / 미리보기 — 한 줄에 「식별값 [Tab] 송장번호」</label>';
   h+='<textarea id="_mtiText" rows="8" placeholder="010-1234-5678\t1234567890&#10;홍길동\t9876543210" style="width:100%;box-sizing:border-box;font-family:monospace;font-size:13px;padding:10px;border:1px solid #cbd5e1;border-radius:8px;margin-top:4px"></textarea>';
-  h+='<div style="display:flex;gap:8px;margin-top:14px"><button class="btn" style="flex:1;background:#7c3aed;color:#fff;font-weight:800" onclick="_modTrackImportRun(\''+key+'\')">✅ 송장 등록'+(smsOn?' + 문자발송':'')+'</button><button class="btn" onclick="closePopup()">취소</button></div>';
+  if(smsOn){
+    h+='<label style="display:flex;align-items:center;gap:8px;margin-top:12px;padding:10px 12px;background:#faf5ff;border:1.5px solid #e9d5ff;border-radius:9px;font-size:13px;font-weight:700;color:#6d28d9;cursor:pointer"><input type="checkbox" id="_mtiSms" style="width:17px;height:17px;flex-shrink:0">📱 이번 파일 등록 건 문자 발송 <span style="font-weight:400;color:#94a3b8">— 요청한 업체 파일만 체크 (건당 요금)</span></label>';
+  }
+  h+='<div style="display:flex;gap:8px;margin-top:14px"><button class="btn" style="flex:1;background:#7c3aed;color:#fff;font-weight:800" onclick="_modTrackImportRun(\''+key+'\')">✅ 송장 등록</button><button class="btn" onclick="closePopup()">취소</button></div>';
   h+='</div>';
   openPopup(h,600);
 }
@@ -1802,6 +1805,8 @@ function _modTrackImportRun(key){
   if(!pairs.length) return toast('붙여넣은 데이터가 없습니다 (식별값[Tab]송장번호)',true);
   var data=(_modData[key]||[]).slice();
   var now=new Date().toISOString();
+  // 📱 파일(배치)별 문자 발송 — 팝업의 체크박스를 켠 경우에만 이번 등록 건 발송
+  var smsThis = !!def.smsTracking && !!((document.getElementById('_mtiSms')||{}).checked);
   var matched=0, misses=[], sendList=[], used={};
   pairs.forEach(function(p){
     var idx= basis==='auto' ? _modTrackMatchAuto(def,data,p.idvs,used,trk.key) : _modTrackMatch(def,data,p.idv,basis,used,trk.key);
@@ -1812,10 +1817,10 @@ function _modTrackImportRun(key){
     merged[trk.key]=p.track; merged._updatedAt=now;
     if(courierCol) merged[courierCol.key]=courier;   // 🚚 택배사 기록
     data[idx]=merged; matched++;
-    if(def.smsTracking && p.track && p.track!==old) sendList.push(merged);
+    if(smsThis && p.track && p.track!==old) sendList.push(merged);
   });
   if(!matched) return toast('매칭된 주문이 없습니다. 매칭 기준을 확인하세요',true);
-  var conf='송장 일괄등록\n\n• 매칭: '+matched+'건\n• 미매칭: '+misses.length+'건'+(misses.length?'\n   ('+misses.slice(0,8).join(', ')+(misses.length>8?' 외 '+(misses.length-8)+'개':'')+')':'')+'\n'+(courier?('• 택배사: '+courier+(defsChanged?' (「택배사」 칸 자동 추가)':'')+'\n'):'')+(def.smsTracking?('• 문자발송 예정: '+sendList.length+'건 (건당 요금 발생)\n'):'• 문자발송: OFF\n')+'\n적용할까요?';
+  var conf='송장 일괄등록\n\n• 매칭: '+matched+'건\n• 미매칭: '+misses.length+'건'+(misses.length?'\n   ('+misses.slice(0,8).join(', ')+(misses.length>8?' 외 '+(misses.length-8)+'개':'')+')':'')+'\n'+(courier?('• 택배사: '+courier+(defsChanged?' (「택배사」 칸 자동 추가)':'')+'\n'):'')+(smsThis?('• 문자발송 예정: '+sendList.length+'건 (건당 요금 발생)\n'):'• 문자발송: 안 함\n')+'\n적용할까요?';
   if(!confirm(conf)){ if(defsChanged){ var _ci=def.columns.indexOf(courierCol); if(_ci>=0) def.columns.splice(_ci,1); } return; }
   var path=_modFbPath(key); if(!path) return toast('행사를 선택하세요',true);
   showLoading('송장 등록 중...');
