@@ -13,6 +13,7 @@ var _modSort={};   // key → {col, asc}
 var _modSearch={}; // key → 검색어
 var _modFilter={}; // key → 필터값
 var _modPrintFilter={}; // key → 'no'|'yes'|''
+var _modDateFilter={}; // key → {from,to} | null(전체) | undefined(미초기화 → def.dateFilterToday면 오늘)
 var _modSel={};    // key → {_id: true} 선택된 행
 var _modSelLast={};// key → 마지막 클릭 인덱스 (Shift 범위선택)
 var _modListeners={};
@@ -243,6 +244,14 @@ function dMod(key){
     h+='<option value="no"'+(_pf==='no'?' selected':'')+'>미출력만</option>';
     h+='<option value="yes"'+(_pf==='yes'?' selected':'')+'>출력됨만</option>';
     h+='</select>';
+    // 📅 기간(접수일) 필터
+    var _df=_modDateF(key); var _dfOn=!!(_df&&(_df.from||_df.to));
+    var _dis='padding:6px 8px;border:1px solid '+(_dfOn?'#2563eb':'#d1d5db')+';border-radius:8px;font-size:12px;background:'+(_dfOn?'#eff6ff':'#fff');
+    h+='<span style="display:inline-flex;align-items:center;gap:4px;font-size:12px;color:#475569;font-weight:700">📅';
+    h+='<input type="date" value="'+((_df&&_df.from)||'')+'" onchange="_modSetDateF(\''+key+'\',\'from\',this.value)" style="'+_dis+'">~';
+    h+='<input type="date" value="'+((_df&&_df.to)||'')+'" onchange="_modSetDateF(\''+key+'\',\'to\',this.value)" style="'+_dis+'">';
+    h+='<button onclick="_modDateToday(\''+key+'\')" style="border:none;border-radius:7px;padding:6px 10px;font-size:11px;font-weight:800;cursor:pointer;background:#2563eb;color:#fff">오늘</button>';
+    h+='<button onclick="_modDateAll(\''+key+'\')" style="border:none;border-radius:7px;padding:6px 10px;font-size:11px;font-weight:800;cursor:pointer;background:'+(_dfOn?'#475569':'#e2e8f0')+';color:'+(_dfOn?'#fff':'#94a3b8')+'">전체</button></span>';
     if(anyActive||_pf) h+='<button class="btn btn-s" style="font-size:11px" onclick="_modClearFilter(\''+key+'\')">필터 해제</button>';
     h+='</div>';
   }
@@ -293,6 +302,16 @@ function _modFilteredData(key){
   var pf=_modPrintFilter[key]||'';
   if(pf==='no') data=data.filter(function(r){return !r._printCount||pn(r._printCount)===0;});
   else if(pf==='yes') data=data.filter(function(r){return pn(r._printCount)>0;});
+  // 📅 기간(접수일) 필터
+  var df=_modDateF(key);
+  if(df&&(df.from||df.to)){
+    data=data.filter(function(r){
+      var rd=_modRowDate(r); if(!rd) return false;
+      if(df.from&&rd<df.from) return false;
+      if(df.to&&rd>df.to) return false;
+      return true;
+    });
+  }
   if(sort.col){
     data.sort(function(a,b){
       var va=a[sort.col]||"",vb=b[sort.col]||"";
@@ -483,8 +502,27 @@ function _modRemoveFilter(key,colKey,val){
   if(arr.length) _modFilter[key][colKey]=arr; else delete _modFilter[key][colKey];
   draw();
 }
-function _modClearFilter(key){ _modFilter[key]={}; _modPrintFilter[key]=''; draw(); }
+function _modClearFilter(key){ _modFilter[key]={}; _modPrintFilter[key]=''; _modDateFilter[key]=null; draw(); }
 function _modSetPrintFilter(key,val){ _modPrintFilter[key]=val; draw(); }
+// 📅 기간(접수일) 필터 — 행 날짜는 _createdAt을 현지(한국) 날짜로 변환해 비교
+function _todayStr(){ var d=new Date(); return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2); }
+function _modRowDate(r){
+  if(!r||!r._createdAt) return '';
+  var d=new Date(r._createdAt);
+  if(isNaN(d.getTime())) return String(r._createdAt).slice(0,10);
+  return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);
+}
+function _modDateF(key){
+  if(_modDateFilter[key]===undefined){
+    var def=_modDefs[key]||{};
+    if(def.dateFilterToday){ var t=_todayStr(); _modDateFilter[key]={from:t,to:t}; }
+    else _modDateFilter[key]=null;
+  }
+  return _modDateFilter[key];
+}
+function _modSetDateF(key,which,val){ var df=_modDateF(key)||{from:'',to:''}; df[which]=val||''; _modDateFilter[key]=(df.from||df.to)?df:null; draw(); }
+function _modDateToday(key){ var t=_todayStr(); _modDateFilter[key]={from:t,to:t}; draw(); }
+function _modDateAll(key){ _modDateFilter[key]=null; draw(); }
 
 // ─── 명단 행 선택(체크박스) ───
 function _modSelToggle(ev,key,id,idx){
@@ -1533,16 +1571,28 @@ var _COURIER_DEFAULTS=[
   {name:'롯데택배', file:'PIDPIC, 롯데, 현대', trk:'운송장번호', ord:'주문번호', rname:'수하인명', tel:''}
 ];
 function popCourierProfiles(key){
-  window.__cpEdit=JSON.parse(JSON.stringify((window.__courierProfiles&&window.__courierProfiles.length)?window.__courierProfiles:_COURIER_DEFAULTS));
-  var h='<div style="max-width:640px">';
-  h+='<h3 style="margin:0 0 4px">🚚 택배사 인식 설정</h3>';
-  h+='<div style="font-size:12px;color:#64748b;margin-bottom:10px">송장 파일명에 <b>포함 문자열</b>이 들어 있으면 그 택배사로 인식하고, 아래 <b>열 이름</b>으로 송장·주문번호·받는분 열을 바로 잡습니다. 포함 문자열은 <b>쉼표(,)로 여러 개</b> 등록 — 예: <b>PIDPIC, 롯데, 현대</b> (타업체가 보내주는 파일명이 달라도 하나만 맞으면 인식). 열 이름은 택배사 파일 첫 행(제목) 그대로 적으세요. 비워둔 항목은 자동 추정합니다.</div>';
-  h+='<div id="_cpList"></div>';
-  h+='<button class="btn" style="background:#0d9488;color:#fff;margin-top:6px" onclick="_cpAdd()">➕ 택배사 추가</button>';
-  h+='<div style="display:flex;gap:8px;margin-top:14px"><button class="btn" style="flex:1;background:#2563eb;color:#fff;font-weight:800" onclick="_cpSave(\''+key+'\')">💾 저장</button><button class="btn" style="background:#64748b;color:#fff" onclick="popModTrackImport(\''+key+'\')">← 돌아가기</button></div>';
-  h+='</div>';
-  openPopup(h,640);
-  _cpRender();
+  var _open=function(){
+    window.__cpEdit=JSON.parse(JSON.stringify((window.__courierProfiles&&window.__courierProfiles.length)?window.__courierProfiles:_COURIER_DEFAULTS));
+    var kq=key?('\''+key+'\''):'null';
+    var h='<div style="max-width:640px">';
+    h+='<h3 style="margin:0 0 4px">🚚 택배사 인식 설정</h3>';
+    h+='<div style="font-size:12px;color:#64748b;margin-bottom:10px">송장 파일명에 <b>포함 문자열</b>이 들어 있으면 그 택배사로 인식하고, 아래 <b>열 이름</b>으로 송장·주문번호·받는분 열을 바로 잡습니다. 포함 문자열은 <b>쉼표(,)로 여러 개</b> 등록 — 예: <b>PIDPIC, 롯데, 현대</b> (타업체가 보내주는 파일명이 달라도 하나만 맞으면 인식). 열 이름은 택배사 파일 첫 행(제목) 그대로 적으세요. 비워둔 항목은 자동 추정합니다.</div>';
+    h+='<div id="_cpList"></div>';
+    h+='<button class="btn" style="background:#0d9488;color:#fff;margin-top:6px" onclick="_cpAdd()">➕ 택배사 추가</button>';
+    h+='<div style="display:flex;gap:8px;margin-top:14px"><button class="btn" style="flex:1;background:#2563eb;color:#fff;font-weight:800" onclick="_cpSave('+kq+')">💾 저장</button><button class="btn" style="background:#64748b;color:#fff" onclick="'+(key?('popModTrackImport(\''+key+'\')'):'closePopup()')+'">'+(key?'← 돌아가기':'닫기')+'</button></div>';
+    h+='</div>';
+    openPopup(h,640);
+    _cpRender();
+  };
+  // 시스템 설정에서 바로 열 때: 프로파일 아직 안 불러왔으면 먼저 로드
+  if(!window.__courierProfiles && typeof fbDb!=='undefined'){
+    fbDb.ref('/main/CourierProfiles').once('value').then(function(s){
+      var v=s.val();
+      if(v){ if(!Array.isArray(v)) v=Object.values(v); window.__courierProfiles=v; }
+      else window.__courierProfiles=_COURIER_DEFAULTS.slice();
+      _open();
+    }).catch(function(){ window.__courierProfiles=_COURIER_DEFAULTS.slice(); _open(); });
+  } else _open();
 }
 function _cpRender(){
   var box=document.getElementById('_cpList'); if(!box) return;
@@ -1572,7 +1622,7 @@ function _cpSave(key){
   showLoading('저장 중...');
   fbDb.ref('/main/CourierProfiles').set(list).then(function(){
     hideLoading(); window.__courierProfiles=list; toast('✅ 택배사 인식 설정 저장됨');
-    popModTrackImport(key);
+    if(key) popModTrackImport(key); else closePopup();
   }).catch(function(e){ hideLoading(); toast('실패: '+(e.message||e),true); });
 }
 function popModTrackImport(key){
@@ -1594,6 +1644,9 @@ function popModTrackImport(key){
   h+='<label style="font-size:12px;font-weight:700">매칭 기준</label>';
   h+='<select id="_mtiBasis" style="width:100%;padding:9px;margin:4px 0 10px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px"><option value="auto" selected>자동 (추천) — 주문번호 → 연락처 → 받는분 이름 순서로 시도</option><option value="tel">연락처 (주문자/받는분 번호 모두 비교)</option><option value="rname">받는분(수취인) 이름</option><option value="name">주문자(구매자) 이름</option><option value="id">고유번호 (_id)</option></select>';
   h+='<div style="font-size:11px;color:#94a3b8;margin:-6px 0 10px">매칭 안 되는 줄은 건너뛰고 나머지만 등록됩니다 · 한 주문자의 여러 박스도 순서대로 분배 (송장 빈 행 우선)</div>';
+  h+='<label style="font-size:12px;font-weight:700">택배사 <span style="color:#94a3b8;font-weight:400">— 파일 인식 시 자동 입력, 등록되는 각 주문의 「택배사」 칸에 기록</span></label>';
+  var _cpNames=((window.__courierProfiles&&window.__courierProfiles.length)?window.__courierProfiles:_COURIER_DEFAULTS).map(function(p){return '<option value="'+esc(p.name||'')+'">';}).join('');
+  h+='<input id="_mtiCourier" list="_mtiCourierList" placeholder="예: 롯데택배 (비우면 기록 안 함)" style="width:100%;box-sizing:border-box;padding:9px;margin:4px 0 10px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px"><datalist id="_mtiCourierList">'+_cpNames+'</datalist>';
   h+='<div style="display:flex;gap:6px;align-items:center;margin-bottom:6px"><button class="btn" style="background:#0d9488;color:#fff" onclick="_modTrackImportFile(\''+key+'\')">📤 택배사 엑셀 파일 불러오기</button><button class="btn" style="background:#475569;color:#fff;font-size:12px" onclick="popCourierProfiles(\''+key+'\')" title="파일명으로 택배사 자동 인식 규칙 등록">🚚 택배사 인식 설정</button></div>';
   h+='<div id="_mtiColPick" style="margin-bottom:10px"></div>';
   h+='<label style="font-size:12px;font-weight:700">붙여넣기 / 미리보기 — 한 줄에 「식별값 [Tab] 송장번호」</label>';
@@ -1643,6 +1696,7 @@ function _modTrackImportFile(key){
         var _pFind=function(nm){ if(!nm) return -1; return header.indexOf(String(nm).trim()); };
         if(_prof){
           var _pt=_pFind(_prof.trk); if(_pt>=0) trkGuess=_pt;
+          var _ce=document.getElementById('_mtiCourier'); if(_ce&&!_ce.value.trim()) _ce.value=_prof.name||'';
           toast('🚚 '+(_prof.name||'택배사')+' 파일로 인식했어요');
         }
         // 식별값 열 추정 — 1순위(수취인/수하인 쪽) 먼저, 없으면 2순위(일반)
@@ -1724,6 +1778,18 @@ function _modTrackBuildPairs(){
 function _modTrackImportRun(key){
   var def=_modDefs[key]; if(!def) return;
   var trk=_modTrackingCol(def); if(!trk) return toast('송장 컬럼이 없습니다',true);
+  // 🚚 택배사 기록 — 입력값 있으면 매칭된 각 행의 「택배사」 칸에 저장 (칸 없으면 송장 옆에 자동 추가)
+  var courier=((document.getElementById('_mtiCourier')||{}).value||'').trim();
+  var courierCol=null, defsChanged=false;
+  if(courier){
+    courierCol=(def.columns||[]).find(function(c){return /택배사|배송사|운송사/.test(c.label||'') && c.type!=='badge';});
+    if(!courierCol){
+      courierCol={key:_modColKey(), label:'택배사', type:'text'};
+      var _ti=(def.columns||[]).indexOf(trk);
+      def.columns.splice(_ti>=0?_ti+1:def.columns.length, 0, courierCol);
+      defsChanged=true;
+    }
+  }
   var basis=(document.getElementById('_mtiBasis')||{}).value||'auto';
   var raw=(document.getElementById('_mtiText')||{}).value||'';
   var pairs=[];
@@ -1744,15 +1810,18 @@ function _modTrackImportRun(key){
     var old=String(data[idx][trk.key]||'').trim();
     var merged={}; for(var k in data[idx]) merged[k]=data[idx][k];
     merged[trk.key]=p.track; merged._updatedAt=now;
+    if(courierCol) merged[courierCol.key]=courier;   // 🚚 택배사 기록
     data[idx]=merged; matched++;
     if(def.smsTracking && p.track && p.track!==old) sendList.push(merged);
   });
   if(!matched) return toast('매칭된 주문이 없습니다. 매칭 기준을 확인하세요',true);
-  var conf='송장 일괄등록\n\n• 매칭: '+matched+'건\n• 미매칭: '+misses.length+'건'+(misses.length?'\n   ('+misses.slice(0,8).join(', ')+(misses.length>8?' 외 '+(misses.length-8)+'개':'')+')':'')+'\n'+(def.smsTracking?('• 문자발송 예정: '+sendList.length+'건 (건당 요금 발생)\n'):'• 문자발송: OFF\n')+'\n적용할까요?';
-  if(!confirm(conf)) return;
+  var conf='송장 일괄등록\n\n• 매칭: '+matched+'건\n• 미매칭: '+misses.length+'건'+(misses.length?'\n   ('+misses.slice(0,8).join(', ')+(misses.length>8?' 외 '+(misses.length-8)+'개':'')+')':'')+'\n'+(courier?('• 택배사: '+courier+(defsChanged?' (「택배사」 칸 자동 추가)':'')+'\n'):'')+(def.smsTracking?('• 문자발송 예정: '+sendList.length+'건 (건당 요금 발생)\n'):'• 문자발송: OFF\n')+'\n적용할까요?';
+  if(!confirm(conf)){ if(defsChanged){ var _ci=def.columns.indexOf(courierCol); if(_ci>=0) def.columns.splice(_ci,1); } return; }
   var path=_modFbPath(key); if(!path) return toast('행사를 선택하세요',true);
   showLoading('송장 등록 중...');
-  fbDb.ref(path).set(data).then(function(){
+  (defsChanged?_saveModDefs():Promise.resolve()).then(function(){
+    return fbDb.ref(path).set(data);
+  }).then(function(){
     hideLoading(); closePopup(); toast('✅ 송장 '+matched+'건 등록'+(misses.length?' ('+misses.length+'건 미매칭)':''));
     if(sendList.length){
       var sent=0, chain=Promise.resolve();
@@ -1818,6 +1887,11 @@ function dModManager(){
     });
   }
   h+='</div>';
+  // 🚚 택배사 인식 설정 — 송장 일괄등록 파일 자동 인식 규칙 (별도 카드)
+  h+='<div class="card" style="margin-top:14px"><h3 style="margin-bottom:4px">🚚 택배사 인식 설정</h3>';
+  h+='<p class="mut" style="margin-bottom:12px">송장 일괄등록에서 파일명으로 택배사를 자동 인식하는 규칙(포함 문자열·열 매핑)을 관리합니다.</p>';
+  h+='<button class="btn" style="background:#475569;color:#fff" onclick="popCourierProfiles()">🚚 택배사 인식 설정 열기</button>';
+  h+='</div>';
   return h;
 }
 
@@ -1854,6 +1928,7 @@ function popModDef(keyOrIdx){
   h+='<select id="mdf_global" style="'+_fs+'"><option value="false"'+(def.global?'':' selected')+'>행사별 (각 행사 데이터 분리)</option><option value="true"'+(def.global?' selected':'')+'>공통 (전체 행사 공유)</option></select>';
   h+='</div>';
   h+=_tog('mdf_adminTab',def.adminTab,'🔒 <b>관리자만 이 탭 보기</b> <span style="color:#94a3b8">(SUBADMIN 이상 / 체크 안 하면 모두에게 표시)</span>');
+  h+=_tog('mdf_dateToday',def.dateFilterToday,'📅 <b>기간 필터 기본값 오늘</b> <span style="color:#94a3b8">— 명단을 열면 오늘 접수분만 먼저 표시 (「전체」 버튼으로 해제)</span>');
 
   // ── 섹션: 공개 신청폼 ──
   h+=_secH('📝 공개 신청폼');
@@ -2204,6 +2279,7 @@ function saveModDef(keyOrNew){
   var multiRecipient=((document.getElementById('mdf_multiRecipient')||{}).checked)||false;
   var googleEmail=((document.getElementById('mdf_googleEmail')||{}).checked)||false;
   var adminTab=((document.getElementById('mdf_adminTab')||{}).checked)||false;
+  var dateFilterToday=((document.getElementById('mdf_dateToday')||{}).checked)||false;
   var formTitle=((document.getElementById('mdf_formTitle')||{}).value||'').trim();
   var formDesc=((document.getElementById('mdf_formDesc')||{}).value||'').trim();
   var formFooter=((document.getElementById('mdf_formFooter')||{}).value||'').trim();
@@ -2243,7 +2319,7 @@ function saveModDef(keyOrNew){
     key:key, label:label, icon:icon,
     cat:'custom', catLabel:catLabel||'', catIcon:icon,
     fbPath:'Mod_'+key, global:global, evtId:modEvtId,
-    adminTab:adminTab,
+    adminTab:adminTab, dateFilterToday:dateFilterToday,
     columns:cols,
     formTitle:formTitle, formDesc:formDesc, formFooter:formFooter, downloadUrl:downloadUrl, payInfo:payInfo, formImage:formImage,
     smsApply:smsApply, smsApplyTpl:smsApplyTpl, smsTracking:smsTracking, smsTrackingTpl:smsTrackingTpl, smsCancel:smsCancel, smsCancelTpl:smsCancelTpl, smsApplyTo:smsApplyTo, smsTrackingTo:smsTrackingTo, smsCancelTo:smsCancelTo, multiRecipient:multiRecipient,
