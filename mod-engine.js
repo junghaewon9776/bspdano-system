@@ -1259,12 +1259,12 @@ function modExportExcel(key){
     var wb=XLSX.utils.book_new();
     var ws=XLSX.utils.aoa_to_sheet(rows);
     XLSX.utils.book_append_sheet(wb,ws,def.label);
-    XLSX.writeFile(wb,def.label+'_'+(new Date().toISOString().slice(0,10))+'.xlsx');
+    XLSX.writeFile(wb,def.label+'_'+(_todayStr())+'.xlsx');
   } else {
     var csv=rows.map(function(r){return r.map(function(c){return '"'+String(c).replace(/"/g,'""')+'"'}).join(',')}).join('\n');
     var blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'});
     var a=document.createElement('a');a.href=URL.createObjectURL(blob);
-    a.download=def.label+'_'+(new Date().toISOString().slice(0,10))+'.csv';a.click();
+    a.download=def.label+'_'+(_todayStr())+'.csv';a.click();
   }
 }
 
@@ -3963,7 +3963,7 @@ async function _mlExportPdfRotated(key){
       showLoading('PDF 만드는 중… ('+(i+1)+'/'+rows.length+')');
     }
     hideLoading();
-    pdf.save(def.label+'_세로라벨_'+(new Date().toISOString().slice(0,10))+'.pdf');
+    pdf.save(def.label+'_세로라벨_'+(_todayStr())+'.pdf');
     toast('📄 '+rows.length+'장 세로 PDF 저장 — 거꾸로면 회전방향 버튼으로 바꾸세요');
   }catch(e){ hideLoading(); toast('PDF 실패: '+(e.message||e),true); console.error(e); }
 }
@@ -3997,7 +3997,7 @@ function _mlExportMailMerge(key){
   var wb=XLSX.utils.book_new();
   var ws=XLSX.utils.aoa_to_sheet(aoa);
   XLSX.utils.book_append_sheet(wb,ws,'라벨');
-  var fn=def.label+'_메일머지_'+(new Date().toISOString().slice(0,10))+'.xlsx';
+  var fn=def.label+'_메일머지_'+(_todayStr())+'.xlsx';
   XLSX.writeFile(wb,fn);
   toast('📊 '+rows.length+'건 엑셀 내보냄 — 차량명찰 메일머지에 붙여넣으세요');
   _modLogAdd(key,'발급','', '('+rows.length+'건 메일머지 엑셀)','메일머지 엑셀 내보내기');

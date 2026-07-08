@@ -452,7 +452,7 @@ label{display:block;font-size:10px;color:#999;margin-bottom:3px}
 <!-- firebase-storage 제거: 구글 드라이브 프록시로 대체 -->
 <script src="firebase-config.js"></script>
 <script src="common.js?v=20260618a"></script>
-<script src="mod-engine.js?v=20260707v146"></script>
+<script src="mod-engine.js?v=20260708v147"></script>
 
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" onerror="console.warn('XLSX CDN load failed')"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js" onerror="console.warn('xlsx-js-style CDN load failed')"></script>
@@ -519,6 +519,9 @@ var DEEP_EVT = "";   // ?evtId= 딥링크 (해당 행사 자동 선택)
 var IS_MODVIEW_MODE = false; var MODVIEW_KEY=""; var MODVIEW_ID=""; var MODVIEW_EVT="";  // QR 조회 페이지
 var IS_ASSETVIEW_MODE = false; var ASSETVIEW_ID="";  // 자산 QR 조회 페이지
 var DEEP_MOD_KEY = "";  // 모듈 바로가기(?modlist=) — 로그인 후 이동할 모듈 키
+// 한국시간 헬퍼 — toISOString은 UTC(외국시간)이므로 날짜/시간 표시엔 이걸 쓸 것
+function todayKST(){ var d=new Date(); return d.getFullYear()+"-"+("0"+(d.getMonth()+1)).slice(-2)+"-"+("0"+d.getDate()).slice(-2); }
+function nowKST(full){ var d=new Date(); var s=todayKST()+" "+("0"+d.getHours()).slice(-2)+":"+("0"+d.getMinutes()).slice(-2); return full?s:s.slice(5); }
 (function(){
   try {
     // 카톡 인앱브라우저면 외부 브라우저(크롬/사파리)로 자동 전환 — 신청서 작성 중 카톡 대화(주소 등)를 자유롭게 볼 수 있게
@@ -4745,7 +4748,7 @@ function _applySmsFindCol(H, names){
   return -1;
 }
 function _applySmsResolveVars(tmpl, row, H, ctx){
-  var today=new Date().toISOString().slice(0,10);
+  var today=todayKST();
   var pick=function(names){ var i=_applySmsFindCol(H, names); return i>=0?String(row[i]||""):""; };
   var nm   = pick(["이름","성명","대표자","참가자명","참가자"]);
   var team = pick(["팀명","단체명"]);
@@ -11379,7 +11382,7 @@ function _feePivotView(memsOrdered, memFees, curP){
   var bank = (window.FEE_BANK_INFO_CACHE)||"";
   h += '<div style="padding:10px 16px;background:#f8fafc;border-top:1px solid #e5e7eb;display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;font-size:12px">';
   h += '<div><b>(계좌안내)</b> '+(bank?esc(bank):'<span style="color:#dc2626">설정→회비설정에서 입금계좌 입력하세요</span>')+'</div>';
-  h += '<div style="color:#64748b">마지막 업데이트 : '+new Date().toISOString().slice(0,10)+'</div>';
+  h += '<div style="color:#64748b">마지막 업데이트 : '+todayKST()+'</div>';
   h += '</div>';
   h += '</div>'; // end feePivotRoot
   return h;
@@ -11443,9 +11446,9 @@ async function _feeCellSave(memId, memNm, memAr, period, paid, oldPaid){
   showLoading("저장 중...");
   var r;
   if(existing){
-    r = await api("updateFee",{id:CID, fid:existing.id, paidAmt:paid, paidDt:new Date().toISOString().slice(0,10)});
+    r = await api("updateFee",{id:CID, fid:existing.id, paidAmt:paid, paidDt:todayKST()});
   } else if(paid>0){
-    r = await api("addFee",{id:CID, year:period, memId:memId, memNm:memNm, memAr:memAr, dueAmt:FEE_DEFAULT_AMT||paid, paidAmt:paid, paidDt:new Date().toISOString().slice(0,10), method:"계좌이체"});
+    r = await api("addFee",{id:CID, year:period, memId:memId, memNm:memNm, memAr:memAr, dueAmt:FEE_DEFAULT_AMT||paid, paidAmt:paid, paidDt:todayKST(), method:"계좌이체"});
   } else {
     hideLoading(); draw(); return;
   }
@@ -11496,7 +11499,7 @@ function feeQuickAdd(memId){
   h+='<div class="frow fr3"><div><label>청구액</label><input id="feN_due" type="text" value="'+(FEE_DEFAULT_AMT?FEE_DEFAULT_AMT.toLocaleString():"")+'" oninput="this.value=this.value.replace(/[^0-9]/g,\'\').replace(/\\B(?=(\\d{3})+(?!\\d))/g,\',\')"></div>';
   h+='<div><label>납부액</label><input id="feN_paid" type="text" value="'+(FEE_DEFAULT_AMT?FEE_DEFAULT_AMT.toLocaleString():"")+'" oninput="this.value=this.value.replace(/[^0-9]/g,\'\').replace(/\\B(?=(\\d{3})+(?!\\d))/g,\',\')"></div>';
   h+='<div><label>이월액</label><input id="feN_carry" type="text" placeholder="0"></div></div>';
-  h+='<div class="frow fr2"><div><label>납부일</label><input id="feN_dt" type="date" value="'+(new Date().toISOString().slice(0,10))+'"></div>';
+  h+='<div class="frow fr2"><div><label>납부일</label><input id="feN_dt" type="date" value="'+(todayKST())+'"></div>';
   h+='<div><label>납부방법</label><select id="feN_method"><option value="계좌이체">계좌이체</option><option>현금</option><option>카드</option><option>기타</option></select></div></div>';
   h+='<div class="frow fr2"><div><label>입금자 <span style="font-size:10px;color:#888">(본인과 다를 때만)</span></label><input id="feN_depositor" type="text"></div>';
   h+='<div><label>비고</label><input id="feN_note" type="text"></div></div>';
@@ -11809,7 +11812,7 @@ function feeSmsPreview(){
     .replace(/\{기간\}/g, period? feePeriodLabel(period):"전체 누적")
     .replace(/\{미납액\}/g,"30,000").replace(/\{완납액\}/g,"0").replace(/\{잔액\}/g,"30,000")
     .replace(/\{요구액\}/g,"30,000").replace(/\{납부액\}/g,"0").replace(/\{이월\}/g,"0")
-    .replace(/\{오늘\}/g, new Date().toISOString().slice(0,10))
+    .replace(/\{오늘\}/g, todayKST())
     .replace(/\{계좌\}/g,"농협 123-456-789012").replace(/\{입금계좌\}/g,"농협 123-456-789012")
     .replace(/\{서명\}/g,"법성포단오제보존회");
   var byteLen = new Blob([sample]).size;
@@ -12385,7 +12388,7 @@ async function popCalendarConfig(){
   hideLoading();
   if(!r || !r.ok){ toast((r&&r.err)||"권한 필요",true); return; }
   var c = r.cfg || {};
-  var today = new Date().toISOString().slice(0,10);
+  var today = todayKST();
   var h = '<h3 style="margin:0 0 12px">📅 Google 캘린더 설정</h3>';
   h += '<div style="font-size:12px;color:#64748b;margin-bottom:14px;line-height:1.6">각 캘린더별로 구글 이벤트 자동 생성/삭제. 캘린더 ID 찾는 법: 구글 캘린더 → 해당 캘린더 옵션(⋮) → 설정 및 공유 → 캘린더 통합 → 캘린더 ID 복사</div>';
   // 공지 섹션
@@ -13091,7 +13094,7 @@ function _assetRowHtml(n){
   // 분류/장소 = 설정 + 실제 자산 합집합 (엑셀 가져온 값도 자동 표시)
   var catList = _assetCatList();
   var locList = _assetLocList();
-  var today = new Date().toISOString().slice(0,10);
+  var today = todayKST();
   var lbl = 'display:block;font-size:13px;font-weight:700;margin-bottom:6px';
   var selStyle = 'width:100%;padding:12px;border:1.5px solid #cbd5e1;border-radius:8px;background:#fff;font-size:16px;box-sizing:border-box';
   var inStyle  = 'width:100%;padding:12px;border:1.5px solid #cbd5e1;border-radius:8px;font-size:16px;box-sizing:border-box';
@@ -13805,7 +13808,7 @@ function _rpSearchRender(){
 function popRentalNew(assetId){
   var a = (assets||[]).filter(function(x){return x.id===assetId;})[0];
   if(!a){ toast("자산 없음",true); return; }
-  var today = new Date().toISOString().slice(0,10);
+  var today = todayKST();
   var h = '<h3 style="margin:0 0 12px">🤝 대여 신청 — '+esc(a.name||"")+'</h3>';
   h += '<div style="padding:8px 12px;background:#eff6ff;border-radius:6px;margin-bottom:10px;font-size:13px">';
   h += '📦 '+esc(a.barcode||"")+' · '+esc(a.category||"")+' · 잔고 <b>'+(a.qtyAvail||0)+'</b>개';
@@ -13990,7 +13993,7 @@ async function rentalDelete(id){
 function rentalReturn(id){
   var r = (rentals||[]).filter(function(x){return x.id===id;})[0];
   if(!r){ toast("없음",true); return; }
-  var today = new Date().toISOString().slice(0,10);
+  var today = todayKST();
   var h = '<h3 style="margin:0 0 10px">↩️ 반납 처리 — '+esc(id)+'</h3>';
   h += '<div style="padding:8px 12px;background:#eff6ff;border-radius:6px;margin-bottom:10px;font-size:13px">대여수량: <b>'+(r.qty||0)+'</b>개 · 반납예정일: '+esc(r.dueDt||"")+'</div>';
   h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
@@ -14681,7 +14684,7 @@ async function _lpExcel(){
   });
   var wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), "라벨");
-  XLSX.writeFile(wb, "자산_라벨_"+new Date().toISOString().slice(0,10)+".xlsx");
+  XLSX.writeFile(wb, "자산_라벨_"+todayKST()+".xlsx");
   toast("엑셀 다운로드 완료");
 }
 
@@ -14706,7 +14709,7 @@ function expAssets(){
   });
   var wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), "자산목록");
-  XLSX.writeFile(wb, "자산목록_"+new Date().toISOString().slice(0,10)+".xlsx");
+  XLSX.writeFile(wb, "자산목록_"+todayKST()+".xlsx");
   toast("엑셀 다운로드 완료");
 }
 // 엑셀 양식
@@ -14957,11 +14960,11 @@ function _dictExp(kind){
   if(kind==="cat"){
     rows = [["분류","자산명","메모"]];
     (assetCats||[]).forEach(function(r){ rows.push([r.category||"", r.name||"", r.note||""]); });
-    name = "자산분류_"+new Date().toISOString().slice(0,10)+".xlsx";
+    name = "자산분류_"+todayKST()+".xlsx";
   } else {
     rows = [["장소","위치","메모"]];
     (assetLocs||[]).forEach(function(r){ rows.push([r.location||"", r.detail||"", r.note||""]); });
-    name = "자산장소_"+new Date().toISOString().slice(0,10)+".xlsx";
+    name = "자산장소_"+todayKST()+".xlsx";
   }
   var wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), "master");
@@ -18481,7 +18484,7 @@ function _noticePreview(){
   // 선택된 대상자 3명 샘플로 치환해서 보여주기
   var aud=(document.getElementById("nAud")||{}).value||"all";
   var samples = _noticeResolveSamples(aud, 3);
-  var today = new Date().toISOString().slice(0,10);
+  var today = todayKST();
   var h='<h3 style="margin:0 0 10px">👁 미리보기</h3>';
   if(!samples.length){
     h+='<div style="padding:20px;text-align:center;color:#999">수신자를 먼저 선택하세요</div>';
