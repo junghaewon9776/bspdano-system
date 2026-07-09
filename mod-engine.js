@@ -895,7 +895,7 @@ function _modFormField(col,val,idOverride){
           var _custom=null; _modParseMulti(val).forEach(function(it){ if(it&&it.o&&(it.raw||!_optset[it.o])) _custom=it; });
           mh+='<div data-optrow="__etc__" style="display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid #fde68a;background:#fffbeb">'
             +'<span style="font-size:12px;font-weight:700;color:#92400e;flex-shrink:0">✏️ 직접입력</span>'
-            +'<input type="text" class="mqetcname" placeholder="'+esc(col.etcPlaceholder||'예: 특수굴비30미 2개')+'" value="'+(_custom?esc(_custom.o):'')+'" style="flex:1;min-width:0;padding:8px;border:1px solid #cbd5e1;border-radius:6px;font-weight:700">'
+            +'<input type="text" class="mqetcname" placeholder="'+esc(col.etcPlaceholder||'입력 안 하셔도 됩니다.')+'" value="'+(_custom?esc(_custom.o):'')+'" style="flex:1;min-width:0;padding:8px;border:1px solid #cbd5e1;border-radius:6px;font-weight:700">'
             +'</div>';
         }
         // 품목 목록 — 길어도 박스 안에서 스크롤 (화면 전체를 차지하지 않게)
@@ -2139,7 +2139,7 @@ function _renderModDefCols(){
       var _etcChk=(c.multiQty? !!c.allowEtc : (c.allowEtc!==false));
       h+='<label style="font-size:11px;display:flex;align-items:center;gap:5px;margin-top:5px;color:#475569;cursor:pointer"><input type="checkbox"'+(_etcChk?' checked':'')+' onchange="_modDefEditCols['+i+'].allowEtc=this.checked;_modDefRefreshCols()">✏️ <b>직접 입력 허용</b> <span style="color:#94a3b8">— 목록에 없는 항목을 직접 타이핑('+(c.multiQty?'품명+수량':'기타')+')</span></label>';
       if(_etcChk){
-        h+='<div style="margin-top:4px;display:flex;align-items:center;gap:6px;font-size:11px;color:#475569"><span>직접입력 예시</span><input value="'+esc(c.etcPlaceholder||'')+'" placeholder="'+(c.multiQty?'예: 특수굴비30미 2개':'직접 입력')+'" style="flex:1;min-width:0;font-size:11px;padding:4px 6px;border:1px solid #cbd5e1;border-radius:5px" onchange="_modDefEditCols['+i+'].etcPlaceholder=this.value"></div>';
+        h+='<div style="margin-top:4px;display:flex;align-items:center;gap:6px;font-size:11px;color:#475569"><span>직접입력 안내문구</span><input value="'+esc(c.etcPlaceholder||'')+'" placeholder="비우면: 입력 안 하셔도 됩니다." style="flex:1;min-width:0;font-size:11px;padding:4px 6px;border:1px solid #cbd5e1;border-radius:5px" onchange="_modDefEditCols['+i+'].etcPlaceholder=this.value"></div>';
       }
       // 📦 재고(수량) 관리 — 옵션별 수량, 신청 시 자동 차감(건수 기반)
       h+='<div style="margin-top:6px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:7px;padding:7px 9px">';
