@@ -1002,16 +1002,20 @@ function _modTgNotifyApply(def, rows){
       var tg=s.val()||{};
       if(!tg.token||!tg.chat_id) return;
       var base=rows[0];
-      var ordCol=(def.columns||[]).find(function(c){return c.type==='text'&&/주문자|구매자|신청자/.test(c.label||'')&&!/받는|수령|수취/.test(c.label||'');});
-      var ordTel=(def.columns||[]).find(function(c){return c.type==='tel'&&!/받는|수령|수취/.test(c.label||'');});
-      var rnCol=(def.columns||[]).find(function(c){return c.type==='text'&&/받는|수령|수취/.test(c.label||'');});
+      var m=_modCopyCols(def);   // 주문자·주문자연락처·받는분·연락처·주소·품명 컬럼 (엑셀복사와 동일 식별)
+      var v=function(col,r){ return col?_modCellVal(def,col,r):''; };
       var msg='📦 '+(def.label||'')+' 접수!\n';
-      if(ordCol&&base[ordCol.key]) msg+='주문자: '+base[ordCol.key]+(ordTel&&base[ordTel.key]?(' ('+base[ordTel.key]+')'):'')+'\n';
+      var on=v(m.ordNm,base), ot=v(m.ordTel,base);
+      if(on) msg+='주문자: '+on+(ot?(' '+ot):'')+'\n';
       msg+='받는분 '+rows.length+'명\n';
       rows.forEach(function(r,i){
-        var items='';
-        (def.columns||[]).forEach(function(c){ if(c.multiQty&&r[c.key]&&!items) items=_modMultiStr(r[c.key],', ',c.multiNoQty,c.multiQtyKae); });
-        msg+=(rows.length>1?((i+1)+') '):'')+(rnCol?(r[rnCol.key]||''):'')+(items?(' — '+items):'')+'\n';
+        var parts=[];
+        var rn=v(m.recvNm,r); if(rn) parts.push(rn);
+        var rt=v(m.recvTel,r); if(rt) parts.push(rt);
+        var ad=v(m.addr,r); if(ad) parts.push(ad);
+        var it=v(m.item,r); if(it) parts.push(it);
+        msg+='\n'+(rows.length>1?('['+(i+1)+'] '):'')+parts.join('\n');
+        if(rows.length>1) msg+='\n';
       });
       var chats=String(tg.chat_id).split(',').map(function(c){return c.trim();}).filter(Boolean);
       chats.forEach(function(ch){
