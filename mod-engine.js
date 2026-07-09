@@ -201,6 +201,7 @@ function dMod(key){
   if(isA() && (def.columns||[]).some(function(c){return c.type==='select'&&c.stockOn;})) h+='<button class="btn" style="background:#0f766e;color:#fff" onclick="popModStock(\''+key+'\')">📦 재고</button>';
   if(isA()) h+='<button class="btn" style="background:#16a34a;color:#fff" onclick="popModSheet(\''+key+'\')">📝 시트 편집</button>';
   if(isA()) h+='<button class="btn" style="background:#0d9488;color:#fff" onclick="modImportExcel(\''+key+'\')">📤 가져오기</button>';
+  if(isA()) h+='<button class="btn" style="background:#15803d;color:#fff" onclick="_modCopyExcel(\''+key+'\')" title="지금 보이는 명단(필터 적용된 것)을 엑셀에 붙여넣게 복사">📋 엑셀로 복사</button>';
   if(isA() && _modTrackingCol(def)) h+='<button class="btn" style="background:#7c3aed;color:#fff" onclick="popModTrackImport(\''+key+'\')">📦 송장 일괄등록</button>';
   if(feat.excel!==false) h+='<button class="btn" onclick="modExportExcel(\''+key+'\')">📥 내보내기</button>';
   if(typeof isSuper==='function'&&isSuper()) h+='<button class="btn" style="background:#7c3aed;color:#fff" onclick="popModLog(\''+key+'\')">📋 로그</button>';
@@ -373,6 +374,7 @@ function _modListHtml(key){
         h+='<button class="btn btn-s" onclick="modSetStatusSel(\''+key+'\',\''+esc(bc.key)+'\',\''+esc(sk)+'\')" style="background:'+(bm.bg||'#f1f5f9')+';color:'+(bm.color||'#475569')+';border:1px solid '+(bm.bg||'#cbd5e1')+';font-weight:700">'+pre+esc(bm.label||sk)+' 처리</button>';
       });
     });
+    h+='<button class="btn btn-s" style="background:#15803d;color:#fff" onclick="_modCopyExcelSel(\''+key+'\')" title="선택한 주문을 엑셀에 붙여넣게 복사">📋 엑셀로 복사</button>';
     h+='<button class="btn btn-s" style="background:#0891b2;color:#fff" onclick="popModMarkSel(\''+key+'\')">🎨 색칠</button>';
     h+='<button class="btn btn-s" style="background:#dc2626;color:#fff" onclick="modDelSel(\''+key+'\')">🗑 선택 삭제</button>';
     h+='<button class="btn btn-s" style="margin-left:auto;background:#64748b;color:#fff" onclick="_modSelClear(\''+key+'\')">선택 해제</button>';
@@ -556,6 +558,53 @@ function _modSelRefresh(key){
   b.innerHTML=_modListHtml(key);
   var sc2=document.getElementById('_modScroll_'+key);
   if(sc2){ sc2.scrollTop=st; sc2.scrollLeft=sl; }
+}
+// ─── 📋 엑셀로 복사 (탭 구분 → 엑셀 붙여넣으면 셀/행 자동 분리) ───
+// 컬럼을 라벨로 식별: 주문자 / 주문자연락처 / 받는분 / 받는분연락처 / 주소 / 품명
+function _modCopyCols(def){
+  var cols=def.columns||[];
+  var isRecv=function(c){return /받는|수령|수취/.test(c.label||'');};
+  var ordNm=cols.find(function(c){return c.type==='text'&&!isRecv(c)&&/주문자|구매자|신청자|보내/.test(c.label||'');})
+          || cols.find(function(c){return c.type==='text'&&!isRecv(c);});
+  var ordTel=cols.find(function(c){return c.type==='tel'&&!isRecv(c);});
+  var recvNm=cols.find(function(c){return c.type==='text'&&isRecv(c);});
+  var recvTel=cols.find(function(c){return c.type==='tel'&&isRecv(c);});
+  var addr=cols.find(function(c){return c.type==='address';});
+  var item=cols.find(function(c){return c.multiQty;}) || cols.find(function(c){return /품명|상품|제품|물품/.test(c.label||'');});
+  return {ordNm:ordNm,ordTel:ordTel,recvNm:recvNm,recvTel:recvTel,addr:addr,item:item};
+}
+function _modCellVal(def,c,row){
+  if(!c) return '';
+  var v=row[c.key];
+  if(v==null) return '';
+  if(c.multiQty) return _modMultiStr(v, ', ', c.multiNoQty, c.multiQtyKae);
+  return String(v).replace(/[\t\r\n]+/g,' ').trim();   // 탭·줄바꿈 제거(셀 밀림 방지)
+}
+// ids 없으면 현재 화면(필터 적용)의 전체 복사
+function _modCopyExcel(key, idsArr){
+  var def=_modDefs[key]; if(!def) return;
+  var data=_modFilteredData(key);
+  if(idsArr && idsArr.length){ var idset={}; idsArr.forEach(function(i){idset[i]=1;}); data=data.filter(function(r){return idset[r._id];}); }
+  if(!data.length) return toast('복사할 내용이 없습니다',true);
+  var m=_modCopyCols(def);
+  var head=['주문자','주문자연락처','받는분','연락처','주소','품명'];
+  var lines=[head.join('\t')];
+  data.forEach(function(r){
+    lines.push([
+      _modCellVal(def,m.ordNm,r), _modCellVal(def,m.ordTel,r),
+      _modCellVal(def,m.recvNm,r), _modCellVal(def,m.recvTel,r),
+      _modCellVal(def,m.addr,r), _modCellVal(def,m.item,r)
+    ].join('\t'));
+  });
+  var txt=lines.join('\n');
+  var done=function(){ toast('📋 '+data.length+'건 복사됨 — 엑셀에 붙여넣기(Ctrl+V)'); };
+  var fb=function(){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.opacity='0'; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); done(); }catch(e){ toast('복사 실패',true); } };
+  if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(txt).then(done).catch(fb); } else fb();
+}
+function _modCopyExcelSel(key){
+  var ids=_modSelIds(key);
+  if(!ids.length) return toast('선택된 항목이 없습니다',true);
+  _modCopyExcel(key, ids);
 }
 // 선택 항목 → 라벨 출력
 function popModLabelSel(key){
