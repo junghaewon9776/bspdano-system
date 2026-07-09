@@ -1004,7 +1004,9 @@ function _modTgNotifyApply(def, rows){
       var base=rows[0];
       var m=_modCopyCols(def);   // 주문자·주문자연락처·받는분·연락처·주소·품명 컬럼 (엑셀복사와 동일 식별)
       var v=function(col,r){ return col?_modCellVal(def,col,r):''; };
-      var msg='📦 '+(def.label||'')+' 접수!\n';
+      // 제목엔 지점(카테고리) 우선 — 지점별로 복제한 모듈들은 이름이 같고 카테고리로 구분됨
+      var _head=(def.catLabel&&def.catLabel.trim())?def.catLabel.trim():(def.label||'');
+      var msg='📦 '+_head+' 접수!\n';
       var on=v(m.ordNm,base), ot=v(m.ordTel,base);
       if(on) msg+='주문자: '+on+(ot?(' '+ot):'')+'\n';
       msg+='받는분 '+rows.length+'명\n';
