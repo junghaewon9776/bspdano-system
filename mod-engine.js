@@ -945,6 +945,32 @@ function _modSmsGlobal(tels, msg){
     return fetch(proxy,{method:'POST',redirect:'follow',body:JSON.stringify(body)}).then(function(r){return r.json();}).catch(function(e){return {ok:false,err:'프록시 통신오류: '+(e.message||e)};});
   });
 }
+// 📮 신청 접수 관리자 텔레그램 알림 — /excel_config/telegram(택배봇) 설정된 시스템(가문굴비)만 발송, 없으면 조용히 건너뜀
+function _modTgNotifyApply(def, rows){
+  try{
+    if(typeof fbDb==='undefined'||!rows||!rows.length) return;
+    fbDb.ref('/excel_config/telegram').once('value').then(function(s){
+      var tg=s.val()||{};
+      if(!tg.token||!tg.chat_id) return;
+      var base=rows[0];
+      var ordCol=(def.columns||[]).find(function(c){return c.type==='text'&&/주문자|구매자|신청자/.test(c.label||'')&&!/받는|수령|수취/.test(c.label||'');});
+      var ordTel=(def.columns||[]).find(function(c){return c.type==='tel'&&!/받는|수령|수취/.test(c.label||'');});
+      var rnCol=(def.columns||[]).find(function(c){return c.type==='text'&&/받는|수령|수취/.test(c.label||'');});
+      var msg='📦 '+(def.label||'')+' 접수!\n';
+      if(ordCol&&base[ordCol.key]) msg+='주문자: '+base[ordCol.key]+(ordTel&&base[ordTel.key]?(' ('+base[ordTel.key]+')'):'')+'\n';
+      msg+='받는분 '+rows.length+'명\n';
+      rows.forEach(function(r,i){
+        var items='';
+        (def.columns||[]).forEach(function(c){ if(c.multiQty&&r[c.key]&&!items) items=_modMultiStr(r[c.key],', ',c.multiNoQty,c.multiQtyKae); });
+        msg+=(rows.length>1?((i+1)+') '):'')+(rnCol?(r[rnCol.key]||''):'')+(items?(' — '+items):'')+'\n';
+      });
+      var chats=String(tg.chat_id).split(',').map(function(c){return c.trim();}).filter(Boolean);
+      chats.forEach(function(ch){
+        fetch('https://api.telegram.org/bot'+tg.token+'/sendMessage',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chat_id:ch,text:msg})}).catch(function(){});
+      });
+    }).catch(function(){});
+  }catch(e){}
+}
 // 템플릿의 {라벨} → 해당 컬럼 값으로 치환
 function _modSmsFill(tpl, def, row){
   var s=String(tpl||'');
@@ -3174,6 +3200,7 @@ function submitModApply(){
         });
       });
     }
+    _modTgNotifyApply(def, rows);   // 📮 관리자 텔레그램 알림 (택배봇 설정된 시스템만)
     var _dlUrl=(def.downloadUrl||'').trim();
     var _um=_dlUrl.match(/https?:\/\/\S+/i);          // 앞에 글자 섞여 있어도 URL만 추출
     if(_um) _dlUrl=_um[0];
