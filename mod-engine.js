@@ -587,8 +587,7 @@ function _modCopyExcel(key, idsArr){
   if(idsArr && idsArr.length){ var idset={}; idsArr.forEach(function(i){idset[i]=1;}); data=data.filter(function(r){return idset[r._id];}); }
   if(!data.length) return toast('복사할 내용이 없습니다',true);
   var m=_modCopyCols(def);
-  var head=['주문자','주문자연락처','받는분','연락처','주소','품명'];
-  var lines=[head.join('\t')];
+  var lines=[];   // 헤더(제목) 없이 데이터만 — 기존 엑셀 표에 바로 붙여넣기 좋게
   data.forEach(function(r){
     lines.push([
       _modCellVal(def,m.ordNm,r), _modCellVal(def,m.ordTel,r),
@@ -1005,23 +1004,26 @@ function _modTgNotifyApply(def, rows){
       var m=_modCopyCols(def);   // 주문자·주문자연락처·받는분·연락처·주소·품명 컬럼 (엑셀복사와 동일 식별)
       var v=function(col,r){ return col?_modCellVal(def,col,r):''; };
       // 제목엔 지점(카테고리) 우선 — 지점별로 복제한 모듈들은 이름이 같고 카테고리로 구분됨
+      var _esc=function(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
       var _head=(def.catLabel&&def.catLabel.trim())?def.catLabel.trim():(def.label||'');
-      var msg='📦 '+_head+' 접수!\n';
+      // 제목·주문자 = 코드블록 밖(복사 안 됨) / 받는분 상세 = <pre> 블록(텔레그램 복사 버튼)
+      var msg='📦 '+_esc(_head)+' 접수!\n';
       var on=v(m.ordNm,base), ot=v(m.ordTel,base);
-      if(on) msg+='주문자: '+on+(ot?(' '+ot):'')+'\n';
+      if(on) msg+='주문자: '+_esc(on)+(ot?(' '+_esc(ot)):'')+'\n';
       msg+='받는분 '+rows.length+'명\n';
+      var body=[];
       rows.forEach(function(r,i){
         var parts=[];
         var rn=v(m.recvNm,r); if(rn) parts.push(rn);
         var rt=v(m.recvTel,r); if(rt) parts.push(rt);
         var ad=v(m.addr,r); if(ad) parts.push(ad);
         var it=v(m.item,r); if(it) parts.push(it);
-        msg+='\n'+(rows.length>1?('['+(i+1)+'] '):'')+parts.join('\n');
-        if(rows.length>1) msg+='\n';
+        body.push((rows.length>1?('['+(i+1)+'] '):'')+parts.join('\n'));
       });
+      msg+='<pre>'+_esc(body.join('\n\n'))+'</pre>';   // ← 이 블록에 복사 버튼이 붙음
       var chats=String(tg.chat_id).split(',').map(function(c){return c.trim();}).filter(Boolean);
       chats.forEach(function(ch){
-        fetch('https://api.telegram.org/bot'+tg.token+'/sendMessage',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chat_id:ch,text:msg})}).catch(function(){});
+        fetch('https://api.telegram.org/bot'+tg.token+'/sendMessage',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chat_id:ch,text:msg,parse_mode:'HTML'})}).catch(function(){});
       });
     }).catch(function(){});
   }catch(e){}
