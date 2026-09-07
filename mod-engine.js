@@ -3352,7 +3352,7 @@ function popModSms(key, preSelIds){
   if(typeof smsTplPicker==='function') h+='<button type="button" class="btn btn-s" style="font-size:11px;padding:3px 8px;background:#fbbf24;color:#78350f" onclick="smsTplPicker(\'modSmsBody\',true)">📋 템플릿</button>';
   if(typeof smsTplSaveCurrent==='function') h+='<button type="button" class="btn btn-s" style="font-size:11px;padding:3px 8px" onclick="smsTplSaveCurrent(\'modSmsBody\',window._SMS_POPUP_VARS)">💾 저장</button>';
   h+='</div></div>';
-  h+='<textarea id="modSmsBody" rows="5" oninput="_modSmsByteCount()" placeholder="예: [법성포단오제] '+esc(def.label)+' 안내드립니다. {이름}님 ..." style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;resize:vertical;box-sizing:border-box"></textarea>';
+  h+='<textarea id="modSmsBody" rows="5" oninput="_modSmsByteCount()" placeholder="예: '+esc(def.label)+' 안내드립니다. {이름}님 ..." style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;resize:vertical;box-sizing:border-box"></textarea>';
   h+='<div style="font-size:11px;color:#94a3b8;margin-top:3px">💡 {이름} 등 변수는 발송 시 자동 치환 · 90byte 초과 시 LMS</div>';
 
   // 하단 버튼
