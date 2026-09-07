@@ -1523,6 +1523,9 @@ var TG_BOT_TOKEN = "8761665630:AAGv9FjG4fcxee4hpyjoIjd5wkXm0c-_qV0";
 var TG_CHAT_IDS  = "8613833560";
 var TG_SYS_URL   = "https://junghaewon9776.github.io/bspdano-system/";
 
+
+// 로그인 알림에 붙일 시스템 이름 (SYS_PARENT = 각 시스템 상호/주관)
+function _tgSysTag(){ try{ return (typeof SYS_PARENT!=="undefined"&&SYS_PARENT)?SYS_PARENT:((typeof SYS_NAME!=="undefined"&&SYS_NAME)?SYS_NAME:"시스템"); }catch(e){ return "시스템"; } }
 function _apiNotifyLogin(p) {
   var botToken = TG_BOT_TOKEN;
   var chatIds = TG_CHAT_IDS;
@@ -1541,7 +1544,7 @@ function _apiNotifyLogin(p) {
   }
   var text;
   if (p.logout) {
-    text = "🔒 <b>로그아웃</b>"
+    text = "🔒 <b>[" + _tgSysTag() + "] 로그아웃</b>"
       + "\n• 계정: " + (p.id||"") + (p.nm ? " (" + p.nm + ")" : "")
       + "\n• 역할: " + roleLabel
       + (p.evtNm ? "\n• 행사: " + p.evtNm : "")
@@ -1550,14 +1553,14 @@ function _apiNotifyLogin(p) {
       + (dev ? "\n• 기기: " + dev : "")
       + "\n• 시각: " + now_();
   } else if (p.fail) {
-    text = "❌ <b>로그인 실패</b>"
+    text = "❌ <b>[" + _tgSysTag() + "] 로그인 실패</b>"
       + "\n• 계정: " + (p.id||"")
       + "\n• 사유: " + (p.err||"")
       + "\n• IP: " + (p.ip||"-")
       + (dev ? "\n• 기기: " + dev : "")
       + "\n• 시각: " + now_();
   } else {
-    text = "✅ <b>로그인 성공</b>"
+    text = "✅ <b>[" + _tgSysTag() + "] 로그인 성공</b>"
       + "\n• 계정: " + (p.id||"") + (p.nm ? " (" + p.nm + ")" : "")
       + "\n• 역할: " + roleLabel
       + (p.evtNm ? "\n• 행사: " + p.evtNm : "")
