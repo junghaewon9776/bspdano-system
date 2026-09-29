@@ -1563,33 +1563,105 @@ function modImportExcel(key){
   };
   inp.click();
 }
-function _mshImportAoa(key, aoa){
+// ─── 가져오기 열 짝맞춤 ───
+function _impNorm(s){ return String(s==null?'':s).replace(/[\s_\-·.:*]/g,'').toLowerCase(); }
+// 칸(col) ↔ 파일 제목(h) 점수: 4=지난번에 고른 것 / 3=이름 같음 / 2=별칭 같음 / 1=제목 안에 이름 포함 (예: "성함(받는분)")
+function _impScore(col, h, remember){
+  var hn=_impNorm(h); if(!hn) return 0;
+  if(remember && remember[col.key]===hn) return 4;
+  var names=[col.label,col.key]; var al=(col.aliases||[]);
+  if(names.some(function(n){return _impNorm(n)===hn;})) return 3;
+  if(al.some(function(n){return _impNorm(n)===hn;})) return 2;
+  var all=names.concat(al).map(_impNorm).filter(function(n){return n.length>=2;});
+  if(all.some(function(n){return hn.indexOf(n)>=0;})) return 1;   // 파일 제목 안에 칸 이름이 들어있을 때만 (반대 방향은 "번호"→일반전화번호 같은 오매칭)
+  return 0;
+}
+// 한 제목 줄에 대해 칸별 열 번호 추측 (높은 점수부터, 한 열은 한 칸에만)
+function _impGuess(cols, header, remember){
+  var cand=[];
+  cols.forEach(function(c){ header.forEach(function(h,hi){ var sc=_impScore(c,h,remember); if(sc) cand.push({k:c.key,hi:hi,sc:sc}); }); });
+  cand.sort(function(a,b){ return b.sc-a.sc || a.hi-b.hi; });
+  var map={}, usedH={}, total=0;
+  cand.forEach(function(x){ if(map[x.k]!=null || usedH[x.hi]) return; map[x.k]=x.hi; usedH[x.hi]=1; total+=x.sc; });
+  return {map:map,total:total};
+}
+function _impRemember(key){ try{ return JSON.parse(localStorage.getItem('modImpMap_'+key)||'{}')||{}; }catch(e){ return {}; } }
+function _mshImportMapPop(key, aoa, hdrIdx){
+  if(hdrIdx==null) _epostEnsureCols(key);
+  var def=_modDefs[key]; var cols=_mshCols(def); var rem=_impRemember(key);
+  var maxH=Math.min(10, aoa.length-1);
+  if(hdrIdx==null){   // 제목 줄 자동 찾기 — 위쪽 10줄 중 칸 이름과 가장 잘 맞는 줄
+    var best=-1; hdrIdx=0;
+    for(var r=0;r<maxH;r++){ var g=_impGuess(cols, aoa[r].map(String), rem); if(g.total>best){ best=g.total; hdrIdx=r; } }
+  }
+  var header=aoa[hdrIdx].map(function(v){return String(v==null?'':v).trim();});
+  var sample=aoa[hdrIdx+1]||[];
+  var guess=_impGuess(cols, header, rem).map;
+  window.__impAoa=aoa; window.__impKey=key; window.__impHdr=hdrIdx;
+  var colName=function(i){ var n='',x=i+1; while(x>0){ var m=(x-1)%26; n=String.fromCharCode(65+m)+n; x=Math.floor((x-1)/26);} return n; };
+  var h='<div class="pop-head"><h3>📤 엑셀 열 맞추기 <button class="close-x" onclick="closePopup()">&times;</button></h3></div>';
+  h+='<div style="padding:14px;max-height:75vh;overflow-y:auto">';
+  h+='<div style="font-size:13px;color:#475569;margin-bottom:10px;line-height:1.6">올린 파일의 어느 열을 어느 칸에 넣을지 확인하세요. 자동으로 맞춰 두었으니 <b>틀린 것만</b> 고치면 됩니다.<br>한 번 맞춘 것은 기억해서 다음부터 자동으로 맞춰져요.</div>';
+  h+='<label style="display:flex;align-items:center;gap:8px;font-size:13px;margin-bottom:10px;background:#f1f5f9;padding:8px 10px;border-radius:8px">제목이 있는 줄';
+  h+='<select onchange="_mshImportMapPop(window.__impKey, window.__impAoa, Number(this.value))" style="padding:5px 8px;border:1px solid #cbd5e1;border-radius:6px">';
+  for(var r2=0;r2<maxH;r2++){ var prev=aoa[r2].map(String).filter(function(v){return v.trim();}).slice(0,3).join(', '); h+='<option value="'+r2+'"'+(r2===hdrIdx?' selected':'')+'>'+(r2+1)+'번째 줄 ('+esc(prev.slice(0,30))+')</option>'; }
+  h+='</select><span style="color:#94a3b8;font-size:11px">그 아래 '+(aoa.length-hdrIdx-1)+'줄을 가져옵니다</span></label>';
+  h+='<table class="tbl" style="font-size:13px;margin:0"><thead><tr><th style="white-space:nowrap">이 시스템 칸</th><th>← 파일의 열</th></tr></thead><tbody>';
+  cols.forEach(function(c){
+    var sel=guess[c.key];
+    h+='<tr><td style="white-space:nowrap;font-weight:700">'+esc(c.label)+(c.required?' <span style="color:#ef4444">*</span>':'')+'</td><td>';
+    h+='<select class="imp_map" data-k="'+esc(c.key)+'" style="width:100%;padding:6px 8px;border:1px solid '+(sel!=null?'#16a34a':'#cbd5e1')+';border-radius:6px;background:'+(sel!=null?'#f0fdf4':'#fff')+'" onchange="this.style.borderColor=this.value===\'\'?\'#cbd5e1\':\'#16a34a\';this.style.background=this.value===\'\'?\'#fff\':\'#f0fdf4\'">';
+    h+='<option value="">— 안 가져옴 —</option>';
+    header.forEach(function(hd,hi){
+      if(!hd && !String(sample[hi]==null?'':sample[hi]).trim()) return;
+      var ex=String(sample[hi]==null?'':sample[hi]).trim();
+      h+='<option value="'+hi+'"'+(sel===hi?' selected':'')+'>'+colName(hi)+'열: '+esc(hd||'(제목 없음)')+(ex?' — 예: '+esc(ex.slice(0,20)):'')+'</option>';
+    });
+    h+='</select></td></tr>';
+  });
+  h+='</tbody></table>';
+  h+='<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px">';
+  h+='<button class="btn" style="background:#475569;color:#fff" onclick="closePopup()">취소</button>';
+  h+='<button class="btn" style="background:#0d9488;color:#fff;font-weight:700;padding:10px 18px" onclick="_mshImportMapGo()">이대로 가져오기</button>';
+  h+='</div></div>';
+  openPopup(h, 620);
+}
+function _mshImportMapGo(){
+  var key=window.__impKey, aoa=window.__impAoa, hdr=window.__impHdr||0; if(!aoa) return;
+  var header=aoa[hdr].map(function(v){return String(v==null?'':v).trim();});
+  var map={}, rem=_impRemember(key), usedBy={}, dup='';
+  var def=_modDefs[key]||{};
+  document.querySelectorAll('.imp_map').forEach(function(sel){
+    var k=sel.getAttribute('data-k');
+    if(sel.value===''){ delete rem[k]; return; }
+    var hi=Number(sel.value); map[k]=hi;
+    if(usedBy[hi]!=null && !dup) dup=header[hi]||(hi+1)+'번째 열';
+    usedBy[hi]=k;
+    rem[k]=_impNorm(header[hi]);
+  });
+  if(!Object.keys(map).length) return toast('가져올 칸을 하나 이상 골라주세요',true);
+  var miss=(_mshCols(def)).filter(function(c){return c.required && map[c.key]==null;}).map(function(c){return c.label;});
+  if(miss.length && !confirm('필수 칸 "'+miss.join(', ')+'" 에 연결된 열이 없습니다.\n그래도 가져올까요? (나중에 직접 채워야 해요)')) return;
+  if(dup && !confirm('"'+dup+'" 열이 두 칸에 연결돼 있어요. 그대로 진행할까요?')) return;
+  try{ localStorage.setItem('modImpMap_'+key, JSON.stringify(rem)); }catch(e){}
+  closePopup();
+  _mshImportAoa(key, aoa.slice(hdr), map);
+}
+// 엑셀 가져오기 — 파일 열 그대로 올리고, 「어느 열 → 어느 칸」 확인 창에서 맞춘 뒤 가져옴
+//   colMapKeys 없으면: 제목 줄 자동 찾기 + 자동 짝맞춤 → 확인 창 표시
+//   colMapKeys 있으면({칸key: 열번호}): 그대로 가져오기 실행
+function _mshImportAoa(key, aoa, colMapKeys){
   var def=_modDefs[key]; var cols=_mshCols(def);
   aoa=(aoa||[]).filter(function(r){ return r&&r.some(function(v){return String(v).trim()!==''; }); });
-  if(aoa.length<2) return toast('데이터가 없습니다 (첫 행=제목, 둘째 행부터 데이터)',true);
+  if(aoa.length<2) return toast('데이터가 없습니다 (제목 줄 + 데이터 줄이 필요합니다)',true);
+  if(!colMapKeys) return _mshImportMapPop(key, aoa);
   var header=aoa[0].map(function(s){return String(s).trim();});
-  // "고유번호" 열 위치 (있으면 그 행은 기존 데이터 업데이트, 비었으면 신규)
   var idCol=-1;
   header.forEach(function(hl,i){ if(hl==='고유번호'||hl==='_id'||hl==='QR번호') idCol=i; });
-  // 헤더 라벨 → 컬럼 인덱스 매핑
-  var _hn=function(s){ return String(s||'').replace(/\s+/g,''); };
-  var _used={};
-  var colMap=header.map(function(hLabel){
-    for(var i=0;i<cols.length;i++){ if(cols[i].label===hLabel||cols[i].key===hLabel){ _used[cols[i].key]=1; return cols[i]; } }
-    return null;
-  });
-  // 정확히 안 맞은 제목은 별칭(col.aliases)으로 한 번 더 — 같은 칸에 두 번 매핑되지 않게
-  colMap=colMap.map(function(c,hi){
-    if(c) return c;
-    var hl=_hn(header[hi]); if(!hl) return null;
-    for(var i=0;i<cols.length;i++){
-      if(_used[cols[i].key]) continue;
-      if((cols[i].aliases||[]).some(function(a){return _hn(a)===hl;})){ _used[cols[i].key]=1; return cols[i]; }
-    }
-    return null;
-  });
+  var colMap=header.map(function(){return null;});
+  cols.forEach(function(c){ var hi=colMapKeys[c.key]; if(hi!=null && hi>=0 && hi<colMap.length) colMap[hi]=c; });
   var matched=colMap.filter(Boolean).length;
-  if(!matched) return toast('일치하는 컬럼명이 없습니다. 제목 행이 "'+cols.map(function(c){return c.label;}).join(', ')+'" 와 같아야 합니다',true);
+  if(!matched) return toast('가져올 칸을 하나 이상 골라주세요',true);
 
   // 기존 데이터 (고유번호로 찾기)
   var data=(_modData[key]||[]).slice();
@@ -5484,7 +5556,7 @@ function _modStatDate(c, data){
 //   받는 분 / 우편번호 / 주소 / 상세주소 / 일반전화 / 휴대전화 / 등기번호(선납소포라벨만) / 중량(g)
 // ═══════════════════════════════════════════
 var EPOST_COLS=[
-  {key:'nm',   label:'받는분',  type:'text', required:true, search:true, aliases:['이름','성명','수취인','받는사람','받는 분','수신인','수신자']},
+  {key:'nm',   label:'받는분',  type:'text', required:true, search:true, aliases:['이름','성함','성명','수취인','받는사람','받는 분','수신인','수신자']},
   {key:'pos',  label:'직책',    type:'text', search:true, aliases:['직위','직함','직급']},
   {key:'zip',  label:'우편번호',type:'text', search:true, placeholder:'12345', aliases:['우편','새우편번호','우편번호(5자리)']},
   {key:'addr1',label:'기본주소',type:'text', required:true, search:true, addrSearch:true, zipKey:'zip', detailKey:'addr2', placeholder:'주소검색을 누르거나 직접 입력', aliases:['주소','도로명주소','주소1','받는분주소','받는분 주소']},
@@ -5501,6 +5573,18 @@ function _epostCreateModule(){
     global:true, adminTab:true, columns:JSON.parse(JSON.stringify(EPOST_COLS)), features:{search:true,excel:true,epost:true}});
   _saveModDefs().then(function(){ toast('📮 등기우편 모듈 생성됨'); if(typeof mkTabs==='function') mkTabs(); draw(); })
     .catch(function(e){ delete _modDefs[key]; toast('생성 실패: '+(e.message||e),true); });
+}
+// 예전에 만든 등기우편 모듈에 새로 생긴 칸(직책 등)이 없으면 채워 넣기
+function _epostEnsureCols(key){
+  var def=_modDefs[key]; if(!def||!def.features||!def.features.epost) return;
+  var have={}; (def.columns||[]).forEach(function(c){ have[c.key]=1; });
+  var add=EPOST_COLS.filter(function(c){ return !have[c.key]; }); if(!add.length) return;
+  add.forEach(function(c){
+    var at=EPOST_COLS.indexOf(c), prevKey=at>0?EPOST_COLS[at-1].key:null;
+    var pi=prevKey?def.columns.findIndex(function(x){return x.key===prevKey;}):-1;
+    def.columns.splice(pi+1,0,JSON.parse(JSON.stringify(c)));
+  });
+  _saveModDefs().then(function(){ toast('📮 등기우편에 '+add.map(function(c){return c.label;}).join(', ')+' 칸 추가됨'); }).catch(function(){});
 }
 function _epostDigits(s){ return String(s==null?'':s).replace(/[^0-9]/g,''); }
 function _epostTel(s){
