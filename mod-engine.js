@@ -3644,18 +3644,18 @@ function _saveModLabelLayout(key,mode,layout){ try{ localStorage.setItem('modLab
 
 function _modLabelOpt(key){
   var def=_modDefs[key]||{};
-  var mode='label', titleKey='', fields=null, suffix='';
-  try{ var s=localStorage.getItem('modLabelOpt_'+key); if(s){ var o=JSON.parse(s); mode=o.mode||'label'; titleKey=o.titleKey||''; fields=o.fields||null; suffix=o.suffix||''; } }catch(e){}
+  var mode='label', titleKey='', fields=null, suffix='', showLbl;
+  try{ var s=localStorage.getItem('modLabelOpt_'+key); if(s){ var o=JSON.parse(s); mode=o.mode||'label'; titleKey=o.titleKey||''; fields=o.fields||null; suffix=o.suffix||''; showLbl=o.showLbl; } }catch(e){}
   if(!titleKey){ var c0=(def.columns||[]).filter(function(c){return !c.adminOnly&&c.key!=='status'&&!c.hideTable})[0]; titleKey=c0?c0.key:''; }
   var sizes=_modLabelSizes(key);
   var cur=sizes[mode]||sizes.label;
-  var d=Object.assign({mode:mode,titleKey:titleKey,suffix:suffix,fields:fields,sizes:sizes}, cur);
+  var d=Object.assign({mode:mode,titleKey:titleKey,suffix:suffix,showLbl:showLbl,fields:fields,sizes:sizes}, cur);
   d.layout=_modLabelLayout(key,mode);
   return d;
 }
 function _saveModLabelOpt(key,opt){
   try{
-    var save={mode:opt.mode,titleKey:opt.titleKey,suffix:opt.suffix||'',fields:opt.fields,sizes:opt.sizes};
+    var save={mode:opt.mode,titleKey:opt.titleKey,suffix:opt.suffix||'',showLbl:opt.showLbl,fields:opt.fields,sizes:opt.sizes};
     localStorage.setItem('modLabelOpt_'+key, JSON.stringify(save));
   }catch(e){}
 }
@@ -3693,7 +3693,7 @@ function _mlCurrentPreset(name){
     name:name, mode:opt.mode,
     w:opt.w,h:opt.h,pt:opt.pt,pr:opt.pr,pb:opt.pb,pl:opt.pl,
     gap:opt.gap,sheetMargin:opt.sheetMargin,border:opt.border,qr:opt.qr,orientation:opt.orientation,
-    titleKey:opt.titleKey, suffix:opt.suffix||'', fields:opt.fields, layout:opt.layout
+    titleKey:opt.titleKey, suffix:opt.suffix||'', showLbl:opt.showLbl, fields:opt.fields, layout:opt.layout
   };
 }
 function _mlPresetSaveNew(){
@@ -3748,6 +3748,7 @@ function _mlPresetLoad(){
   _mlSetSizeInputs(window.__mlSizes[mode]);
   var t=document.getElementById('ml_title'); if(t&&p.titleKey) t.value=p.titleKey;
   var sfx=document.getElementById('ml_suffix'); if(sfx){ sfx.value=p.suffix||''; if(sfx.value!==(p.suffix||'')) sfx.value=''; }
+  var slb=document.getElementById('ml_showlbl'); if(slb && p.showLbl!=null) slb.checked=!!p.showLbl;
   document.querySelectorAll('.ml_field').forEach(function(cb){ cb.checked = p.fields ? (p.fields.indexOf(cb.value)>=0) : true; });
   if(p.layout) _saveModLabelLayout(key, mode, p.layout);
   else { try{ localStorage.removeItem('modLabelLayout_'+key+'_'+mode); }catch(e){} }
@@ -3797,6 +3798,13 @@ function _mlTitleSuffix(def,row,opt,titleV){
   if(s==='_pos'){ var pc=_mlPosCol(def); var pv=pc?String(row[pc.key]==null?'':row[pc.key]).trim():''; return pv?t+' '+pv:t; }
   return t+' '+s;
 }
+// 뒤에 붙일 말이 붙는 칸 — 등기우편은 받는분(nm)이 어디 찍히든, 그 외엔 크게 표시할 항목
+function _mlSuffixKey(def,opt){
+  if(def.features&&def.features.epost&&(def.columns||[]).some(function(c){return c.key==='nm';})) return 'nm';
+  return opt.titleKey||'';
+}
+// 칸 이름(제목) 붙이기 — 저장값 없으면 등기우편은 끔, 나머지는 켬(기존 그대로)
+function _mlShowLbl(def,opt){ return (opt.showLbl==null) ? !(def.features&&def.features.epost) : !!opt.showLbl; }
 function _modLabelHtml(def,row,opt){
   var allc=(def.columns||[]).filter(function(c){return c.key!=='status'&&!c.hideTable&&c.type!=='file'&&c.type!=='consent'});
   var hasFields=!!(opt.fields&&opt.fields.length);
@@ -3807,7 +3815,8 @@ function _modLabelHtml(def,row,opt){
   var url=_modViewUrl(def,row);
   var qr='https://api.qrserver.com/v1/create-qr-code/?size=160x160&margin=0&data='+encodeURIComponent(url);
   var titleV = opt.titleKey ? (row[opt.titleKey]||'') : (cols[0]?row[cols[0].key]:'');
-  titleV = _mlTitleSuffix(def,row,opt,titleV);
+  var _sk=_mlSuffixKey(def,opt), _showLbl=_mlShowLbl(def,opt);
+  if(opt.titleKey && opt.titleKey===_sk) titleV = _mlTitleSuffix(def,row,opt,titleV);
   // QR 크기: 지정(opt.qr>0)하면 그 mm로 정사각형, 아니면 자동. 라벨 안 넘치게 제한
   var qrmm = (opt.qr&&opt.qr>0) ? opt.qr : Math.min((opt.h-opt.pt-opt.pb), opt.w*0.34);
   qrmm = Math.max(8, Math.min(qrmm, opt.h-opt.pt-opt.pb, opt.w-opt.pl-opt.pr));
@@ -3831,12 +3840,13 @@ function _modLabelHtml(def,row,opt){
       var fp=pos[c.key]||null;
       if(!fp) return;
       var pv=_modPlain(c,v);
+      if(c.key===_sk) pv=_mlTitleSuffix(def,row,opt,pv);
       pv=_modMaskVal(pv,fp);
-      var plain=c.label+(fp.colon?': ':' ')+pv;
+      var plain=(_showLbl?c.label+(fp.colon?': ':' '):'')+pv;
       var ef=_mlElemFit(fp, plain, fp.fs||7.5, opt.w, opt.h);
       var sep=fp.brk?((fp.colon?':':'')+'<br>'):(fp.colon?': ':' ');
       var lbl=fp.bold?esc(c.label):'<b>'+esc(c.label)+'</b>';
-      h+='<div style="position:absolute;left:'+fp.x+'%;top:'+fp.y+'%;font-size:'+ef.fs+'pt;line-height:1.3;color:#222;'+(fp.bold?'font-weight:800;':'')+ef.css+'">'+lbl+sep+esc(pv)+'</div>';
+      h+='<div style="position:absolute;left:'+fp.x+'%;top:'+fp.y+'%;font-size:'+ef.fs+'pt;line-height:1.3;color:#222;'+(fp.bold?'font-weight:800;':'')+ef.css+'">'+(_showLbl?lbl+sep:'')+esc(pv)+'</div>';
     });
     h+='</div>';
     return h;
@@ -3847,7 +3857,8 @@ function _modLabelHtml(def,row,opt){
   cols.forEach(function(c){
     if(c.key===opt.titleKey) return;
     var v=row[c.key]; if(v==null||v==='') return;
-    h+='<div style="font-size:7.5pt;line-height:1.3;color:#222"><b>'+esc(c.label)+'</b> '+esc(_modPlain(c,v))+'</div>';
+    var _pv=_modPlain(c,v); if(c.key===_sk) _pv=_mlTitleSuffix(def,row,opt,_pv);
+    h+='<div style="font-size:7.5pt;line-height:1.3;color:#222">'+(_showLbl?'<b>'+esc(c.label)+'</b> ':'')+esc(_pv)+'</div>';
   });
   h+='</div>';
   if(showQr) h+='<img src="'+qr+'" style="width:'+qrmm+'mm;height:'+qrmm+'mm;align-self:flex-start;flex-shrink:0">';
@@ -3947,6 +3958,7 @@ function popModLabel(key,singleId,idsList){
   // QR 코드 표시 항목 (작은 라벨에선 끌 수 있게)
   h+='<label style="font-size:12px;display:flex;align-items:center;gap:3px;background:#ede9fe;padding:3px 8px;border-radius:6px;font-weight:700;color:#6d28d9"><input type="checkbox" class="ml_field" value="_qr"'+(checkedFields.indexOf('_qr')>=0?' checked':'')+' onchange="_modLabelPreview()"> ▣ QR코드</label>';
   h+='</div></div>';
+  h+='<label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;color:#334155;background:#fef9c3;border:1px solid #fde047;border-radius:8px;padding:8px 10px;margin-bottom:10px;cursor:pointer"><input id="ml_showlbl" type="checkbox"'+(_mlShowLbl(def,opt)?' checked':'')+' onchange="_modLabelPreview()" style="width:17px;height:17px"> 칸 이름(제목) 붙이기 <span style="font-weight:400;color:#64748b;font-size:11px">켜면 「기본주소 전남…」, 끄면 「전남…」만</span></label>';
 
   // ── 출력 대상 선택 (체크 / 전체선택·해제 / Shift 범위 / 상태별) ──
   if(!singleId){
@@ -4112,6 +4124,7 @@ function _modLabelReadOpt(){
     mode:mode,
     titleKey:(document.getElementById('ml_title')||{}).value||'',
     suffix:(document.getElementById('ml_suffix')||{}).value||'',
+    showLbl:(function(){ var e=document.getElementById('ml_showlbl'); return e?e.checked:undefined; })(),
     fields:fields,
     layout:layout,
     sizes:sizes
@@ -4828,6 +4841,8 @@ function _mllRender(){
   var pos=L.pos;
   var row=(_modData[L.key]||[])[0]||{};
   var titleV=L.opt.titleKey?(row[L.opt.titleKey]||'샘플제목'):'샘플제목';
+  var _sk=_mlSuffixKey(L.def,L.opt), _showLbl=_mlShowLbl(L.def,L.opt);
+  if(L.opt.titleKey && L.opt.titleKey===_sk) titleV=_mlTitleSuffix(L.def,row,L.opt,titleV);
   var html='';
   var colors=['#6366f1','#0ea5e9','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#14b8a6'];
   var ci=0;
@@ -4840,9 +4855,10 @@ function _mllRender(){
     if(c.key===L.opt.titleKey) return;
     var fp=pos[c.key]||{x:4,y:20,fs:7.5};
     ci=(ci+1)%colors.length;
-    var v=_modMaskVal(row[c.key]||'샘플',fp);
+    var _rv=row[c.key]||'샘플'; if(c.key===_sk) _rv=_mlTitleSuffix(L.def,row,L.opt,_rv);
+    var v=_modMaskVal(_rv,fp);
     var sepC=fp.brk?((fp.colon?':':'')+'\n'):(fp.colon?': ':' ');
-    items.push({id:c.key,label:c.label,text:c.label+sepC+v,x:fp.x,y:fp.y,fs:fp.fs||7.5,bold:fp.bold,mode:(fp.mode||(fp.wrap?'wrap':'line')),w:fp.w,align:fp.align,vert:fp.vert,color:colors[ci]});
+    items.push({id:c.key,label:c.label,text:(_showLbl?c.label+sepC:'')+v,x:fp.x,y:fp.y,fs:fp.fs||7.5,bold:fp.bold,mode:(fp.mode||(fp.wrap?'wrap':'line')),w:fp.w,align:fp.align,vert:fp.vert,color:colors[ci]});
   });
   var qp=pos['_qr']||{x:70,y:4,w:25};
   var qSize=Math.round((qp.w||25)*SCALE);
