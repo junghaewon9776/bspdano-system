@@ -195,6 +195,8 @@ function dMod(key){
   if(isA() && feat.applyForm) h+='<button class="btn" style="background:#0ea5e9;color:#fff" onclick="popModFormLink(\''+key+'\')">🔗 신청폼 링크</button>';
   if(isA()) h+='<button class="btn" style="background:#0891b2;color:#fff" onclick="_modCopyShortcut(\''+key+'\')" title="이 모듈로 바로 가는 링크 복사 (담당자용 — 로그인하면 이 화면)">🔗 바로가기 링크</button>';
   if(isA() && _hasTel) h+='<button class="btn" style="background:#8b5cf6;color:#fff" onclick="popModSms(\''+key+'\')">💬 문자 직접 보내기</button>';
+  if(isA() && feat.epost) h+='<button class="btn" style="background:#dc2626;color:#fff" onclick="popEpostExport(\''+key+'\')" title="인터넷우체국 간편사전접수에 올릴 받는분 파일">📮 우체국 사전접수 파일</button>';
+  if(isA() && feat.epost && typeof mems!=='undefined') h+='<button class="btn" style="background:#0369a1;color:#fff" onclick="popEpostFromMems(\''+key+'\')">👥 회원에서 가져오기</button>';
   if(isA()) h+='<button class="btn" style="background:#475569;color:#fff" onclick="popModLabel(\''+key+'\')">🖨 라벨 출력</button>';
   if(isA()) h+='<button class="btn btn-b" onclick="popModAdd(\''+key+'\')">➕ 추가</button>';
   if(isA()) h+='<button class="btn" style="background:#e67e22;color:#fff" onclick="popModStat(\''+key+'\')">📊 통계</button>';
@@ -362,6 +364,7 @@ function _modListHtml(key){
     h+='<div id="_modSelBar_'+key+'" style="display:'+(selCount?'flex':'none')+';align-items:center;gap:8px;flex-wrap:wrap;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:8px 12px;margin-bottom:8px;position:sticky;top:0;z-index:20;box-shadow:0 2px 8px rgba(37,99,235,.15)">';
     h+='<b style="color:#2563eb;font-size:13px"><span id="_modSelCnt_'+key+'">'+selCount+'</span>개 선택</b>';
     h+='<button class="btn btn-s" style="background:#475569;color:#fff" onclick="popModLabelSel(\''+key+'\')">🖨 라벨 출력</button>';
+    if(feat.epost) h+='<button class="btn btn-s" style="background:#dc2626;color:#fff" onclick="popEpostExport(\''+key+'\',_modSelIds(\''+key+'\'))">📮 사전접수 파일</button>';
     if((def.columns||[]).some(function(c){return c.type==='tel';})) h+='<button class="btn btn-s" style="background:#8b5cf6;color:#fff" onclick="popModSmsSel(\''+key+'\')">💬 문자 직접 보내기</button>';
     // 상태배지 칼럼 전부 처리 버튼 표시 (2개 이상이면 칼럼명 prefix)
     var _badgeCols=(def.columns||[]).filter(function(c){return c.type==='badge'&&c.badgeMap;});
@@ -977,6 +980,11 @@ function _modFormField(col,val,idOverride){
       ah+='<input id="'+id+'_detail" value="'+esc(_adet)+'" placeholder="상세주소 (동·호수 등)" style="width:100%;'+_ais+';margin-top:6px">';
       return ah;
     default:
+      // addrSearch: 일반 글자칸 옆에 🔍 주소검색 (결과를 이 칸 + zipKey 칸에 채움) — 등기우편처럼 우편번호/기본주소/상세주소를 따로 저장할 때
+      if(col.addrSearch && !idOverride){
+        return '<div style="display:flex;gap:6px"><input id="'+id+'" type="text" value="'+ev+'"'+(col.placeholder?' placeholder="'+esc(col.placeholder)+'"':'')+' style="flex:1;min-width:0;'+_w+'">'
+          +'<button type="button" onclick="_modAddrSearchTo(\''+id+'\',\''+esc(col.zipKey||'')+'\',\''+esc(col.detailKey||'')+'\')" style="flex-shrink:0;padding:8px 12px;border:none;border-radius:8px;background:#2563eb;color:#fff;font-weight:700;cursor:pointer;white-space:nowrap">🔍 주소검색</button></div>';
+      }
       return '<input id="'+id+'" type="text" value="'+ev+'"'+(col.placeholder?' placeholder="'+esc(col.placeholder)+'"':'')+' style="'+_w+'">';
   }
 }
@@ -1101,6 +1109,21 @@ function _modAddrSearch(inputId){
       }}).open();
     }catch(e){ if(typeof toast==='function') toast('주소검색 오류: '+(e.message||e),true); }
   }
+  _modLoadPostcode(open);
+}
+// 우편번호/기본주소를 각각 다른 칸(mod_f_{zipKey})에 채우는 버전
+function _modAddrSearchTo(addrId, zipKey, detailKey){
+  _modLoadPostcode(function(){
+    try{
+      new daum.Postcode({ oncomplete:function(data){
+        var el=document.getElementById(addrId); if(el) el.value=data.roadAddress||data.jibunAddress||data.address||'';
+        var z=zipKey?document.getElementById('mod_f_'+zipKey):null; if(z) z.value=data.zonecode||'';
+        var d=detailKey?document.getElementById('mod_f_'+detailKey):null; if(d){ try{d.focus();}catch(e){} }
+      }}).open();
+    }catch(e){ if(typeof toast==='function') toast('주소검색 오류: '+(e.message||e),true); }
+  });
+}
+function _modLoadPostcode(open){
   if(typeof daum!=='undefined' && daum.Postcode){ open(); return; }
   var s=document.createElement('script');
   s.src='https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js';
@@ -1549,8 +1572,20 @@ function _mshImportAoa(key, aoa){
   var idCol=-1;
   header.forEach(function(hl,i){ if(hl==='고유번호'||hl==='_id'||hl==='QR번호') idCol=i; });
   // 헤더 라벨 → 컬럼 인덱스 매핑
+  var _hn=function(s){ return String(s||'').replace(/\s+/g,''); };
+  var _used={};
   var colMap=header.map(function(hLabel){
-    for(var i=0;i<cols.length;i++){ if(cols[i].label===hLabel||cols[i].key===hLabel) return cols[i]; }
+    for(var i=0;i<cols.length;i++){ if(cols[i].label===hLabel||cols[i].key===hLabel){ _used[cols[i].key]=1; return cols[i]; } }
+    return null;
+  });
+  // 정확히 안 맞은 제목은 별칭(col.aliases)으로 한 번 더 — 같은 칸에 두 번 매핑되지 않게
+  colMap=colMap.map(function(c,hi){
+    if(c) return c;
+    var hl=_hn(header[hi]); if(!hl) return null;
+    for(var i=0;i<cols.length;i++){
+      if(_used[cols[i].key]) continue;
+      if((cols[i].aliases||[]).some(function(a){return _hn(a)===hl;})){ _used[cols[i].key]=1; return cols[i]; }
+    }
     return null;
   });
   var matched=colMap.filter(Boolean).length;
@@ -1573,6 +1608,7 @@ function _mshImportAoa(key, aoa){
       fields[c.key]=v;
     });
     if(!anyVal) continue;
+    if(def.features&&def.features.epost) _epostFixRow(fields);
     var rid = idCol>=0 ? String(aoa[r][idCol]==null?'':aoa[r][idCol]).trim() : '';
     if(rid && byId[rid]!=null){
       // 기존 행 업데이트 (고유번호·QR 유지)
@@ -1953,6 +1989,7 @@ function dModManager(){
   var h='<div class="card"><h3 style="margin-bottom:4px">📦 모듈 관리</h3>';
   h+='<p class="mut" style="margin-bottom:16px">코드 없이 데이터 관리 탭을 추가합니다. 모듈을 정의하면 자동으로 테이블·추가/수정 폼·검색·엑셀이 생성됩니다.</p>';
   h+='<button class="btn btn-b" onclick="popModDef(-1)" style="margin-bottom:16px">➕ 새 모듈 만들기</button>';
+  if(!defs.some(function(d){return d.features&&d.features.epost;})) h+=' <button class="btn" onclick="_epostCreateModule()" style="margin-bottom:16px;background:#dc2626;color:#fff">📮 등기우편 모듈 바로 만들기</button>';
 
   if(!defs.length){
     h+='<div class="empty2" style="padding:40px">정의된 모듈이 없습니다</div>';
@@ -3535,18 +3572,18 @@ function _saveModLabelLayout(key,mode,layout){ try{ localStorage.setItem('modLab
 
 function _modLabelOpt(key){
   var def=_modDefs[key]||{};
-  var mode='label', titleKey='', fields=null;
-  try{ var s=localStorage.getItem('modLabelOpt_'+key); if(s){ var o=JSON.parse(s); mode=o.mode||'label'; titleKey=o.titleKey||''; fields=o.fields||null; } }catch(e){}
+  var mode='label', titleKey='', fields=null, suffix='';
+  try{ var s=localStorage.getItem('modLabelOpt_'+key); if(s){ var o=JSON.parse(s); mode=o.mode||'label'; titleKey=o.titleKey||''; fields=o.fields||null; suffix=o.suffix||''; } }catch(e){}
   if(!titleKey){ var c0=(def.columns||[]).filter(function(c){return !c.adminOnly&&c.key!=='status'&&!c.hideTable})[0]; titleKey=c0?c0.key:''; }
   var sizes=_modLabelSizes(key);
   var cur=sizes[mode]||sizes.label;
-  var d=Object.assign({mode:mode,titleKey:titleKey,fields:fields,sizes:sizes}, cur);
+  var d=Object.assign({mode:mode,titleKey:titleKey,suffix:suffix,fields:fields,sizes:sizes}, cur);
   d.layout=_modLabelLayout(key,mode);
   return d;
 }
 function _saveModLabelOpt(key,opt){
   try{
-    var save={mode:opt.mode,titleKey:opt.titleKey,fields:opt.fields,sizes:opt.sizes};
+    var save={mode:opt.mode,titleKey:opt.titleKey,suffix:opt.suffix||'',fields:opt.fields,sizes:opt.sizes};
     localStorage.setItem('modLabelOpt_'+key, JSON.stringify(save));
   }catch(e){}
 }
@@ -3584,7 +3621,7 @@ function _mlCurrentPreset(name){
     name:name, mode:opt.mode,
     w:opt.w,h:opt.h,pt:opt.pt,pr:opt.pr,pb:opt.pb,pl:opt.pl,
     gap:opt.gap,sheetMargin:opt.sheetMargin,border:opt.border,qr:opt.qr,orientation:opt.orientation,
-    titleKey:opt.titleKey, fields:opt.fields, layout:opt.layout
+    titleKey:opt.titleKey, suffix:opt.suffix||'', fields:opt.fields, layout:opt.layout
   };
 }
 function _mlPresetSaveNew(){
@@ -3638,6 +3675,7 @@ function _mlPresetLoad(){
   var a4=document.getElementById('ml_a4opts'); if(a4) a4.style.display=(mode==='a4')?'block':'none';
   _mlSetSizeInputs(window.__mlSizes[mode]);
   var t=document.getElementById('ml_title'); if(t&&p.titleKey) t.value=p.titleKey;
+  var sfx=document.getElementById('ml_suffix'); if(sfx){ sfx.value=p.suffix||''; if(sfx.value!==(p.suffix||'')) sfx.value=''; }
   document.querySelectorAll('.ml_field').forEach(function(cb){ cb.checked = p.fields ? (p.fields.indexOf(cb.value)>=0) : true; });
   if(p.layout) _saveModLabelLayout(key, mode, p.layout);
   else { try{ localStorage.removeItem('modLabelLayout_'+key+'_'+mode); }catch(e){} }
@@ -3679,6 +3717,14 @@ function _mlElemFit(p, plain, baseFs, labelWmm, labelHmm){
   return {css:css, fs:fs};
 }
 
+// 이름 뒤에 붙일 말 — opt.suffix: ''(없음) / '귀하' / '님' / '_pos'(직책 칸 값)
+function _mlPosCol(def){ return (def.columns||[]).find(function(c){return /^(직책|직위|직함|직급)$/.test(String(c.label||'').trim());})||null; }
+function _mlTitleSuffix(def,row,opt,titleV){
+  var s=opt.suffix||''; var t=String(titleV==null?'':titleV).trim();
+  if(!s||!t) return titleV;
+  if(s==='_pos'){ var pc=_mlPosCol(def); var pv=pc?String(row[pc.key]==null?'':row[pc.key]).trim():''; return pv?t+' '+pv:t; }
+  return t+' '+s;
+}
 function _modLabelHtml(def,row,opt){
   var allc=(def.columns||[]).filter(function(c){return c.key!=='status'&&!c.hideTable&&c.type!=='file'&&c.type!=='consent'});
   var hasFields=!!(opt.fields&&opt.fields.length);
@@ -3689,6 +3735,7 @@ function _modLabelHtml(def,row,opt){
   var url=_modViewUrl(def,row);
   var qr='https://api.qrserver.com/v1/create-qr-code/?size=160x160&margin=0&data='+encodeURIComponent(url);
   var titleV = opt.titleKey ? (row[opt.titleKey]||'') : (cols[0]?row[cols[0].key]:'');
+  titleV = _mlTitleSuffix(def,row,opt,titleV);
   // QR 크기: 지정(opt.qr>0)하면 그 mm로 정사각형, 아니면 자동. 라벨 안 넘치게 제한
   var qrmm = (opt.qr&&opt.qr>0) ? opt.qr : Math.min((opt.h-opt.pt-opt.pb), opt.w*0.34);
   qrmm = Math.max(8, Math.min(qrmm, opt.h-opt.pt-opt.pb, opt.w-opt.pl-opt.pr));
@@ -3812,7 +3859,14 @@ function popModLabel(key,singleId,idsList){
   h+='<div id="ml_a4info" style="font-size:11px;color:#64748b;margin-top:6px"></div>';
   h+='</div>';
 
-  h+='<label style="font-size:12px;color:#475569;display:block;margin-bottom:10px">크게 표시할 항목<select id="ml_title" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:6px" onchange="_modLabelPreview()">'+fieldOpts+'</select></label>';
+  h+='<div style="display:flex;gap:8px;margin-bottom:10px">';
+  h+='<label style="flex:2;font-size:12px;color:#475569">크게 표시할 항목<select id="ml_title" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:6px" onchange="_modLabelPreview()">'+fieldOpts+'</select></label>';
+  var _posCol=_mlPosCol(def), _sf=opt.suffix||'';
+  if(_sf==='_pos'&&!_posCol) _sf='';
+  h+='<label style="flex:1;font-size:12px;color:#475569">뒤에 붙일 말<select id="ml_suffix" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:6px" onchange="_modLabelPreview()">';
+  if(_posCol) h+='<option value="_pos"'+(_sf==='_pos'?' selected':'')+'>'+esc(_posCol.label)+' (예: 홍길동 회장)</option>';
+  [['','없음'],['귀하','귀하'],['님','님']].forEach(function(o){ h+='<option value="'+o[0]+'"'+(_sf===o[0]?' selected':'')+'>'+o[1]+'</option>'; });
+  h+='</select></label></div>';
   h+='<div style="font-size:12px;color:#475569;margin-bottom:10px">라벨에 표시할 항목 <span style="font-size:10px;color:#94a3b8">(체크한 것만, 컬럼 순서대로 · 위치/글씨크기는 「📐 배치 편집」)</span>';
   h+='<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:5px">';
   allCols.forEach(function(c){
@@ -3985,6 +4039,7 @@ function _modLabelReadOpt(){
   return Object.assign({
     mode:mode,
     titleKey:(document.getElementById('ml_title')||{}).value||'',
+    suffix:(document.getElementById('ml_suffix')||{}).value||'',
     fields:fields,
     layout:layout,
     sizes:sizes
@@ -5420,4 +5475,213 @@ function _modStatDate(c, data){
   }
   body+='<div style="font-size:11px;color:#94a3b8;margin-top:4px">입력 '+filled+' · 미입력 '+(data.length-filled)+' · 기간 '+(keys[0]||'')+' ~ '+(keys[keys.length-1]||'')+'</div>';
   return _modStatCard(c.label, body);
+}
+
+// ═══════════════════════════════════════════
+// 📮 등기우편 — 인터넷우체국 간편사전접수 파일 + 회원에서 가져오기
+//   features.epost=true 인 모듈에서만 버튼이 보임 (다른 시스템엔 영향 없음)
+//   우체국 주소파일(template_befrecev.xls, 시트 "template") 열 순서:
+//   받는 분 / 우편번호 / 주소 / 상세주소 / 일반전화 / 휴대전화 / 등기번호(선납소포라벨만) / 중량(g)
+// ═══════════════════════════════════════════
+var EPOST_COLS=[
+  {key:'nm',   label:'받는분',  type:'text', required:true, search:true, aliases:['이름','성명','수취인','받는사람','받는 분','수신인','수신자']},
+  {key:'pos',  label:'직책',    type:'text', search:true, aliases:['직위','직함','직급']},
+  {key:'zip',  label:'우편번호',type:'text', search:true, placeholder:'12345', aliases:['우편','새우편번호','우편번호(5자리)']},
+  {key:'addr1',label:'기본주소',type:'text', required:true, search:true, addrSearch:true, zipKey:'zip', detailKey:'addr2', placeholder:'주소검색을 누르거나 직접 입력', aliases:['주소','도로명주소','주소1','받는분주소','받는분 주소']},
+  {key:'addr2',label:'상세주소',type:'text', placeholder:'동·호수 등', aliases:['주소2','상세','나머지주소']},
+  {key:'hp',   label:'휴대전화',type:'tel',  search:true, aliases:['연락처','전화번호','핸드폰','휴대폰','휴대폰번호','휴대전화번호','전화','받는분연락처']},
+  {key:'tel2', label:'일반전화',type:'text', aliases:['집전화','유선전화','일반전화번호']},
+  {key:'grp',  label:'구분',    type:'text', filter:true, search:true, aliases:['소속','분류','그룹']},
+  {key:'memo', label:'메모',    type:'text', aliases:['비고']}
+];
+function _epostCreateModule(){
+  var key='epost'; var n=2; while(_modDefs[key]) key='epost'+(n++);
+  if(!confirm('📮 등기우편 모듈을 만들까요?\n\n받는분 · 우편번호 · 기본주소 · 상세주소 · 휴대전화 · 일반전화 · 구분 · 메모 칸이 들어갑니다.\n메뉴 "📮 우편 > 등기우편" 으로 생깁니다.')) return;
+  defMod({key:key,label:'등기우편',icon:'📮',cat:'custom',catLabel:'우편',catIcon:'📮',fbPath:'ModEpost'+(key==='epost'?'':key.slice(5)),
+    global:true, adminTab:true, columns:JSON.parse(JSON.stringify(EPOST_COLS)), features:{search:true,excel:true,epost:true}});
+  _saveModDefs().then(function(){ toast('📮 등기우편 모듈 생성됨'); if(typeof mkTabs==='function') mkTabs(); draw(); })
+    .catch(function(e){ delete _modDefs[key]; toast('생성 실패: '+(e.message||e),true); });
+}
+function _epostDigits(s){ return String(s==null?'':s).replace(/[^0-9]/g,''); }
+function _epostTel(s){
+  var d=_epostDigits(s); if(!d) return '';
+  if(d.length===10 && d.indexOf('10')===0) d='0'+d;          // 엑셀에서 앞 0 빠진 010
+  if(d.indexOf('02')===0){ if(d.length===9) return d.slice(0,2)+'-'+d.slice(2,5)+'-'+d.slice(5); if(d.length===10) return d.slice(0,2)+'-'+d.slice(2,6)+'-'+d.slice(6); }
+  if(d.length===11) return d.slice(0,3)+'-'+d.slice(3,7)+'-'+d.slice(7);
+  if(d.length===10) return d.slice(0,3)+'-'+d.slice(3,6)+'-'+d.slice(6);
+  return String(s).trim();
+}
+// 한 줄 정리: "(12345) 주소" 에서 우편번호 분리, 4자리 우편번호 앞 0 복원, 전화번호 하이픈
+function _epostFixRow(r){
+  var a=String(r.addr1||'').trim();
+  var m=a.match(/^\(?\s*(\d{5})\s*\)?\s+/);
+  if(m){ if(!_epostDigits(r.zip)) r.zip=m[1]; a=a.slice(m[0].length); }
+  r.addr1=a;
+  var z=_epostDigits(r.zip);
+  if(z.length===4) z='0'+z;                                  // 엑셀이 숫자로 읽어 앞 0 빠진 경우 (06234 → 6234)
+  if(r.zip!=null) r.zip=z;
+  if(r.hp!=null) r.hp=_epostTel(r.hp);
+  if(r.tel2!=null) r.tel2=_epostTel(r.tel2);
+  return r;
+}
+function _epostRows(key, ids){
+  var data=_modFilteredData(key);
+  if(ids && ids.length){ var s={}; ids.forEach(function(i){s[i]=1;}); data=data.filter(function(r){return s[r._id];}); }
+  return data.map(function(r){ var o=_epostFixRow({nm:r.nm,zip:r.zip,addr1:r.addr1,addr2:r.addr2,hp:r.hp,tel2:r.tel2}); o._id=r._id; return o; });
+}
+function _epostProblems(o){
+  var p=[];
+  if(!String(o.nm||'').trim()) p.push('받는분 없음');
+  if(!String(o.addr1||'').trim()) p.push('주소 없음');
+  if(!o.zip) p.push('우편번호 없음'); else if(o.zip.length!==5) p.push('우편번호 5자리 아님');
+  return p;
+}
+function popEpostExport(key, ids){
+  var def=_modDefs[key]; if(!def) return;
+  var rows=_epostRows(key, ids);
+  if(!rows.length) return toast('보낼 받는분이 없습니다',true);
+  var bad=rows.map(function(o){return {o:o,p:_epostProblems(o)};}).filter(function(x){return x.p.length;});
+  window.__epostRows=rows; window.__epostKey=key;
+  var h='<div class="pop-head"><h3>📮 우체국 사전접수 파일 <button class="close-x" onclick="closePopup()">&times;</button></h3></div>';
+  h+='<div style="padding:14px;max-height:75vh;overflow-y:auto">';
+  h+='<div style="font-size:15px;font-weight:700;margin-bottom:10px">'+(ids&&ids.length?'선택한 ':'지금 목록에 보이는 ')+'<span style="color:#dc2626">'+rows.length+'명</span>의 받는분 파일을 만듭니다</div>';
+  if(bad.length){
+    h+='<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:13px;color:#991b1b">';
+    h+='<b>⚠ 확인이 필요한 '+bad.length+'명</b> — 이대로 올리면 우체국에서 주소검증에 걸릴 수 있어요. 목록에서 ✏️ 수정 후 다시 만드세요.';
+    h+='<div style="margin-top:6px;max-height:120px;overflow-y:auto;line-height:1.7">';
+    bad.slice(0,50).forEach(function(x){ h+='• '+esc(x.o.nm||'(이름 없음)')+' — '+esc(x.p.join(', '))+'<br>'; });
+    if(bad.length>50) h+='… 외 '+(bad.length-50)+'명';
+    h+='</div></div>';
+  }
+  // 미리보기 (처음 5명)
+  h+='<div style="overflow-x:auto;border:1px solid #e5e7eb;border-radius:8px;margin-bottom:12px"><table class="tbl" style="font-size:12px;margin:0"><thead><tr>';
+  ['받는 분','우편번호','주소','상세주소','일반전화','휴대전화'].forEach(function(t){ h+='<th style="white-space:nowrap">'+t+'</th>'; });
+  h+='</tr></thead><tbody>';
+  rows.slice(0,5).forEach(function(o){ h+='<tr>'+[o.nm,o.zip,o.addr1,o.addr2,o.tel2,o.hp].map(function(v){return '<td style="white-space:nowrap">'+esc(v||'')+'</td>';}).join('')+'</tr>'; });
+  if(rows.length>5) h+='<tr><td colspan="6" style="text-align:center;color:#94a3b8">… 외 '+(rows.length-5)+'명</td></tr>';
+  h+='</tbody></table></div>';
+  h+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">';
+  h+='<button class="btn" style="background:#dc2626;color:#fff;padding:10px 16px;font-weight:700" onclick="_epostDownload()">📥 엑셀 파일 받기</button>';
+  h+='<button class="btn" style="background:#15803d;color:#fff;padding:10px 16px;font-weight:700" onclick="_epostCopy()">📋 복사 (우체국 양식에 붙여넣기용)</button>';
+  h+='</div>';
+  h+='<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px 14px;font-size:13px;line-height:1.8;color:#334155">';
+  h+='<b>📌 인터넷우체국에서 사전접수하는 순서</b><br>';
+  h+='1. 인터넷우체국(epost.go.kr) → <b>간편사전접수</b> → 등기통상(편지·서류) 선택<br>';
+  h+='2. 보내는 분(청년회) 정보 입력<br>';
+  h+='3. 받는 분 → <b>주소(파일) 이용하기</b> → 파일찾기로 방금 받은 엑셀 올리기<br>';
+  h+='&nbsp;&nbsp;&nbsp;↳ 파일이 안 올라가면: 거기서 <b>엑셀양식 다운로드</b> → 양식의 2번째 줄 A칸(홍길동1 자리) 클릭 → <b>📋 복사</b> 누른 뒤 붙여넣기(Ctrl+V) → 저장 후 올리기<br>';
+  h+='4. 받는 분 목록 <b>주소검증</b> → 접수신청 → 문자로 사전접수번호 받음<br>';
+  h+='5. 라벨(🖨 라벨 출력) 붙인 봉투 들고 우체국 창구 → 휴대폰 번호/사전접수번호 보여주기';
+  h+='</div></div>';
+  openPopup(h, 760);
+}
+function _epostAoa(withHeader){
+  var rows=window.__epostRows||[];
+  // 제목은 우체국 양식(template_befrecev.xls) 그대로 — 등기번호·중량은 비워둠
+  var aoa=withHeader?[['받는 분','우편번호','주소(시도+시군구+도로명+건물번호)','상세주소(동, 호수, 洞명칭, 아파트, 건물명 등)','일반전화(02-1234-5678)','휴대전화(010-1234-5678)','등기번호(선납소포라벨만 입력가능)','중량(g)']]:[];
+  rows.forEach(function(o){ aoa.push([o.nm||'',o.zip||'',o.addr1||'',o.addr2||'',o.tel2||'',o.hp||'','',''].map(function(v){return String(v).replace(/[\t\r\n]+/g,' ').trim();})); });
+  return aoa;
+}
+function _epostDownload(){
+  if(typeof XLSX==='undefined') return toast('엑셀 라이브러리 로딩 중입니다. 잠시 후 다시 시도하세요',true);
+  var aoa=_epostAoa(true);
+  var ws=XLSX.utils.aoa_to_sheet(aoa);
+  for(var r=1;r<aoa.length;r++){
+    // 우편번호: 우체국 양식처럼 숫자 셀. 단 0으로 시작(서울 0xxxx)하면 0이 지워지므로 글자 셀로
+    var za=XLSX.utils.encode_cell({r:r,c:1}), zv=aoa[r][1];
+    if(ws[za] && /^[1-9]\d{4}$/.test(zv)){ ws[za]={t:'n',v:Number(zv)}; }
+    else if(ws[za]){ ws[za].t='s'; }
+    [4,5].forEach(function(c){ var a=XLSX.utils.encode_cell({r:r,c:c}); if(ws[a]) ws[a].t='s'; });
+  }
+  ws['!cols']=[{wch:10},{wch:8},{wch:40},{wch:28},{wch:15},{wch:15},{wch:14},{wch:8}];
+  var wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'template');
+  var fn='우체국사전접수_'+_todayStr().replace(/-/g,'')+'_'+(aoa.length-1)+'명.xls';
+  XLSX.writeFile(wb,fn,{bookType:'biff8'});
+  try{ _modLogAdd(window.__epostKey,'epost','','사전접수 파일',(aoa.length-1)+'명'); }catch(e){}
+  toast('📥 '+fn+' 저장됨');
+}
+function _epostCopy(){
+  var txt=_epostAoa(false).map(function(r){return r.join('\t');}).join('\n');
+  var n=(window.__epostRows||[]).length;
+  var done=function(){ toast('📋 '+n+'명 복사됨 — 우체국 양식 첫 입력칸에 붙여넣기(Ctrl+V)'); };
+  if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(txt).then(done,function(){ _epostCopyFallback(txt); done(); }); }
+  else { _epostCopyFallback(txt); done(); }
+}
+function _epostCopyFallback(txt){
+  var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.left='-9999px';
+  document.body.appendChild(ta); ta.select(); try{ document.execCommand('copy'); }catch(e){} document.body.removeChild(ta);
+}
+
+// ─── 👥 회원(인원관리)에서 받는분 가져오기 ───
+function _epostMemList(){
+  var today=_todayStr();
+  return (typeof mems!=='undefined'?mems:[]).filter(function(m){ return m && m.nm && !(m.leftDt && m.leftDt<=today); });
+}
+function popEpostFromMems(key){
+  var list=_epostMemList();
+  if(!list.length) return toast('인원관리에 회원이 없습니다',true);
+  window.__epostMemKey=key; window.__epostMemSel={};
+  var groups={}; list.forEach(function(m){ var g=m.ar||'(소속 없음)'; (groups[g]=groups[g]||[]).push(m); });
+  var h='<div class="pop-head"><h3>👥 회원에서 받는분 가져오기 <button class="close-x" onclick="closePopup()">&times;</button></h3></div>';
+  h+='<div style="padding:14px">';
+  h+='<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">';
+  h+='<input id="epm_q" type="text" placeholder="🔍 이름 검색" oninput="_epostMemFilter()" style="flex:1;min-width:140px;padding:8px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:13px">';
+  h+='<button class="btn btn-s" style="background:#2563eb;color:#fff" onclick="_epostMemAll(true)">전체 선택</button>';
+  h+='<button class="btn btn-s" style="background:#64748b;color:#fff" onclick="_epostMemAll(false)">전체 해제</button>';
+  h+='</div>';
+  h+='<div style="font-size:12px;color:#64748b;margin-bottom:8px">탈퇴한 회원은 빠져 있어요 · <span style="color:#dc2626">주소 없음</span> 표시된 사람은 가져온 뒤 주소를 채워야 해요</div>';
+  h+='<div id="epm_list" style="max-height:55vh;overflow-y:auto;border:1px solid #e5e7eb;border-radius:8px">';
+  Object.keys(groups).sort(function(a,b){return a.localeCompare(b,'ko');}).forEach(function(g){
+    h+='<div class="epm_grp" style="background:#f1f5f9;padding:6px 10px;font-weight:700;font-size:13px;display:flex;align-items:center;gap:8px;position:sticky;top:0">';
+    h+='<label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" onclick="_epostMemGrp(this,\''+esc(g)+'\')"> '+esc(g)+' <span style="color:#94a3b8;font-weight:400">('+groups[g].length+'명)</span></label></div>';
+    groups[g].forEach(function(m){
+      var hasAddr=!!String(m.addr||'').trim();
+      h+='<label class="epm_row" data-grp="'+esc(g)+'" data-nm="'+esc(m.nm)+'" style="display:flex;align-items:center;gap:8px;padding:6px 12px;border-top:1px solid #f1f5f9;cursor:pointer;font-size:13px">';
+      h+='<input type="checkbox" class="epm_chk" value="'+esc(m.id)+'" onchange="_epostMemCnt()">';
+      h+='<b style="min-width:60px">'+esc(m.nm)+'</b>';
+      h+='<span style="flex:1;color:'+(hasAddr?'#475569':'#dc2626')+';white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(hasAddr?(m.zip?'('+esc(m.zip)+') ':'')+esc(m.addr):'주소 없음')+'</span>';
+      h+='</label>';
+    });
+  });
+  h+='</div>';
+  h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px">';
+  h+='<span id="epm_cnt" style="font-weight:700;color:#2563eb">0명 선택</span>';
+  h+='<button class="btn" style="background:#0369a1;color:#fff;padding:10px 18px;font-weight:700" onclick="_epostMemAdd()">선택한 회원 추가</button>';
+  h+='</div></div>';
+  openPopup(h, 640);
+}
+function _epostMemVisible(){ return [].slice.call(document.querySelectorAll('#epm_list .epm_row')).filter(function(r){return r.style.display!=='none';}); }
+function _epostMemFilter(){
+  var q=String((document.getElementById('epm_q')||{}).value||'').trim();
+  document.querySelectorAll('#epm_list .epm_row').forEach(function(r){ r.style.display=(!q||r.getAttribute('data-nm').indexOf(q)>=0)?'flex':'none'; });
+}
+function _epostMemAll(on){ _epostMemVisible().forEach(function(r){ r.querySelector('input').checked=on; }); _epostMemCnt(); }
+function _epostMemGrp(cb,g){ document.querySelectorAll('#epm_list .epm_row').forEach(function(r){ if(r.getAttribute('data-grp')===g && r.style.display!=='none') r.querySelector('input').checked=cb.checked; }); _epostMemCnt(); }
+function _epostMemCnt(){ var n=document.querySelectorAll('#epm_list .epm_chk:checked').length; var el=document.getElementById('epm_cnt'); if(el) el.textContent=n+'명 선택'; }
+function _epostMemAdd(){
+  var key=window.__epostMemKey; var def=_modDefs[key]; if(!def) return;
+  var path=_modFbPath(key); if(!path) return toast('저장 위치를 찾을 수 없습니다',true);
+  var ids=[].slice.call(document.querySelectorAll('#epm_list .epm_chk:checked')).map(function(c){return c.value;});
+  if(!ids.length) return toast('회원을 선택하세요',true);
+  var byId={}; _epostMemList().forEach(function(m){ byId[String(m.id)]=m; });
+  var data=(_modData[key]||[]).slice();
+  var seen={}; data.forEach(function(r){ seen[String(r.nm||'').trim()+'|'+String(r.addr1||'').replace(/\s+/g,'')]=1; });
+  var now=new Date().toISOString(), nNew=0, nDup=0, nNoAddr=0;
+  ids.forEach(function(id){
+    var m=byId[id]; if(!m) return;
+    var o=_epostFixRow({nm:String(m.nm).trim(), zip:m.zip||'', addr1:m.addr||'', addr2:'', hp:m.tel||'', tel2:'', grp:m.ar||'', memo:''});
+    var k=o.nm+'|'+String(o.addr1).replace(/\s+/g,'');
+    if(seen[k]){ nDup++; return; }
+    seen[k]=1;
+    if(!o.addr1) nNoAddr++;
+    o._id=_modId(); o._createdAt=now; data.push(o); nNew++;
+  });
+  if(!nNew) return toast('이미 목록에 있는 회원들입니다 ('+nDup+'명)',true);
+  showLoading('추가 중...');
+  fbDb.ref(path).set(data).then(function(){
+    hideLoading(); closePopup();
+    try{ _modLogAdd(key,'add','','회원에서 가져오기',nNew+'명'); }catch(e){}
+    toast('✅ '+nNew+'명 추가'+(nDup?' · 중복 '+nDup+'명 건너뜀':'')+(nNoAddr?' · 주소 없는 '+nNoAddr+'명은 채워주세요':''));
+  }).catch(function(e){ hideLoading(); toast('실패: '+(e.message||e),true); });
 }
