@@ -6537,6 +6537,61 @@ function purBadge(g){
   if(g.prtD)  return '<span class="pst pst-pr">📄 발행 '+esc(g.prtD)+'</span>';
   return '<span class="pst pst-no">❌ 미발행</span>';
 }
+// 📅 같은 날 결제 순서 — 명세서(inv)별 {dt, ord(사용자가 정한 순서), ca(등록시각), ids}
+//   정렬: 날짜 → ord(둘 다 있을 때) → 등록시각. ⬆⬇ 로 바꾸면 그 날짜 명세서 전체에 ord 10,20,30… 저장
+function _purSeqCmp(a,b){
+  var ad=a.dt||"", bd=b.dt||"";
+  if(ad!==bd) return ad<bd?-1:1;
+  if(a.ord!=null && b.ord!=null && a.ord!==b.ord) return a.ord-b.ord;
+  var ac=a.ca||"", bc=b.ca||""; return ac<bc?-1:ac>bc?1:0;
+}
+function _purDayOrder(){
+  var meta={}, byDate={};
+  (purs||[]).forEach(function(p){
+    var iv=p.inv||p.id, ca=String(p.createdAt||"");
+    var m=meta[iv]||(meta[iv]={inv:iv, dt:normD(p.dt)||"", ord:null, ca:ca, ids:[]});
+    m.ids.push(p.id);
+    if(m.ord==null && p.ord!=null && p.ord!=="" && isFinite(Number(p.ord))) m.ord=Number(p.ord);
+    if(ca && (!m.ca || ca<m.ca)) m.ca=ca;
+  });
+  Object.keys(meta).forEach(function(iv){ var m=meta[iv]; (byDate[m.dt]=byDate[m.dt]||[]).push(m); });
+  var pos={};
+  Object.keys(byDate).forEach(function(d){ byDate[d].sort(_purSeqCmp); byDate[d].forEach(function(m,i){ pos[m.inv]={n:i+1,total:byDate[d].length}; }); });
+  return {meta:meta, byDate:byDate, pos:pos};
+}
+// dir: -1 = 그날 더 먼저 결제한 걸로 / +1 = 더 나중으로
+async function purMove(inv, dir){
+  var D=_purDayOrder(), me=D.meta[inv]; if(!me) return;
+  var list=D.byDate[me.dt]||[], i=list.indexOf(me), j=i+dir;
+  if(j<0||j>=list.length) return;
+  var t=list[i]; list[i]=list[j]; list[j]=t;
+  var jobs=[];
+  list.forEach(function(m,k){
+    var no=(k+1)*10;
+    m.ids.forEach(function(id){
+      var row=null; for(var q=0;q<purs.length;q++) if(purs[q].id==id){row=purs[q];break;}
+      if(row && Number(row.ord)!==no){ row.ord=no; jobs.push(id); }
+    });
+  });
+  showLoading("순서 저장 중...");
+  for(var x=0;x<jobs.length;x++){
+    var row=null; for(var q=0;q<purs.length;q++) if(purs[q].id==jobs[x]){row=purs[q];break;}
+    var r=await api("updatePur",{id:jobs[x], ord:row.ord});
+    if(!r||!r.ok){ hideLoading(); toast((r&&r.err)||"순서 저장 실패",true); draw(); return; }
+  }
+  hideLoading(); toast("순서 변경 — 잔액도 이 순서로 다시 계산됐어요"); draw();
+}
+function _purSeqUi(inv){
+  var D=window._PUR_PM; if(!D) return "";
+  var p=D.pos[inv]; if(!p||p.total<2) return "";
+  var h=' <span style="background:#fef3c7;color:#92400e;border:1px solid #fcd34d;padding:3px 9px;border-radius:10px;font-size:12.5px;font-weight:700" title="같은 날 결제 순서 — 잔액이 이 순서로 계산돼요">그날 '+p.n+'/'+p.total+'번째</span>';
+  if(isA()){
+    var bs='border:none;border-radius:6px;padding:4px 9px;font-size:13px;font-weight:800;cursor:pointer;color:#fff;';
+    h+=' <button title="더 나중에 결제한 걸로 (목록 위로)" style="'+bs+'background:'+(p.n<p.total?'#2563eb':'#cbd5e1;cursor:default')+'"'+(p.n<p.total?' onclick="purMove(\''+esc(inv)+'\',1)"':' disabled')+'>⬆</button>';
+    h+=' <button title="더 먼저 결제한 걸로 (목록 아래로)" style="'+bs+'background:'+(p.n>1?'#2563eb':'#cbd5e1;cursor:default')+'"'+(p.n>1?' onclick="purMove(\''+esc(inv)+'\',-1)"':' disabled')+'>⬇</button>';
+  }
+  return h;
+}
 // 💳 카드/통장별 잔액 — 세입(inc.card) 합계 − 구매(purs.card)·지출(exps.card) 을 날짜순 누적
 //   byInv[명세서] = {card, after(이 건 결제 후 잔액)} / cards[이름] = {inc, used, bal}
 function _purCardRunBal(){
@@ -6550,7 +6605,9 @@ function _purCardRunBal(){
     ev[invIdx[iv]].am+=pn(p.tot);
   });
   (exps||[]).forEach(function(e){ var c=String(e.card||"").trim(); if(!c) return; ev.push({k:"exp",card:c,dt:normD(e.dt)||"",ca:String(e.createdAt||""),am:pn(e.am)}); });
-  ev.sort(function(a,b){ return a.dt<b.dt?-1:a.dt>b.dt?1:(a.ca<b.ca?-1:a.ca>b.ca?1:0); });
+  var _DO=_purDayOrder();
+  ev.forEach(function(x){ if(x.k==="pur"&&_DO.meta[x.inv]){ x.ord=_DO.meta[x.inv].ord; x.ca=_DO.meta[x.inv].ca; } else x.ord=null; });
+  ev.sort(_purSeqCmp);
   ev.forEach(function(x){
     var c=(cards[x.card]=cards[x.card]||{inc:0,used:0,bal:0});
     c.used+=x.am;
@@ -6593,7 +6650,8 @@ function dPur(){
   // 명세서 단위로 그룹화 (inv 기준) — 대표행(첫 물품)의 prtD/signU 사용
   var groups={};var order=[];
   for(var i=0;i<fp.length;i++){var p=fp[i];var iv=p.inv||p.id;if(!groups[iv]){groups[iv]={inv:iv,dt:p.dt,ar:p.ar,by:p.by,items:[],tot:0,prtD:p.prtD||"",signU:p.signU||"",mgmtNo:p.mgmtNo||"",noMgmt:(p.noMgmt==="Y"||p.noMgmt===true),gwan:p.gwan||"",expTp:p.expTp||"",expMid:p.expMid||"",card:p.card||""};order.push(iv)}groups[iv].items.push(p);groups[iv].tot+=pn(p.tot);if(!groups[iv].prtD&&p.prtD)groups[iv].prtD=p.prtD;if(!groups[iv].signU&&p.signU)groups[iv].signU=p.signU;if(!groups[iv].mgmtNo&&p.mgmtNo)groups[iv].mgmtNo=p.mgmtNo;}
-  var gListAll=order.map(function(iv){return groups[iv]}).sort(function(a,b){return(a.dt||"").localeCompare(b.dt||"")}).reverse();
+  var _PM=window._PUR_PM=_purDayOrder();
+  var gListAll=order.map(function(iv){return groups[iv]}).sort(function(a,b){return -_purSeqCmp(_PM.meta[a.inv]||{dt:normD(a.dt)},_PM.meta[b.inv]||{dt:normD(b.dt)});});
   // 필터 적용 (미발행/미서명)
   var gList=gListAll.filter(function(G){
     if(PUR_SHOW_UNPRT && G.prtD) return false;
@@ -6758,7 +6816,7 @@ function dPur(){
       h+='<div style="background:#f8fafc;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;border-bottom:1px solid #e5e7eb">';
       h+='<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">';
       h+='<input type="checkbox" class="purChk" '+checked+' onchange="purTog(\''+G.inv+'\',this.checked)" style="width:16px;height:16px;cursor:pointer">';
-      h+=' <span class="tag tag-b">'+esc(G.ar||"공통")+'</span> <span style="font-weight:700;font-size:15px;color:#0f172a">'+esc(fmtDK(G.dt))+'</span> <span style="color:#475569;font-size:13px">물품 '+G.items.length+'개</span> '+purBadge(G);
+      h+=' <span class="tag tag-b">'+esc(G.ar||"공통")+'</span> <span style="font-weight:700;font-size:15px;color:#0f172a">'+esc(fmtDK(G.dt))+'</span>'+_purSeqUi(G.inv)+' <span style="color:#475569;font-size:13px">물품 '+G.items.length+'개</span> '+purBadge(G);
       if(G.mgmtNo) h+=' <span style="background:#dbeafe;color:#1e40af;padding:3px 10px;border-radius:10px;font-size:13px;font-weight:600;font-weight:600">📋 '+esc(G.mgmtNo)+'</span>';
       else if(G.noMgmt) h+=' <span style="background:#fef3c7;color:#92400e;padding:3px 10px;border-radius:10px;font-size:13px;font-weight:600;font-weight:600">번호없음</span>';
       if(G.gwan) h+=' <span style="background:#fce7f3;color:#be185d;padding:3px 10px;border-radius:10px;font-size:13px;font-weight:600">관:'+esc(G.gwan)+'</span>';
