@@ -6649,11 +6649,6 @@ function _purStatusTxt(G){
   if(G.prtD) return '<span style="color:#334155;font-weight:700">📄 결의서 발행 '+esc(G.prtD)+'</span>';
   return '<span style="color:#64748b">결의서 미발행</span>';
 }
-function _purThumbs(arr,tp,pid,label){
-  var h='';
-  for(var j=0;j<(arr||[]).length;j++) h+='<span style="position:relative;display:inline-block;margin-right:2px" title="'+esc(label)+'"><img class="photoTh" src="'+imgSrc(arr[j])+'" onclick="showPh(this)" style="border:1px solid #cbd5e1"><span style="position:absolute;left:1px;bottom:1px;background:rgba(15,23,42,.75);color:#fff;font-size:8.5px;padding:0 3px;border-radius:3px">'+esc(label)+'</span><button style="position:absolute;top:-4px;right:-4px;background:#dc2626;color:#fff;border:none;border-radius:50%;width:14px;height:14px;font-size:8px;cursor:pointer;line-height:14px;padding:0" onclick="delPh(\''+tp+'\',\''+pid+'\','+j+')">×</button></span>';
-  return h;
-}
 function dPur(){
   // 자동 로드 제거 — 탭 바로 열고 🔄 새로고침 버튼으로 수동 로드
   var af=isA()?(purAr=="all"?null:purAr):myar();
@@ -6890,13 +6885,13 @@ function dPur(){
       h+='<div style="padding:8px 12px;display:flex;flex-wrap:wrap;align-items:center;gap:4px"><span style="font-size:12px;color:#64748b;font-weight:700;margin-right:2px">📎 증빙</span>';
       h+=_purThumbs(pcSrc,'pc',firstP.id,'상품캡처');
       h+=_purThumbs(phSrc,'pur',firstP.id,'물품사진');
-      h+=_purThumbs(rcSrc,'rc',firstP.id,'영수증');
-      h+=_purDocChips(qdSrc,'qt',firstP.id,'📄 견적서','#f1f5f9','#334155','#cbd5e1');
-      h+=_purDocChips(stSrc,'st',firstP.id,'📋 거래명세표','#f1f5f9','#334155','#cbd5e1');
-      h+=_purDocChips(txSrc,'tax',firstP.id,'🧾 '+_taxDocName(firstP),'#f1f5f9','#334155','#cbd5e1');
+      h+=_purThumbs(rcSrc,'rc',firstP.id,'영수증',1);
+      h+=_purThumbs(qdSrc,'qt',firstP.id,'견적서',1);
+      h+=_purThumbs(stSrc,'st',firstP.id,'거래명세표',1);
+      h+=_purThumbs(txSrc,'tax',firstP.id,_taxDocName(firstP),1);
       if(!phSrc.length&&!rcSrc.length&&!txSrc.length&&!qdSrc.length&&!stSrc.length&&!pcSrc.length)h+='<span style="color:#94a3b8;font-size:12px">없음</span> ';
-      h+='<span class="attMany">'+_attBtnsHtml(firstP.id,_bank)+'</span>';
-      h+='<button class="abtn attOne" style="background:#334155" onclick="_attPick(\''+firstP.id+'\','+(_bank?1:0)+')">＋ 증빙</button>';
+      h+='<span class="attMany">'+_attBtnsHtml(firstP.id,_bank,firstP)+'</span>';
+      h+='<button class="abtn attOne" style="background:#334155" onclick="_attPick(\''+firstP.id+'\','+(_bank?1:0)+')">＋ 증빙 <b>'+_evKindsDone(firstP)+'/6</b></button>';
       h+='</div>';
       // ⑥ 버튼 줄 (작게, 한 색)
       h+='<div style="display:flex;gap:4px;flex-wrap:wrap;padding:7px 12px;border-top:1px solid #e2e8f0;background:#f8fafc">';
@@ -7010,12 +7005,6 @@ function _attPrevHtml(px,k){
   return h;
 }
 function _attRefresh(px,k){ var el=document.getElementById(px+"Att_"+k+"_prev"); if(el) el.innerHTML=_attPrevHtml(px,k); }
-function _attPush(px,k,file){
-  var key=px+k; (_ATT[key]=_ATT[key]||[]);
-  var isImg=/^image\//i.test(file.type||"");
-  var url=""; try{ url=URL.createObjectURL(file); }catch(e){}
-  _ATT[key].push({file:file, name:file.name||(_attType(k).up+".png"), isImg:isImg, url:url});
-}
 function _attAdd(px,k,inp){
   var fs=inp.files||[]; for(var i=0;i<fs.length;i++) _attPush(px,k,fs[i]);
   inp.value=""; _attRefresh(px,k);
@@ -7051,31 +7040,12 @@ function _attFinal(px,k,newUrls){
 }
 function _attChanged(px){ return ATT_TYPES.some(function(t){ return (_ATT[px+t.k]||[]).length || Object.keys(_ATT_DEL[px+t.k]||{}).length; }); }
 // 세금계산서 칸 선택 파일 미리보기 (이름·썸네일)
-function _attPrevInput(inp, boxId){
-  var box=document.getElementById(boxId); if(!box) return;
-  var h=''; var fs=inp.files||[];
-  for(var i=0;i<fs.length;i++){ var f=fs[i], isImg=/^image\//i.test(f.type||""), u=""; try{u=URL.createObjectURL(f);}catch(e){}
-    h+='<span style="display:inline-block;margin:4px 6px 0 0">'+(isImg?'<img src="'+u+'" style="width:96px;height:76px;object-fit:cover;border-radius:6px;border:1px solid #fdba74">':'<span style="display:inline-flex;flex-direction:column;align-items:center;justify-content:center;width:96px;height:76px;border-radius:6px;border:1px solid #fdba74;background:#fff;font-size:26px">📄<span style="font-size:9px;max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(f.name)+'</span></span>')+'</span>'; }
-  box.innerHTML=h;
-}
 
 function _attFirstItem(p){ var iv=p.inv||p.id; for(var i=0;i<(purs||[]).length;i++) if((purs[i].inv||purs[i].id)===iv) return purs[i]; return p; }
 function _attEditHtml(p){ var fp=_attFirstItem(p); _attReset("ep",fp); return '<div style="margin-top:14px">'+_attAllHtml("ep")+'</div>'; }
 
 // PC용 — 증빙 추가 버튼 6개 (아이콘)
-function _attBtnsHtml(pid, bank){
-  var it=[["pc","🛒 상품캡처"],["pur","📷 물품사진"],["qt","📄 견적서"],["rc","🧾 영수증"],["st","📋 거래명세표"],["tax","🧾 세금계산서"]];
-  return it.map(function(x){ return '<button class="abtn" style="background:'+(x[0]==="tax"&&bank?'#c2410c':'#334155')+'" onclick="attStart(\''+x[0]+'\',\''+pid+'\')">+'+x[1]+'</button>'; }).join("");
-}
 // 목록 [＋ 증빙 추가] → 종류 고르기
-function _attPick(pid, bank){
-  var it=[["pc","🛒 상품캡처","#d97706"],["pur","📷 물품사진","#7c3aed"],["qt","📄 견적서","#4f46e5"],["rc","🧾 영수증","#ea580c"],["st","📋 거래명세표","#15803d"],["tax",bank?"🧾 세금계산서 (계좌이체·현금)":"🧾 세금계산서","#c2410c"]];
-  var h='<h3>＋ 증빙 추가 <button class="close-x" onclick="closePopup2()">&times;</button></h3>';
-  h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
-  it.forEach(function(x){ h+='<button type="button" onclick="closePopup2();attStart(\''+x[0]+'\',\''+pid+'\')" style="background:'+x[2]+';color:#fff;border:none;border-radius:8px;padding:14px 8px;font-size:14px;font-weight:700;cursor:pointer">'+x[1]+'</button>'; });
-  h+='</div><div style="font-size:12px;color:#64748b;margin-top:10px">고르면 파일 선택 창이 열려요 (문서는 PDF도 가능)</div>';
-  openPopup2(h,420);
-}
 // ===== 📱 계정별 텔레그램 알림 =====
 //   Users[].tg = 텔레그램 채팅 ID. 알림은 기존 관리자 방(TG_CHAT_IDS) + 받을 사람들의 tg 로 보냄
 function _tgOf(uid){ var u=(typeof US!=="undefined"&&US)?US[uid]:null; return u&&u.tg?String(u.tg).trim():""; }
@@ -7166,6 +7136,83 @@ async function _tgSaveMine(){
   if(!r||!r.ok) return toast((r&&r.err)||"저장 실패",true);
   if(US[CID]) US[CID].tg=v;
   toast(v?"📱 텔레그램 알림 연결 저장":"텔레그램 알림 해제"); draw();
+}
+
+// 증빙 종류별 [필드, 버튼글자, attStart 타입]
+var _EV_KINDS=[["pcDoc","🛒 상품캡처","pc"],["ph","📷 물품사진","pur"],["qtDoc","📄 견적서","qt"],["rc","🧾 영수증","rc"],["stDoc","📋 거래명세표","st"],["taxDoc","🧾 세금계산서","tax"]];
+function _evFind(pid){ for(var i=0;i<(purs||[]).length;i++) if(purs[i].id==pid) return purs[i]; return {}; }
+// PC용 — 증빙 버튼 6개: 올린 건 연하게 ✓+건수, 안 올린 건 진하게 +
+function _attBtnsHtml(pid, bank, f){
+  f=f||_evFind(pid);
+  return _EV_KINDS.map(function(x){
+    var n=(f[x[0]]||[]).length, need=(x[2]==="tax"&&bank&&!n);
+    var st=n?'background:#e2e8f0;color:#334155;border:1px solid #cbd5e1':(need?'background:#c2410c;color:#fff':'background:#334155;color:#fff');
+    return '<button class="abtn" style="'+st+'" title="'+(n?'올린 것 '+n+'개 — 눌러서 더 추가':'아직 없음 — 눌러서 추가')+'" onclick="attStart(\''+x[2]+'\',\''+pid+'\')">'+(n?'✓ ':'+')+x[1]+(n?' <b>'+n+'</b>':'')+'</button>';
+  }).join("");
+}
+function _evKindsDone(f){ return _EV_KINDS.filter(function(x){return (f[x[0]]||[]).length;}).length; }
+// 목록 [＋ 증빙] → 종류 고르기 (올린 건 ✓·건수, 연하게)
+function _attPick(pid, bank){
+  var f=_evFind(pid);
+  var h='<h3>＋ 증빙 추가 <button class="close-x" onclick="closePopup2()">&times;</button></h3>';
+  h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
+  _EV_KINDS.forEach(function(x){
+    var n=(f[x[0]]||[]).length, need=(x[2]==="tax"&&bank&&!n);
+    var st=n?'background:#e2e8f0;color:#334155;border:1px solid #cbd5e1':(need?'background:#c2410c;color:#fff;border:none':'background:#334155;color:#fff;border:none');
+    h+='<button type="button" onclick="closePopup2();attStart(\''+x[2]+'\',\''+pid+'\')" style="'+st+';border-radius:8px;padding:12px 8px;font-size:14px;font-weight:700;cursor:pointer;text-align:center">'+(n?'✓ ':'+ ')+x[1]+'<div style="font-size:11px;font-weight:600;margin-top:2px">'+(n?'올린 것 '+n+'개 · 더 추가':(need?'계좌이체·현금 — 필요':'아직 없음'))+'</div></button>';
+  });
+  h+='</div><div style="font-size:12px;color:#64748b;margin-top:10px">고르면 파일 선택 창이 열려요 (문서는 PDF도 가능)</div>';
+  openPopup2(h,420);
+}
+// 목록 썸네일 (사진·PDF 모두 첫 장 미리보기) — 문서는 누르면 원본 열기
+function _purThumbs(arr,tp,pid,label,orig){
+  var h='';
+  for(var j=0;j<(arr||[]).length;j++){
+    var u=arr[j], click=orig?('window.open(\''+esc(u)+'\',\'_blank\')'):'showPh(this)';
+    h+='<span style="position:relative;display:inline-block;margin-right:2px" title="'+esc(label)+(orig?' — 눌러서 원본 보기':'')+'"><img class="photoTh" src="'+imgSrc(u)+'" onclick="'+click+'" style="border:1px solid #cbd5e1;background:#f1f5f9;cursor:pointer"><span style="position:absolute;left:1px;bottom:1px;background:rgba(15,23,42,.75);color:#fff;font-size:8.5px;padding:0 3px;border-radius:3px">'+esc(label)+'</span><button style="position:absolute;top:-4px;right:-4px;background:#dc2626;color:#fff;border:none;border-radius:50%;width:14px;height:14px;font-size:8px;cursor:pointer;line-height:14px;padding:0" onclick="delPh(\''+tp+'\',\''+pid+'\','+j+')">×</button></span>';
+  }
+  return h;
+}
+// PDF 첫 페이지 → 미리보기 이미지 (pdf.js 필요할 때만 불러옴)
+var _pdfjsP=null;
+function _pdfjsLoad(){
+  if(_pdfjsP) return _pdfjsP;
+  _pdfjsP=new Promise(function(res,rej){
+    if(window.pdfjsLib) return res(window.pdfjsLib);
+    var s=document.createElement("script"); s.src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
+    s.onload=function(){ try{ window.pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"; }catch(e){} res(window.pdfjsLib); };
+    s.onerror=function(){ _pdfjsP=null; rej(new Error("pdf.js 로딩 실패")); };
+    document.head.appendChild(s);
+  });
+  return _pdfjsP;
+}
+async function _pdfThumb(file){
+  var lib=await _pdfjsLoad();
+  var buf=await file.arrayBuffer();
+  var doc=await lib.getDocument({data:buf}).promise;
+  var page=await doc.getPage(1);
+  var vp=page.getViewport({scale:1}); var sc=240/vp.width; vp=page.getViewport({scale:sc});
+  var cv=document.createElement("canvas"); cv.width=vp.width; cv.height=vp.height;
+  await page.render({canvasContext:cv.getContext("2d"), viewport:vp}).promise;
+  return cv.toDataURL("image/jpeg",0.8);
+}
+function _attPush(px,k,file){
+  var key=px+k; (_ATT[key]=_ATT[key]||[]);
+  var isImg=/^image\//i.test(file.type||""), isPdf=/pdf$/i.test(file.type||"")||/\.pdf$/i.test(file.name||"");
+  var url=""; try{ url=URL.createObjectURL(file); }catch(e){}
+  var rec={file:file, name:file.name||(_attType(k).up+".png"), isImg:isImg, url:url};
+  _ATT[key].push(rec);
+  if(isPdf){ _pdfThumb(file).then(function(d){ rec.url=d; rec.isImg=true; rec.pdf=true; _attRefresh(px,k); }).catch(function(){}); }
+}
+function _attPrevInput(inp, boxId){
+  var box=document.getElementById(boxId); if(!box) return;
+  var fs=inp.files||[]; box.innerHTML="";
+  for(var i=0;i<fs.length;i++){ (function(f,idx){
+    var isImg=/^image\//i.test(f.type||""), isPdf=/pdf$/i.test(f.type||"")||/\.pdf$/i.test(f.name||""), u=""; try{u=URL.createObjectURL(f);}catch(e){}
+    var id=boxId+"_"+idx;
+    box.insertAdjacentHTML("beforeend",'<span style="display:inline-block;margin:4px 6px 0 0">'+(isImg?'<img src="'+u+'" style="width:96px;height:76px;object-fit:cover;border-radius:6px;border:1px solid #fdba74">':'<span id="'+id+'" style="display:inline-flex;flex-direction:column;align-items:center;justify-content:center;width:96px;height:76px;border-radius:6px;border:1px solid #fdba74;background:#fff;font-size:26px">📄<span style="font-size:9px;max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(f.name)+'</span></span>')+'</span>');
+    if(isPdf) _pdfThumb(f).then(function(d){ var el=document.getElementById(id); if(el) el.outerHTML='<img src="'+d+'" title="'+esc(f.name)+'" style="width:96px;height:76px;object-fit:cover;object-position:top;border-radius:6px;border:1px solid #fdba74">'; }).catch(function(){});
+  })(fs[i],i); }
 }
 
 // ===== ✍ 지출결의서 전자결재 (모두싸인 방식 · 각자 로그인해서 승인/반려) =====
