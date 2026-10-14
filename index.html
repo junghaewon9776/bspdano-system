@@ -18351,10 +18351,55 @@ async function tmplAll(){
 
 // ===== 엑셀 가져오기 =====
 var impMode="all";
+// 📥 세출예산 엑셀 가져오기 — [➕ 기존에 추가·업데이트] / [🔄 새로 바꾸기] 고르기. 대분류·중분류·소분류로 같은 항목 판단
+function _askImpMode(st){
+  return new Promise(function(res){
+    window._impModeRes=function(m){ window._impModeRes=null; closePopup2(); res(m); };
+    var h='<h3>📥 세출예산 가져오기 <button class="close-x" onclick="_impModeRes&&_impModeRes(null)">&times;</button></h3>';
+    h+='<div style="font-size:14px;margin-bottom:10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;line-height:1.8">파일의 중분류 항목 <b>'+st.total+'건</b><br>• 새로 추가 <b style="color:#2563eb">'+st.nNew+'건</b> · 금액 바뀜 <b style="color:#c2410c">'+st.nChg+'건</b> · 그대로 '+st.nSame+'건<br>• 지금 있는데 파일엔 없는 항목 <b style="color:#dc2626">'+st.gone+'건</b></div>';
+    h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">';
+    h+='<button type="button" onclick="_impModeRes(\'merge\')" style="background:#2563eb;color:#fff;border:none;border-radius:10px;padding:14px 10px;font-size:15px;font-weight:800;cursor:pointer;text-align:left">➕ 기존에 추가·업데이트<div style="font-size:12px;font-weight:400;margin-top:4px;line-height:1.5">같은 항목은 금액만 바꾸고, 새 항목은 추가.<br>파일에 없는 기존 '+st.gone+'건은 <b>그대로 둠</b></div></button>';
+    h+='<button type="button" onclick="if(!'+st.gone+'||confirm(\'파일에 없는 기존 중분류 '+st.gone+'건이 지워져요.\\n(대분류 예산은 그대로)\\n\\n그 이름을 쓰던 구매가 있으면 나중에 🔗 끊긴 이름 바로잡기로 다시 연결하세요.\\n\\n새로 바꿀까요?\'))_impModeRes(\'replace\')" style="background:#c2410c;color:#fff;border:none;border-radius:10px;padding:14px 10px;font-size:15px;font-weight:800;cursor:pointer;text-align:left">🔄 새로 바꾸기 (전체 교체)<div style="font-size:12px;font-weight:400;margin-top:4px;line-height:1.5">중분류 예산을 파일 내용으로 통째로 교체.<br>파일에 없는 기존 '+st.gone+'건은 <b>지워짐</b></div></button>';
+    h+='</div><div style="font-size:12px;color:#64748b;margin-top:10px">💡 내보내기 → 엑셀에서 고치기 → 다시 올리기 할 땐 「새로 바꾸기」가 편해요. 대분류 예산(대분류 설정의 금액)은 어느 쪽이든 그대로예요.</div>';
+    h+='<div class="popStickyFoot" style="justify-content:flex-end"><button class="btn" style="background:#475569;color:#fff" onclick="_impModeRes(null)">취소</button></div>';
+    openPopup2(h,560);
+  });
+}
+async function _expbgImport(rows){
+  var evt=CUR_EVT&&CUR_EVT.evtId; if(!evt) return {ok:false};
+  var cur=(await fbDb.ref('/evtData/'+evt+'/ExpBG').once('value')).val()||[];
+  if(!Array.isArray(cur)) cur=Object.keys(cur).map(function(k){return cur[k];});
+  cur=cur.filter(function(r){return r&&r.tp;});    // 예전 형식(이름 없는 행) 제외
+  var K=function(r){ return (r.tp||"")+"›"+(r.mid||"")+"›"+(r.sub||""); };
+  var idx={}; cur.forEach(function(r,i){ if(r.mid) idx[K(r)]=i; });
+  var fm_={}, keys=[];
+  rows.forEach(function(r){ var k=K(r); if(!(k in fm_)) keys.push(k); fm_[k]=r; });
+  var st={total:keys.length,nNew:0,nChg:0,nSame:0,gone:0};
+  keys.forEach(function(k){ var f=fm_[k]; if(idx[k]==null) st.nNew++; else if((Number(cur[idx[k]].planAm)||0)!==(Number(f.planAm)||0)||(f.note&&f.note!==(cur[idx[k]].note||""))) st.nChg++; else st.nSame++; });
+  st.gone=cur.filter(function(r){ return r.mid && !(K(r) in fm_); }).length;
+  var mode=await _askImpMode(st);
+  if(!mode) return null;
+  var nid=function(){ return (typeof uid==="function")?uid():("X"+Date.now()+Math.floor(Math.random()*99999)); };
+  var mk=function(f,old){ return Object.assign({}, old||{}, {id:(old&&old.id)||nid(), tp:f.tp, mid:f.mid, sub:f.sub||"", planAm:Number(f.planAm)||0, note:(f.note||(old&&old.note)||""), evtId:evt}); };
+  var out;
+  if(mode==="merge"){
+    out=cur.slice();
+    keys.forEach(function(k){ var f=fm_[k]; if(idx[k]!=null) out[idx[k]]=mk(f,cur[idx[k]]); else out.push(mk(f)); });
+  } else {
+    out=cur.filter(function(r){return !r.mid;});   // 대분류 예산 행은 유지
+    keys.forEach(function(k){ out.push(mk(fm_[k], idx[k]!=null?cur[idx[k]]:null)); });
+  }
+  out=JSON.parse(JSON.stringify(out));
+  showLoading("세출예산 저장 중...");
+  try{ await fbDb.ref('/evtData/'+evt+'/ExpBG').set(out); }catch(e){ hideLoading(); toast("저장 실패: "+(e.message||e),true); return {ok:false}; }
+  expBG=_normExpBG(out);
+  toast((mode==="merge"?"➕ 추가 "+st.nNew+"건 · 바뀜 "+st.nChg+"건":"🔄 새로 바꾸기 — "+keys.length+"건으로 교체"+(st.gone?" (지운 항목 "+st.gone+"건)":"")));
+  return {ok:true, n:(mode==="merge"?st.nNew+st.nChg:keys.length)};
+}
 function impClick(m){
   if(typeof XLSX=="undefined"){toast("엑셀 라이브러리 로딩중",true);return}
   var mLabel = {act:"활동일지", pur:"물품구매", bud:"지출내역", expbg:"세출예산", inc:"세입관리", mem:"인원관리(전체 교체)", acct:"계정관리", all:"전체"}[m] || m;
-  if(!confirm("📥 ["+mLabel+"] 항목을 엑셀로 가져옵니다.\n\n선택한 파일의 해당 시트 데이터가 현재 데이터에 추가됩니다.\n계속하시겠습니까?"))return;
+  if(!confirm("📥 ["+mLabel+"] 항목을 엑셀로 가져옵니다.\n\n"+(m==="expbg"?"파일을 고르면 [기존에 추가·업데이트] / [새로 바꾸기] 중에 고를 수 있어요.":"선택한 파일의 해당 시트 데이터가 현재 데이터에 추가됩니다.")+"\n계속하시겠습니까?"))return;
   impMode=m;
   document.getElementById("impF").click();
 }
@@ -18795,9 +18840,10 @@ async function doImp(inp){
           return {tp:tp, mid:mid, sub:String(_rowGet(x,"소분류")||"").trim(), planAm:Number(String(_rowGet(x,["사업계획비(원)","사업계획비","예산액","예산액(원)","금액","금액(원)","계획금액","계획금액(원)","배정액","배정액(원)"])||"0").replace(/[^0-9.-]/g,""))||0, note:String(_rowGet(x,"비고")||"").trim()};
         }).filter(function(x){return x;});
         if(bgRows.length){
-          showLoading("세출예산 "+bgRows.length+"건 일괄 저장중...");
-          var rsBG=await api("bulkUpsertExpBig",{rows:bgRows});
-          if(rsBG&&rsBG.ok){c+=(rsBG.added||0)+(rsBG.updated||0);}else{fail+=bgRows.length;}
+          hideLoading();
+          var _ebr=await _expbgImport(bgRows);          // 방식 고르기 창 → 저장
+          if(_ebr && _ebr.ok) c+=_ebr.n; else if(_ebr && !_ebr.ok) fail+=bgRows.length;
+          showLoading("마무리 중...");
         }
       }
       // 세입 — 벌크
