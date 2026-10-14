@@ -6093,6 +6093,48 @@ function memFiltSel(){
   return h+"</select>";
 }
 
+// ===== 💰 대시보드: 돈 한눈에 (통장 잔액·결제 남은·결제 다 하면·예산 가용) =====
+function _dashBudgetRows(){
+  var big={}, mid={}, used={}, pre={}, order=[];
+  (expBG||[]).forEach(function(r){ if(!r||!r.tp) return; if(order.indexOf(r.tp)<0) order.push(r.tp); if(r.mid) mid[r.tp]=(mid[r.tp]||0)+pn(r.planAm); else big[r.tp]=(big[r.tp]||0)+pn(r.planAm); });
+  (purs||[]).forEach(function(p){ var k=p.expTp||"(미분류)"; if(_isPre(p)) pre[k]=(pre[k]||0)+pn(p.tot); else used[k]=(used[k]||0)+pn(p.tot); });
+  (exps||[]).forEach(function(e){ var k=e.expTp||"(미분류)"; used[k]=(used[k]||0)+pn(e.am); });
+  Object.keys(used).concat(Object.keys(pre)).forEach(function(k){ if(order.indexOf(k)<0) order.push(k); });
+  return order.map(function(k){ var plan=(big[k]>0)?big[k]:(mid[k]||0), u=used[k]||0, pr=pre[k]||0; return {tp:k, plan:plan, used:u, pre:pr, avail:plan-u-pr}; });
+}
+function _dashMoney(){
+  var fb=_purFinalBal(), rows=_dashBudgetRows();
+  var nPre={}; (purs||[]).forEach(function(p){ if(_isPre(p)) nPre[p.inv||p.id]=1; }); var preN=Object.keys(nPre).length;
+  var bP=0,bU=0,bPre=0; rows.forEach(function(r){ bP+=r.plan; bU+=r.used; bPre+=r.pre; }); var bA=bP-bU-bPre;
+  var tile=function(lb,v,sub,col,bd,click){ return '<div style="flex:1 1 170px;background:#fff;border:'+bd+';border-radius:10px;padding:10px 14px;'+(click?'cursor:pointer':'')+'"'+(click?' onclick="'+click+'"':'')+'><div style="font-size:12.5px;color:#475569;font-weight:700">'+lb+'</div><div style="font-size:22px;font-weight:900;color:'+col+';line-height:1.25">'+v+'</div><div style="font-size:11.5px;color:#64748b">'+sub+'</div></div>'; };
+  var go="CTAB=\\'pur\\';mkTabs();draw()", goE="CTAB=\\'exp\\';mkTabs();draw()";
+  var h='<div class="card" style="margin-bottom:12px"><h3 style="margin-bottom:10px">💰 돈 한눈에</h3>';
+  h+='<div style="display:flex;gap:8px;flex-wrap:wrap">';
+  h+=tile('🏦 지금 통장 잔액', fm(fb.now)+'원', fb.hasDep?'결제 완료까지 반영':'입금 미등록 — 예산 기준', '#0f172a', '1px solid #cbd5e1', go);
+  h+=tile('⏳ 결제 남은 금액', fm(fb.pre)+'원', preN+'건 결제 전', fb.pre?'#92400e':'#94a3b8', fb.pre?'2px solid #f59e0b':'1px solid #e2e8f0', go);
+  h+=tile('💰 결제 다 하면 남는 잔액', (fb.fin<0?'⚠ ':'')+fm(fb.fin)+'원', fb.fin<0?'<b style="color:#dc2626">돈 부족 — 입금 필요</b>':'더 쓸 수 있는 돈', fb.fin<0?'#dc2626':'#15803d', '2px solid '+(fb.fin<0?'#dc2626':'#16a34a'), go);
+  h+=tile('📊 예산 남은 가용', (bA<0?'⚠ ':'')+fm(bA)+'원', '예산 '+fm(bP)+' − 사용 '+fm(bU)+' − 결제 전 '+fm(bPre), bA<0?'#dc2626':'#1e40af', '1px solid #93c5fd', goE);
+  h+='</div></div>';
+  return h;
+}
+// 세출 대분류별: 사용(진한색) + 결제 전(주황) 막대, 남은 가용
+function _dashExpBars(){
+  var rows=_dashBudgetRows().filter(function(r){ return r.plan||r.used||r.pre; });
+  var h='<div class="card"><h3>세출 대분류별 예산 <span style="font-size:12px;color:#64748b;font-weight:400">■ 사용 <span style="color:#d97706">■ 결제 전</span> · 오른쪽 = 남은 가용</span></h3>';
+  if(!rows.length) return h+'<div class="mut" style="padding:14px;text-align:center;font-size:12px">세출예산 탭에서 대분류/중분류를 등록하세요</div></div>';
+  var tP=0,tU=0,tPr=0;
+  rows.forEach(function(r){
+    tP+=r.plan; tU+=r.used; tPr+=r.pre;
+    var base=Math.max(r.plan, r.used+r.pre, 1), wU=r.used/base*100, wP=r.pre/base*100, over=r.avail<0;
+    h+='<div style="margin-bottom:11px">';
+    h+='<div style="display:flex;justify-content:space-between;gap:8px;font-size:12.5px;margin-bottom:3px;flex-wrap:wrap"><span style="font-weight:700">'+esc(r.tp)+'</span><span style="color:#475569">사용 '+fm(r.used)+(r.pre?' · <span style="color:#b45309">결제 전 '+fm(r.pre)+'</span>':'')+' / 예산 '+fm(r.plan)+' · <b style="color:'+(over?'#dc2626':'#0f172a')+'">'+(over?'⚠ 초과 ':'남음 ')+fm(r.avail)+'</b></span></div>';
+    h+='<div style="height:10px;background:#e2e8f0;border-radius:5px;overflow:hidden;display:flex'+(over?';outline:2px solid #dc2626':'')+'"><div style="width:'+wU+'%;background:'+(over?'#dc2626':'#2563eb')+'"></div><div style="width:'+wP+'%;background:#f59e0b"></div></div>';
+    h+='</div>';
+  });
+  var tA=tP-tU-tPr;
+  h+='<div style="border-top:2px solid #e2e8f0;padding-top:8px;margin-top:6px;font-weight:800;display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px;font-size:13px"><span>합계</span><span>사용 '+fm(tU)+(tPr?' · <span style="color:#b45309">결제 전 '+fm(tPr)+'</span>':'')+' / 예산 '+fm(tP)+' · <span style="color:'+(tA<0?'#dc2626':'#0f172a')+'">'+(tA<0?'⚠ 초과 ':'남음 ')+fm(tA)+'</span></span></div>';
+  return h+'</div>';
+}
 // ===== 대시보드 =====
 function dDash(){
   var df=getDateFilter();
@@ -6112,6 +6154,7 @@ function dDash(){
   }
   h+=periodBar();
   h+='<div class="exbar">'+(isA()?'<button class="btn-out btn-tp" onclick="tmplAll()">📋 전체 양식 다운로드</button> <button class="btn-out btn-ex" onclick="expAll()">전체 엑셀 내보내기</button> <button class="btn-out btn-im" onclick="impClick(\'all\')">전체 엑셀 가져오기</button> ':'')+unitBar()+'</div>';
+  if(isA()) h+=_dashMoney();
   // 상단 요약 카드: 예산집행 / 우리 구매만 (전체 활동/수거량/증빙사진은 구 시스템 잔재라 제거)
   h+='<div class="g4" style="margin-bottom:12px">';
   if(isA()){
@@ -6151,27 +6194,8 @@ function dDash(){
     }
     h+='</div>';
     // 부서별 현황 블록 제거 — 참가자 관리 시스템에서 불필요
-    // === 세출 대분류별 예산 집행 (ExpBG + Purs/Exps 기반) ===
-    h+='<div class="card"><h3>세출 대분류별 예산 집행 ('+un+')</h3>';
-    var tpPlan={}, tpSpent={};
-    // 계획금액: ExpBG 대분류별 합계
-    (expBG||[]).forEach(function(r){ if(r.mid) return; /* 대분류만 (중분류 제외) */ var k=r.tp||"(미분류)";tpPlan[k]=(tpPlan[k]||0)+pn(r.planAm); });
-    // 집행금액: Purs + Exps 대분류별 합계 (expTp 필드)
-    (purs||[]).forEach(function(p){var k=p.expTp||"(미분류)";tpSpent[k]=(tpSpent[k]||0)+pn(p.tot);});
-    (exps||[]).forEach(function(e){var k=e.expTp||"(미분류)";tpSpent[k]=(tpSpent[k]||0)+pn(e.am);});
-    var tpKeys=Object.keys(tpPlan);
-    if(!tpKeys.length){
-      h+='<div class="mut" style="padding:14px;text-align:center;font-size:12px">세출예산 탭에서 대분류/중분류를 등록하세요</div>';
-    }else{
-      var totPlan=0,totSp=0;
-      for(var i=0;i<tpKeys.length;i++){
-        var k=tpKeys[i],plan=tpPlan[k]||0,sp=tpSpent[k]||0,p2=plan?(sp/plan)*100:0;
-        totPlan+=plan;totSp+=sp;
-        h+='<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;font-size:11px"><span style="font-weight:600">'+esc(k)+"</span><span>"+fmu(sp)+"/"+fmu(plan)+"</span></div>"+pb(Math.min(p2,100),p2>90?"#dc2626":p2>70?"#f59e0b":"#2563eb")+"</div>";
-      }
-      h+='<div style="border-top:2px solid #eee;padding-top:8px;margin-top:8px;font-weight:700;display:flex;justify-content:space-between"><span>합계</span><span>'+fmu(totSp)+"/"+fmu(totPlan)+"</span></div>";
-    }
-    h+='</div>';
+    // === 세출 대분류별 예산 (사용 + 결제 전 + 남은 가용) ===
+    h+=_dashExpBars();
 
     // ===== 세입/세출 대시보드 위젯 =====
     h += dDashIncExp();
@@ -6258,6 +6282,7 @@ function dDashIncExp(){
     expByTp[r.tp].plan += Number(r.planAm)||0;
   });
   (purs||[]).forEach(function(p){
+    if (_isPre(p)) return;   // 결제 전 제외
     var k = p.expTp || "(미분류)";
     if (!expByTp[k]) expByTp[k] = {plan:0, actual:0};
     expByTp[k].actual += Number(p.tot)||0;
