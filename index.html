@@ -6450,6 +6450,7 @@ function actExpTpOpts(sel){
   var keys=Object.keys(tps);
   var h='<option value="">(세출 대분류 선택)</option>';
   for(var i=0;i<keys.length;i++) h+='<option'+(keys[i]===sel?' selected':'')+'>'+esc(keys[i])+'</option>';
+  if(sel && keys.indexOf(sel)<0) h+='<option value="'+esc(sel)+'" selected>⚠ '+esc(sel)+' (예산에 없는 이름)</option>';
   return h;
 }
 // 세출 중분류 옵션 (대분류 필터)
@@ -6459,6 +6460,7 @@ function actExpMidOpts(tp, sel){
   var keys=Object.keys(mids);
   var h='<option value="">(중분류 선택)</option>';
   for(var i=0;i<keys.length;i++) h+='<option'+(keys[i]===sel?' selected':'')+'>'+esc(keys[i])+'</option>';
+  if(sel && keys.indexOf(sel)<0) h+='<option value="'+esc(sel)+'" selected>⚠ '+esc(sel)+' (예산에 없는 이름)</option>';
   return h;
 }
 function onActExpTpChg(prefix){
@@ -9035,6 +9037,7 @@ function dExp(){
   h += '<button class="btn btn-s" style="background:#0ea5e9;color:#fff;font-weight:700" onclick="_financeRefresh()">🔄 새로고침</button>';
   h += '<button class="btn" style="background:#7c3aed;color:#fff;font-weight:700" onclick="expManageGwan()">🏷️ 관(款) 설정</button>';
   h += '<button class="btn" style="background:#2563eb;color:#fff;font-weight:700" onclick="expManageTypes()">📂 대분류 설정</button>';
+  h += ' <button class="btn" style="background:#ea580c;color:#fff;font-weight:700" onclick="expFixOrphans()" title="예산에 없는 옛 이름을 쓰는 구매·지출·활동일지를 예산 항목에 다시 연결">🔗 끊긴 이름 바로잡기</button>';
   h += '<button class="btn" style="background:#16a34a;color:#fff;font-weight:700" onclick="expAdd()">+ 세출 추가</button>';
   h += '<button class="btn" style="background:#8b5cf6;color:#fff;font-weight:700" onclick="tmplExpBG()" title="엑셀 양식 다운로드">📋 양식</button>';
   h += '<button class="btn" style="background:#ea580c;color:#fff;font-weight:700" onclick="impClick(\'expbg\')">⬆ 엑셀 가져오기</button>';
@@ -9260,6 +9263,92 @@ function expEdit(idx){
   h += '</div></div>';
   openPopup(h, 460);
 }
+// 세출 이름 변경 시 연결 기록(구매·지출·활동일지·예산행)도 같이 변경
+//   oldMid===null → 대분류만 비교/변경 (대분류 이름 바꾸기)
+var _EXP_LINK_NODES={Purs:"구매",Exps:"지출",Acts:"활동일지",ExpBG:"예산 항목"};
+async function _expRenameLinks(oldTp, oldMid, newTp, newMid, dry, nodes){
+  var evt=CUR_EVT&&CUR_EVT.evtId; if(!evt) return {total:0,by:{}};
+  var res={total:0,by:{}};
+  for(var ni=0;ni<nodes.length;ni++){
+    var node=nodes[ni];
+    var snap=await fbDb.ref('/evtData/'+evt+'/'+node).once('value');
+    var val=snap.val()||{}, upd={}, n=0;
+    Object.keys(val).forEach(function(k){
+      var r=val[k]; if(!r||typeof r!=='object') return;
+      var tpKey=(node==="ExpBG")?"tp":"expTp", midKey=(node==="ExpBG")?"mid":"expMid";
+      if((r[tpKey]||"")!==oldTp) return;
+      if(oldMid!==null && (r[midKey]||"")!==oldMid) return;
+      n++;
+      if(newTp!==oldTp) upd[k+'/'+tpKey]=newTp;
+      if(oldMid!==null && newMid!==oldMid) upd[k+'/'+midKey]=newMid;
+    });
+    if(n){ res.by[node]=n; res.total+=n; }
+    if(!dry && Object.keys(upd).length) await fbDb.ref('/evtData/'+evt+'/'+node).update(upd);
+  }
+  return res;
+}
+function _expLinkMsg(res){
+  return Object.keys(res.by).map(function(k){ return "• "+_EXP_LINK_NODES[k]+" "+res.by[k]+"건"; }).join("\n");
+}
+function _expApplyLocal(oldTp, oldMid, newTp, newMid){
+  [[purs,"expTp","expMid"],[exps,"expTp","expMid"],[acts,"expTp","expMid"],[expBG,"tp","mid"]].forEach(function(x){
+    (x[0]||[]).forEach(function(r){
+      if(!r||(r[x[1]]||"")!==oldTp) return;
+      if(oldMid!==null && (r[x[2]]||"")!==oldMid) return;
+      r[x[1]]=newTp; if(oldMid!==null) r[x[2]]=newMid;
+    });
+  });
+}
+async function expFixOrphans(){
+  var have={}; (expBG||[]).forEach(function(e){ if(e.tp&&e.mid) have[e.tp+"›"+e.mid]=1; });
+  var evt=CUR_EVT&&CUR_EVT.evtId; if(!evt) return toast("행사를 선택하세요",true);
+  showLoading("확인 중...");
+  var orph={}, NODES=["Purs","Exps","Acts"];
+  for(var ni=0;ni<NODES.length;ni++){
+    var node=NODES[ni];
+    var snap=await fbDb.ref('/evtData/'+evt+'/'+node).once('value'); var val=snap.val()||{};
+    Object.keys(val).forEach(function(k){
+      var r=val[k]; if(!r||!r.expTp||!r.expMid) return;
+      var key=r.expTp+"›"+r.expMid; if(have[key]) return;
+      var o=orph[key]||(orph[key]={tp:r.expTp,mid:r.expMid,by:{}}); o.by[node]=(o.by[node]||0)+1;
+    });
+  }
+  hideLoading();
+  var keys=Object.keys(orph);
+  var opts='<option value="">— 그대로 두기 —</option>';
+  Object.keys(have).sort().forEach(function(k){ opts+='<option value="'+esc(k)+'">'+esc(k.replace("›"," › "))+'</option>'; });
+  var h='<h3>🔗 끊긴 이름 바로잡기 <button class="close-x" onclick="closePopup()">&times;</button></h3>';
+  if(!keys.length){ h+='<div style="padding:20px;text-align:center;color:#16a34a;font-weight:700">✅ 끊긴 이름이 없어요. 모든 기록이 예산 항목에 연결돼 있어요.</div>'; openPopup(h,520); return; }
+  h+='<div style="font-size:13px;color:#475569;margin-bottom:10px;line-height:1.6">예산관리에 없는 이름을 쓰는 기록이에요 (이름을 바꾸기 전 옛 이름 등).<br>오른쪽에서 <b>연결할 예산 항목</b>을 고르고 「바로잡기」를 누르면 그 기록들이 그 이름으로 바뀌어요.</div>';
+  h+='<table class="tbl" style="font-size:13px;margin:0"><thead><tr><th>지금 기록에 있는 이름</th><th>건수</th><th>→ 연결할 예산 항목</th></tr></thead><tbody>';
+  keys.sort().forEach(function(k){
+    var o=orph[k];
+    var cnt=Object.keys(o.by).map(function(nk){ return _EXP_LINK_NODES[nk]+" "+o.by[nk]+"건"; }).join(", ");
+    h+='<tr><td style="font-weight:700;color:#b45309">'+esc(o.tp)+' › '+esc(o.mid)+'</td><td style="white-space:nowrap">'+esc(cnt)+'</td>';
+    h+='<td><select class="orphMap" data-tp="'+esc(o.tp)+'" data-mid="'+esc(o.mid)+'" style="width:100%;padding:6px">'+opts+'</select></td></tr>';
+  });
+  h+='</tbody></table>';
+  h+='<div class="popStickyFoot" style="justify-content:flex-end"><button class="btn" style="background:#475569;color:#fff" onclick="closePopup()">취소</button><button class="btn btn-b" style="font-weight:700" onclick="expFixOrphansGo()">바로잡기</button></div>';
+  openPopup(h,680);
+}
+async function expFixOrphansGo(){
+  var jobs=[];
+  document.querySelectorAll(".orphMap").forEach(function(sel){
+    if(!sel.value) return;
+    var t=sel.value.split("›");
+    jobs.push({oTp:sel.getAttribute("data-tp"),oMid:sel.getAttribute("data-mid"),nTp:t[0],nMid:t.slice(1).join("›")});
+  });
+  if(!jobs.length) return toast("연결할 예산 항목을 하나 이상 고르세요",true);
+  if(!confirm(jobs.map(function(j){return j.oTp+" › "+j.oMid+"  →  "+j.nTp+" › "+j.nMid;}).join("\n")+"\n\n이렇게 바로잡을까요?")) return;
+  var total=0;
+  showLoading("바로잡는 중...");
+  for(var i=0;i<jobs.length;i++){
+    var j=jobs[i];
+    var r=await _expRenameLinks(j.oTp,j.oMid,j.nTp,j.nMid,false,["Purs","Exps","Acts"]);
+    _expApplyLocal(j.oTp,j.oMid,j.nTp,j.nMid); total+=r.total;
+  }
+  hideLoading(); closePopup(); draw(); toast("✅ "+total+"건 바로잡음");
+}
 function expEditSave(idx){
   var row = expBG[idx];
   if(!row){ toast("항목을 찾을 수 없습니다", true); return; }
@@ -9269,11 +9358,24 @@ function expEditSave(idx){
   var am = Number(document.getElementById("expE_am").value.replace(/,/g,""))||0;
   var note = document.getElementById("expE_note").value;
   if (!tp||!mid){ toast("대분류/중분류는 필수입니다", true); return; }
-  row.tp = tp; row.mid = mid; row.sub = sub; row.planAm = am; row.note = note;
-  showLoading("저장 중...");
-  fbDb.ref('/evtData/'+CUR_EVT.evtId+'/ExpBG').set(expBG).then(function(){
-    hideLoading(); closePopup(); draw(); toast("수정됨");
-  });
+  var oldTp=row.tp||"", oldMid=row.mid||"";
+  var renamed = oldMid && (tp!==oldTp || mid!==oldMid);
+  (async function(){
+    var cnt={total:0,by:{}};
+    if(renamed){
+      showLoading("연결된 기록 확인 중...");
+      cnt=await _expRenameLinks(oldTp, oldMid, tp, mid, true, ["Purs","Exps","Acts"]);
+      hideLoading();
+      if(cnt.total && !confirm("'"+oldTp+" › "+oldMid+"' → '"+tp+" › "+mid+"'\n\n이 이름을 쓰는 기록도 같이 바뀝니다:\n"+_expLinkMsg(cnt)+"\n\n같이 바꿀까요? (취소하면 저장 안 함)")) return;
+    }
+    // 같은 대분류·중분류의 다른 예산 행(소분류)도 이름 맞춤
+    if(renamed) expBG.forEach(function(x){ if(x!==row && (x.tp||"")===oldTp && (x.mid||"")===oldMid){ x.tp=tp; x.mid=mid; } });
+    row.tp = tp; row.mid = mid; row.sub = sub; row.planAm = am; row.note = note;
+    showLoading("저장 중...");
+    await fbDb.ref('/evtData/'+CUR_EVT.evtId+'/ExpBG').set(expBG);
+    if(renamed && cnt.total){ showLoading("연결된 기록 이름 바꾸는 중..."); await _expRenameLinks(oldTp, oldMid, tp, mid, false, ["Purs","Exps","Acts"]); _expApplyLocal(oldTp, oldMid, tp, mid); }
+    hideLoading(); closePopup(); draw(); toast("수정됨"+(cnt.total?" · 연결된 기록 "+cnt.total+"건도 같이 변경":""));
+  })().catch(function(e){ hideLoading(); toast("저장 실패: "+(e&&e.message||e), true); });
 }
 function expDel(idx){
   var r = expBG[idx];
@@ -9435,18 +9537,23 @@ function expTypeImport(){
   };
   inp.click();
 }
-function expRenameType(oldName){
+async function expRenameType(oldName){
   var newNm = prompt("'"+oldName+"' 을(를) 어떤 이름으로 변경하시겠습니까?", oldName);
-  if (!newNm || newNm === oldName) return;
+  if (!newNm || (newNm=newNm.trim()) === oldName) return;
+  var NODES=["ExpBG","Purs","Exps","Acts"];
+  showLoading("연결된 기록 확인 중...");
+  var cnt=await _expRenameLinks(oldName, null, newNm, null, true, NODES);
+  hideLoading();
+  if(cnt.total && !confirm("대분류 '"+oldName+"' → '"+newNm+"'\n\n이 대분류를 쓰는 기록도 같이 바뀝니다:\n"+_expLinkMsg(cnt)+"\n\n같이 바꿀까요? (취소하면 변경 안 함)")) return;
   showLoading("변경 중...");
-  api("renameExpType",{id:CID, oldName:oldName, newName:newNm.trim()}).then(function(r){
-    hideLoading();
-    if(!r||!r.ok){ toast((r&&r.err)||"실패",true); return; }
-    expTypes = r.types||expTypes;
-    refreshData(false);
-    setTimeout(expManageTypes, 100);
-    toast("변경됨");
-  });
+  var r=await api("renameExpType",{id:CID, oldName:oldName, newName:newNm});
+  if(!r||!r.ok){ hideLoading(); toast((r&&r.err)||"실패",true); return; }
+  if(cnt.total){ showLoading("연결된 기록 이름 바꾸는 중..."); await _expRenameLinks(oldName, null, newNm, null, false, NODES); _expApplyLocal(oldName, null, newNm, null); }
+  hideLoading();
+  expTypes = r.types||expTypes;
+  refreshData(false);
+  setTimeout(expManageTypes, 100);
+  toast("변경됨"+(cnt.total?" · 연결된 기록 "+cnt.total+"건도 같이 변경":""));
 }
 function expDelType(name){
   if(!confirm("'"+name+"' 대분류를 삭제하시겠습니까? (연결된 항목이 없어야 삭제 가능)")) return;
