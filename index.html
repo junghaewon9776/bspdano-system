@@ -7171,6 +7171,11 @@ function _esgLineLoad(){
 function _esgUidOf(role){ var x=ESIG_LINE.filter(function(l){return l.role===role;})[0]; return x?x.uid:""; }
 function _esgCanSign(role){ var u=_esgUidOf(role); return !!u && typeof CID!=="undefined" && u===CID; }
 function _esgIsMember(){ return ESIG_ROLES.some(_esgCanSign); }
+// 실무자 (/main/EsigStaff = [uid…]) — 서명은 못 하고, 결재 현황 보기·결재 요청·링크·수기 원본 올리기 가능
+var ESIG_STAFF=[];
+function _esgStaffLoad(){ try{ fbDb.ref('/main/EsigStaff').on('value',function(s){ var v=s.val()||[]; if(!Array.isArray(v)) v=Object.keys(v).map(function(k){return v[k];}); ESIG_STAFF=v.filter(Boolean).map(String); }); }catch(e){} }
+function _esgIsStaff(){ return typeof CID!=="undefined" && ESIG_STAFF.indexOf(CID)>=0; }
+function _esgCanManage(){ return (typeof isA==="function"&&isA()) || _esgIsStaff(); }
 function _esgHead(i,style){ return '<td class="th ctr"'+(style?' style="'+style+'"':'')+'>'+esc(ESIG_ROLES[i]||"")+'</td>'; }
 function _esgUserNm(uid){ return (uid&&typeof US!=="undefined"&&US[uid]&&US[uid].nm)?US[uid].nm:(uid||""); }
 // ⚙ 결재선 설정 (관리자)
@@ -7186,6 +7191,10 @@ function _esgLineEdit(){
     h+='</select></div>';
   });
   h+='<div style="font-size:12px;color:#94a3b8">※ 칸 이름을 바꾸면, 이미 받은 그 칸의 서명은 예전 이름으로 남아 결재칸에 안 보일 수 있어요. 서명 받기 전에 정해 두세요.</div>';
+  h+='<div style="margin-top:14px;border-top:1px solid #e2e8f0;padding-top:10px"><div style="font-weight:800;margin-bottom:4px">👷 실무자 <span style="font-weight:400;font-size:12px;color:#64748b">(회원이어도 체크하면: 결재 현황 보기 · 결재 요청 보내기 · 수기 원본 올리기 — 서명은 못 함)</span></div>';
+  h+='<div style="max-height:200px;overflow:auto;border:1px solid #e2e8f0;border-radius:8px;padding:6px 8px">';
+  us.forEach(function(u){ h+='<label style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:13px;cursor:pointer"><input type="checkbox" class="esgStaffChk" value="'+esc(u.id)+'"'+(ESIG_STAFF.indexOf(u.id)>=0?' checked':'')+'> '+esc(u.nm)+' <span style="color:#94a3b8">('+esc(u.id)+(u.ar?' · '+esc(u.ar):'')+')</span></label>'; });
+  h+='</div></div>';
   h+='<div class="popStickyFoot" style="justify-content:flex-end"><button class="btn" style="background:#475569;color:#fff" onclick="closePopup2()">취소</button><button class="btn btn-b" style="font-weight:700" onclick="_esgLineSave()">저장</button></div>';
   openPopup2(h,560);
 }
@@ -7199,7 +7208,8 @@ async function _esgLineSave(){
     arr.push({role:r,uid:u});
   }
   showLoading("결재선 저장 중...");
-  try{ await fbDb.ref('/main/EsigLine').set(arr); hideLoading(); closePopup2(); toast("⚙ 결재선 저장됨"); if(_ESG_CUR&&document.getElementById("esgBox")) _esgPop(_ESG_CUR); }
+  var staff=[].slice.call(document.querySelectorAll(".esgStaffChk")).filter(function(c){return c.checked;}).map(function(c){return c.value;});
+  try{ await fbDb.ref('/main/EsigLine').set(arr); await fbDb.ref('/main/EsigStaff').set(staff); hideLoading(); closePopup2(); toast("⚙ 결재선 저장됨"); if(_ESG_CUR&&document.getElementById("esgBox")) _esgPop(_ESG_CUR); }
   catch(e){ hideLoading(); toast("저장 실패: "+(e.message||e),true); }
 }
 var ESIG={}, _ESIG_EVT=null, _ESG_CUR=null;
@@ -7242,7 +7252,7 @@ function _esgCell(inv,role,extraCls){
 }
 // 목록 버튼
 function _esgBtn(inv){
-  if(!((typeof isA==="function"&&isA())||_esgIsMember())) return '';   // 결재선에 없는 계정은 서명 버튼 없음
+  if(!(_esgCanManage()||_esgIsMember())) return '';   // 결재자·실무자·관리자가 아니면 서명 버튼 없음
   var d=_esgOf(inv), n=_esgCount(inv), done=n===ESIG_ROLES.length, rej=Object.keys(d.rej||{}).length;
   var orig=_esgInvItems(inv).some(function(p){return p.signU;});
   var bg=rej?'#dc2626':done?'#16a34a':orig?'#16a34a':n?'#0891b2':'#475569';
@@ -7266,11 +7276,11 @@ function _esgPop(inv){
     else if(q&&!q.done) h+='<span style="color:#b45309;font-weight:700">⏳ '+esc(q.nm||"")+'님께 요청함</span> <span style="color:#94a3b8;font-size:12px">'+esc(q.at||"")+'</span>';
     else h+='<span style="color:#94a3b8">결재 전</span>';
     h+='</div><div style="display:flex;gap:6px;flex-wrap:wrap">';
-    var _adm=(typeof isA==="function"&&isA());
+    var _adm=(typeof isA==="function"&&isA()), _mgr=_esgCanManage();
     if(_esgCanSign(role)) h+='<button class="btn btn-s" style="background:#2563eb;color:#fff;font-weight:700" onclick="_esgReview(\''+esc(inv)+'\',\''+esc(role)+'\')">✍ 결재하기</button>';
     else h+='<button class="btn btn-s" style="background:#475569;color:#fff" onclick="_esgReview(\''+esc(inv)+'\',\''+esc(role)+'\')">👁 보기</button>';
-    if(_adm&&_luid) h+='<button class="btn btn-s" style="background:#334155;color:#fff;font-weight:700" onclick="_esgReq(\''+esc(inv)+'\',\''+esc(role)+'\')">📨 결재 요청</button>';
-    if(q&&!q.done&&_adm) h+='<button class="btn btn-s" style="background:#334155;color:#fff" onclick="_esgReqShow(\''+esc(inv)+'\',\''+esc(role)+'\')">🔗 링크</button>';
+    if(_mgr&&_luid) h+='<button class="btn btn-s" style="background:#334155;color:#fff;font-weight:700" onclick="_esgReq(\''+esc(inv)+'\',\''+esc(role)+'\')">📨 결재 요청</button>';
+    if(q&&!q.done&&_mgr) h+='<button class="btn btn-s" style="background:#334155;color:#fff" onclick="_esgReqShow(\''+esc(inv)+'\',\''+esc(role)+'\')">🔗 링크</button>';
     if(((s&&s.img)||rj)&&(_adm||_esgCanSign(role))) h+='<button class="btn btn-s" style="background:#dc2626;color:#fff" onclick="_esgClear(\''+esc(inv)+'\',\''+esc(role)+'\')">지우기</button>';
     h+='</div></div>';
   });
@@ -7516,7 +7526,7 @@ async function _esgOpenDeep(de){
   _esgTg("👀 ["+(typeof SYS_NAME!=="undefined"?SYS_NAME:"")+"] 결재 링크로 접속", de.inv, de.role, "• 요청 대상: "+(q.nm||"")+(q.uid&&q.uid!==CID?" ⚠ 다른 계정으로 열람":""));
 }
 function renderEsignPage(){}
-_esgLineLoad();   // 결재선 불러오기 (실시간)
+_esgLineLoad(); _esgStaffLoad();   // 결재선·실무자 불러오기 (실시간)
 
 // ===== 🧾 계좌이체 증빙 — 보탬e: 계좌이체는 전자세금계산서 필수 / 강사료·원고료·행사보험은 대체 증빙(증서·수령증) =====
 var TAX_ALT_REASONS=["강사료","원고료","행사보험 (보험증서)","기타"];
