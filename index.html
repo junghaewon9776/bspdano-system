@@ -6850,9 +6850,16 @@ function dPur(){
       for(var j=0;j<rcSrc.length;j++)h+='<span style="position:relative;display:inline-block;margin-right:2px"><img class="photoTh" src="'+imgSrc(rcSrc[j])+'" onclick="showPh(this)" style="border-color:#f59e0b"><button style="position:absolute;top:-4px;right:-4px;background:#dc2626;color:#fff;border:none;border-radius:50%;width:14px;height:14px;font-size:8px;cursor:pointer;line-height:14px;padding:0" onclick="delPh(\'rc\',\''+firstP.id+'\','+j+')">×</button></span> ';
       var txSrc=firstP.taxDoc||[], _bank=_isBankPay(firstP.payM);
       for(var j=0;j<txSrc.length;j++)h+='<span style="position:relative;display:inline-block;margin-right:4px"><a href="'+esc(txSrc[j])+'" target="_blank" style="display:inline-block;background:#ffedd5;color:#9a3412;border:1px solid #fb923c;border-radius:6px;padding:3px 8px;font-size:11px;font-weight:700;text-decoration:none">🧾 '+esc(_taxDocName(firstP))+(txSrc.length>1?' '+(j+1):'')+'</a><button style="position:absolute;top:-6px;right:-6px;background:#dc2626;color:#fff;border:none;border-radius:50%;width:14px;height:14px;font-size:8px;cursor:pointer;line-height:14px;padding:0" onclick="delPh(\'tax\',\''+firstP.id+'\','+j+')">×</button></span> ';
-      if(!phSrc.length&&!rcSrc.length&&!txSrc.length)h+='<span style="color:#94a3b8;font-size:13px">없음</span> ';
-      h+='<button class="abtn" onclick="attStart(\'pur\',\''+firstP.id+'\')">+물품사진</button> <button class="abtn abtn2" onclick="attStart(\'rc\',\''+firstP.id+'\')">+영수증</button>';
-      if(_bank) h+=' <button class="abtn" style="background:#ea580c;color:#fff;border-color:#ea580c" onclick="attStart(\'tax\',\''+firstP.id+'\')">+'+esc(_taxDocName(firstP))+'</button>';
+      var qdSrc=firstP.qtDoc||[], stSrc=firstP.stDoc||[];
+      h+=_purDocChips(qdSrc,'qt',firstP.id,'📄 견적서','#e0e7ff','#3730a3','#818cf8');
+      h+=_purDocChips(stSrc,'st',firstP.id,'📋 거래명세표','#dcfce7','#166534','#4ade80');
+      if(!phSrc.length&&!rcSrc.length&&!txSrc.length&&!qdSrc.length&&!stSrc.length)h+='<span style="color:#94a3b8;font-size:13px">없음</span> ';
+      h+='<span style="flex-basis:100%;height:0"></span>';
+      h+='<button class="abtn" onclick="attStart(\'pur\',\''+firstP.id+'\')">+물품사진</button>';
+      h+=' <button class="abtn" style="background:#4f46e5" onclick="attStart(\'qt\',\''+firstP.id+'\')">+견적서</button>';
+      h+=' <button class="abtn abtn2" onclick="attStart(\'rc\',\''+firstP.id+'\')">+영수증</button>';
+      h+=' <button class="abtn" style="background:#15803d" onclick="attStart(\'st\',\''+firstP.id+'\')">+거래명세표</button>';
+      h+=' <button class="abtn" style="background:#ea580c;color:#fff;border-color:#ea580c" onclick="attStart(\'tax\',\''+firstP.id+'\')">+'+esc(_bank?_taxDocName(firstP):'세금계산서')+'</button>';
       if(_bank && !txSrc.length) h+=' <span style="font-size:13px;color:#fff;background:#dc2626;padding:4px 10px;border-radius:10px;font-weight:700">⚠ 계좌이체 — '+esc(_taxDocName(firstP))+' 미첨부</span>';
       h+='</div></div>';
       h+='</div>';
@@ -6939,6 +6946,12 @@ function _taxRead(px){
   }
   return {tp:tp, rs:rs};
 }
+// 증빙 문서 칩 (견적서·거래명세표 — PDF/사진 링크 + 삭제)
+function _purDocChips(arr,tp,pid,label,bg,fg,bd){
+  var h='';
+  for(var j=0;j<(arr||[]).length;j++) h+='<span style="position:relative;display:inline-block;margin-right:4px"><a href="'+esc(arr[j])+'" target="_blank" style="display:inline-block;background:'+bg+';color:'+fg+';border:1px solid '+bd+';border-radius:6px;padding:4px 9px;font-size:12.5px;font-weight:700;text-decoration:none">'+label+(arr.length>1?' '+(j+1):'')+'</a><button style="position:absolute;top:-6px;right:-6px;background:#dc2626;color:#fff;border:none;border-radius:50%;width:15px;height:15px;font-size:9px;cursor:pointer;line-height:15px;padding:0" onclick="delPh(\''+tp+'\',\''+pid+'\','+j+')">×</button></span> ';
+  return h;
+}
 function _taxDocName(p){ return (p&&p.taxTp==="alt")?((p.taxAltRs||"대체")+" 증빙"):"세금계산서"; }
 
 var purRowCnt=1;
@@ -6976,7 +6989,9 @@ function popPur(){
      '<div><label style="font-size:12px">대표자</label><input type="text" id="pVendorCeo" placeholder="예: 김옥란" style="width:100%;padding:7px;border:1px solid #ddd;border-radius:6px"></div>'+
      '<div><label style="font-size:12px">주소</label><input type="text" id="pVendorAddr" placeholder="예: 광주광역시 ..." style="width:100%;padding:7px;border:1px solid #ddd;border-radius:6px"></div></div>';
   h+='</div>';
-  h+='<div class="frow fr2" style="margin-bottom:14px"><div><label>물품사진 (여러장 가능)</label><input type="file" id="pPh" multiple accept="image/*"></div><div><label>영수증 (여러장 가능)</label><input type="file" id="pRc" multiple accept="image/*"></div></div>';
+  h+='<div style="font-weight:700;color:#334155;margin-bottom:6px">📎 증빙 <span style="font-weight:400;font-size:12px;color:#64748b">(여러 장 가능 · 문서는 PDF도 가능 · 지금 없으면 나중에 목록에서 추가)</span></div>';
+  h+='<div class="frow fr2" style="margin-bottom:8px"><div><label>📷 물품사진</label><input type="file" id="pPh" multiple accept="image/*"></div><div><label>📄 견적서</label><input type="file" id="pQd" multiple accept="image/*,application/pdf"></div></div>';
+  h+='<div class="frow fr2" style="margin-bottom:14px"><div><label>🧾 영수증</label><input type="file" id="pRc" multiple accept="image/*,application/pdf"></div><div><label>📋 거래명세표</label><input type="file" id="pSt" multiple accept="image/*,application/pdf"></div></div>';
   h+='<div id="purRowBox" style="margin-bottom:10px">';
   h+=purCardHtml(1,bo);
   h+='</div>';
@@ -7466,6 +7481,8 @@ async function addP(){
   var rcFiles=await readFiles(document.getElementById("pRc"));
   var phUrls=phFiles.length?await uploadAll(phFiles,ar,"물품사진"):[];
   var rcUrls=rcFiles.length?await uploadAll(rcFiles,ar,"영수증"):[];
+  var qdFiles=await readFiles(document.getElementById("pQd")), qdUrls=qdFiles.length?await uploadAll(qdFiles,ar,"견적서"):[];
+  var stFiles=await readFiles(document.getElementById("pSt")), stUrls=stFiles.length?await uploadAll(stFiles,ar,"거래명세표"):[];
   var invId="INV"+Date.now()+Math.floor(Math.random()*999);
   var payM=document.getElementById("pPayM")?document.getElementById("pPayM").value:"";
   var gwan=document.getElementById("pGwan")?document.getElementById("pGwan").value:"";
@@ -7485,7 +7502,7 @@ async function addP(){
   for(var i=0;i<items.length;i++){
     var it=items[i];
     showLoading("저장 중 ("+(i+1)+"/"+items.length+")");
-    var payload={dt:d,dtIni:dtIni,ar:ar,it:it.it,qt:_stripComma(it.qt),un:_stripComma(it.un),tot:_stripComma(it.tot),bi:it.bi,by:CID,ph:phUrls.slice(),rc:rcUrls.slice(),inv:invId,payM:payM,gwan:gwan,expTp:expTp,expMid:expMid,incTp:incTp,incSub:incSub,card:card,noMgmt:noMgmt,mgmtNo:firstMgmt||mgmtNo,vendorId:vendorId,vendorName:vendorName,vendorCeo:vendorCeo,vendorAddr:vendorAddr};
+    var payload={dt:d,dtIni:dtIni,ar:ar,it:it.it,qt:_stripComma(it.qt),un:_stripComma(it.un),tot:_stripComma(it.tot),bi:it.bi,by:CID,ph:phUrls.slice(),rc:rcUrls.slice(),qtDoc:qdUrls.slice(),stDoc:stUrls.slice(),inv:invId,payM:payM,gwan:gwan,expTp:expTp,expMid:expMid,incTp:incTp,incSub:incSub,card:card,noMgmt:noMgmt,mgmtNo:firstMgmt||mgmtNo,vendorId:vendorId,vendorName:vendorName,vendorCeo:vendorCeo,vendorAddr:vendorAddr};
     if(_isBankPay(payM)){ payload.taxTp=_tax.tp; payload.taxAltRs=_tax.rs; payload.taxDoc=taxUrls.slice(); }
     var r=await api("addPur",payload);
     if(r.ok){payload.id=r.id;payload.mgmtNo=r.mgmtNo||"";if(!firstMgmt)firstMgmt=r.mgmtNo||"";purs.push(payload);ok++;}
@@ -16913,7 +16930,7 @@ async function delAdm(uid){
 }
 
 // ===== 사진 첨부 =====
-function attStart(tp,id){ATT={t:tp,i:id};var f=document.getElementById("attF");f.accept=(tp=="tax")?"image/*,application/pdf":"image/*";f.click()}
+function attStart(tp,id){ATT={t:tp,i:id};var f=document.getElementById("attF");f.accept=(tp=="tax"||tp=="qt"||tp=="st"||tp=="rc")?"image/*,application/pdf":"image/*";f.click()}
 async function doAttach(inp){
   if(!ATT||!inp.files||!inp.files.length)return;
   var tp=ATT.t,id=ATT.i,item=null,ar="";
@@ -16923,13 +16940,18 @@ async function doAttach(inp){
   ar=item.ar||"";
   showLoading("사진 업로드...");
   var files=await readFiles(inp);
-  var type=tp=="act"?"활동사진":tp=="rc"?"영수증":tp=="tax"?"세금계산서":"물품사진";
+  var type=tp=="act"?"활동사진":tp=="rc"?"영수증":tp=="tax"?"세금계산서":tp=="qt"?"견적서":tp=="st"?"거래명세표":"물품사진";
   var urls=await uploadAll(files,ar,type);
   if(urls.length){
     if(tp=="act"){
       var newPh=(item.ph||[]).concat(urls);
       var r=await api("updateAct",{id:id,ph:newPh});
       if(r.ok){item.ph=newPh;toast("사진 "+urls.length+"장 첨부");}
+      else toast(r.err,true);
+    } else if(tp=="qt"||tp=="st"){
+      var fk=tp=="qt"?"qtDoc":"stDoc", nv=(item[fk]||[]).concat(urls), o={id:id}; o[fk]=nv;
+      var r=await api("updatePur",o);
+      if(r.ok){item[fk]=nv;toast((tp=="qt"?"📄 견적서 ":"📋 거래명세표 ")+urls.length+"개 첨부");}
       else toast(r.err,true);
     } else if(tp=="tax"){
       var newTx=(item.taxDoc||[]).concat(urls);
@@ -16956,7 +16978,7 @@ async function delPh(tp,id,idx){
   if(tp=="act"){for(var i=0;i<acts.length;i++)if(acts[i].id==id){item=acts[i];break}}
   else{for(var i=0;i<purs.length;i++)if(purs[i].id==id){item=purs[i];break}}
   if(!item)return;
-  var arr=tp=="rc"?(item.rc||[]):tp=="tax"?(item.taxDoc||[]):(item.ph||[]);
+  var arr=tp=="rc"?(item.rc||[]):tp=="tax"?(item.taxDoc||[]):tp=="qt"?(item.qtDoc||[]):tp=="st"?(item.stDoc||[]):(item.ph||[]);
   var url=arr[idx];
   showLoading("삭제 중...");
   await api("deletePhoto",{url:url});
@@ -16965,6 +16987,8 @@ async function delPh(tp,id,idx){
   if(tp=="act")r=await api("updateAct",{id:id,ph:arr});
   else if(tp=="rc")r=await api("updatePur",{id:id,rc:arr});
   else if(tp=="tax"){item.taxDoc=arr;r=await api("updatePur",{id:id,taxDoc:arr});}
+  else if(tp=="qt"){item.qtDoc=arr;r=await api("updatePur",{id:id,qtDoc:arr});}
+  else if(tp=="st"){item.stDoc=arr;r=await api("updatePur",{id:id,stDoc:arr});}
   else r=await api("updatePur",{id:id,ph:arr});
   hideLoading();
   if(!r.ok){toast(r.err,true);return}
