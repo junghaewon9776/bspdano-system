@@ -8075,15 +8075,15 @@ function popPur(){
   // 지출결의서 번호 (결제수단 제거)
   h+='<div class="frow fr1" style="margin-bottom:10px"><div><label style="display:flex;align-items:center;gap:8px">지출결의서 번호 <input type="checkbox" id="pNoMgmt" onchange="togglePurMgmtVisible()"> <span style="font-size:12px;color:#666">없음</span></label>'+
     '<div id="pMgmtBox" style="margin-top:4px"><input type="text" id="pMgmtNo" placeholder="자동생성 (비워두면 자동)" style="width:100%;font-size:13px;padding:8px"></div></div></div>';
-  h+='<div class="frow fr2" style="margin-bottom:10px"><div><label>세입 대분류 <span style="color:#888;font-size:11px">(재원 구분)</span></label><select id="pIncTp" onchange="onPurIncTpChg(\'p\')">'+incTpOpts+'</select></div>'+
-    '<div><label>세입 중분류</label><select id="pIncSub" onchange="onPurIncSubChg(\'p\')"><option value="">(세입 중분류 선택)</option></select></div></div>';
+  h+='<div class="frow fr2" style="margin-bottom:10px"><div><label>세입 대분류 <b style="color:#dc2626" title="나중에라도 꼭 선택 (비워도 등록은 돼요)">*</b> <span style="color:#888;font-size:11px">(재원 구분)</span></label><select id="pIncTp" onchange="onPurIncTpChg(\'p\')">'+incTpOpts+'</select></div>'+
+    '<div><label>세입 중분류 <b style="color:#dc2626" title="나중에라도 꼭 선택 (비워도 등록은 돼요)">*</b></label><select id="pIncSub" onchange="onPurIncSubChg(\'p\')"><option value="">(세입 중분류 선택)</option></select></div></div>';
   // 관/세출/카드
   h+='<div class="frow fr3" style="margin-bottom:10px"><div><label>관 (지출결의서 분류)</label><select id="pGwan">'+purGwanOpts("")+'</select></div>'+
-    '<div><label>세출 대분류 (행사)</label><select id="pExpTp" onchange="onPurExpTpChg(\'p\')">'+actExpTpOpts("")+'</select></div>'+
-    '<div><label>세출 중분류 (세부행사)</label><select id="pExpMid" onchange="onPurExpMidChg(\'p\')">'+actExpMidOpts("","")+'</select></div></div>';
+    '<div><label>세출 대분류 (행사) <b style="color:#dc2626" title="나중에라도 꼭 선택 (비워도 등록은 돼요)">*</b></label><select id="pExpTp" onchange="onPurExpTpChg(\'p\')">'+actExpTpOpts("")+'</select></div>'+
+    '<div><label>세출 중분류 (세부행사) <b style="color:#dc2626" title="나중에라도 꼭 선택 (비워도 등록은 돼요)">*</b></label><select id="pExpMid" onchange="onPurExpMidChg(\'p\')">'+actExpMidOpts("","")+'</select></div></div>';
   h+='<div id="pBudgetInfo" style="padding:8px 12px;background:#f0f9ff;border:1px solid #bfdbfe;border-radius:6px;margin-bottom:10px;font-size:13px"></div>';
-  h+='<div class="frow fr2" style="margin-bottom:10px"><div><label>사용 카드/통장 <span style="color:#888;font-size:11px">(물품 결제에 사용한 것)</span></label><select id="pCard" onchange="onPurCardChg()">'+purCardOpts("")+'</select></div>'+
-    '<div><label>결제방법 <span style="color:#888;font-size:11px">(지정카드/계좌이체 등)</span></label><select id="pPayM" onchange="_taxToggle(\'p\')">'+incPayOpts("","")+'</select></div></div>';
+  h+='<div class="frow fr2" style="margin-bottom:10px"><div><label>사용 카드/통장 <b style="color:#dc2626" title="나중에라도 꼭 선택 (비워도 등록은 돼요)">*</b> <span style="color:#888;font-size:11px">(물품 결제에 사용한 것)</span></label><select id="pCard" onchange="onPurCardChg()">'+purCardOpts("")+'</select></div>'+
+    '<div><label>결제방법 <b style="color:#dc2626" title="나중에라도 꼭 선택 (비워도 등록은 돼요)">*</b> <span style="color:#888;font-size:11px">(지정카드/계좌이체 등)</span></label><select id="pPayM" onchange="_taxToggle(\'p\')">'+incPayOpts("","")+'</select></div></div>';
   h+='<div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:14px"><label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:700"><input type="checkbox" id="pPre" style="width:18px;height:18px"> ⏳ 아직 결제 전 (계약·예정)으로 등록</label><span style="font-size:11.5px;color:#64748b">보통은 체크 없이 = 결제 완료. 체크하면 통장 잔액에 안 들어가고, 결제 후 목록에서 [✅ 결제 처리]</span></div>';
   h+=taxBoxHtml("p");
   // 거래처(지급처) 정보 — 검색 후 자동 채움, 없으면 직접 입력
@@ -8639,14 +8639,14 @@ function edPur(id){
   openPopup('<h3>구매 수정 <span style="font-size:13px;color:#64748b;font-weight:600">명세서 전체</span> <button class="close-x" onclick="closePopup()">&times;</button></h3>'+
     '<div class="frow fr2"><div><label>구매일</label><input type="date" id="epD" value="'+esc(p.dt)+'"></div>'+
     '<div><label>발의일자 <span style="color:#888;font-size:11px">(지출결의서용)</span></label><input type="date" id="epDtIni" value="'+esc(p.dtIni||"")+'"></div></div>'+
-    '<div class="frow fr2"><div><label>세입 대분류</label><select id="epIncTp" onchange="onPurIncTpChg(\'ep\')">'+incTpOpts+'</select></div>'+
-    '<div><label>세입 중분류</label><select id="epIncSub">'+purIncSubOpts(p.incTp||"",p.incSub||"")+'</select></div></div>'+
+    '<div class="frow fr2"><div><label>세입 대분류 <b style="color:#dc2626" title="나중에라도 꼭 선택 (비워도 등록은 돼요)">*</b></label><select id="epIncTp" onchange="onPurIncTpChg(\'ep\')">'+incTpOpts+'</select></div>'+
+    '<div><label>세입 중분류 <b style="color:#dc2626" title="나중에라도 꼭 선택 (비워도 등록은 돼요)">*</b></label><select id="epIncSub">'+purIncSubOpts(p.incTp||"",p.incSub||"")+'</select></div></div>'+
     '<div class="frow fr3"><div><label>관 (지출결의서 분류)</label><select id="epGwan">'+purGwanOpts(p.gwan||"")+'</select></div>'+
-    '<div><label>세출 대분류</label><select id="epExpTp" onchange="onPurExpTpChg(\'ep\')">'+actExpTpOpts(p.expTp||"")+'</select></div>'+
-    '<div><label>세출 중분류</label><select id="epExpMid" onchange="onPurExpMidChg(\'ep\')">'+actExpMidOpts(p.expTp||"",p.expMid||"")+'</select></div></div>'+
+    '<div><label>세출 대분류 <b style="color:#dc2626" title="나중에라도 꼭 선택 (비워도 등록은 돼요)">*</b></label><select id="epExpTp" onchange="onPurExpTpChg(\'ep\')">'+actExpTpOpts(p.expTp||"")+'</select></div>'+
+    '<div><label>세출 중분류 <b style="color:#dc2626" title="나중에라도 꼭 선택 (비워도 등록은 돼요)">*</b></label><select id="epExpMid" onchange="onPurExpMidChg(\'ep\')">'+actExpMidOpts(p.expTp||"",p.expMid||"")+'</select></div></div>'+
     '<div id="epBudgetInfo" style="padding:8px 12px;background:#f0f9ff;border:1px solid #bfdbfe;border-radius:6px;margin-top:8px;font-size:13px"></div>'+
-    '<div class="frow fr2" style="margin-top:10px"><div><label>사용 카드/통장</label><select id="epCard" onchange="_refreshEpPayM()">'+purCardOpts(p.card||"")+'</select></div>'+
-    '<div><label>결제방법</label><select id="epPayM" onchange="_taxToggle(\'ep\')">'+incPayOpts(p.card||"", p.payM||"")+'</select></div></div>'+
+    '<div class="frow fr2" style="margin-top:10px"><div><label>사용 카드/통장 <b style="color:#dc2626" title="나중에라도 꼭 선택 (비워도 등록은 돼요)">*</b></label><select id="epCard" onchange="_refreshEpPayM()">'+purCardOpts(p.card||"")+'</select></div>'+
+    '<div><label>결제방법 <b style="color:#dc2626" title="나중에라도 꼭 선택 (비워도 등록은 돼요)">*</b></label><select id="epPayM" onchange="_taxToggle(\'ep\')">'+incPayOpts(p.card||"", p.payM||"")+'</select></div></div>'+
     '<div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;margin-top:10px;font-size:14px"><label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:700"><input type="checkbox" id="epPre" style="width:18px;height:18px"'+(_isPre(p)?' checked':'')+'> ⏳ 아직 결제 전 (계약·예정)</label><span style="font-size:11.5px;color:#64748b">체크 = 통장 잔액에 안 들어감. 체크 풀고 저장 = 결제 완료 (같은 명세서 물품 전체)</span></div>'+
     taxBoxHtml("ep", p)+
     _attEditHtml(p)+
