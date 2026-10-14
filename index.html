@@ -6894,7 +6894,13 @@ function dPur(){
       if(canSeeAmt()){
         h+='<div style="text-align:right;margin-left:auto"><div style="font-size:11px;color:#64748b">합계</div><div style="font-weight:900;font-size:19px;color:#0f172a;line-height:1.15">'+fm(G.tot)+'원</div>';
         var _rb=_isPreG(G)?null:_RB.byInv[G.inv];
-        if(_isPreG(G)) h+='<div style="font-size:12px;color:#92400e">결제 전 — 통장 잔액 미반영</div>';
+        if(_isPreG(G)){
+          var _pc=String(G.card||"").trim(), _cc=_pc&&_RB.cards?_RB.cards[_pc]:null, _pam=pn(G.tot);
+          h+='<div style="font-size:12.5px;color:#92400e;font-weight:700">⏳ 결제할 금액 '+fm(_pam)+'원</div>';
+          if(_cc){ var _hasD=_cc.depN>0, _now=_hasD?_cc.bal:_cc.planBal, _aft=_now-_pam;
+            h+='<div style="font-size:12px;color:'+(_aft<0?'#dc2626;font-weight:800':'#475569')+'" title="지금 '+esc(_pc)+' 잔액 '+fm(_now)+'원에서 이 건을 결제하면">결제하면 '+esc(_pc)+(_hasD?' 잔액 ':' 예산 잔액 ')+(_aft<0?'⚠ ':'')+fm(_aft)+'원'+(_hasD?'':' <span style="color:#c2410c">(입금 미등록)</span>')+'</div>'; }
+          else h+='<div style="font-size:12px;color:#64748b">통장 잔액엔 아직 안 빠짐</div>';
+        }
         var _cb=_CB[G.inv];
         if(_cb) h+='<div style="font-size:12px;color:'+(_cb.after<0?'#dc2626;font-weight:800':'#475569')+'" title="'+esc(_cb.mid)+' 예산 '+fm(_cb.budget)+'원에서 이 건까지 쓴 뒤 남은 금액">📊 '+esc(_cb.mid)+' 예산 남음 '+(_cb.after<0?'⚠ ':'')+fm(_cb.after)+'원</div>';
         if(_rb){ var _rv=_rb.hasDep?_rb.after:_rb.planAfter; h+='<div style="font-size:12px;color:'+(_rv<0?'#dc2626;font-weight:700':'#475569')+'">'+esc(_rb.card)+(_rb.hasDep?' 잔액 ':' 예산 잔액 ')+fm(_rv)+'원'+(_rb.hasDep?'':' <span style="color:#c2410c">(입금 미등록)</span>')+'</div>'; }
