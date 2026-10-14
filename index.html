@@ -6916,6 +6916,111 @@ function purCardOpts(sel, filterTp, filterSub){
   return h;
 }
 
+// ===== 📎 증빙 첨부 칸 (등록·수정 공용) — 파일 선택 버튼 + 미리보기 + × 빼기 (+상품캡처는 Ctrl+V) =====
+//   px: 등록 "p" / 수정 "ep".  _ATT[px+k]=새로 고른 파일들, _ATT_EX[px+k]=이미 저장된 주소, _ATT_DEL[px+k]={주소:1} 뺄 것
+var ATT_TYPES=[
+  {k:"pc",fld:"pcDoc",lb:"🛒 구매 전 상품 캡처",hint:"스마트스토어 등에서 캡처 — Ctrl+V 붙여넣기 가능",acc:"image/*,application/pdf",up:"상품캡처",paste:true,bg:"#fffbeb",bd:"#f59e0b",fg:"#92400e"},
+  {k:"ph",fld:"ph",lb:"📷 물품사진",acc:"image/*",up:"물품사진",bg:"#f8fafc",bd:"#cbd5e1",fg:"#334155"},
+  {k:"qt",fld:"qtDoc",lb:"📄 견적서",acc:"image/*,application/pdf",up:"견적서",bg:"#eef2ff",bd:"#a5b4fc",fg:"#3730a3"},
+  {k:"rc",fld:"rc",lb:"🧾 영수증",acc:"image/*,application/pdf",up:"영수증",bg:"#fff7ed",bd:"#fdba74",fg:"#9a3412"},
+  {k:"st",fld:"stDoc",lb:"📋 거래명세표",acc:"image/*,application/pdf",up:"거래명세표",bg:"#f0fdf4",bd:"#86efac",fg:"#166534"}
+];
+var _ATT={}, _ATT_EX={}, _ATT_DEL={};
+function _attType(k){ return ATT_TYPES.filter(function(t){return t.k===k;})[0]; }
+function _attReset(px, item){
+  ATT_TYPES.forEach(function(t){ _ATT[px+t.k]=[]; _ATT_DEL[px+t.k]={}; _ATT_EX[px+t.k]=((item&&item[t.fld])||[]).slice(); });
+}
+function _attSlotHtml(px, t){
+  var id=px+"Att_"+t.k;
+  var h='<div style="border:'+(t.paste?'2px dashed ':'1.5px solid ')+t.bd+';background:'+t.bg+';border-radius:8px;padding:8px 10px">';
+  h+='<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><b style="color:'+t.fg+';font-size:14px">'+t.lb+'</b>';
+  if(t.hint) h+='<span style="font-size:11px;color:'+t.fg+';opacity:.8">'+t.hint+'</span>';
+  h+='</div>';
+  h+='<input type="file" id="'+id+'" multiple accept="'+t.acc+'" style="display:none" onchange="_attAdd(\''+px+'\',\''+t.k+'\',this)">';
+  h+='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">';
+  h+='<button type="button" onclick="document.getElementById(\''+id+'\').click()" style="background:'+t.fg+';color:#fff;border:none;border-radius:6px;padding:8px 12px;font-size:13px;font-weight:700;cursor:pointer">📁 파일 선택</button>';
+  if(t.paste) h+='<div tabindex="0" onpaste="_attPaste(event,\''+px+'\',\''+t.k+'\')" onclick="this.focus()" style="flex:1;min-width:160px;padding:8px;border:1.5px dashed '+t.bd+';border-radius:6px;background:#fff;color:'+t.fg+';font-size:12.5px;text-align:center;cursor:text">📋 여기 누르고 <b>Ctrl+V</b> (캡처 붙여넣기)</div>';
+  h+='</div>';
+  h+='<div id="'+id+'_prev" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">'+_attPrevHtml(px,t.k)+'</div>';
+  h+='</div>';
+  return h;
+}
+// 등록/수정 화면에 넣을 증빙 칸 전체 (상품캡처는 한 줄 전체, 나머지 2칸씩)
+function _attAllHtml(px){
+  var h='<div style="font-weight:700;color:#334155;margin:4px 0 6px">📎 증빙 <span style="font-weight:400;font-size:12px;color:#64748b">(여러 장 가능 · 문서는 PDF도 가능 · 올리면 아래에 미리보기)</span></div>';
+  h+='<div style="margin-bottom:8px">'+_attSlotHtml(px,ATT_TYPES[0])+'</div>';
+  h+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:8px;margin-bottom:12px">';
+  for(var i=1;i<ATT_TYPES.length;i++) h+=_attSlotHtml(px,ATT_TYPES[i]);
+  h+='</div>';
+  return h;
+}
+function _attThumb(src, isImg, name, rmJs, saved){
+  var x='<button type="button" onclick="'+rmJs+'" title="빼기" style="position:absolute;top:-7px;right:-7px;background:#dc2626;color:#fff;border:none;border-radius:50%;width:20px;height:20px;font-size:12px;cursor:pointer;line-height:20px;padding:0;box-shadow:0 1px 3px rgba(0,0,0,.3)">×</button>';
+  var tag=saved?'<span style="position:absolute;left:3px;bottom:3px;background:rgba(22,163,74,.9);color:#fff;font-size:9px;padding:0 4px;border-radius:3px">저장됨</span>':'<span style="position:absolute;left:3px;bottom:3px;background:rgba(37,99,235,.9);color:#fff;font-size:9px;padding:0 4px;border-radius:3px">새로</span>';
+  var body=isImg
+    ? '<img src="'+src+'" onclick="window.open(this.src)" style="width:96px;height:76px;object-fit:cover;border-radius:6px;border:1px solid #cbd5e1;cursor:zoom-in;background:#fff;display:block">'
+    : '<a href="'+src+'" target="_blank" style="display:flex;flex-direction:column;align-items:center;justify-content:center;width:96px;height:76px;border-radius:6px;border:1px solid #cbd5e1;background:#fff;font-size:26px;text-decoration:none;color:#334155">📄<span style="font-size:9px;max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(name||"파일")+'</span></a>';
+  return '<span style="position:relative;display:inline-block">'+body+tag+x+'</span>';
+}
+function _attPrevHtml(px,k){
+  var h='', key=px+k, del=_ATT_DEL[key]||{};
+  (_ATT_EX[key]||[]).forEach(function(u,i){ if(del[u]) return; h+=_attThumb(imgSrc(u), true, "", "_attRm('"+px+"','"+k+"','ex',"+i+")", true); });
+  (_ATT[key]||[]).forEach(function(f,i){ h+=_attThumb(f.url, f.isImg, f.name, "_attRm('"+px+"','"+k+"','new',"+i+")", false); });
+  return h;
+}
+function _attRefresh(px,k){ var el=document.getElementById(px+"Att_"+k+"_prev"); if(el) el.innerHTML=_attPrevHtml(px,k); }
+function _attPush(px,k,file){
+  var key=px+k; (_ATT[key]=_ATT[key]||[]);
+  var isImg=/^image\//i.test(file.type||"");
+  var url=""; try{ url=URL.createObjectURL(file); }catch(e){}
+  _ATT[key].push({file:file, name:file.name||(_attType(k).up+".png"), isImg:isImg, url:url});
+}
+function _attAdd(px,k,inp){
+  var fs=inp.files||[]; for(var i=0;i<fs.length;i++) _attPush(px,k,fs[i]);
+  inp.value=""; _attRefresh(px,k);
+}
+function _attPaste(ev,px,k){
+  var items=(ev.clipboardData||window.clipboardData||{}).items||[], n=0;
+  for(var i=0;i<items.length;i++){
+    var it=items[i]; if(!it.type||it.type.indexOf("image/")!==0) continue;
+    var f=it.getAsFile(); if(!f) continue;
+    try{ f=new File([f], _attType(k).up+"_"+Date.now()+"_"+i+".png", {type:f.type}); }catch(e){}
+    _attPush(px,k,f); n++;
+  }
+  if(n){ ev.preventDefault(); _attRefresh(px,k); toast("🛒 캡처 "+n+"장 붙여넣음"); }
+  else toast("붙여넣을 이미지가 없어요 — 캡처(Win+Shift+S) 후 다시 Ctrl+V",true);
+}
+function _attRm(px,k,kind,i){
+  var key=px+k;
+  if(kind==="ex"){ var u=(_ATT_EX[key]||[])[i]; if(u){ if(!confirm("저장된 파일을 이 건에서 뺄까요? (저장을 눌러야 반영돼요)")) return; (_ATT_DEL[key]=_ATT_DEL[key]||{})[u]=1; } }
+  else { var f=(_ATT[key]||[])[i]; if(f&&f.url){ try{URL.revokeObjectURL(f.url);}catch(e){} } (_ATT[key]||[]).splice(i,1); }
+  _attRefresh(px,k);
+}
+// 새로 고른 파일 업로드 → 주소 목록
+async function _attUpload(px,k,ar){
+  var list=_ATT[px+k]||[]; if(!list.length) return [];
+  var out=[];
+  for(var i=0;i<list.length;i++){ var r=await compressOne(list[i].file); out.push({name:r.name||list[i].name, dataUrl:r.dataUrl}); }
+  return await uploadAll(out, ar, _attType(k).up);
+}
+// 최종 목록 = 저장된 것(뺀 것 제외) + 새로 올린 것
+function _attFinal(px,k,newUrls){
+  var del=_ATT_DEL[px+k]||{};
+  return (_ATT_EX[px+k]||[]).filter(function(u){return !del[u];}).concat(newUrls||[]);
+}
+function _attChanged(px){ return ATT_TYPES.some(function(t){ return (_ATT[px+t.k]||[]).length || Object.keys(_ATT_DEL[px+t.k]||{}).length; }); }
+// 세금계산서 칸 선택 파일 미리보기 (이름·썸네일)
+function _attPrevInput(inp, boxId){
+  var box=document.getElementById(boxId); if(!box) return;
+  var h=''; var fs=inp.files||[];
+  for(var i=0;i<fs.length;i++){ var f=fs[i], isImg=/^image\//i.test(f.type||""), u=""; try{u=URL.createObjectURL(f);}catch(e){}
+    h+='<span style="display:inline-block;margin:4px 6px 0 0">'+(isImg?'<img src="'+u+'" style="width:96px;height:76px;object-fit:cover;border-radius:6px;border:1px solid #fdba74">':'<span style="display:inline-flex;flex-direction:column;align-items:center;justify-content:center;width:96px;height:76px;border-radius:6px;border:1px solid #fdba74;background:#fff;font-size:26px">📄<span style="font-size:9px;max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(f.name)+'</span></span>')+'</span>'; }
+  box.innerHTML=h;
+}
+
+function _attFirstItem(p){ var iv=p.inv||p.id; for(var i=0;i<(purs||[]).length;i++) if((purs[i].inv||purs[i].id)===iv) return purs[i]; return p; }
+function _attEditHtml(p){ var fp=_attFirstItem(p); _attReset("ep",fp); return '<div style="margin-top:14px">'+_attAllHtml("ep")+'</div>'; }
+
 // ===== ✍ 지출결의서 전자서명 (모두싸인 방식) =====
 //   /evtData/{evt}/Esig/{inv} = { roles:{담당:{img,nm,at,via}, ...}, req:{회장:{tok,nm,tel,at,done}} }
 //   직접 서명(로그인 사용자) + 서명 요청 링크(?esign=evt&inv=&role=&t=토큰, 로그인 없이 폰에서 서명)
@@ -7156,7 +7261,8 @@ function taxBoxHtml(px, p){
   h+='</div>';
   if(docs.length) h+='<div style="font-size:12px;color:#166534;margin-bottom:6px">✅ 이미 첨부된 증빙 '+docs.length+'개 (추가하려면 아래에서 파일 선택)</div>';
   h+='<label id="'+px+'TaxLbl" style="font-size:12px;color:#7c2d12;font-weight:600">'+(alt?'대체 증빙 파일 (보험증서·수령증 등)':'전자세금계산서 파일')+' <span style="font-weight:400;color:#9a3412">— 사진 또는 PDF, 여러 개 가능</span></label>';
-  h+='<input type="file" id="'+px+'Tax" multiple accept="image/*,application/pdf" style="width:100%;margin-top:4px">';
+  h+='<input type="file" id="'+px+'Tax" multiple accept="image/*,application/pdf" style="width:100%;margin-top:4px" onchange="_attPrevInput(this,\''+px+'TaxPrev\')">';
+  h+='<div id="'+px+'TaxPrev" style="display:flex;flex-wrap:wrap"></div>';
   h+='</div>';
   return h;
 }
@@ -7240,16 +7346,8 @@ function popPur(){
      '<div><label style="font-size:12px">대표자</label><input type="text" id="pVendorCeo" placeholder="예: 김옥란" style="width:100%;padding:7px;border:1px solid #ddd;border-radius:6px"></div>'+
      '<div><label style="font-size:12px">주소</label><input type="text" id="pVendorAddr" placeholder="예: 광주광역시 ..." style="width:100%;padding:7px;border:1px solid #ddd;border-radius:6px"></div></div>';
   h+='</div>';
-  h+='<div style="font-weight:700;color:#334155;margin-bottom:6px">📎 증빙 <span style="font-weight:400;font-size:12px;color:#64748b">(여러 장 가능 · 문서는 PDF도 가능 · 지금 없으면 나중에 목록에서 추가)</span></div>';
-  window._pcPaste=[];
-  h+='<div style="border:2px dashed #f59e0b;background:#fffbeb;border-radius:8px;padding:10px 12px;margin-bottom:10px">';
-  h+='<label style="font-weight:700;color:#92400e">🛒 구매 전 상품 캡처 <span style="font-weight:400;font-size:12px;color:#a16207">(스마트스토어 등에서 "이거 사면 좋겠다" 캡처)</span></label>';
-  h+='<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:6px"><input type="file" id="pPc" multiple accept="image/*,application/pdf">';
-  h+='<div id="pPcZone" tabindex="0" onpaste="_pcOnPaste(event)" onclick="this.focus()" style="flex:1;min-width:200px;padding:10px;border:1.5px solid #fbbf24;border-radius:6px;background:#fff;color:#92400e;font-size:13px;text-align:center;cursor:text">📋 여기를 누르고 <b>Ctrl+V</b> — 캡처한 화면 바로 붙여넣기</div></div>';
-  h+='<div id="pPcThumbs" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px"></div>';
-  h+='</div>';
-  h+='<div class="frow fr2" style="margin-bottom:8px"><div><label>📷 물품사진</label><input type="file" id="pPh" multiple accept="image/*"></div><div><label>📄 견적서</label><input type="file" id="pQd" multiple accept="image/*,application/pdf"></div></div>';
-  h+='<div class="frow fr2" style="margin-bottom:14px"><div><label>🧾 영수증</label><input type="file" id="pRc" multiple accept="image/*,application/pdf"></div><div><label>📋 거래명세표</label><input type="file" id="pSt" multiple accept="image/*,application/pdf"></div></div>';
+  _attReset("p");
+  h+=_attAllHtml("p");
   h+='<div id="purRowBox" style="margin-bottom:10px">';
   h+=purCardHtml(1,bo);
   h+='</div>';
@@ -7735,14 +7833,7 @@ async function addP(){
   showLoading("저장 중...");
   var taxUrls=[];
   if(_isBankPay(_payM0)){ var taxFiles=await readFiles(_taxInp); taxUrls=taxFiles.length?await uploadAll(taxFiles,ar,"세금계산서"):[]; }
-  var phFiles=await readFiles(document.getElementById("pPh"));
-  var rcFiles=await readFiles(document.getElementById("pRc"));
-  var phUrls=phFiles.length?await uploadAll(phFiles,ar,"물품사진"):[];
-  var rcUrls=rcFiles.length?await uploadAll(rcFiles,ar,"영수증"):[];
-  var pcFiles=(await readFiles(document.getElementById("pPc"))).concat((window._pcPaste||[]).filter(Boolean));
-  var pcUrls=pcFiles.length?await uploadAll(pcFiles,ar,"상품캡처"):[]; window._pcPaste=[];
-  var qdFiles=await readFiles(document.getElementById("pQd")), qdUrls=qdFiles.length?await uploadAll(qdFiles,ar,"견적서"):[];
-  var stFiles=await readFiles(document.getElementById("pSt")), stUrls=stFiles.length?await uploadAll(stFiles,ar,"거래명세표"):[];
+  var phUrls=await _attUpload("p","ph",ar), rcUrls=await _attUpload("p","rc",ar), pcUrls=await _attUpload("p","pc",ar), qdUrls=await _attUpload("p","qt",ar), stUrls=await _attUpload("p","st",ar);
   var invId="INV"+Date.now()+Math.floor(Math.random()*999);
   var payM=document.getElementById("pPayM")?document.getElementById("pPayM").value:"";
   var gwan=document.getElementById("pGwan")?document.getElementById("pGwan").value:"";
@@ -7804,6 +7895,7 @@ function edPur(id){
     '<div class="frow fr2" style="margin-top:10px"><div><label>사용 카드/통장</label><select id="epCard" onchange="_refreshEpPayM()">'+purCardOpts(p.card||"")+'</select></div>'+
     '<div><label>결제방법</label><select id="epPayM" onchange="_taxToggle(\'ep\')">'+incPayOpts(p.card||"", p.payM||"")+'</select></div></div>'+
     taxBoxHtml("ep", p)+
+    _attEditHtml(p)+
     // 거래처(지급처) — 검색 + 주소/상호/대표자 수정 가능
     '<div style="background:#f0f9ff;border:1px solid #bfdbfe;border-radius:8px;padding:10px 12px;margin-top:12px">'+
     '<label style="font-weight:600;display:block;margin-bottom:6px">🏢 지급처 (거래처)</label>'+
@@ -7868,6 +7960,14 @@ async function savePur(id){
   var r=await api("updatePur",p);
   if(!r.ok){hideLoading();alert(r.err||"실패");return}
   for(var i=0;i<purs.length;i++)if(purs[i].id==id)Object.assign(purs[i],p);
+  if(_attChanged("ep")){
+    var fpE=_attFirstItem(_old||p), updA={id:fpE.id};
+    for(var ti=0;ti<ATT_TYPES.length;ti++){ var tt=ATT_TYPES[ti]; var nu=await _attUpload("ep",tt.k,fpE.ar||""); updA[tt.fld]=_attFinal("ep",tt.k,nu); }
+    showLoading("저장 중...");
+    var rA=await api("updatePur",updA);
+    if(rA&&rA.ok){ for(var qa=0;qa<purs.length;qa++) if(purs[qa].id==fpE.id) Object.assign(purs[qa],updA); }
+    else toast("증빙 저장 실패: "+((rA&&rA.err)||""),true);
+  }
   var _addOk=0;
   if(_adds.length){
     var base=Object.assign({}, _old||{}, p);
