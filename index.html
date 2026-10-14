@@ -104,9 +104,14 @@ label{display:block;font-size:10px;color:#999;margin-bottom:3px}
 .purList .photoTh{width:46px;height:36px;border-radius:4px}
 .purList .attMany{display:inline-flex;flex-wrap:wrap;gap:2px}
 .purList .attOne{display:none}
-.purList .pCard{max-width:880px;margin-left:auto!important;margin-right:auto!important}
 .purList .pCard table{font-size:16.5px!important}
-.purList .pCard thead tr{font-size:13.5px!important;color:#334155!important}
+.purList .pCard thead tr{background:#e2e8f0!important;color:#0f172a!important}
+.purList .pCard thead th{font-size:17px!important;color:#0f172a!important;padding-top:9px!important;padding-bottom:9px!important;font-weight:800!important;position:relative;border-right:2px solid #cbd5e1;overflow:hidden;text-overflow:ellipsis}
+.purList .pCard tbody td{font-size:16.5px!important;color:#0f172a!important;overflow:hidden;text-overflow:ellipsis}
+.purList .pCard tbody td:first-child{font-size:17px!important}
+.purList .pAmt > div:nth-child(2){font-size:22px!important}
+.purList .pAmt > div:nth-child(n+3){font-size:14px!important;line-height:1.5}
+@media(max-width:600px){ .purList .pAmt > div:nth-child(n+3){font-size:12.5px!important} }
 .purList .pCard tbody td{padding-top:10px!important;padding-bottom:10px!important}
 .purList .pCard tbody td:first-child{font-weight:700!important;font-size:17px}
 @media(max-width:600px){
@@ -6922,7 +6927,7 @@ function dPur(){
       if(G.mgmtNo) h+='<span style="font-size:12px;color:#475569">No. '+esc(G.mgmtNo)+'</span>';
       h+='</div>';
       if(canSeeAmt()){
-        h+='<div style="text-align:right;margin-left:auto"><div style="font-size:11px;color:#64748b">합계</div><div style="font-weight:900;font-size:19px;color:#0f172a;line-height:1.15">'+fm(G.tot)+'원</div>';
+        h+='<div class="pAmt" style="text-align:right;margin-left:auto"><div style="font-size:11px;color:#64748b">합계</div><div style="font-weight:900;font-size:19px;color:#0f172a;line-height:1.15">'+fm(G.tot)+'원</div>';
         var _rb=_isPreG(G)?null:_RB.byInv[G.inv];
         if(_isPreG(G)){
           var _pc=String(G.card||"").trim(), _cc=_pc&&_RB.cards?_RB.cards[_pc]:null, _pam=pn(G.tot);
@@ -6938,9 +6943,9 @@ function dPur(){
       }
       h+='</div>';
       // ② 부가정보 한 줄 (회색)
-      var _meta=[G.ar||"공통",[G.expTp,G.expMid].filter(Boolean).join(" › "),G.gwan?("관 "+G.gwan):"",[G.card,firstP.payM].filter(Boolean).join(" · "),firstP.vendorName?("지급처 "+firstP.vendorName):""].filter(Boolean);
+      var _meta=[G.ar||"공통",[G.expTp,G.expMid].filter(Boolean).join(" › "),G.gwan?("관 "+G.gwan):"",G.card||"",firstP.vendorName?("지급처 "+firstP.vendorName):""].filter(Boolean);
       var _catTxt=[G.expTp,G.expMid].filter(Boolean).join(" › ");
-      h+='<div class="pMeta" style="padding:2px 14px 10px;font-size:15px;color:#1e293b;line-height:1.6">'+_meta.map(function(m){ return m===_catTxt?'<b style="color:#0f172a">'+esc(m)+'</b>':esc(m); }).join(' <span style="color:#94a3b8">|</span> ')+' <span style="color:#94a3b8">|</span> '+_purStatusTxt(G)+'</div>';
+      h+='<div class="pMeta" style="padding:2px 14px 10px;font-size:15px;color:#1e293b;line-height:1.6">'+_meta.map(function(m){ return m===_catTxt?'<b style="color:#0f172a">'+esc(m)+'</b>':(m===G.card?esc(m)+_payBadge(firstP.payM):esc(m)); }).join(' <span style="color:#94a3b8">|</span> ')+' <span style="color:#94a3b8">|</span> '+_purStatusTxt(G)+'</div>';
       // ③ 경고 (문제 있을 때만 빨강)
       var _warns=[]; if(_zero) _warns.push("금액 0원 — 수정에서 합계 확인"); if(_noTax) _warns.push(_payWord(firstP.payM)+" — "+_taxDocName(firstP)+" 미첨부"); if(_rej) _warns.push("반려됨 — ✍ 서명에서 사유 확인");
       if(_warns.length) h+='<div style="margin:0 12px 8px;padding:5px 9px;background:#fef2f2;border:1px solid #fecaca;border-radius:6px;color:#b91c1c;font-size:12.5px;font-weight:700">⚠ '+_warns.map(esc).join(' · ')+'</div>';
@@ -7484,6 +7489,51 @@ function _purFinalBal(){
   (purs||[]).forEach(function(p){ if(_isPre(p)) pre+=pn(p.tot); });
   return {now:now, pre:pre, fin:now-pre, hasDep:hasDep, cards:cards};
 }
+// 결제방법 배지 (구매 카드)
+function _payBadge(pm){
+  pm=String(pm||"").trim(); if(!pm) return "";
+  var bg=/이체|계좌/.test(pm)?"#c2410c":(/현금/.test(pm)?"#15803d":(/카드/.test(pm)?"#1d4ed8":"#475569"));
+  var ic=/이체|계좌/.test(pm)?"🏦 ":(/현금/.test(pm)?"💵 ":(/카드/.test(pm)?"💳 ":""));
+  return ' <span style="background:'+bg+';color:#fff;font-weight:800;font-size:13.5px;padding:2px 9px;border-radius:6px;white-space:nowrap">'+ic+esc(pm)+'</span>';
+}
+// ↔ 구매 카드 품목 표: 제목 칸 오른쪽 끝을 끌어서 칸 너비 조절 (모든 카드 같이, 이 기기에 기억). 두 번 누르면 원래대로
+var PUR_COLW=(function(){ try{ return JSON.parse(localStorage.getItem("purColW")||"null")||{}; }catch(e){ return {}; } })();
+function _purColWApply(){
+  var st=document.getElementById("purColWStyle");
+  if(!st){ st=document.createElement("style"); st.id="purColWStyle"; document.head.appendChild(st); }
+  var css=""; Object.keys(PUR_COLW).forEach(function(i){ var w=PUR_COLW[i]; if(w>0) css+='.purList .pCard thead th:nth-child('+(+i+1)+'){width:'+w+'px!important}'; });
+  if(css) css='.purList .pCard table{table-layout:fixed}'+css;
+  st.textContent=css;
+}
+(function(){
+  var drag=null;
+  var thAt=function(e){ var th=e.target&&e.target.closest?e.target.closest(".purList .pCard thead th"):null; if(!th) return null; var r=th.getBoundingClientRect(); return (r.right-e.clientX)<=12?th:null; };
+  document.addEventListener("pointerdown",function(e){
+    var th=thAt(e); if(!th) return;
+    e.preventDefault();
+    var tr=th.parentNode, idx=Array.prototype.indexOf.call(tr.children,th);
+    // 처음 끌 때 지금 보이는 너비를 모두 고정
+    Array.prototype.forEach.call(tr.children,function(c,i){ if(!(PUR_COLW[i]>0)) PUR_COLW[i]=Math.round(c.getBoundingClientRect().width); });
+    drag={idx:idx, x:e.clientX, w:PUR_COLW[idx]};
+    _purColWApply();
+    document.body.style.cursor="col-resize";
+  });
+  document.addEventListener("pointermove",function(e){
+    if(!drag){ var th=thAt(e); var h=e.target&&e.target.closest?e.target.closest(".purList .pCard thead th"):null; if(h) h.style.cursor=th?"col-resize":""; return; }
+    PUR_COLW[drag.idx]=Math.max(40, drag.w+(e.clientX-drag.x));
+    _purColWApply();
+  });
+  document.addEventListener("pointerup",function(){
+    if(!drag) return; drag=null; document.body.style.cursor="";
+    try{ localStorage.setItem("purColW", JSON.stringify(PUR_COLW)); }catch(e){}
+  });
+  document.addEventListener("dblclick",function(e){
+    if(!thAt(e)) return;
+    PUR_COLW={}; try{ localStorage.removeItem("purColW"); }catch(x){}
+    _purColWApply(); toast("칸 너비를 원래대로 돌렸어요");
+  });
+  if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",_purColWApply); else _purColWApply();
+})();
 function _purPayFilterBar(all){
   var pre=all.filter(_isPreG), preTot=0, late=0, td=today(), allTot=0;
   pre.forEach(function(G){ preTot+=pn(G.tot); if(normD(G.dt)&&normD(G.dt)<td) late++; });
