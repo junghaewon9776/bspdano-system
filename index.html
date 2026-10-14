@@ -6838,7 +6838,7 @@ function taxBoxHtml(px, p){
   var alt=(p.taxTp==="alt"), rs=p.taxAltRs||"", isEtc=rs&&TAX_ALT_REASONS.indexOf(rs)<0;
   var docs=p.taxDoc||[];
   var h='<div id="'+px+'TaxBox" style="display:none;background:#fff7ed;border:2px solid #fb923c;border-radius:8px;padding:10px 12px;margin-bottom:12px">';
-  h+='<div style="font-weight:700;color:#c2410c;margin-bottom:8px">🧾 계좌이체 증빙 <span style="font-weight:400;font-size:12px;color:#9a3412">(보탬e: 계좌이체는 전자세금계산서 첨부 필수)</span></div>';
+  h+='<div style="font-weight:700;color:#c2410c;margin-bottom:8px">🧾 계좌이체 증빙 <span style="font-weight:400;font-size:12px;color:#9a3412">(보탬e: 계좌이체는 전자세금계산서 필요 — 지금 없으면 나중에 첨부해도 돼요)</span></div>';
   h+='<div style="display:flex;gap:14px;flex-wrap:wrap;font-size:13px;margin-bottom:8px">';
   h+='<label style="display:flex;align-items:center;gap:5px;cursor:pointer"><input type="radio" name="'+px+'TaxTp" value="etax"'+(alt?'':' checked')+' onchange="_taxTpChg(\''+px+'\')"> 전자세금계산서</label>';
   h+='<label style="display:flex;align-items:center;gap:5px;cursor:pointer"><input type="radio" name="'+px+'TaxTp" value="alt"'+(alt?' checked':'')+' onchange="_taxTpChg(\''+px+'\')"> 세금계산서가 안 나오는 경우 (강사료·원고료·행사보험 등)</label>';
@@ -7394,12 +7394,7 @@ async function addP(){
   if(!items.length){alert("물품명과 합계를 1건 이상 입력하세요");return}
   var _payM0=(document.getElementById("pPayM")||{}).value||"";
   var _tax=_taxRead("p"), _taxInp=document.getElementById("pTax");
-  if(_isBankPay(_payM0) && !(_taxInp&&_taxInp.files&&_taxInp.files.length)){
-    alert(_tax.tp==="alt"
-      ? "계좌이체는 증빙이 꼭 필요해요.\n\n'"+_tax.rs+"' 대체 증빙(보험증서·수령증 등) 파일을 첨부해 주세요."
-      : "계좌이체는 전자세금계산서 첨부가 필수예요 (보탬e).\n\n세금계산서 파일을 첨부하거나,\n강사료·원고료·행사보험처럼 세금계산서가 안 나오는 경우는\n'세금계산서가 안 나오는 경우'를 고르고 대체 증빙을 첨부해 주세요.");
-    return;
-  }
+  var _taxMiss=_isBankPay(_payM0) && !(_taxInp&&_taxInp.files&&_taxInp.files.length);   // 미첨부여도 등록은 됨 — 목록에 경고 표시
   var ar=myar()||"";
   showLoading("저장 중...");
   var taxUrls=[];
@@ -7433,7 +7428,7 @@ async function addP(){
     if(r.ok){payload.id=r.id;payload.mgmtNo=r.mgmtNo||"";if(!firstMgmt)firstMgmt=r.mgmtNo||"";purs.push(payload);ok++;}
   }
   hideLoading();
-  closePopup();toast(ok+"건 구매 등록 완료"+(ok<items.length?" ("+(items.length-ok)+"건 실패)":""));draw();
+  closePopup();toast(ok+"건 구매 등록 완료"+(ok<items.length?" ("+(items.length-ok)+"건 실패)":"")+(_taxMiss?" · 🧾 "+(_tax.tp==="alt"?"대체 증빙":"세금계산서")+"는 나중에 목록의 '+세금계산서'로 첨부하세요":""));draw();
   refreshData(false);
 }
 async function delP(id){
@@ -7497,9 +7492,7 @@ async function savePur(id){
   var _old=null; for(var oi=0;oi<purs.length;oi++) if(purs[oi].id==id){_old=purs[oi];break}
   var _payE=pv("epPayM"), _taxE=_taxRead("ep"), _taxInpE=document.getElementById("epTax");
   var _taxNew=(_taxInpE&&_taxInpE.files)?_taxInpE.files.length:0, _taxOld=((_old&&_old.taxDoc)||[]).length;
-  if(_isBankPay(_payE) && !_taxNew && !_taxOld){
-    if(!confirm("계좌이체인데 "+(_taxE.tp==="alt"?"대체 증빙":"전자세금계산서")+"이(가) 첨부되지 않았어요.\n(보탬e: 계좌이체는 증빙 첨부 필수)\n\n그래도 저장할까요? 나중에 목록의 '+세금계산서' 버튼으로 붙일 수 있어요.")) return;
-  }
+
   var p={id:id,dt:pv("epD"),dtIni:pv("epDtIni"),it:pv("epI"),qt:pv("epQ"),un:pv("epU"),tot:pv("epT"),payM:pv("epPayM"),
     gwan:pv("epGwan"),expTp:pv("epExpTp"),expMid:pv("epExpMid"),incTp:pv("epIncTp"),incSub:pv("epIncSub"),card:pv("epCard"),
     noMgmt:pc("epNoMgmt"),mgmtNo:pv("epMgmtNo").trim(),
