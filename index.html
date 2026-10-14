@@ -96,11 +96,17 @@ label{display:block;font-size:10px;color:#999;margin-bottom:3px}
 .abtn2{background:#ea580c}
 .popStickyFoot{position:sticky;bottom:-24px;margin:16px -24px -24px;padding:12px 24px;background:#fff;border-top:1px solid #e2e8f0;box-shadow:0 -6px 14px rgba(15,23,42,.08);z-index:5;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 @media(max-width:640px){.popStickyFoot{bottom:-14px;margin:14px -14px -14px;padding:10px 14px}}
-.purList .tag{font-size:12.5px;padding:3px 9px}
-.purList .pst{font-size:12.5px}
-.purList .abtn{font-size:13px;padding:6px 11px;border-radius:6px;margin:2px}
-.purList .photoTh{width:60px;height:46px;border-radius:5px}
-@media(max-width:600px){.purList .abtn{font-size:14px;padding:8px 12px}.purList .photoTh{width:70px;height:54px}}
+.purList .tag{font-size:12px;padding:2px 7px}
+.purList .pst{font-size:12px}
+.purList .abtn{font-size:12px;padding:4px 9px;border-radius:5px;margin:1px}
+.purList .btn-s{padding:4px 8px!important;font-size:12px!important;line-height:1.3}
+.purList .photoTh{width:46px;height:36px;border-radius:4px}
+@media(max-width:600px){
+ .purList .btn-s{padding:3px 6px!important;font-size:11px!important}
+ .purList .abtn{font-size:11.5px;padding:4px 8px}
+ .purList .tag{font-size:11px;padding:1px 6px}
+ .purList .photoTh{width:42px;height:32px}
+}
 
 .modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:999;align-items:center;justify-content:center}
 .modal.show{display:flex}
@@ -6872,13 +6878,7 @@ function dPur(){
       h+=_purDocChips(qdSrc,'qt',firstP.id,'📄 견적서','#e0e7ff','#3730a3','#818cf8');
       h+=_purDocChips(stSrc,'st',firstP.id,'📋 거래명세표','#dcfce7','#166534','#4ade80');
       if(!phSrc.length&&!rcSrc.length&&!txSrc.length&&!qdSrc.length&&!stSrc.length&&!pcSrc.length)h+='<span style="color:#94a3b8;font-size:13px">없음</span> ';
-      h+='<span style="flex-basis:100%;height:0"></span>';
-      h+='<button class="abtn" style="background:#d97706" onclick="attStart(\'pc\',\''+firstP.id+'\')">+상품캡처</button> ';
-      h+='<button class="abtn" onclick="attStart(\'pur\',\''+firstP.id+'\')">+물품사진</button>';
-      h+=' <button class="abtn" style="background:#4f46e5" onclick="attStart(\'qt\',\''+firstP.id+'\')">+견적서</button>';
-      h+=' <button class="abtn abtn2" onclick="attStart(\'rc\',\''+firstP.id+'\')">+영수증</button>';
-      h+=' <button class="abtn" style="background:#15803d" onclick="attStart(\'st\',\''+firstP.id+'\')">+거래명세표</button>';
-      h+=' <button class="abtn" style="background:#ea580c;color:#fff;border-color:#ea580c" onclick="attStart(\'tax\',\''+firstP.id+'\')">+'+esc(_bank?_taxDocName(firstP):'세금계산서')+'</button>';
+      h+=' <button class="abtn" style="background:#2563eb" onclick="_attPick(\''+firstP.id+'\','+(_bank?1:0)+')">＋ 증빙 추가</button>';
       if(_bank && !txSrc.length) h+=' <span style="font-size:13px;color:#fff;background:#dc2626;padding:4px 10px;border-radius:10px;font-weight:700">⚠ '+_payWord(firstP.payM)+' — '+esc(_taxDocName(firstP))+' 미첨부</span>';
       h+='</div></div>';
       h+='</div>';
@@ -7023,6 +7023,15 @@ function _attPrevInput(inp, boxId){
 function _attFirstItem(p){ var iv=p.inv||p.id; for(var i=0;i<(purs||[]).length;i++) if((purs[i].inv||purs[i].id)===iv) return purs[i]; return p; }
 function _attEditHtml(p){ var fp=_attFirstItem(p); _attReset("ep",fp); return '<div style="margin-top:14px">'+_attAllHtml("ep")+'</div>'; }
 
+// 목록 [＋ 증빙 추가] → 종류 고르기
+function _attPick(pid, bank){
+  var it=[["pc","🛒 상품캡처","#d97706"],["pur","📷 물품사진","#7c3aed"],["qt","📄 견적서","#4f46e5"],["rc","🧾 영수증","#ea580c"],["st","📋 거래명세표","#15803d"],["tax",bank?"🧾 세금계산서 (계좌이체·현금)":"🧾 세금계산서","#c2410c"]];
+  var h='<h3>＋ 증빙 추가 <button class="close-x" onclick="closePopup2()">&times;</button></h3>';
+  h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
+  it.forEach(function(x){ h+='<button type="button" onclick="closePopup2();attStart(\''+x[0]+'\',\''+pid+'\')" style="background:'+x[2]+';color:#fff;border:none;border-radius:8px;padding:14px 8px;font-size:14px;font-weight:700;cursor:pointer">'+x[1]+'</button>'; });
+  h+='</div><div style="font-size:12px;color:#64748b;margin-top:10px">고르면 파일 선택 창이 열려요 (문서는 PDF도 가능)</div>';
+  openPopup2(h,420);
+}
 // ===== 📱 계정별 텔레그램 알림 =====
 //   Users[].tg = 텔레그램 채팅 ID. 알림은 기존 관리자 방(TG_CHAT_IDS) + 받을 사람들의 tg 로 보냄
 function _tgOf(uid){ var u=(typeof US!=="undefined"&&US)?US[uid]:null; return u&&u.tg?String(u.tg).trim():""; }
