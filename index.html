@@ -6761,7 +6761,7 @@ function dPur(){
     h+='<span style="margin-left:auto;font-size:12px;color:#64748b">등록 <b style="color:#111">'+totInv+'건</b></span>';
     h+=' <span style="font-size:12px;color:#dc2626" title="물품사진 미첨부">📷 미첨부 <b>'+noPh+'</b>/'+totInv+'</span>';
     h+=' <span style="font-size:12px;color:#dc2626" title="영수증 미첨부">🧾 미첨부 <b>'+noRc+'</b>/'+totInv+'</span>';
-    if(noTax) h+=' <span style="font-size:12px;color:#fff;background:#ea580c;padding:2px 8px;border-radius:10px;font-weight:700" title="계좌이체인데 세금계산서(대체 증빙) 미첨부">⚠ 계좌이체 증빙 미첨부 '+noTax+'건</span>';
+    if(noTax) h+=' <span style="font-size:12px;color:#fff;background:#ea580c;padding:2px 8px;border-radius:10px;font-weight:700" title="계좌이체·현금인데 세금계산서(대체 증빙) 미첨부">⚠ 계좌이체·현금 증빙 미첨부 '+noTax+'건</span>';
     h+=' <span style="font-size:12px;color:#7c3aed" title="결의서 발행">📄 결의서 <b>'+cPrtFilt+'</b>/'+totInv+'</span>';
     h+=' <span style="font-size:12px;color:#16a34a" title="결의서 서명본">✅ 서명 <b>'+cSignFilt+'</b>/'+totInv+'</span>';
     h+=' | <span style="font-size:13px;font-weight:700;color:#16a34a">집행 '+fmu(filterTot)+'원</span>';
@@ -6877,7 +6877,7 @@ function dPur(){
       h+=' <button class="abtn abtn2" onclick="attStart(\'rc\',\''+firstP.id+'\')">+영수증</button>';
       h+=' <button class="abtn" style="background:#15803d" onclick="attStart(\'st\',\''+firstP.id+'\')">+거래명세표</button>';
       h+=' <button class="abtn" style="background:#ea580c;color:#fff;border-color:#ea580c" onclick="attStart(\'tax\',\''+firstP.id+'\')">+'+esc(_bank?_taxDocName(firstP):'세금계산서')+'</button>';
-      if(_bank && !txSrc.length) h+=' <span style="font-size:13px;color:#fff;background:#dc2626;padding:4px 10px;border-radius:10px;font-weight:700">⚠ 계좌이체 — '+esc(_taxDocName(firstP))+' 미첨부</span>';
+      if(_bank && !txSrc.length) h+=' <span style="font-size:13px;color:#fff;background:#dc2626;padding:4px 10px;border-radius:10px;font-weight:700">⚠ '+_payWord(firstP.payM)+' — '+esc(_taxDocName(firstP))+' 미첨부</span>';
       h+='</div></div>';
       h+='</div>';
     }
@@ -7135,14 +7135,15 @@ async function renderEsignPage(){
 
 // ===== 🧾 계좌이체 증빙 — 보탬e: 계좌이체는 전자세금계산서 필수 / 강사료·원고료·행사보험은 대체 증빙(증서·수령증) =====
 var TAX_ALT_REASONS=["강사료","원고료","행사보험 (보험증서)","기타"];
-function _isBankPay(payM){ return /계좌이체/.test(String(payM||"")); }
+function _isBankPay(payM){ return /계좌이체|현금/.test(String(payM||"")); }
+function _payWord(payM){ return /현금/.test(String(payM||""))?"현금":"계좌이체"; }
 // px: 등록="p" / 수정="ep"
 function taxBoxHtml(px, p){
   p=p||{};
   var alt=(p.taxTp==="alt"), rs=p.taxAltRs||"", isEtc=rs&&TAX_ALT_REASONS.indexOf(rs)<0;
   var docs=p.taxDoc||[];
   var h='<div id="'+px+'TaxBox" style="display:none;background:#fff7ed;border:2px solid #fb923c;border-radius:8px;padding:10px 12px;margin-bottom:12px">';
-  h+='<div style="font-weight:700;color:#c2410c;margin-bottom:8px">🧾 계좌이체 증빙 <span style="font-weight:400;font-size:12px;color:#9a3412">(보탬e: 계좌이체는 전자세금계산서 필요 — 지금 없으면 나중에 첨부해도 돼요)</span></div>';
+  h+='<div style="font-weight:700;color:#c2410c;margin-bottom:8px">🧾 계좌이체·현금 증빙 <span style="font-weight:400;font-size:12px;color:#9a3412">(보탬e: 계좌이체·현금은 전자세금계산서 필요 — 지금 없으면 나중에 첨부해도 돼요)</span></div>';
   h+='<div style="display:flex;gap:14px;flex-wrap:wrap;font-size:13px;margin-bottom:8px">';
   h+='<label style="display:flex;align-items:center;gap:5px;cursor:pointer"><input type="radio" name="'+px+'TaxTp" value="etax"'+(alt?'':' checked')+' onchange="_taxTpChg(\''+px+'\')"> 전자세금계산서</label>';
   h+='<label style="display:flex;align-items:center;gap:5px;cursor:pointer"><input type="radio" name="'+px+'TaxTp" value="alt"'+(alt?' checked':'')+' onchange="_taxTpChg(\''+px+'\')"> 세금계산서가 안 나오는 경우 (강사료·원고료·행사보험 등)</label>';
