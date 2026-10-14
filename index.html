@@ -10038,7 +10038,7 @@ function dExp(){
   expBG.forEach(function(r){ if(r.tp && types.indexOf(r.tp)<0) types.push(r.tp); });
 
   // 상단 요약 — 대분류 예산과 중분류 배정 분리
-  var totUse=0;
+  var totUse=0, totPre=0;
   var bigAmt={}, midAmt={};
   expBG.forEach(function(r){
     if(!r.tp) return;
@@ -10052,7 +10052,7 @@ function dExp(){
   (purs||[]).forEach(function(p){
     if (f.tp && p.expTp !== f.tp) return;
     if (f.gwan && p.gwan !== f.gwan) return;
-    if (typeof _isPre==="function" && _isPre(p)) return;   // 결제 전 제외
+    if (typeof _isPre==="function" && _isPre(p)) { totPre += (Number(p.tot)||0); return; }   // 결제 전은 따로
     totUse += (Number(p.tot)||0);
   });
   (exps||[]).forEach(function(e){
@@ -10064,6 +10064,7 @@ function dExp(){
   var totPlan=0;
   Object.keys(bigAmt).forEach(function(k){ totPlan += bigAmt[k]; });
   var totRem = totPlan - totUse; // 대분류 예산 - 실제 집행
+  var totAvail = totRem - totPre;  // 남은 가용 = 예산 남음 - 결제 전
 
   var h = '<div class="card">';
   h += '<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:8px">';
@@ -10089,6 +10090,8 @@ function dExp(){
   h += '<div style="background:#fff;border:1px solid '+(unallocTot<0?"#fca5a5":"#86efac")+';border-radius:6px;padding:10px;text-align:center"><div style="color:'+(unallocTot<0?"#b91c1c":"#166534")+';font-weight:600;font-size:12px">미배정 잔여</div><div style="font-size:18px;font-weight:800;color:'+(unallocTot<0?"#991b1b":"#14532d")+'">'+(unallocTot<0?"⚠ ":"")+fmtKRW(unallocTot)+'</div></div>';
   h += '<div style="background:#fff;border:1px solid #fb923c;border-radius:6px;padding:10px;text-align:center"><div style="color:#ea580c;font-weight:600;font-size:12px">실제 집행</div><div style="font-size:18px;font-weight:800;color:#9a3412">'+fmtKRW(totUse)+'</div></div>';
   h += '<div style="background:#fff;border:1px solid '+(totRem<0?"#fca5a5":"#86efac")+';border-radius:6px;padding:10px;text-align:center"><div style="color:'+(totRem<0?"#b91c1c":"#166534")+';font-weight:600;font-size:12px">예산 남음</div><div style="font-size:18px;font-weight:800;color:'+(totRem<0?"#991b1b":"#14532d")+'">'+(totRem<0?"⚠ ":"")+fmtKRW(totRem)+'</div></div>';
+  h += '<div style="background:#fff;border:1px solid #fcd34d;border-radius:6px;padding:10px;text-align:center"><div style="color:#92400e;font-weight:600;font-size:12px">⏳ 결제 전 합</div><div style="font-size:18px;font-weight:800;color:#92400e">'+fmtKRW(totPre)+'</div></div>';
+  h += '<div style="background:#fff;border:2px solid '+(totAvail<0?"#dc2626":"#334155")+';border-radius:6px;padding:10px;text-align:center"><div style="color:'+(totAvail<0?"#b91c1c":"#0f172a")+';font-weight:700;font-size:12px">남은 가용 합</div><div style="font-size:18px;font-weight:900;color:'+(totAvail<0?"#991b1b":"#0f172a")+'">'+(totAvail<0?"⚠ ":"")+fmtKRW(totAvail)+'</div></div>';
   h += '</div>';
 
   // 필터 바 (관 → 대분류 순)
@@ -10136,8 +10139,10 @@ function dExp(){
     var midRows = rows.filter(function(r){return r.mid;});
     var midPlanSum = midAmt[t] || 0;
     var useSum = 0;
+    var _seenMid={};
     midRows.forEach(function(r){
-      useSum += txnSumFor(function(x){ return x.expTp===t && x.expMid===r.mid && (r.sub?x.expSub===r.sub:true); });
+      if(_seenMid[r.mid]) return; _seenMid[r.mid]=1;
+      useSum += txnSumFor(function(x){ return x.expTp===t && x.expMid===r.mid; });
     });
     // 대분류 집행 직접 기록분도 포함 (mid 없이 바로 대분류로 집행된 건)
     useSum += txnSumFor(function(x){ return x.expTp===t && (!x.expMid || x.expMid===""); });
@@ -10194,6 +10199,12 @@ function dExp(){
         h2 += '<td style="padding:8px;text-align:right;font-weight:800;color:'+(avail<0?'#c53030':'#0f172a')+'">'+(avail<0?'⚠ ':'')+fmtKRW(avail)+(avail<0&&!over?'<div style="font-size:10px">오버 예상</div>':'')+'</td>';
         return h2;
       };
+      var _tP=0,_tU=0,_tPre=0;
+      _grpOrder.forEach(function(mid){
+        _grp[mid].forEach(function(r){ _tP+=Number(r.planAm)||0; });
+        _tU += txnSumFor(function(x){ return x.expTp===t && x.expMid===mid; });
+        _tPre += preSumFor(function(x){ return x.expTp===t && x.expMid===mid; });
+      });
       _grpOrder.forEach(function(mid){
         var rs=_grp[mid], single=(rs.length===1 && !rs[0].sub);
         var used = txnSumFor(function(x){ return x.expTp===t && x.expMid===mid; });
@@ -10225,6 +10236,11 @@ function dExp(){
           h += '<td style="padding:6px 8px;text-align:right;white-space:nowrap">'+_btns(r)+'</td></tr>';
         });
       });
+      h += '<tr style="border-top:2px solid #334155;background:#f1f5f9;font-weight:800">';
+      h += '<td style="padding:9px 8px">합계</td>';
+      h += '<td style="padding:9px 8px;text-align:right">'+fmtKRW(_tP)+'</td>';
+      h += _nums(_tP, _tU, _tPre);
+      h += '<td></td><td></td></tr>';
       h += '</tbody></table>';
     }
     h += '</div>';
