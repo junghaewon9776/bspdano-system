@@ -6756,6 +6756,7 @@ function dPur(){
     if(PUR_SHOW_UNSIGN && G.signU) return false;
     if(PUR_PAYF==="pre" && !_isPreG(G)) return false;
     if(PUR_PAYF==="paid" && _isPreG(G)) return false;
+    if(PUR_Q && !_purMatch(G,PUR_Q)) return false;
     return true;
   });
   // 선택 상태 정리 (화면에 없는 invId 제거)
@@ -6889,6 +6890,7 @@ function dPur(){
   h+='</div>';
 
   h+='<div class="card purList"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:6px"><h3 style="margin:0">구매 내역 (명세서 '+gList.length+(gList.length!=gListAll.length?"/"+gListAll.length:"")+'건 / 물품 '+fp.length+"건)</h3></div>";
+  h+='<div style="display:flex;gap:6px;align-items:center;margin-bottom:10px"><div style="position:relative;flex:1;max-width:520px"><input type="search" id="purQ" value="'+esc(PUR_Q)+'" placeholder="🔍 검색 — 품목, 거래처, 분류, 카드, 금액, 날짜…" oninput="_purQIn(this)" oncompositionstart="_purQC=true" oncompositionend="_purQC=false;_purQIn(this)" autocomplete="off" style="width:100%;padding:10px 12px;font-size:15px;border:2px solid '+(PUR_Q?'#2563eb':'#cbd5e1')+';border-radius:8px"></div>'+(PUR_Q?'<span style="font-size:14px;font-weight:700;color:#1d4ed8;white-space:nowrap">'+gList.length+'건 찾음</span><button class="btn btn-s" style="background:#475569;color:#fff" onclick="PUR_Q=\'\';draw()">✕ 지우기</button>':'')+'</div>';
   h+=_purPayFilterBar(gListAll);
   var _RB=_purCardRunBal(), _CB=_purCatRunBal();
   var _rbKeys=Object.keys(_RB.cards);
@@ -7454,6 +7456,23 @@ async function _plPay(id){
 // ===== ⏳ 결제 상태 (구매 한 곳에서: 결제 전 → [✅ 결제 처리] → 결제 완료) =====
 //   purs[].payState = "pre"(결제 전·계약/예정) | 없음(결제 완료). 결제 전은 통장 잔액엔 안 들어가고, 세출 가용 예산에서만 미리 뺌
 var PUR_PAYF="all";
+// 🔍 구매 검색 — 품목·거래처·분류·카드·결제방법·번호·날짜·금액, 띄어쓰기로 여러 단어(모두 포함)
+var PUR_Q="", _purQT=null, _purQC=false;
+function _purMatch(G,q){
+  var t=[G.dt,G.mgmtNo,G.expTp,G.expMid,G.gwan,G.card,G.ar,String(G.tot)];
+  (G.items||[]).forEach(function(p){ t.push(p.it,p.vendorName,p.payM,p.expTp,p.expMid,p.incTp,p.incSub,p.dt,String(p.tot||"").replace(/,/g,""),String(p.un||"").replace(/,/g,"")); });
+  var hay=t.filter(Boolean).join(" ").toLowerCase();
+  return String(q).toLowerCase().split(/\s+/).filter(Boolean).every(function(w){ return hay.indexOf(w.replace(/,/g,""))>=0; });
+}
+function _purQIn(el){
+  if(_purQC) return;   // 한글 조합 중엔 기다림
+  clearTimeout(_purQT);
+  _purQT=setTimeout(function(){
+    PUR_Q=el.value; var pos=el.selectionStart;
+    draw();
+    var e2=document.getElementById("purQ"); if(e2){ e2.focus(); try{ e2.setSelectionRange(pos,pos); }catch(x){} }
+  },250);
+}
 function _isPre(p){ return !!(p&&p.payState==="pre"); }
 function _isPreG(G){ return (G.items||[]).some(_isPre); }
 // 세출 항목별: 예산 · 결제 완료 · 결제 전 · 남은 가용  (예산관리 › 세출 화면)
