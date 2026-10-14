@@ -6655,6 +6655,7 @@ function _purStatusTxt(G){
   return '<span style="color:#64748b">결의서 미발행</span>';
 }
 function dPur(){
+  if(PUR_VIEW==="plan") return _plView();
   // 자동 로드 제거 — 탭 바로 열고 🔄 새로고침 버튼으로 수동 로드
   var af=isA()?(purAr=="all"?null:purAr):myar();
   var fp;
@@ -6688,7 +6689,7 @@ function dPur(){
   // 명세서 단위로 그룹화 (inv 기준) — 대표행(첫 물품)의 prtD/signU 사용
   var groups={};var order=[];
   for(var i=0;i<fp.length;i++){var p=fp[i];var iv=p.inv||p.id;if(!groups[iv]){groups[iv]={inv:iv,dt:p.dt,ar:p.ar,by:p.by,items:[],tot:0,prtD:p.prtD||"",signU:p.signU||"",mgmtNo:p.mgmtNo||"",noMgmt:(p.noMgmt==="Y"||p.noMgmt===true),gwan:p.gwan||"",expTp:p.expTp||"",expMid:p.expMid||"",card:p.card||""};order.push(iv)}groups[iv].items.push(p);groups[iv].tot+=pn(p.tot);if(!groups[iv].prtD&&p.prtD)groups[iv].prtD=p.prtD;if(!groups[iv].signU&&p.signU)groups[iv].signU=p.signU;if(!groups[iv].mgmtNo&&p.mgmtNo)groups[iv].mgmtNo=p.mgmtNo;}
-  _esigListen();
+  _esigListen(); _plListen();
   var _PM=window._PUR_PM=_purDayOrder();
   var gListAll=order.map(function(iv){return groups[iv]}).sort(function(a,b){return -_purSeqCmp(_PM.meta[a.inv]||{dt:normD(a.dt)},_PM.meta[b.inv]||{dt:normD(b.dt)});});
   // 필터 적용 (미발행/미서명)
@@ -6706,7 +6707,7 @@ function dPur(){
   var cPrt=0,cSign=0,cNo=0;
   gListAll.forEach(function(G){ if(G.signU)cSign++; else if(G.prtD)cPrt++; else cNo++; });
 
-  var h='<div class="exbar"><button class="btn btn-b" onclick="popPur()">+ 구매 등록</button> <button class="btn-s" style="background:#7c3aed;color:#fff;font-weight:700" onclick="_esgInbox()">📥 내 결재함</button> <button class="btn-s" style="background:#0ea5e9;color:#fff;font-weight:700" onclick="_financeRefresh()">🔄 새로고침</button> <button class="btn-out btn-tp" onclick="tmplPur()">📋 양식</button>'+(isA()?' <button class="btn-out btn-ex" onclick="expPur()">엑셀 내보내기</button> <button class="btn-out btn-im" onclick="impClick(\'pur\')">엑셀 가져오기</button>':'');
+  var h=_plTabs()+'<div class="exbar"><button class="btn btn-b" onclick="popPur()">+ 구매 등록</button> <button class="btn-s" style="background:#7c3aed;color:#fff;font-weight:700" onclick="_esgInbox()">📥 내 결재함</button> <button class="btn-s" style="background:#0ea5e9;color:#fff;font-weight:700" onclick="_financeRefresh()">🔄 새로고침</button> <button class="btn-out btn-tp" onclick="tmplPur()">📋 양식</button>'+(isA()?' <button class="btn-out btn-ex" onclick="expPur()">엑셀 내보내기</button> <button class="btn-out btn-im" onclick="impClick(\'pur\')">엑셀 가져오기</button>':'');
   h+='</div>';
 
   // 부서 필터 (관리자만)
@@ -7229,6 +7230,183 @@ function _attPrevInput(inp, boxId){
     box.insertAdjacentHTML("beforeend",'<span style="display:inline-block;margin:4px 6px 0 0">'+(isImg?'<img src="'+u+'" style="width:96px;height:76px;object-fit:cover;border-radius:6px;border:1px solid #fdba74">':'<span id="'+id+'" style="display:inline-flex;flex-direction:column;align-items:center;justify-content:center;width:96px;height:76px;border-radius:6px;border:1px solid #fdba74;background:#fff;font-size:26px">📄<span style="font-size:9px;max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(f.name)+'</span></span>')+'</span>');
     if(isPdf) _pdfThumb(f).then(function(d){ var el=document.getElementById(id); if(el) el.outerHTML='<img src="'+d+'" title="'+esc(f.name)+'" style="width:96px;height:76px;object-fit:cover;object-position:top;border-radius:6px;border:1px solid #fdba74">'; }).catch(function(){});
   })(fs[i],i); }
+}
+
+// ===== 🤝 계약·예정 (결제 전) — 통장 잔액엔 안 들어가고, 가용 예산에서만 미리 뺌 =====
+//   /evtData/{evt}/Plans/{id} = {st:'quote'|'contract', dt, expTp, expMid, gwan, it, vendorName, am, card, memo, pcDoc[], ph[], qtDoc[], createdAt, by, paid:{dt,am,inv,at,by}}
+var PUR_VIEW="pay", PLANS=[], _PL_EVT=null;
+// 결제 처리 창의 세금계산서 칸 (증빙 첨부 칸 공용 코드에 종류 하나 더)
+var ATT_TYPES_EXTRA=[{k:"tx",fld:"taxDoc",lb:"🧾 세금계산서",hint:"계좌이체·현금이면 필요",acc:"image/*,application/pdf",up:"세금계산서",bg:"#fff7ed",bd:"#fb923c",fg:"#c2410c"}];
+function _attType(k){ return ATT_TYPES.concat(ATT_TYPES_EXTRA).filter(function(t){return t.k===k;})[0]; }
+function _plListen(){
+  var evt=CUR_EVT&&CUR_EVT.evtId; if(!evt||_PL_EVT===evt) return;
+  if(_PL_EVT) try{ fbDb.ref('/evtData/'+_PL_EVT+'/Plans').off(); }catch(e){}
+  _PL_EVT=evt;
+  fbDb.ref('/evtData/'+evt+'/Plans').on('value',function(s){
+    var v=s.val()||{}; PLANS=Object.keys(v).map(function(k){ return Object.assign({},v[k],{id:k}); });
+    if(typeof CTAB!=="undefined"&&CTAB==="pur"&&!document.querySelector('#popup.show')) draw();
+  });
+}
+function _plCan(){ return (typeof isA==="function"&&isA()) || (typeof _esgIsStaff==="function"&&_esgIsStaff()); }
+function _plOpen(){ return PLANS.filter(function(p){return !p.paid;}); }
+function _plSumFor(tp,mid,exceptId){
+  var s=0; _plOpen().forEach(function(p){ if(p.id===exceptId||p.st!=="contract") return; if((p.expTp||"")!==tp) return; if(mid&&(p.expMid||"")!==mid) return; s+=pn(p.am); }); return s;
+}
+// 항목별(대분류›중분류) 예산 · 결제완료 · 계약(예정) · 견적 · 남은 가용
+function _plBudgetRows(){
+  var map={}, order=[];
+  var R=function(tp,mid){ var k=(tp||"")+"›"+(mid||""); if(!map[k]){ map[k]={tp:tp||"",mid:mid||"",budget:0,used:0,contract:0,quote:0,hasBudget:false}; order.push(k); } return map[k]; };
+  (expBG||[]).forEach(function(r){ if(r&&r.tp&&r.mid){ var x=R(r.tp,r.mid); x.budget+=Number(r.planAm)||0; x.hasBudget=true; } });
+  (purs||[]).forEach(function(p){ if(p.expTp) R(p.expTp,p.expMid).used+=pn(p.tot); });
+  (exps||[]).forEach(function(e){ if(e.expTp) R(e.expTp,e.expMid).used+=pn(e.am); });
+  _plOpen().forEach(function(p){ if(!p.expTp) return; var x=R(p.expTp,p.expMid); if(p.st==="contract") x.contract+=pn(p.am); else x.quote+=pn(p.am); });
+  return order.map(function(k){ var x=map[k]; x.avail=x.budget-x.used-x.contract; return x; });
+}
+function _plTabs(){
+  var n=_plOpen().length;
+  var b=function(on){ return 'background:'+(on?'#2563eb':'#475569')+';color:#fff;font-weight:700;padding:8px 14px;border:none;border-radius:8px;cursor:pointer;font-size:14px'; };
+  return '<div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap"><button style="'+b(PUR_VIEW!=="plan")+'" onclick="PUR_VIEW=\'pay\';draw()">💳 결제 내역</button><button style="'+b(PUR_VIEW==="plan")+'" onclick="PUR_VIEW=\'plan\';draw()">🤝 계약·예정'+(n?' <b>'+n+'</b>':'')+'</button></div>';
+}
+function _plBudgetTable(){
+  var rows=_plBudgetRows(); if(!rows.length) return '<div class="card"><div class="mut">세출 예산 항목이 없어요 — 예산관리에서 대분류·중분류 예산을 먼저 넣어 주세요.</div></div>';
+  var T={budget:0,used:0,contract:0,quote:0,avail:0};
+  var td='padding:7px 8px;border-bottom:1px solid #e2e8f0;text-align:right;white-space:nowrap';
+  var h='<div class="card"><h3 style="margin:0 0 4px">📊 항목별 가용 예산</h3><div style="font-size:12px;color:#64748b;margin-bottom:8px">남은 가용 = 예산 − 결제완료 − 계약(예정). 견적은 참고로만 보여요. 통장 잔액과는 별개예요.</div>';
+  h+='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#f1f5f9;color:#475569;font-size:12px"><th style="text-align:left;padding:6px 8px">항목</th><th style="'+td+'">예산</th><th style="'+td+'">결제완료</th><th style="'+td+'">계약(예정)</th><th style="'+td+';color:#0f172a">남은 가용</th><th style="'+td+'">견적</th></tr></thead><tbody>';
+  rows.forEach(function(x){
+    ["budget","used","contract","quote","avail"].forEach(function(k){T[k]+=x[k];});
+    var bad=x.avail<0;
+    h+='<tr style="'+(bad?'background:#fef2f2':'')+'"><td style="padding:7px 8px;border-bottom:1px solid #e2e8f0;font-weight:600">'+esc(x.tp)+(x.mid?' › '+esc(x.mid):'')+(x.hasBudget?'':' <span style="font-size:11px;color:#c2410c">(예산 없음)</span>')+'</td>';
+    h+='<td style="'+td+'">'+fm(x.budget)+'</td><td style="'+td+'">'+fm(x.used)+'</td><td style="'+td+'">'+(x.contract?fm(x.contract):'-')+'</td>';
+    h+='<td style="'+td+';font-weight:800;color:'+(bad?'#dc2626':'#0f172a')+'">'+(bad?'⚠ ':'')+fm(x.avail)+(bad?'<div style="font-size:10px;font-weight:700">오버 예상</div>':'')+'</td><td style="'+td+';color:#64748b">'+(x.quote?fm(x.quote):'-')+'</td></tr>';
+  });
+  h+='<tr style="background:#f8fafc;font-weight:800"><td style="padding:7px 8px">합계</td><td style="'+td+'">'+fm(T.budget)+'</td><td style="'+td+'">'+fm(T.used)+'</td><td style="'+td+'">'+fm(T.contract)+'</td><td style="'+td+';color:'+(T.avail<0?'#dc2626':'#0f172a')+'">'+fm(T.avail)+'</td><td style="'+td+';color:#64748b">'+fm(T.quote)+'</td></tr>';
+  h+='</tbody></table></div></div>';
+  return h;
+}
+function _plThumbs(arr,label){ var h=''; (arr||[]).forEach(function(u){ h+='<a href="'+esc(u)+'" target="_blank" title="'+esc(label)+'" style="position:relative;display:inline-block;margin-right:3px"><img class="photoTh" src="'+imgSrc(u)+'" style="border:1px solid #cbd5e1;background:#f1f5f9"><span style="position:absolute;left:1px;bottom:1px;background:rgba(15,23,42,.75);color:#fff;font-size:8.5px;padding:0 3px;border-radius:3px">'+esc(label)+'</span></a>'; }); return h; }
+function _plView(){
+  _plListen(); try{ _esigListen(); }catch(e){}
+  var can=_plCan();
+  var h=_plTabs();
+  if(can) h+='<div class="exbar"><button class="btn btn-b" onclick="popPlan()">+ 계약·예정 등록</button> <span style="font-size:12px;color:#64748b">계약했지만 아직 결제 전인 건 — 결제하면 [✅ 결제 처리]로 결제 내역에 넘겨요</span></div>';
+  h+=_plBudgetTable();
+  var open=_plOpen().sort(function(a,b){ return String(b.dt||"").localeCompare(String(a.dt||"")); });
+  h+='<div class="card purList"><h3 style="margin:0 0 10px">🤝 계약·예정 '+open.length+'건 <span style="font-size:13px;font-weight:400;color:#64748b">· 계약 '+fm(open.filter(function(p){return p.st==="contract";}).reduce(function(s,p){return s+pn(p.am);},0))+'원 · 견적 '+fm(open.filter(function(p){return p.st!=="contract";}).reduce(function(s,p){return s+pn(p.am);},0))+'원</span></h3>';
+  if(!open.length) h+='<div class="empty2">결제 전인 계약·견적이 없어요</div>';
+  open.forEach(function(p){
+    var isC=p.st==="contract";
+    h+='<div class="pCard" style="border:1px solid #cbd5e1;border-left:4px solid '+(isC?'#334155':'#94a3b8')+';border-radius:8px;margin-bottom:12px;background:#fff;overflow:hidden">';
+    h+='<div style="display:flex;justify-content:space-between;gap:8px;padding:10px 12px 4px;flex-wrap:wrap"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span style="font-weight:800;font-size:15px">'+esc(p.dt?fmtDK(p.dt):"날짜 미정")+'</span><span style="padding:2px 8px;border-radius:10px;font-size:12px;font-weight:700;'+(isC?'background:#334155;color:#fff':'background:#e2e8f0;color:#334155')+'">'+(isC?'🤝 계약':'📝 견적')+'</span>'+(p.vendorName?'<span style="font-size:13px;color:#334155">'+esc(p.vendorName)+'</span>':'')+'</div>';
+    h+='<div style="text-align:right;margin-left:auto"><div style="font-size:11px;color:#64748b">'+(isC?'계약 금액':'견적 금액')+'</div><div style="font-weight:900;font-size:18px">'+fm(p.am)+'원</div></div></div>';
+    h+='<div style="padding:0 12px 6px;font-size:14px;font-weight:600;color:#0f172a">'+esc(p.it||"")+'</div>';
+    h+='<div style="padding:0 12px 8px;font-size:12.5px;color:#475569">'+[[p.expTp,p.expMid].filter(Boolean).join(" › "),p.gwan?"관 "+p.gwan:"",p.card?"결제 예정: "+p.card:""].filter(Boolean).map(esc).join(' <span style="color:#cbd5e1">|</span> ')+(p.memo?'<div style="color:#64748b;margin-top:2px">📝 '+esc(p.memo)+'</div>':'')+'</div>';
+    var th=_plThumbs(p.pcDoc,'상품캡처')+_plThumbs(p.ph,'물품사진')+_plThumbs(p.qtDoc,'견적·계약');
+    h+='<div style="padding:0 12px 8px">'+(th||'<span style="font-size:12px;color:#94a3b8">첨부 없음</span>')+'</div>';
+    if(can) h+='<div style="display:flex;gap:4px;flex-wrap:wrap;padding:7px 12px;border-top:1px solid #e2e8f0;background:#f8fafc"><button class="btn btn-s" style="background:#16a34a;color:#fff;font-weight:700" onclick="_plPayPop(\''+esc(p.id)+'\')">✅ 결제 처리</button><button class="btn btn-s" style="background:#334155;color:#fff" onclick="popPlan(\''+esc(p.id)+'\')">✏️ 수정</button><button class="btn btn-s" style="background:#dc2626;color:#fff" onclick="_plDel(\''+esc(p.id)+'\')">🗑 삭제</button></div>';
+    h+='</div>';
+  });
+  var paid=PLANS.filter(function(p){return p.paid;});
+  if(paid.length){
+    h+='<details style="margin-top:6px"><summary style="cursor:pointer;font-size:13px;color:#475569;font-weight:700">✅ 결제 처리된 계약 '+paid.length+'건</summary><div style="margin-top:6px">';
+    paid.forEach(function(p){ var d=pn(p.paid.am)-pn(p.am); h+='<div style="font-size:12.5px;padding:5px 0;border-bottom:1px dashed #e2e8f0;color:#334155">'+esc(p.paid.dt||"")+' · '+esc(p.it||"")+' · 계약 '+fm(p.am)+'원 → 실제 <b>'+fm(p.paid.am)+'원</b>'+(d?' <span style="color:'+(d>0?'#dc2626':'#16a34a')+'">('+(d>0?'+':'')+fm(d)+')</span>':'')+'</div>'; });
+    h+='</div></details>';
+  }
+  h+='</div>';
+  return h;
+}
+// 등록·수정
+function _plBudgetHint(){
+  var tp=(document.getElementById("plTp")||{}).value||"", mid=(document.getElementById("plMid")||{}).value||"", box=document.getElementById("plBudget"); if(!box) return;
+  if(!tp||!mid){ box.innerHTML=""; return; }
+  var x=_plBudgetRows().filter(function(r){return r.tp===tp&&r.mid===mid;})[0]||{budget:0,used:0,contract:0};
+  var me=pn(String((document.getElementById("plAm")||{}).value||"").replace(/,/g,"")), st=(document.getElementById("plSt")||{}).value;
+  var cur=window._plEditId?(_plOpen().filter(function(p){return p.id===window._plEditId&&p.st==="contract";})[0]||null):null;
+  var others=x.contract-(cur?pn(cur.am):0);
+  var after=x.budget-x.used-others-(st==="contract"?me:0);
+  box.innerHTML='📊 예산 <b>'+fm(x.budget)+'</b> · 결제완료 <b>'+fm(x.used)+'</b> · 다른 계약 <b>'+fm(others)+'</b> → '+(st==="contract"?'이 계약 포함 ':'')+'남은 가용 <b style="color:'+(after<0?'#dc2626':'#0f172a')+'">'+(after<0?'⚠ ':'')+fm(after)+'원</b>'+(after<0?' <b style="color:#dc2626">— 예산 초과 예상</b>':'');
+}
+function popPlan(id){
+  var p=id?(PLANS.filter(function(x){return x.id===id;})[0]||{}):{st:"contract",dt:today()};
+  window._plEditId=id||"";
+  _attReset("pl", p);
+  var h='<h3>'+(id?'✏️ 계약·예정 수정':'🤝 계약·예정 등록')+' <button class="close-x" onclick="closePopup()">&times;</button></h3>';
+  h+='<div class="frow fr2"><div><label>상태</label><select id="plSt" onchange="_plBudgetHint()"><option value="contract"'+(p.st==="contract"?' selected':'')+'>🤝 계약 (가용 예산에서 미리 뺌)</option><option value="quote"'+(p.st!=="contract"?' selected':'')+'>📝 견적만 (참고용)</option></select></div><div><label>계약·견적일</label><input type="date" id="plDt" value="'+esc(p.dt||"")+'"></div></div>';
+  h+='<div class="frow fr2"><div><label>세출 대분류 *</label><select id="plTp" onchange="document.getElementById(\'plMid\').innerHTML=actExpMidOpts(this.value,\'\');_plBudgetHint()">'+actExpTpOpts(p.expTp||"")+'</select></div><div><label>세출 중분류 *</label><select id="plMid" onchange="_plBudgetHint()">'+actExpMidOpts(p.expTp||"",p.expMid||"")+'</select></div></div>';
+  h+='<div id="plBudget" style="padding:7px 10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;margin:4px 0 10px;font-size:13px"></div>';
+  h+='<div class="frow fr1"><div><label>내용 (품목) *</label><input type="text" id="plIt" value="'+esc(p.it||"")+'" placeholder="예: 무대·음향 임차, 현수막 10개"></div></div>';
+  h+='<div class="frow fr2"><div><label>업체</label><input type="text" id="plVendor" value="'+esc(p.vendorName||"")+'"></div><div><label>금액(원) *</label><input type="text" inputmode="numeric" id="plAm" value="'+esc(p.am?_cm(p.am):"")+'" oninput="this.value=_cm(this.value);_plBudgetHint()" style="font-weight:700"></div></div>';
+  h+='<div class="frow fr2"><div><label>관</label><select id="plGwan">'+purGwanOpts(p.gwan||"")+'</select></div><div><label>결제 예정 카드/통장</label><select id="plCard">'+purCardOpts(p.card||"")+'</select></div></div>';
+  h+='<div class="frow fr1"><div><label>메모</label><input type="text" id="plMemo" value="'+esc(p.memo||"")+'" placeholder="예: 행사 후 정산, 잔금 50%"></div></div>';
+  h+='<div style="font-weight:700;color:#334155;margin:6px 0">📎 첨부 <span style="font-weight:400;font-size:12px;color:#64748b">(결제 처리하면 결제 내역으로 그대로 넘어가요)</span></div>';
+  h+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px;margin-bottom:8px">'+_attSlotHtml("pl",_attType("qt"))+_attSlotHtml("pl",_attType("ph"))+_attSlotHtml("pl",_attType("pc"))+'</div>';
+  h+='<div class="popStickyFoot" style="justify-content:flex-end"><button class="btn" style="background:#475569;color:#fff;padding:12px 18px" onclick="closePopup()">취소</button><button class="btn btn-b" style="padding:12px 28px;font-weight:700" onclick="_plSave(\''+esc(id||"")+'\')">저장</button></div>';
+  openPopup(h,640);
+  setTimeout(_plBudgetHint,30);
+}
+async function _plSave(id){
+  var v=function(i){ return String((document.getElementById(i)||{}).value||"").trim(); };
+  var it=v("plIt"), am=v("plAm").replace(/,/g,""), tp=v("plTp"), mid=v("plMid");
+  if(!it) return toast("내용을 입력하세요",true);
+  if(!(pn(am)>0)) return toast("금액을 입력하세요",true);
+  if(!tp||!mid) return toast("세출 대분류·중분류를 고르세요",true);
+  var old=id?(PLANS.filter(function(x){return x.id===id;})[0]||{}):{};
+  var row={st:v("plSt")||"contract", dt:v("plDt"), expTp:tp, expMid:mid, gwan:v("plGwan"), it:it, vendorName:v("plVendor"), am:am, card:v("plCard"), memo:v("plMemo"),
+    createdAt:old.createdAt||nowKST(true), by:old.by||CID, updAt:nowKST(true)};
+  showLoading("저장 중...");
+  try{
+    var ar=(typeof myar==="function"&&myar())||"";
+    var kinds=[["qt","qtDoc"],["ph","ph"],["pc","pcDoc"]];
+    for(var i=0;i<kinds.length;i++){ var nu=await _attUpload("pl",kinds[i][0],ar); row[kinds[i][1]]=_attFinal("pl",kinds[i][0],nu); }
+    var key=id||("PL"+Date.now()+Math.floor(Math.random()*999));
+    await fbDb.ref('/evtData/'+CUR_EVT.evtId+'/Plans/'+key).set(JSON.parse(JSON.stringify(row)));
+    hideLoading(); closePopup(); toast(id?"수정됨":"🤝 계약·예정 등록됨");
+  }catch(e){ hideLoading(); toast("저장 실패: "+(e.message||e),true); }
+}
+async function _plDel(id){
+  var p=PLANS.filter(function(x){return x.id===id;})[0]; if(!p) return;
+  if(!confirm("'"+(p.it||"")+"' 계약·예정을 삭제할까요?\n(첨부 파일 기록도 같이 지워져요)")) return;
+  try{ await fbDb.ref('/evtData/'+CUR_EVT.evtId+'/Plans/'+id).remove(); toast("삭제됨"); }catch(e){ toast("삭제 실패: "+(e.message||e),true); }
+}
+// ✅ 결제 처리 → 결제 내역(구매)으로 넘기기
+function _plPayPop(id){
+  var p=PLANS.filter(function(x){return x.id===id;})[0]; if(!p) return;
+  var h='<h3>✅ 결제 처리 <button class="close-x" onclick="closePopup2()">&times;</button></h3>';
+  h+='<div style="font-size:13px;color:#475569;margin-bottom:10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px"><b>'+esc(p.it||"")+'</b> · '+esc(p.vendorName||"")+' · '+(p.st==="contract"?"계약":"견적")+' '+fm(p.am)+'원<br>'+esc([p.expTp,p.expMid].filter(Boolean).join(" › "))+'</div>';
+  h+='<div class="frow fr2"><div><label>결제일 *</label><input type="date" id="pyDt" value="'+today()+'"></div><div><label>실제 결제 금액(원) * <span style="font-size:11px;color:#64748b">계약과 달라도 돼요</span></label><input type="text" inputmode="numeric" id="pyAm" value="'+_cm(p.am)+'" oninput="this.value=_cm(this.value)" style="font-weight:700"></div></div>';
+  h+='<div class="frow fr2"><div><label>카드/통장</label><select id="pyCard" onchange="document.getElementById(\'pyPayM\').innerHTML=incPayOpts(this.value,\'\')">'+purCardOpts(p.card||"")+'</select></div><div><label>결제방법</label><select id="pyPayM">'+incPayOpts(p.card||"","")+'</select></div></div>';
+  _attReset("py"); _ATT["pytx"]=[]; _ATT_EX["pytx"]=[]; _ATT_DEL["pytx"]={};
+  h+='<div style="font-weight:700;color:#334155;margin:10px 0 6px">📎 결제 증빙 <span style="font-weight:400;font-size:12px;color:#64748b">(지금 없으면 나중에 결제 내역에서 첨부)</span></div>';
+  h+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px">'+_attSlotHtml("py",_attType("rc"))+_attSlotHtml("py",_attType("tx"))+'</div>';
+  h+='<div style="font-size:12px;color:#64748b;margin-top:6px">결제 처리하면 이 건이 <b>💳 결제 내역</b>에 등록되고(통장 잔액에 반영), 계약 때 첨부한 견적서·사진도 같이 넘어가요. 품목을 나누려면 넘긴 뒤 결제 내역에서 [수정 → + 항목 추가] 하세요.</div>';
+  h+='<div class="popStickyFoot" style="justify-content:flex-end"><button class="btn" style="background:#475569;color:#fff" onclick="closePopup2()">취소</button><button class="btn" style="background:#16a34a;color:#fff;font-weight:800;padding:10px 22px" onclick="_plPay(\''+esc(id)+'\')">✅ 결제 처리</button></div>';
+  openPopup2(h,520);
+}
+async function _plPay(id){
+  var p=PLANS.filter(function(x){return x.id===id;})[0]; if(!p) return;
+  var dt=String((document.getElementById("pyDt")||{}).value||""), am=String((document.getElementById("pyAm")||{}).value||"").replace(/,/g,"");
+  var card=String((document.getElementById("pyCard")||{}).value||""), payM=String((document.getElementById("pyPayM")||{}).value||"");
+  if(!dt) return toast("결제일을 넣어 주세요",true);
+  if(!(pn(am)>0)) return toast("실제 결제 금액을 넣어 주세요",true);
+  var payload={dt:dt,dtIni:"",ar:(typeof myar==="function"&&myar())||"",it:p.it||"",qt:"1",un:am,tot:am,bi:"",by:CID,
+    ph:(p.ph||[]).slice(),rc:[],pcDoc:(p.pcDoc||[]).slice(),qtDoc:(p.qtDoc||[]).slice(),stDoc:[],inv:"INV"+Date.now()+Math.floor(Math.random()*999),
+    payM:payM,gwan:p.gwan||"",expTp:p.expTp||"",expMid:p.expMid||"",incTp:"",incSub:"",card:card,noMgmt:false,mgmtNo:"",
+    vendorId:"",vendorName:p.vendorName||"",vendorCeo:"",vendorAddr:"",planId:id};
+  showLoading("결제 내역으로 넘기는 중...");
+  try{
+    var _ar=payload.ar;
+    payload.rc=await _attUpload("py","rc",_ar);
+    var _tx=await _attUpload("py","tx",_ar);
+    if(_tx.length||_isBankPay(payM)){ payload.taxTp="etax"; payload.taxAltRs=""; payload.taxDoc=_tx; }
+    showLoading("결제 내역으로 넘기는 중...");
+    var r=await api("addPur",payload);
+    if(!r||!r.ok){ hideLoading(); return toast("결제 내역 등록 실패: "+((r&&r.err)||""),true); }
+    payload.id=r.id; payload.mgmtNo=r.mgmtNo||""; purs.push(payload);
+    await fbDb.ref('/evtData/'+CUR_EVT.evtId+'/Plans/'+id+'/paid').set({dt:dt,am:am,inv:payload.inv,at:nowKST(true),by:CID});
+    hideLoading(); closePopup2();
+    try{ _tgPurNotify([payload],{dt:dt,cat:[payload.expTp,payload.expMid].filter(Boolean).join(" › "),pay:[card,payM].filter(Boolean).join(" · "),vendor:payload.vendorName}); }catch(e){}
+    PUR_VIEW="pay"; draw(); toast("✅ 결제 처리 — 결제 내역에 등록됐어요"+(_isBankPay(payM)&&!_tx.length?" (세금계산서는 목록에서 첨부)":""));
+  }catch(e){ hideLoading(); toast("실패: "+(e.message||e),true); }
 }
 
 // ===== ✍ 지출결의서 전자결재 (모두싸인 방식 · 각자 로그인해서 승인/반려) =====
@@ -7767,7 +7945,8 @@ function _updatePurBudgetInfo(prefix){
     +'<b style="color:#2563eb">'+fmtKRW(budget)+'</b>'
     +' | 집행 <b style="color:#dc2626">'+fmtKRW(used)+'</b>'
     +' | 남은 <b style="color:'+color+'">'+(rem<0?"⚠ ":"")+fmtKRW(rem)+'</b>'
-    +(budget>0?' | 집행률 <b style="color:'+rateColor+';font-size:14px">'+rate+'%</b>':'');
+    +(budget>0?' | 집행률 <b style="color:'+rateColor+';font-size:14px">'+rate+'%</b>':'')
+    +(function(){ var pl=(typeof _plSumFor==="function")?_plSumFor(tp,mid):0; if(!pl) return ''; var av=budget-used-pl; return '<div style="margin-top:3px">🤝 계약(예정) <b>'+fmtKRW(pl)+'</b> → 남은 가용 <b style="color:'+(av<0?'#dc2626':'#0f172a')+'">'+(av<0?'⚠ ':'')+fmtKRW(av)+'</b>'+(av<0?' <b style="color:#dc2626">예산 초과 예상</b>':'')+'</div>'; })();
 }
 // ===== 거래처 관리 팝업 =====
 var VENDOR_FILT="";
