@@ -1177,7 +1177,7 @@ async function refreshData(showToast){
   if(r.evts) EVENTS=r.evts;
   if(r.curEvt) CUR_EVT=r.curEvt;
   if(r.LBL){LBL.leader=r.LBL.leader||"단장";LBL.member=r.LBL.member||"단원";}
-  acts=r.acts||[];purs=r.purs||[];exps=r.exps||[];mems=r.mems||[];notices=r.notices||[];pays=r.pays||[];dpst=r.dpst||[];inc=r.inc||[];incTypes=r.incTypes||[];expBG=r.expBG||[];txn=r.txn||[];expTypes=r.expTypes||[];gwanTypes=r.gwanTypes||[];incCards=r.incCards||[];awards=r.awards||[];memGroups=r.memGroups||r.groups||[];vendors=r.vendors||vendors||[];fees=r.fees||[];assets=r.assets||[];rentals=r.rentals||[];assetCats=r.assetCats||[];assetLocs=r.assetLocs||[];fees=r.fees||fees||[];
+  acts=r.acts||[];purs=r.purs||[];exps=r.exps||[];mems=r.mems||[];notices=r.notices||[];pays=r.pays||[];dpst=r.dpst||[];inc=r.inc||[];incTypes=r.incTypes||[];expBG=_normExpBG(r.expBG||[]);txn=r.txn||[];expTypes=r.expTypes||[];gwanTypes=r.gwanTypes||[];incCards=r.incCards||[];awards=r.awards||[];memGroups=r.memGroups||r.groups||[];vendors=r.vendors||vendors||[];fees=r.fees||[];assets=r.assets||[];rentals=r.rentals||[];assetCats=r.assetCats||[];assetLocs=r.assetLocs||[];fees=r.fees||fees||[];
   SHARE_MEMS=!!r.shareMems;
   if(r.fieldMenu!=null) FIELD_MENU=r.fieldMenu||"on";
   if(r.linkTabs!=null) LINK_TABS=r.linkTabs||"on";
@@ -1209,7 +1209,7 @@ async function switchEvent(evtId){
   try { localStorage.setItem("lastEvtId", evtId); } catch(e){}
   AR=r.AR||AR;BG=r.BG||BG;US=r.US||US;
   if(r.LBL){LBL.leader=r.LBL.leader||"단장";LBL.member=r.LBL.member||"단원";}
-  acts=r.acts||[];purs=r.purs||[];exps=r.exps||[];mems=r.mems||[];notices=r.notices||[];pays=r.pays||[];dpst=r.dpst||[];inc=r.inc||[];incTypes=r.incTypes||[];expBG=r.expBG||[];txn=r.txn||[];expTypes=r.expTypes||[];gwanTypes=r.gwanTypes||[];incCards=r.incCards||[];awards=r.awards||[];memGroups=r.memGroups||r.groups||[];vendors=r.vendors||vendors||[];fees=r.fees||[];assets=r.assets||[];rentals=r.rentals||[];assetCats=r.assetCats||[];assetLocs=r.assetLocs||[];
+  acts=r.acts||[];purs=r.purs||[];exps=r.exps||[];mems=r.mems||[];notices=r.notices||[];pays=r.pays||[];dpst=r.dpst||[];inc=r.inc||[];incTypes=r.incTypes||[];expBG=_normExpBG(r.expBG||[]);txn=r.txn||[];expTypes=r.expTypes||[];gwanTypes=r.gwanTypes||[];incCards=r.incCards||[];awards=r.awards||[];memGroups=r.memGroups||r.groups||[];vendors=r.vendors||vendors||[];fees=r.fees||[];assets=r.assets||[];rentals=r.rentals||[];assetCats=r.assetCats||[];assetLocs=r.assetLocs||[];
   SHARE_MEMS=!!r.shareMems;
   fixDates();
   if(!_tabAllowedByEvt(CTAB)) CTAB="dash";
@@ -9496,6 +9496,18 @@ function expTypeExport(){
   toast("세출 대분류 다운로드");
 }
 // 대분류 엑셀 가져오기 (추가 모드)
+// 예전 형식 세출 대분류 행({name, amount}, tp 없음) 정리 — "undefined" 대분류·예산 중복 방지
+function _normExpBG(arr){
+  var have={}; (arr||[]).forEach(function(r){ if(r&&r.tp&&!r.mid) have[r.tp]=1; });
+  return (arr||[]).filter(function(r){
+    if(!r) return false;
+    if(r.tp) return true;
+    var nm=String(r.name||"").trim(); if(!nm) return false;      // 이름도 없으면 버림
+    if(have[nm]) return false;                                    // 같은 대분류 이미 있음 → 중복
+    r.tp=nm; r.mid=""; if(r.planAm==null) r.planAm=Number(r.amount)||0; have[nm]=1;
+    return true;
+  });
+}
 function expTypeImport(){
   var inp=document.createElement("input");
   inp.type="file"; inp.accept=".xlsx,.xls,.csv";
@@ -9518,10 +9530,11 @@ function expTypeImport(){
         }
         var out=rows.map(function(r){
           return {
-            name: String(_rowGet(r,"대분류")||"").trim(),
-            amount: Number(String(_rowGet(r,["예산(원)","예산"])||"0").replace(/[^0-9.-]/g,""))||0
+            tp: String(_rowGet(r,"대분류")||"").trim(),
+            mid: "",
+            planAm: Number(String(_rowGet(r,["예산(원)","예산"])||"0").replace(/[^0-9.-]/g,""))||0
           };
-        }).filter(function(x){return x.name;});
+        }).filter(function(x){return x.tp;});
         if(!out.length){ alert("❌ 대분류 이름이 있는 행이 없습니다"); return; }
         if(!confirm("📥 대분류 "+out.length+"건 추가/업데이트\n\n기존 대분류와 이름이 같으면 예산이 업데이트됩니다.\n\n계속하시겠습니까?")) return;
         showLoading(out.length+"건 일괄 처리중...");
