@@ -6622,6 +6622,24 @@ function _purSeqUi(inv){
 }
 // 💳 카드/통장별 잔액 — 세입(inc.card) 합계 − 구매(purs.card)·지출(exps.card) 을 날짜순 누적
 //   byInv[명세서] = {card, after(이 건 결제 후 잔액)} / cards[이름] = {inc, used, bal}
+// 📊 세출 항목별 예산 남음 — 예산(중분류+소분류 합) − 날짜순 누적 사용(결제 전 포함). byInv[명세서]={mid, after, budget}
+function _purCatRunBal(){
+  var bud={}, byInv={}, ev=[], invIdx={};
+  (expBG||[]).forEach(function(r){ if(r&&r.tp&&r.mid){ var k=r.tp+"›"+r.mid; bud[k]=(bud[k]||0)+(Number(r.planAm)||0); } });
+  (purs||[]).forEach(function(p){
+    if(!p.expTp||!p.expMid) return;
+    var k=p.expTp+"›"+p.expMid, iv=p.inv||p.id;
+    if(invIdx[iv]==null){ invIdx[iv]=ev.length; ev.push({k:"pur",inv:iv,key:k,mid:p.expMid,dt:normD(p.dt)||"",ca:String(p.createdAt||""),am:0}); }
+    ev[invIdx[iv]].am+=pn(p.tot);
+  });
+  (exps||[]).forEach(function(e){ if(e.expTp&&e.expMid) ev.push({k:"exp",key:e.expTp+"›"+e.expMid,dt:normD(e.dt)||"",ca:String(e.createdAt||""),am:pn(e.am),ord:null}); });
+  var _DO=_purDayOrder();
+  ev.forEach(function(x){ if(x.k==="pur"){ var m=_DO.meta[x.inv]; x.ord=m?m.ord:null; if(m) x.ca=m.ca; } });
+  ev.sort(_purSeqCmp);
+  var used={};
+  ev.forEach(function(x){ used[x.key]=(used[x.key]||0)+x.am; if(x.k==="pur"&&bud[x.key]!=null) byInv[x.inv]={mid:x.mid, after:bud[x.key]-used[x.key], budget:bud[x.key]}; });
+  return byInv;
+}
 function _purCardRunBal(){
   // 카드/통장별: 입금(dpst) − 사용(구매·지출) = 실제 잔액 / 예산(inc) − 사용 = 예산 잔액. 날짜순 누적(같은 날은 입금 먼저)
   var cards={}, byInv={};
@@ -6834,7 +6852,7 @@ function dPur(){
 
   h+='<div class="card purList"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:6px"><h3 style="margin:0">구매 내역 (명세서 '+gList.length+(gList.length!=gListAll.length?"/"+gListAll.length:"")+'건 / 물품 '+fp.length+"건)</h3></div>";
   h+=_purPayFilterBar(gListAll);
-  var _RB=_purCardRunBal();
+  var _RB=_purCardRunBal(), _CB=_purCatRunBal();
   var _rbKeys=Object.keys(_RB.cards);
   if(_rbKeys.length && canSeeAmt()){
     h+='<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px">';
@@ -6877,6 +6895,8 @@ function dPur(){
         h+='<div style="text-align:right;margin-left:auto"><div style="font-size:11px;color:#64748b">합계</div><div style="font-weight:900;font-size:19px;color:#0f172a;line-height:1.15">'+fm(G.tot)+'원</div>';
         var _rb=_isPreG(G)?null:_RB.byInv[G.inv];
         if(_isPreG(G)) h+='<div style="font-size:12px;color:#92400e">결제 전 — 통장 잔액 미반영</div>';
+        var _cb=_CB[G.inv];
+        if(_cb) h+='<div style="font-size:12px;color:'+(_cb.after<0?'#dc2626;font-weight:800':'#475569')+'" title="'+esc(_cb.mid)+' 예산 '+fm(_cb.budget)+'원에서 이 건까지 쓴 뒤 남은 금액">📊 '+esc(_cb.mid)+' 예산 남음 '+(_cb.after<0?'⚠ ':'')+fm(_cb.after)+'원</div>';
         if(_rb){ var _rv=_rb.hasDep?_rb.after:_rb.planAfter; h+='<div style="font-size:12px;color:'+(_rv<0?'#dc2626;font-weight:700':'#475569')+'">'+esc(_rb.card)+(_rb.hasDep?' 잔액 ':' 예산 잔액 ')+fm(_rv)+'원'+(_rb.hasDep?'':' <span style="color:#c2410c">(입금 미등록)</span>')+'</div>'; }
         h+='</div>';
       }
@@ -8006,6 +8026,7 @@ function _updatePurBudgetInfo(prefix){
     +' | 집행 <b style="color:#dc2626">'+fmtKRW(used)+'</b>'
     +' | 남은 <b style="color:'+color+'">'+(rem<0?"⚠ ":"")+fmtKRW(rem)+'</b>'
     +(budget>0?' | 집행률 <b style="color:'+rateColor+';font-size:14px">'+rate+'%</b>':'')
+    +(function(){ if(prefix!=="p"||!mid) return ''; var cur=0; document.querySelectorAll("#purRowBox .pTot").forEach(function(t){ cur+=pn(String(t.value||"").replace(/,/g,"")); }); if(!cur) return ''; var pl=(typeof _plSumFor==="function")?_plSumFor(tp,mid):0; var af=budget-used-pl-cur; return '<div style="margin-top:4px;font-size:14px">🧮 이번 건 <b>'+fmtKRW(cur)+'</b> 반영 후 <b>'+esc(mid)+'</b> 남음 <b style="font-size:16px;color:'+(af<0?'#dc2626':'#0f172a')+'">'+(af<0?'⚠ ':'')+fmtKRW(af)+'</b>'+(af<0?' <b style="color:#dc2626">예산 초과</b>':'')+'</div>'; })()
     +(function(){ var pl=(typeof _plSumFor==="function")?_plSumFor(tp,mid):0; if(!pl) return ''; var av=budget-used-pl; return '<div style="margin-top:3px">⏳ 결제 전 <b>'+fmtKRW(pl)+'</b> → 남은 가용 <b style="color:'+(av<0?'#dc2626':'#0f172a')+'">'+(av<0?'⚠ ':'')+fmtKRW(av)+'</b>'+(av<0?' <b style="color:#dc2626">예산 초과 예상</b>':'')+'</div>'; })();
 }
 // ===== 거래처 관리 팝업 =====
@@ -8414,6 +8435,7 @@ function _purGrandTotal(){
   var sum=0, n=0;
   document.querySelectorAll("#purRowBox .pTot").forEach(function(t){ var v=parseFloat(String(t.value||"").replace(/,/g,"")); if(isFinite(v)){ sum+=v; n++; } });
   el.innerHTML=n?('🧮 총 합계 <b style="font-size:17px;color:#7c3aed">'+sum.toLocaleString()+'원</b> <span style="color:#94a3b8;font-size:12px">(물품 '+n+'개)</span>'):'';
+  try{ _updatePurBudgetInfo("p"); }catch(e){}
 }
 // 기존 함수명 호환
 function calcPurRow(el){calcPurCard(el)}
