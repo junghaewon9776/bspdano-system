@@ -7445,6 +7445,17 @@ function _plBudgetTable(){
   return h;
 }
 // 구매 목록 위: 결제 상태 필터 + 결제 전 알림
+// 카드·통장별: 지금 잔액(결제 완료 기준) − 결제 남은 금액(결제 전 전체) = 결제 다 하면 남는 잔액
+function _purFinalBal(){
+  var RB=_purCardRunBal(), pre={}, rows=[], fin=0;
+  (purs||[]).forEach(function(p){ if(!_isPre(p)) return; var c=String(p.card||"").trim()||"(카드 미지정)"; pre[c]=(pre[c]||0)+pn(p.tot); });
+  Object.keys(pre).forEach(function(c){
+    var cc=RB.cards[c], hasDep=!!(cc&&cc.depN>0), now=cc?(hasDep?cc.bal:cc.planBal):0;
+    rows.push({card:c, now:now, pre:pre[c], fin:now-pre[c], hasDep:hasDep});
+  });
+  rows.forEach(function(r){ fin+=r.fin; });
+  return {rows:rows, fin:fin};
+}
 function _purPayFilterBar(all){
   var pre=all.filter(_isPreG), preTot=0, late=0, td=today(), allTot=0;
   pre.forEach(function(G){ preTot+=pn(G.tot); if(normD(G.dt)&&normD(G.dt)<td) late++; });
@@ -7460,6 +7471,12 @@ function _purPayFilterBar(all){
     h+=box('🧾 전체',all.length,allTot,'1px solid #cbd5e1','#0f172a');
     h+=box('✅ 결제 완료',all.length-pre.length,paidTot,'1px solid #86efac','#166534');
     h+=box('⏳ 결제 남은 금액',pre.length,preTot,(preTot?'2px solid #f59e0b':'1px solid #e2e8f0'),(preTot?'#92400e':'#94a3b8'),late?'<div style="font-size:11.5px;color:#dc2626;font-weight:700">날짜 지난 것 '+late+'건 — 결제했으면 [✅ 결제 처리]</div>':'');
+    // 💰 결제 다 하면 남는 잔액 = 지금 잔액 − 결제 남은 금액 (카드·통장별)
+    var _fb=_purFinalBal();
+    if(_fb.rows.length){
+      var _fbSub=_fb.rows.map(function(r){ return '<div style="font-size:11.5px;color:'+(r.fin<0?'#dc2626;font-weight:800':'#475569')+';line-height:1.5">'+esc(r.card)+' '+fm(r.now)+' − '+fm(r.pre)+' = <b>'+(r.fin<0?'⚠ ':'')+fm(r.fin)+'</b>'+(r.hasDep?'':' <span style="color:#c2410c">(입금 미등록·예산 기준)</span>')+'</div>'; }).join('');
+      h+='<div style="flex:1 1 220px;background:#fff;border:2px solid '+(_fb.fin<0?'#dc2626':'#334155')+';border-radius:8px;padding:8px 12px"><div style="font-size:12px;color:#0f172a;font-weight:700">💰 결제 다 하면 남는 잔액</div><div style="font-size:19px;font-weight:900;color:'+(_fb.fin<0?'#dc2626':'#0f172a')+'">'+(_fb.fin<0?'⚠ ':'')+fm(_fb.fin)+'원'+(_fb.fin<0?' <span style="font-size:12px">부족</span>':'')+'</div>'+_fbSub+'</div>';
+    }
     h+='</div>';
   }
   return h;
