@@ -6911,9 +6911,23 @@ function dPur(){
   }
   h+="</div>";
   if(isA()){
-    var wp=0,wr=0,wn=0;
-    for(var i=0;i<purs.length;i++){var ph=(purs[i].ph||[]).length,rc=(purs[i].rc||[]).length;if(ph)wp++;if(rc)wr++;if(!ph&&!rc)wn++}
-    h+='<div class="card"><h3>증빙 현황</h3><div class="g3"><div style="text-align:center;padding:14px;background:#f0fdf4;border-radius:8px"><div style="font-size:24px;font-weight:700;color:#16a34a">'+wp+'</div><div style="font-size:11px;color:#888">물품사진</div></div><div style="text-align:center;padding:14px;background:#eff6ff;border-radius:8px"><div style="font-size:24px;font-weight:700;color:#2563eb">'+wr+'</div><div style="font-size:11px;color:#888">영수증</div></div><div style="text-align:center;padding:14px;background:'+(wn?"#fef2f2":"#f5f5f5")+';border-radius:8px"><div style="font-size:24px;font-weight:700;color:#dc2626">'+wn+'</div><div style="font-size:11px;color:#888">미첨부</div></div></div></div>';
+    // 📎 증빙 현황 — 명세서(건) 기준, 지금 목록 필터 그대로. 증빙은 명세서 첫 물품에 저장됨
+    var _evT=[["pcDoc","🛒 상품캡처"],["ph","📷 물품사진"],["qtDoc","📄 견적서"],["rc","🧾 영수증"],["stDoc","📋 거래명세표"]];
+    var _evN={}, _evNone=0, _taxNeed=0, _taxHave=0, _evTot=gListAll.length;
+    gListAll.forEach(function(G){
+      var f=G.items[0]||{}, any=false;
+      _evT.forEach(function(t){ if((f[t[0]]||[]).length){ _evN[t[0]]=(_evN[t[0]]||0)+1; any=true; } });
+      if((f.taxDoc||[]).length) any=true;
+      if(_isBankPay(f.payM)){ _taxNeed++; if((f.taxDoc||[]).length) _taxHave++; }
+      if(!any) _evNone++;
+    });
+    var _evBox=function(lb,v,sub,bad){ return '<div style="text-align:center;padding:10px 6px;background:'+(bad?'#fef2f2':'#f8fafc')+';border:1px solid '+(bad?'#fecaca':'#e2e8f0')+';border-radius:8px"><div style="font-size:12px;color:#475569;font-weight:600">'+lb+'</div><div style="font-size:20px;font-weight:800;color:'+(bad?'#dc2626':'#0f172a')+'">'+v+'</div><div style="font-size:11px;color:#94a3b8">'+sub+'</div></div>'; };
+    h+='<div class="card"><h3>📎 증빙 현황 <span style="font-size:12px;font-weight:400;color:#64748b">(명세서 '+_evTot+'건 기준 · 지금 필터 적용)</span></h3>';
+    h+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px">';
+    _evT.forEach(function(t){ h+=_evBox(t[1], (_evN[t[0]]||0), '/ '+_evTot+'건', false); });
+    h+=_evBox('🧾 세금계산서', _taxHave, '/ 계좌이체·현금 '+_taxNeed+'건', _taxHave<_taxNeed);
+    h+=_evBox('⚠ 증빙 없음', _evNone, '건', _evNone>0);
+    h+='</div></div>';
   }
   return h;
 }
