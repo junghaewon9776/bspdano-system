@@ -611,8 +611,9 @@ function _apiRenameExpType(p) {
   return _cfgHelper(evtId).then(function(h){
     var types = (h.cfg.EXP_TYPES||"").split(",").filter(Boolean);
     var idx = types.indexOf(p.oldName);
-    if(idx<0) return {ok:false, err:"대분류를 찾을 수 없습니다"};
-    types[idx] = p.newName;
+    // 설정 목록(EXP_TYPES)에 없고 예산 항목에만 있는 대분류도 이름 변경 허용 → 새 이름을 목록에 추가
+    if(idx<0){ if(types.indexOf(p.newName)<0) types.push(p.newName); }
+    else types[idx] = p.newName;
     return _saveCfgKey(evtId, h.configArr, "EXP_TYPES", types.join(",")).then(function(){
       return {ok:true, types:types};
     });
