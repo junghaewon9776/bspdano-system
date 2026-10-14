@@ -447,8 +447,8 @@ label{display:block;font-size:10px;color:#999;margin-bottom:3px}
 <div class="modal" id="pModal" onclick="this.className='modal'"><img id="pImg" onclick="event.stopPropagation()"></div>
 <div class="toast2" id="toast2"></div>
 <div class="evt-switch-modal" id="evtSwitchModal" onclick="this.classList.remove('show')"><div class="esm-box" onclick="event.stopPropagation()"><div class="esm-icon" id="esmIcon">✅</div><div class="esm-title">행사 전환 완료</div><div class="esm-name" id="esmName"></div><div class="esm-stats" id="esmStats"></div><button onclick="document.getElementById('evtSwitchModal').classList.remove('show')" style="background:#7c3aed;color:#fff;border:none;border-radius:8px;padding:8px 24px;font-size:13px;font-weight:700;cursor:pointer">확인</button></div></div>
-<div class="popup" id="popup" onmousedown="if(event.target==this)closePopup()"><div class="popup-box" id="popBody"></div></div>
-<div class="popup" id="popup2" style="z-index:1000" onmousedown="if(event.target==this)closePopup2()"><div class="popup-box" id="popBody2"></div></div>
+<div class="popup" id="popup" onmousedown="if(event.target==this&&!_popHasClose('popBody','closePopup'))closePopup()"><div class="popup-box" id="popBody"></div></div>
+<div class="popup" id="popup2" style="z-index:1000" onmousedown="if(event.target==this&&!_popHasClose('popBody2','closePopup2'))closePopup2()"><div class="popup-box" id="popBody2"></div></div>
 <input type="file" id="attF" style="display:none" accept="image/*" multiple onchange="doAttach(this)">
 <input type="file" id="resF" style="display:none" accept="image/*,application/pdf" onchange="doResUpload(this)">
 <input type="file" id="impF" style="display:none" accept=".xlsx,.xls" onchange="doImp(this)">
@@ -846,6 +846,7 @@ function openPopup(html,w){var b=document.getElementById("popBody");b.innerHTML=
 // 2단계 팝업 (기존 팝업 위에 오버레이로 표시)
 function openPopup2(html,w){var b=document.getElementById("popBody2");b.innerHTML=html;b.style.width=w?(w+"px"):"";b.style.maxWidth="100%";document.getElementById("popup2").className="popup show";document.getElementById("popup2").style.zIndex="1000";}
 function closePopup2(){document.getElementById("popup2").className="popup";document.getElementById("popBody2").innerHTML="";}
+function _popHasClose(bodyId,fn){var b=document.getElementById(bodyId);return !!(b&&b.querySelector('.close-x,[onclick*="'+fn+'("]'));}
 function closePopup(){document.getElementById("popup").className="popup"}
 function showLoading(msg){var el=document.getElementById("loading");el.querySelector(".msg").textContent=msg||"처리 중...";el.classList.add("on")}
 function hideLoading(){document.getElementById("loading").classList.remove("on")}
