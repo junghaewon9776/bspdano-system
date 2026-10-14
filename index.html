@@ -94,6 +94,8 @@ label{display:block;font-size:10px;color:#999;margin-bottom:3px}
 .photoTh{width:36px;height:28px;border-radius:3px;object-fit:cover;cursor:pointer;border:1px solid #ddd;vertical-align:middle}
 .abtn{background:#7c3aed;color:#fff;border:none;border-radius:4px;padding:3px 7px;font-size:10px;cursor:pointer;font-weight:600;margin-left:2px}
 .abtn2{background:#ea580c}
+.popStickyFoot{position:sticky;bottom:-24px;margin:16px -24px -24px;padding:12px 24px;background:#fff;border-top:1px solid #e2e8f0;box-shadow:0 -6px 14px rgba(15,23,42,.08);z-index:5;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+@media(max-width:640px){.popStickyFoot{bottom:-14px;margin:14px -14px -14px;padding:10px 14px}}
 .purList .tag{font-size:12.5px;padding:3px 9px}
 .purList .pst{font-size:12.5px}
 .purList .abtn{font-size:13px;padding:6px 11px;border-radius:6px;margin:2px}
@@ -6918,7 +6920,7 @@ function popPur(){
   h+=purCardHtml(1,bo);
   h+='</div>';
   h+='<div id="purGrandTot" style="text-align:right;margin:-4px 0 10px;font-size:14px;color:#334155"></div>';
-  h+='<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><button class="btn btn-g" onclick="addPurRow()">+ 항목 추가</button><button class="btn btn-b" style="padding:12px 32px;font-size:15px" onclick="addP()">등록하기</button></div>';
+  h+='<div class="popStickyFoot" style="justify-content:space-between"><button class="btn btn-g" onclick="addPurRow()">+ 항목 추가</button><div style="display:flex;gap:8px;margin-left:auto"><button class="btn" style="background:#475569;color:#fff;padding:12px 18px;font-size:15px" onclick="closePopup()">취소</button><button class="btn btn-b" style="padding:12px 32px;font-size:15px;font-weight:700" onclick="addP()">등록하기</button></div></div>';
   openPopup(h,720);
 }
 function onPurExpTpChg(prefix){
@@ -7477,7 +7479,7 @@ function edPur(id){
     '</div>'+
     '<div class="frow fr1" style="margin-top:10px"><div><label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="epNoMgmt"'+(noM?" checked":"")+'> 지출결의서 번호 없음</label>'+
     '<input type="text" id="epMgmtNo" placeholder="관리번호" value="'+esc(p.mgmtNo||"")+'" style="font-size:13px;padding:8px;margin-top:4px;width:100%"></div></div>'+
-    '<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button class="btn" style="background:#475569;color:#fff" onclick="closePopup()">취소</button><button class="btn btn-b" onclick="savePur(\''+id+'\')">저장</button></div>');
+    '<div class="popStickyFoot" style="justify-content:flex-end"><button class="btn" style="background:#475569;color:#fff;padding:12px 18px;font-size:15px" onclick="closePopup()">취소</button><button class="btn btn-b" style="padding:12px 32px;font-size:15px;font-weight:700" onclick="savePur(\''+id+'\')">저장</button></div>');
   _taxToggle("ep");
 }
 // 숫자에 천단위 콤마 (입력칸용: 숫자 외 문자 제거)
