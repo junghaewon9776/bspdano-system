@@ -102,7 +102,7 @@ label{display:block;font-size:10px;color:#999;margin-bottom:3px}
 .purList .btn-s{padding:4px 8px!important;font-size:12px!important;line-height:1.3}
 .purList .photoTh{width:46px;height:36px;border-radius:4px}
 @media(max-width:600px){
- .purList .btn-s{padding:3px 6px!important;font-size:11px!important}
+ .purList .pCard .btn-s,.purList .pCard .btn{min-height:0!important;padding:4px 7px!important;font-size:11px!important;line-height:1.3!important}
  .purList .abtn{font-size:11.5px;padding:4px 8px}
  .purList .tag{font-size:11px;padding:1px 6px}
  .purList .photoTh{width:42px;height:32px}
@@ -6607,11 +6607,11 @@ async function purMove(inv, dir){
 function _purSeqUi(inv){
   var D=window._PUR_PM; if(!D) return "";
   var p=D.pos[inv]; if(!p||p.total<2) return "";
-  var h=' <span style="background:#fef3c7;color:#92400e;border:1px solid #fcd34d;padding:3px 9px;border-radius:10px;font-size:12.5px;font-weight:700" title="같은 날 결제 순서 — 잔액이 이 순서로 계산돼요">그날 '+p.n+'/'+p.total+'번째</span>';
+  var h=' <span style="background:#f1f5f9;color:#334155;border:1px solid #cbd5e1;padding:2px 8px;border-radius:10px;font-size:12px;font-weight:700" title="같은 날 결제 순서 — 잔액이 이 순서로 계산돼요">그날 '+p.n+'/'+p.total+'번째</span>';
   if(isA()){
-    var bs='border:none;border-radius:6px;padding:4px 9px;font-size:13px;font-weight:800;cursor:pointer;color:#fff;';
-    h+=' <button title="더 나중에 결제한 걸로 (목록 위로)" style="'+bs+'background:'+(p.n<p.total?'#2563eb':'#cbd5e1;cursor:default')+'"'+(p.n<p.total?' onclick="purMove(\''+esc(inv)+'\',1)"':' disabled')+'>⬆</button>';
-    h+=' <button title="더 먼저 결제한 걸로 (목록 아래로)" style="'+bs+'background:'+(p.n>1?'#2563eb':'#cbd5e1;cursor:default')+'"'+(p.n>1?' onclick="purMove(\''+esc(inv)+'\',-1)"':' disabled')+'>⬇</button>';
+    var bs='border:none;border-radius:5px;padding:2px 7px;font-size:11px;font-weight:800;cursor:pointer;color:#fff;';
+    h+=' <button title="더 나중에 결제한 걸로 (목록 위로)" style="'+bs+'background:'+(p.n<p.total?'#334155':'#cbd5e1;cursor:default')+'"'+(p.n<p.total?' onclick="purMove(\''+esc(inv)+'\',1)"':' disabled')+'>⬆</button>';
+    h+=' <button title="더 먼저 결제한 걸로 (목록 아래로)" style="'+bs+'background:'+(p.n>1?'#334155':'#cbd5e1;cursor:default')+'"'+(p.n>1?' onclick="purMove(\''+esc(inv)+'\',-1)"':' disabled')+'>⬇</button>';
   }
   return h;
 }
@@ -6638,6 +6638,17 @@ function _purCardRunBal(){
   });
   Object.keys(cards).forEach(function(k){ cards[k].bal=cards[k].inc-cards[k].used; });
   return {cards:cards, byInv:byInv};
+}
+// 구매 목록 카드 보조 — 발행/서명 상태 글자, 증빙 썸네일
+function _purStatusTxt(G){
+  if(G.signU) return '<span style="color:#15803d;font-weight:700">✅ 서명본 있음</span>';
+  if(G.prtD) return '<span style="color:#334155;font-weight:700">📄 결의서 발행 '+esc(G.prtD)+'</span>';
+  return '<span style="color:#64748b">결의서 미발행</span>';
+}
+function _purThumbs(arr,tp,pid,label){
+  var h='';
+  for(var j=0;j<(arr||[]).length;j++) h+='<span style="position:relative;display:inline-block;margin-right:2px" title="'+esc(label)+'"><img class="photoTh" src="'+imgSrc(arr[j])+'" onclick="showPh(this)" style="border:1px solid #cbd5e1"><span style="position:absolute;left:1px;bottom:1px;background:rgba(15,23,42,.75);color:#fff;font-size:8.5px;padding:0 3px;border-radius:3px">'+esc(label)+'</span><button style="position:absolute;top:-4px;right:-4px;background:#dc2626;color:#fff;border:none;border-radius:50%;width:14px;height:14px;font-size:8px;cursor:pointer;line-height:14px;padding:0" onclick="delPh(\''+tp+'\',\''+pid+'\','+j+')">×</button></span>';
+  return h;
 }
 function dPur(){
   // 자동 로드 제거 — 탭 바로 열고 🔄 새로고침 버튼으로 수동 로드
@@ -6833,54 +6844,63 @@ function dPur(){
       var G=gList[g];
       var canEd=isA()||(G.by==CID);
       var checked=PUR_SEL[G.inv]?" checked":"";
-      var _f0=G.items[0]||{}, _noTax=_isBankPay(_f0.payM)&&!((_f0.taxDoc||[]).length), _zero=!(pn(G.tot)>0);
-      var _bar=(_noTax||_zero)?'#dc2626':(G.signU?'#16a34a':(G.prtD?'#7c3aed':'#94a3b8'));
-      h+='<div style="border:1px solid #e2e8f0;border-left:6px solid '+_bar+';border-radius:10px;margin-bottom:16px;overflow:hidden;box-shadow:0 1px 4px rgba(15,23,42,.08);background:#fff">';
-      // 명세서 헤더
-      h+='<div style="background:#f8fafc;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;border-bottom:1px solid #e5e7eb">';
-      h+='<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">';
+      var firstP=G.items[0]||{}, _bank=_isBankPay(firstP.payM);
+      var txSrc=firstP.taxDoc||[], _noTax=_bank&&!txSrc.length, _zero=!(pn(G.tot)>0);
+      var _es=_esgOf(G.inv), _rej=Object.keys(_es.rej||{}).length;
+      var _bad=_noTax||_zero||_rej;
+      h+='<div class="pCard" style="border:1px solid '+(_bad?'#fca5a5':'#cbd5e1')+';border-left:4px solid '+(_bad?'#dc2626':'#334155')+';border-radius:8px;margin-bottom:14px;background:#fff;overflow:hidden">';
+      // ① 머리줄: 날짜 · 순번 · 결의서번호  ······  합계 / 잔액
+      h+='<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;padding:10px 12px 4px;flex-wrap:wrap">';
+      h+='<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0">';
       h+='<input type="checkbox" class="purChk" '+checked+' onchange="purTog(\''+G.inv+'\',this.checked)" style="width:16px;height:16px;cursor:pointer">';
-      h+=' <span class="tag tag-b">'+esc(G.ar||"공통")+'</span> <span style="font-weight:700;font-size:15px;color:#0f172a">'+esc(fmtDK(G.dt))+'</span>'+_purSeqUi(G.inv)+' <span style="color:#475569;font-size:13px">물품 '+G.items.length+'개</span> '+purBadge(G);
-      if(G.mgmtNo) h+=' <span style="background:#dbeafe;color:#1e40af;padding:3px 10px;border-radius:10px;font-size:13px;font-weight:600;font-weight:600">📋 '+esc(G.mgmtNo)+'</span>';
-      else if(G.noMgmt) h+=' <span style="background:#fef3c7;color:#92400e;padding:3px 10px;border-radius:10px;font-size:13px;font-weight:600;font-weight:600">번호없음</span>';
-      if(G.gwan) h+=' <span style="background:#fce7f3;color:#be185d;padding:3px 10px;border-radius:10px;font-size:13px;font-weight:600">관:'+esc(G.gwan)+'</span>';
-      if(G.expTp) h+=' <span style="background:#f3e8ff;color:#7c3aed;padding:3px 10px;border-radius:10px;font-size:13px;font-weight:600">'+esc(G.expTp)+(G.expMid?" › "+esc(G.expMid):"")+'</span>';
-      if(G.card) h+=' <span style="background:#e0f2fe;color:#075985;padding:3px 10px;border-radius:10px;font-size:13px;font-weight:600">💳 '+esc(G.card)+'</span>';
+      h+='<span style="font-weight:800;font-size:16px;color:#0f172a">'+esc(fmtDK(G.dt))+'</span>'+_purSeqUi(G.inv);
+      if(G.mgmtNo) h+='<span style="font-size:12px;color:#475569">No. '+esc(G.mgmtNo)+'</span>';
       h+='</div>';
-      h+='<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">'+(canSeeAmt()?((!(pn(G.tot)>0)?'<span style="background:#dc2626;color:#fff;font-size:12.5px;font-weight:700;padding:3px 9px;border-radius:10px">⚠ 금액 0원 — 수정에서 합계 확인</span> ':'')+'<span style="font-weight:800;color:#7c3aed;font-size:18px">'+fm(G.tot)+'원</span>'+((_RB.byInv[G.inv])?' <span style="font-size:13px;font-weight:700;padding:3px 9px;border-radius:10px;background:'+(_RB.byInv[G.inv].after<0?'#fee2e2;color:#b91c1c':'#e0f2fe;color:#075985')+'" title="'+esc(_RB.byInv[G.inv].card)+' — 이 건까지 날짜순으로 쓴 뒤 남은 금액">잔액 '+fm(_RB.byInv[G.inv].after)+'원</span>':'')):'<span style="font-weight:700;color:#999;font-size:12px">금액 비공개</span>');
-      h+=' <button class="btn btn-s mobile-hide" style="background:#7c3aed;color:#fff" onclick="vchInv(\''+G.inv+'\')">📄 결의서</button>';
-      h+=' <button class="btn btn-s" style="background:#0d9488;color:#fff" onclick="vchXlsxDL(\''+G.inv+'\')">📗 엑셀</button>';
-      h+=_esgBtn(G.inv);
-      h+=' <button class="btn btn-s" style="background:#16a34a;color:#fff" onclick="resAttach(\''+G.inv+'\')">📎 서명본</button>';
-      if(G.signU)h+=' <a class="btn btn-s" style="background:#0ea5e9;color:#fff;text-decoration:none" href="'+esc(G.signU)+'" target="_blank">👁 보기</a>';
-      h+='</div></div>';
-      // 물품 리스트
-      h+='<div style="padding:4px 12px">';
-      for(var k=0;k<G.items.length;k++){
-        var p=G.items[k];
-        h+='<div style="padding:10px 0;border-bottom:1px dashed #e2e8f0;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px">';
-        var amtLine=canSeeAmt()?(esc(p.qt||"")+'개 × '+fm(p.un)+'원 = <b style="color:#111">'+fm(p.tot)+'원</b>'):('수량 '+esc(p.qt||"")+'개');
-        h+='<div style="flex:1;min-width:150px"><div style="font-weight:700;font-size:16px;color:#0f172a;line-height:1.35">'+esc(p.it)+'</div><div style="font-size:14px;color:#334155;margin-top:2px">'+amtLine+'</div>'+(bn(p.bi)?'<div style="font-size:12.5px;color:#475569;margin-top:1px">비목: '+esc(bn(p.bi))+'</div>':'')+'</div>';
-        if(canEd)h+='<div style="display:flex;gap:4px"><button class="btn btn-b btn-s" onclick="edPur(\''+p.id+'\')">수정</button><button class="btn btn-r btn-s" onclick="delP(\''+p.id+'\')">삭제</button></div>';
+      if(canSeeAmt()){
+        h+='<div style="text-align:right;margin-left:auto"><div style="font-size:11px;color:#64748b">합계</div><div style="font-weight:900;font-size:19px;color:#0f172a;line-height:1.15">'+fm(G.tot)+'원</div>';
+        if(_RB.byInv[G.inv]) h+='<div style="font-size:12px;color:'+(_RB.byInv[G.inv].after<0?'#dc2626;font-weight:700':'#475569')+'">'+esc(_RB.byInv[G.inv].card)+' 잔액 '+fm(_RB.byInv[G.inv].after)+'원</div>';
         h+='</div>';
       }
       h+='</div>';
-      // 증빙(사진/영수증) - 명세서 첫 물품에 저장됨
-      var firstP=G.items[0];
-      var phSrc=firstP.ph||[],rcSrc=firstP.rc||[];
-      h+='<div style="padding:10px 12px;background:#f8fafc;border-top:1px solid #e2e8f0"><div style="font-size:13px;color:#334155;font-weight:700;margin-bottom:6px">📎 증빙</div><div style="display:flex;flex-wrap:wrap;align-items:center;gap:4px">';
-      for(var j=0;j<phSrc.length;j++)h+='<span style="position:relative;display:inline-block;margin-right:2px"><img class="photoTh" src="'+imgSrc(phSrc[j])+'" onclick="showPh(this)"><button style="position:absolute;top:-4px;right:-4px;background:#dc2626;color:#fff;border:none;border-radius:50%;width:14px;height:14px;font-size:8px;cursor:pointer;line-height:14px;padding:0" onclick="delPh(\'pur\',\''+firstP.id+'\','+j+')">×</button></span> ';
-      for(var j=0;j<rcSrc.length;j++)h+='<span style="position:relative;display:inline-block;margin-right:2px"><img class="photoTh" src="'+imgSrc(rcSrc[j])+'" onclick="showPh(this)" style="border-color:#f59e0b"><button style="position:absolute;top:-4px;right:-4px;background:#dc2626;color:#fff;border:none;border-radius:50%;width:14px;height:14px;font-size:8px;cursor:pointer;line-height:14px;padding:0" onclick="delPh(\'rc\',\''+firstP.id+'\','+j+')">×</button></span> ';
-      var txSrc=firstP.taxDoc||[], _bank=_isBankPay(firstP.payM);
-      for(var j=0;j<txSrc.length;j++)h+='<span style="position:relative;display:inline-block;margin-right:4px"><a href="'+esc(txSrc[j])+'" target="_blank" style="display:inline-block;background:#ffedd5;color:#9a3412;border:1px solid #fb923c;border-radius:6px;padding:3px 8px;font-size:11px;font-weight:700;text-decoration:none">🧾 '+esc(_taxDocName(firstP))+(txSrc.length>1?' '+(j+1):'')+'</a><button style="position:absolute;top:-6px;right:-6px;background:#dc2626;color:#fff;border:none;border-radius:50%;width:14px;height:14px;font-size:8px;cursor:pointer;line-height:14px;padding:0" onclick="delPh(\'tax\',\''+firstP.id+'\','+j+')">×</button></span> ';
-      var qdSrc=firstP.qtDoc||[], stSrc=firstP.stDoc||[], pcSrc=firstP.pcDoc||[];
-      for(var j=0;j<pcSrc.length;j++)h+='<span style="position:relative;display:inline-block;margin-right:2px" title="구매 전 상품 캡처"><img class="photoTh" src="'+imgSrc(pcSrc[j])+'" onclick="showPh(this)" style="border:2px solid #f59e0b"><span style="position:absolute;left:2px;bottom:2px;background:#f59e0b;color:#fff;font-size:9px;font-weight:800;padding:0 3px;border-radius:3px">🛒</span><button style="position:absolute;top:-4px;right:-4px;background:#dc2626;color:#fff;border:none;border-radius:50%;width:14px;height:14px;font-size:8px;cursor:pointer;line-height:14px;padding:0" onclick="delPh(\'pc\',\''+firstP.id+'\','+j+')">×</button></span> ';
-      h+=_purDocChips(qdSrc,'qt',firstP.id,'📄 견적서','#e0e7ff','#3730a3','#818cf8');
-      h+=_purDocChips(stSrc,'st',firstP.id,'📋 거래명세표','#dcfce7','#166534','#4ade80');
-      if(!phSrc.length&&!rcSrc.length&&!txSrc.length&&!qdSrc.length&&!stSrc.length&&!pcSrc.length)h+='<span style="color:#94a3b8;font-size:13px">없음</span> ';
-      h+=' <button class="abtn" style="background:#2563eb" onclick="_attPick(\''+firstP.id+'\','+(_bank?1:0)+')">＋ 증빙 추가</button>';
-      if(_bank && !txSrc.length) h+=' <span style="font-size:13px;color:#fff;background:#dc2626;padding:4px 10px;border-radius:10px;font-weight:700">⚠ '+_payWord(firstP.payM)+' — '+esc(_taxDocName(firstP))+' 미첨부</span>';
-      h+='</div></div>';
+      // ② 부가정보 한 줄 (회색)
+      var _meta=[G.ar||"공통",[G.expTp,G.expMid].filter(Boolean).join(" › "),G.gwan?("관 "+G.gwan):"",[G.card,firstP.payM].filter(Boolean).join(" · "),firstP.vendorName?("지급처 "+firstP.vendorName):""].filter(Boolean);
+      h+='<div style="padding:0 12px 8px;font-size:12.5px;color:#475569;line-height:1.5">'+_meta.map(esc).join(' <span style="color:#cbd5e1">|</span> ')+' <span style="color:#cbd5e1">|</span> '+_purStatusTxt(G)+'</div>';
+      // ③ 경고 (문제 있을 때만 빨강)
+      var _warns=[]; if(_zero) _warns.push("금액 0원 — 수정에서 합계 확인"); if(_noTax) _warns.push(_payWord(firstP.payM)+" — "+_taxDocName(firstP)+" 미첨부"); if(_rej) _warns.push("반려됨 — ✍ 서명에서 사유 확인");
+      if(_warns.length) h+='<div style="margin:0 12px 8px;padding:5px 9px;background:#fef2f2;border:1px solid #fecaca;border-radius:6px;color:#b91c1c;font-size:12.5px;font-weight:700">⚠ '+_warns.map(esc).join(' · ')+'</div>';
+      // ④ 품목 표: 품목 | 수량 | 단가 | 금액
+      h+='<div style="padding:0 12px;overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:14px">';
+      h+='<thead><tr style="background:#f1f5f9;color:#475569;font-size:12px"><th style="text-align:left;padding:5px 6px;font-weight:600">품목</th><th style="text-align:right;padding:5px 6px;font-weight:600;white-space:nowrap">수량</th>'+(canSeeAmt()?'<th style="text-align:right;padding:5px 6px;font-weight:600;white-space:nowrap">단가</th><th style="text-align:right;padding:5px 6px;font-weight:600;white-space:nowrap">금액</th>':'')+(canEd?'<th style="width:1%"></th>':'')+'</tr></thead><tbody>';
+      for(var k=0;k<G.items.length;k++){
+        var p=G.items[k];
+        h+='<tr style="border-bottom:1px solid #e2e8f0">';
+        h+='<td style="padding:7px 6px;color:#0f172a;font-weight:600;word-break:keep-all">'+esc(p.it)+(bn(p.bi)?'<div style="font-size:11px;color:#94a3b8;font-weight:400">'+esc(bn(p.bi))+'</div>':'')+'</td>';
+        h+='<td style="padding:7px 6px;text-align:right;white-space:nowrap;color:#334155">'+esc(p.qt||"")+'</td>';
+        if(canSeeAmt()) h+='<td style="padding:7px 6px;text-align:right;white-space:nowrap;color:#334155">'+fm(p.un)+'</td><td style="padding:7px 6px;text-align:right;white-space:nowrap;font-weight:800;color:#0f172a">'+fm(p.tot)+'</td>';
+        if(canEd) h+='<td style="padding:4px 0 4px 6px;white-space:nowrap;text-align:right"><button class="btn btn-s" style="background:#334155;color:#fff" onclick="edPur(\''+p.id+'\')">수정</button> <button class="btn btn-s" style="background:#dc2626;color:#fff" onclick="delP(\''+p.id+'\')">삭제</button></td>';
+        h+='</tr>';
+      }
+      h+='</tbody></table></div>';
+      // ⑤ 증빙 (썸네일·문서 — 한 가지 톤)
+      var phSrc=firstP.ph||[],rcSrc=firstP.rc||[],qdSrc=firstP.qtDoc||[],stSrc=firstP.stDoc||[],pcSrc=firstP.pcDoc||[];
+      h+='<div style="padding:8px 12px;display:flex;flex-wrap:wrap;align-items:center;gap:4px"><span style="font-size:12px;color:#64748b;font-weight:700;margin-right:2px">📎 증빙</span>';
+      h+=_purThumbs(pcSrc,'pc',firstP.id,'상품캡처');
+      h+=_purThumbs(phSrc,'pur',firstP.id,'물품사진');
+      h+=_purThumbs(rcSrc,'rc',firstP.id,'영수증');
+      h+=_purDocChips(qdSrc,'qt',firstP.id,'📄 견적서','#f1f5f9','#334155','#cbd5e1');
+      h+=_purDocChips(stSrc,'st',firstP.id,'📋 거래명세표','#f1f5f9','#334155','#cbd5e1');
+      h+=_purDocChips(txSrc,'tax',firstP.id,'🧾 '+_taxDocName(firstP),'#f1f5f9','#334155','#cbd5e1');
+      if(!phSrc.length&&!rcSrc.length&&!txSrc.length&&!qdSrc.length&&!stSrc.length&&!pcSrc.length)h+='<span style="color:#94a3b8;font-size:12px">없음</span> ';
+      h+='<button class="abtn" style="background:#334155" onclick="_attPick(\''+firstP.id+'\','+(_bank?1:0)+')">＋ 증빙</button>';
+      h+='</div>';
+      // ⑥ 버튼 줄 (작게, 한 색)
+      h+='<div style="display:flex;gap:4px;flex-wrap:wrap;padding:7px 12px;border-top:1px solid #e2e8f0;background:#f8fafc">';
+      h+='<button class="btn btn-s" style="background:#334155;color:#fff" onclick="vchInv(\''+G.inv+'\')">📄 결의서</button>';
+      h+='<button class="btn btn-s" style="background:#334155;color:#fff" onclick="vchXlsxDL(\''+G.inv+'\')">📗 엑셀</button>';
+      h+=_esgBtn(G.inv);
+      h+='<button class="btn btn-s" style="background:#334155;color:#fff" onclick="resAttach(\''+G.inv+'\')">📎 서명본</button>';
+      if(G.signU)h+='<a class="btn btn-s" style="background:#334155;color:#fff;text-decoration:none" href="'+esc(G.signU)+'" target="_blank">👁 서명본 보기</a>';
+      h+='</div>';
       h+='</div>';
     }
   }
@@ -7170,7 +7190,7 @@ function _esgCell(inv,role,extraCls){
 function _esgBtn(inv){
   var d=_esgOf(inv), n=_esgCount(inv), done=n===ESIG_ROLES.length, rej=Object.keys(d.rej||{}).length;
   var orig=_esgInvItems(inv).some(function(p){return p.signU;});
-  var bg=rej?'#dc2626':done?'#16a34a':orig?'#16a34a':n?'#0891b2':'#475569';
+  var bg=rej?'#dc2626':done?'#16a34a':orig?'#16a34a':'#334155';
   var lb='✍ 서명 '+n+'/'+ESIG_ROLES.length+(rej?' · ↩반려':'')+(orig&&!done?' · 원본✅':'');
   return ' <button class="btn btn-s" style="background:'+bg+';color:#fff;font-weight:700" onclick="_esgPop(\''+esc(inv)+'\')">'+lb+'</button>';
 }
