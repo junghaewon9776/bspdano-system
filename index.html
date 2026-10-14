@@ -525,6 +525,7 @@ var DEEP_TAB = "";   // ?tab= 딥링크 (로그인 후 해당 탭 자동 열기)
 var DEEP_EVT = "";   // ?evtId= 딥링크 (해당 행사 자동 선택)
 var IS_MODVIEW_MODE = false; var MODVIEW_KEY=""; var MODVIEW_ID=""; var MODVIEW_EVT="";  // QR 조회 페이지
 var IS_ASSETVIEW_MODE = false; var ASSETVIEW_ID="";  // 자산 QR 조회 페이지
+var IS_ESIGN_MODE = false;  // 결의서 서명 링크 (?esign=)
 var DEEP_MOD_KEY = "";  // 모듈 바로가기(?modlist=) — 로그인 후 이동할 모듈 키
 // 한국시간 헬퍼 — toISOString은 UTC(외국시간)이므로 날짜/시간 표시엔 이걸 쓸 것
 function todayKST(){ var d=new Date(); return d.getFullYear()+"-"+("0"+(d.getMonth()+1)).slice(-2)+"-"+("0"+d.getDate()).slice(-2); }
@@ -584,6 +585,13 @@ function nowKST(full){ var d=new Date(); var s=todayKST()+" "+("0"+d.getHours())
       document.getElementById("mainPage").style.display = "none";
       document.title = "📦 자산 조회";
     }
+    // ===== 결의서 서명 링크 (?esign=evt&inv=&role=&t=) — 로그인 없이 서명 =====
+    if (sp.get("esign")) {
+      IS_ESIGN_MODE = true;
+      document.getElementById("loginPage").style.display = "none";
+      document.getElementById("mainPage").style.display = "none";
+      document.title = "✍ 결의서 서명";
+    }
     // ===== 모듈 바로가기 (?modlist={key}) — 홈페이지(로그인) → 로그인 후 그 모듈 화면으로 이동 =====
     if (sp.get("modlist")) {
       DEEP_MOD_KEY = sp.get("modlist") || "";
@@ -623,6 +631,11 @@ document.addEventListener("DOMContentLoaded", function(){
     if (IS_MODVIEW_MODE) {
       // 일반인도 기본 정보는 조회 가능 / 관리자(로그인 토큰 있는 우리 기기)는 관리자전용까지 표시
       if (typeof renderModView === 'function') renderModView(MODVIEW_KEY, MODVIEW_ID, MODVIEW_EVT);
+      return; // 로그인 로직 스킵
+    }
+    // ===== 결의서 서명 링크 =====
+    if (IS_ESIGN_MODE) {
+      renderEsignPage();
       return; // 로그인 로직 스킵
     }
     // ===== 자산 QR 조회 페이지 =====
@@ -1266,8 +1279,8 @@ async function tryAutoLogin(){
   if(!ok&&er){er.style.color="#dc2626";er.textContent="자동 로그인 실패 — 다시 로그인하세요";}
 }
 window.addEventListener("load",function(){
-  // 공개 신청폼 모드면 자동 로그인 스킵
-  if (IS_APPLY_MODE) return;
+  // 공개 신청폼·서명 링크 모드면 자동 로그인 스킵
+  if (IS_APPLY_MODE || IS_ESIGN_MODE) return;
   // Firebase 실시간 동기화 시작
   initFirebaseSync();
   // 이전 로그아웃 메시지 복원
@@ -6652,6 +6665,7 @@ function dPur(){
   // 명세서 단위로 그룹화 (inv 기준) — 대표행(첫 물품)의 prtD/signU 사용
   var groups={};var order=[];
   for(var i=0;i<fp.length;i++){var p=fp[i];var iv=p.inv||p.id;if(!groups[iv]){groups[iv]={inv:iv,dt:p.dt,ar:p.ar,by:p.by,items:[],tot:0,prtD:p.prtD||"",signU:p.signU||"",mgmtNo:p.mgmtNo||"",noMgmt:(p.noMgmt==="Y"||p.noMgmt===true),gwan:p.gwan||"",expTp:p.expTp||"",expMid:p.expMid||"",card:p.card||""};order.push(iv)}groups[iv].items.push(p);groups[iv].tot+=pn(p.tot);if(!groups[iv].prtD&&p.prtD)groups[iv].prtD=p.prtD;if(!groups[iv].signU&&p.signU)groups[iv].signU=p.signU;if(!groups[iv].mgmtNo&&p.mgmtNo)groups[iv].mgmtNo=p.mgmtNo;}
+  _esigListen();
   var _PM=window._PUR_PM=_purDayOrder();
   var gListAll=order.map(function(iv){return groups[iv]}).sort(function(a,b){return -_purSeqCmp(_PM.meta[a.inv]||{dt:normD(a.dt)},_PM.meta[b.inv]||{dt:normD(b.dt)});});
   // 필터 적용 (미발행/미서명)
@@ -6828,6 +6842,7 @@ function dPur(){
       h+='<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">'+(canSeeAmt()?((!(pn(G.tot)>0)?'<span style="background:#dc2626;color:#fff;font-size:12.5px;font-weight:700;padding:3px 9px;border-radius:10px">⚠ 금액 0원 — 수정에서 합계 확인</span> ':'')+'<span style="font-weight:800;color:#7c3aed;font-size:18px">'+fm(G.tot)+'원</span>'+((_RB.byInv[G.inv])?' <span style="font-size:13px;font-weight:700;padding:3px 9px;border-radius:10px;background:'+(_RB.byInv[G.inv].after<0?'#fee2e2;color:#b91c1c':'#e0f2fe;color:#075985')+'" title="'+esc(_RB.byInv[G.inv].card)+' — 이 건까지 날짜순으로 쓴 뒤 남은 금액">잔액 '+fm(_RB.byInv[G.inv].after)+'원</span>':'')):'<span style="font-weight:700;color:#999;font-size:12px">금액 비공개</span>');
       h+=' <button class="btn btn-s mobile-hide" style="background:#7c3aed;color:#fff" onclick="vchInv(\''+G.inv+'\')">📄 결의서</button>';
       h+=' <button class="btn btn-s" style="background:#0d9488;color:#fff" onclick="vchXlsxDL(\''+G.inv+'\')">📗 엑셀</button>';
+      h+=_esgBtn(G.inv);
       h+=' <button class="btn btn-s" style="background:#16a34a;color:#fff" onclick="resAttach(\''+G.inv+'\')">📎 서명본</button>';
       if(G.signU)h+=' <a class="btn btn-s" style="background:#0ea5e9;color:#fff;text-decoration:none" href="'+esc(G.signU)+'" target="_blank">👁 보기</a>';
       h+='</div></div>';
@@ -6899,6 +6914,223 @@ function purCardOpts(sel, filterTp, filterSub){
   var h='<option value="">(카드/통장 선택)</option>';
   for(var i=0;i<keys.length;i++) h+='<option'+(keys[i]===sel?' selected':'')+'>'+esc(keys[i])+'</option>';
   return h;
+}
+
+// ===== ✍ 지출결의서 전자서명 (모두싸인 방식) =====
+//   /evtData/{evt}/Esig/{inv} = { roles:{담당:{img,nm,at,via}, ...}, req:{회장:{tok,nm,tel,at,done}} }
+//   직접 서명(로그인 사용자) + 서명 요청 링크(?esign=evt&inv=&role=&t=토큰, 로그인 없이 폰에서 서명)
+var ESIG_ROLES=["담당","사무국장","부회장","회장"];
+var ESIG={}, _ESIG_EVT=null, _ESG_CUR=null;
+function _esgKey(inv){ return String(inv||"").replace(/[.#$\[\]\/]/g,"_"); }
+function _esgOf(inv){ return ESIG[_esgKey(inv)]||{}; }
+function _esgCount(inv){ var r=_esgOf(inv).roles||{}; return ESIG_ROLES.filter(function(k){return r[k]&&r[k].img;}).length; }
+function _esigListen(){
+  var evt=CUR_EVT&&CUR_EVT.evtId; if(!evt||_ESIG_EVT===evt) return;
+  if(_ESIG_EVT) try{ fbDb.ref('/evtData/'+_ESIG_EVT+'/Esig').off(); }catch(e){}
+  _ESIG_EVT=evt;
+  fbDb.ref('/evtData/'+evt+'/Esig').on('value',function(s){
+    ESIG=s.val()||{};
+    if(typeof CTAB!=="undefined" && CTAB==="pur" && !document.getElementById("esgPadBox")) draw();
+    if(_ESG_CUR && document.getElementById("esgBox")) _esgPop(_ESG_CUR);
+  });
+}
+function _esgRef(inv){ return fbDb.ref('/evtData/'+CUR_EVT.evtId+'/Esig/'+_esgKey(inv)); }
+function _esgInvItems(inv){ return (purs||[]).filter(function(p){return (p.inv||p.id)===inv;}); }
+function _esgInvTitle(inv){
+  var it=_esgInvItems(inv); if(!it.length) return inv;
+  var p=it[0], tot=0; it.forEach(function(x){tot+=pn(x.tot);});
+  return (p.mgmtNo?p.mgmtNo+" · ":"")+fmtDK(p.dt)+" · "+(p.it||"")+(it.length>1?" 외 "+(it.length-1)+"건":"")+" · "+fm(tot)+"원";
+}
+function _esgLink(inv,role,tok){
+  return location.href.split("?")[0].split("#")[0]+"?esign="+encodeURIComponent(CUR_EVT.evtId)+"&inv="+encodeURIComponent(inv)+"&role="+encodeURIComponent(role)+"&t="+tok;
+}
+// 결의서 결재칸 (출력용)
+function _esgCell(inv,role,extraCls){
+  var s=(_esgOf(inv).roles||{})[role];
+  return '<td class="sig ctr'+(extraCls||'')+'" rowspan="3" style="text-align:center;vertical-align:middle;padding:2px">'+(s&&s.img?'<img src="'+s.img+'" style="max-width:100%;max-height:48px;display:block;margin:0 auto"><div style="font-size:9px;line-height:1.1">'+esc(s.nm||"")+'</div>':'')+'</td>';
+}
+// 목록 버튼
+function _esgBtn(inv){
+  var n=_esgCount(inv), done=n===ESIG_ROLES.length;
+  var orig=_esgInvItems(inv).some(function(p){return p.signU;});
+  if(orig&&!done) return ' <button class="btn btn-s" style="background:#16a34a;color:#fff;font-weight:700" onclick="_esgPop(\''+esc(inv)+'\')" title="수기 서명 원본 올림">✍ 서명 '+n+'/'+ESIG_ROLES.length+' · 원본✅</button>';
+  return' <button class="btn btn-s" style="background:'+(done?'#16a34a':n?'#0891b2':'#475569')+';color:#fff;font-weight:700" onclick="_esgPop(\''+esc(inv)+'\')">✍ 서명 '+n+'/'+ESIG_ROLES.length+'</button>';
+}
+// 서명 현황 팝업
+function _esgPop(inv){
+  _ESG_CUR=inv;
+  var d=_esgOf(inv), roles=d.roles||{}, req=d.req||{};
+  var h='<h3>✍ 결의서 서명 <button class="close-x" onclick="_ESG_CUR=null;closePopup()">&times;</button></h3>';
+  h+='<div id="esgBox"><div style="font-size:13px;color:#475569;margin-bottom:12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px">📄 '+esc(_esgInvTitle(inv))+'</div>';
+  ESIG_ROLES.forEach(function(role){
+    var s=roles[role], q=req[role];
+    h+='<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;border:1px solid #e2e8f0;border-radius:10px;padding:10px 12px;margin-bottom:8px;background:'+(s&&s.img?'#f0fdf4':'#fff')+'">';
+    h+='<div style="min-width:70px;font-weight:800;font-size:15px">'+esc(role)+'</div>';
+    h+='<div style="flex:1;min-width:150px;font-size:13px">';
+    if(s&&s.img) h+='<img src="'+s.img+'" style="height:40px;vertical-align:middle;border:1px solid #d1d5db;border-radius:4px;background:#fff"> <b>'+esc(s.nm||"")+'</b> <span style="color:#64748b;font-size:12px">'+esc(s.at||"")+(s.via==="link"?" · 링크로 서명":"")+'</span>';
+    else if(q&&!q.done) h+='<span style="color:#b45309;font-weight:700">⏳ '+esc(q.nm||"")+'님께 요청함</span> <span style="color:#94a3b8;font-size:12px">'+esc(q.at||"")+'</span>';
+    else h+='<span style="color:#94a3b8">서명 전</span>';
+    h+='</div><div style="display:flex;gap:6px;flex-wrap:wrap">';
+    h+='<button class="btn btn-s" style="background:#2563eb;color:#fff;font-weight:700" onclick="_esgSelf(\''+esc(inv)+'\',\''+role+'\')">✍ 직접 서명</button>';
+    h+='<button class="btn btn-s" style="background:#7c3aed;color:#fff;font-weight:700" onclick="_esgReq(\''+esc(inv)+'\',\''+role+'\')">📨 서명 요청</button>';
+    if(q&&!q.done) h+='<button class="btn btn-s" style="background:#0891b2;color:#fff" onclick="_esgReqShow(\''+esc(inv)+'\',\''+role+'\')">🔗 링크</button>';
+    if(s&&s.img) h+='<button class="btn btn-s" style="background:#dc2626;color:#fff" onclick="_esgClear(\''+esc(inv)+'\',\''+role+'\')">지우기</button>';
+    h+='</div></div>';
+  });
+  h+='<div style="font-size:12px;color:#64748b;margin-top:6px;line-height:1.6">서명하면 결의서(📄 결의서 / 일괄 출력)의 결재칸에 자동으로 들어가요. 요청 링크로 서명하면 여기 바로 반영돼요.<br>✋ <b>전자서명이 어려운 분(감사 등)</b>은: 결의서를 뽑아 → 남은 칸만 손으로 받고 → <b>📎 수기 서명 원본 올리기</b>로 사진/PDF를 올리면 서명완료 처리돼요.</div>';
+  var _orig=_esgInvItems(inv).filter(function(p){return p.signU;})[0];
+  if(_orig) h+='<div style="margin-top:8px;font-size:13px;color:#166534;font-weight:700">✅ 수기 서명 원본 올라와 있음 <a href="'+esc(_orig.signU)+'" target="_blank" style="color:#2563eb">보기</a></div>';
+  h+='</div><div class="popStickyFoot" style="justify-content:flex-end"><button class="btn" style="background:#475569;color:#fff" onclick="_ESG_CUR=null;closePopup()">닫기</button><button class="btn" style="background:#16a34a;color:#fff;font-weight:700" onclick="resAttach(\''+esc(inv)+'\')">📎 수기 서명 원본 올리기</button><button class="btn" style="background:#7c3aed;color:#fff;font-weight:700" onclick="vchInv(\''+esc(inv)+'\')">📄 결의서 보기</button></div>';
+  openPopup(h,600);
+}
+// 서명 패드 (마우스·손가락)
+function _sigPadInit(cv){
+  var ctx=cv.getContext("2d"), drawing=false, empty=true, last=null;
+  function fit(){ var r=cv.getBoundingClientRect(), dpr=window.devicePixelRatio||1; cv.width=Math.max(1,r.width*dpr); cv.height=Math.max(1,r.height*dpr); ctx.setTransform(dpr,0,0,dpr,0,0); ctx.lineWidth=2.6; ctx.lineCap="round"; ctx.lineJoin="round"; ctx.strokeStyle="#111"; }
+  fit();
+  function pt(e){ var r=cv.getBoundingClientRect(); return {x:e.clientX-r.left, y:e.clientY-r.top}; }
+  cv.style.touchAction="none";
+  cv.addEventListener("pointerdown",function(e){ drawing=true; last=pt(e); try{cv.setPointerCapture(e.pointerId);}catch(x){} ctx.beginPath(); ctx.arc(last.x,last.y,1.2,0,Math.PI*2); ctx.fill(); empty=false; e.preventDefault(); });
+  cv.addEventListener("pointermove",function(e){ if(!drawing) return; var p=pt(e); ctx.beginPath(); ctx.moveTo(last.x,last.y); ctx.lineTo(p.x,p.y); ctx.stroke(); last=p; empty=false; e.preventDefault(); });
+  ["pointerup","pointerleave","pointercancel"].forEach(function(t){ cv.addEventListener(t,function(){ drawing=false; }); });
+  return {
+    clear:function(){ ctx.save(); ctx.setTransform(1,0,0,1,0,0); ctx.clearRect(0,0,cv.width,cv.height); ctx.restore(); empty=true; },
+    isEmpty:function(){ return empty; },
+    load:function(src){ var im=new Image(); im.onload=function(){ var r=cv.getBoundingClientRect(); ctx.drawImage(im,0,0,r.width,r.height); empty=false; }; im.src=src; },
+    toData:function(){ var o=document.createElement("canvas"); o.width=360; o.height=160; o.getContext("2d").drawImage(cv,0,0,360,160); return o.toDataURL("image/png"); }
+  };
+}
+function _esgPadHtml(nm){
+  return '<div id="esgPadBox"><label style="font-weight:700">이름</label><input id="esgNm" type="text" value="'+esc(nm||"")+'" style="width:100%;padding:9px;font-size:15px;margin:4px 0 10px">'+
+    '<div style="font-weight:700;margin-bottom:4px">아래 칸에 서명해 주세요 ✍</div>'+
+    '<canvas id="esgPad" style="width:100%;height:200px;border:2px dashed #94a3b8;border-radius:10px;background:#fff;display:block"></canvas>'+
+    '<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap"><button type="button" class="btn btn-s" style="background:#64748b;color:#fff" onclick="window._esgPad&&window._esgPad.clear()">다시 쓰기</button></div></div>';
+}
+function _esgSelf(inv,role){
+  var mine=""; try{ mine=localStorage.getItem("esigMine_"+(typeof CID!=="undefined"?CID:""))||""; }catch(e){}
+  var h='<h3>✍ '+esc(role)+' 서명 <button class="close-x" onclick="closePopup2()">&times;</button></h3>';
+  h+='<div style="font-size:12px;color:#475569;margin-bottom:8px">📄 '+esc(_esgInvTitle(inv))+'</div>';
+  h+=_esgPadHtml((ME&&ME.nm)||"");
+  if(mine) h+='<button type="button" class="btn btn-s" style="background:#0891b2;color:#fff;margin-top:8px" onclick="window._esgPad.clear();window._esgPad.load(localStorage.getItem(\'esigMine_\'+CID))">💾 저장해 둔 내 서명 불러오기</button>';
+  h+='<label style="display:flex;align-items:center;gap:6px;margin-top:10px;font-size:13px"><input type="checkbox" id="esgRemember" checked> 이 서명을 이 기기에 기억 (다음엔 불러오기 한 번으로)</label>';
+  h+='<div class="popStickyFoot" style="justify-content:flex-end"><button class="btn" style="background:#475569;color:#fff" onclick="closePopup2()">취소</button><button class="btn btn-b" style="font-weight:700;padding:10px 24px" onclick="_esgSaveSelf(\''+esc(inv)+'\',\''+role+'\')">서명 완료</button></div>';
+  openPopup2(h,520);
+  setTimeout(function(){ window._esgPad=_sigPadInit(document.getElementById("esgPad")); },60);
+}
+async function _esgSaveSelf(inv,role){
+  var pad=window._esgPad; if(!pad||pad.isEmpty()) return toast("서명을 해 주세요",true);
+  var nm=String((document.getElementById("esgNm")||{}).value||"").trim(); if(!nm) return toast("이름을 입력하세요",true);
+  var img=pad.toData();
+  try{ if((document.getElementById("esgRemember")||{}).checked) localStorage.setItem("esigMine_"+CID, img); }catch(e){}
+  showLoading("서명 저장 중...");
+  try{
+    await _esgRef(inv).child("roles/"+role).set({img:img,nm:nm,at:nowKST(true),via:"self",by:(typeof CID!=="undefined"?CID:"")});
+    var q=(_esgOf(inv).req||{})[role]; if(q&&!q.done) await _esgRef(inv).child("req/"+role+"/done").set(nowKST(true));
+    hideLoading(); closePopup2(); toast("✍ "+role+" 서명 완료");
+  }catch(e){ hideLoading(); toast("저장 실패: "+(e.message||e),true); }
+}
+async function _esgClear(inv,role){
+  if(!confirm(role+" 서명을 지울까요?")) return;
+  await _esgRef(inv).child("roles/"+role).remove(); toast(role+" 서명 지움");
+}
+function _esgReq(inv,role){
+  var q=(_esgOf(inv).req||{})[role]||{};
+  var opts=(typeof mems!=="undefined"?mems:[]).filter(function(m){return m&&m.nm&&m.tel;}).map(function(m){return '<option value="'+esc(m.nm)+'" data-tel="'+esc(m.tel)+'">'+esc(m.ar||"")+'</option>';}).join("");
+  var h='<h3>📨 '+esc(role)+' 서명 요청 <button class="close-x" onclick="closePopup2()">&times;</button></h3>';
+  h+='<div style="font-size:12px;color:#475569;margin-bottom:10px">📄 '+esc(_esgInvTitle(inv))+'</div>';
+  h+='<label style="font-weight:700">서명할 사람 이름</label><input id="esqNm" list="esqMems" value="'+esc(q.nm||"")+'" oninput="var o=[].slice.call(document.querySelectorAll(\'#esqMems option\')).filter(function(x){return x.value===this.value;}.bind(this))[0];if(o)document.getElementById(\'esqTel\').value=o.getAttribute(\'data-tel\')" style="width:100%;padding:9px;font-size:15px;margin:4px 0 10px"><datalist id="esqMems">'+opts+'</datalist>';
+  h+='<label style="font-weight:700">휴대폰 번호 <span style="font-weight:400;color:#64748b;font-size:12px">(문자로 보낼 때만 필요 · 회원이면 자동 입력)</span></label><input id="esqTel" value="'+esc(q.tel||"")+'" placeholder="010-0000-0000" style="width:100%;padding:9px;font-size:15px;margin:4px 0 10px">';
+  h+='<div class="popStickyFoot" style="justify-content:flex-end"><button class="btn" style="background:#475569;color:#fff" onclick="closePopup2()">취소</button><button class="btn" style="background:#7c3aed;color:#fff;font-weight:700" onclick="_esgReqMake(\''+esc(inv)+'\',\''+role+'\')">요청 링크 만들기</button></div>';
+  openPopup2(h,480);
+}
+async function _esgReqMake(inv,role){
+  var nm=String((document.getElementById("esqNm")||{}).value||"").trim(), tel=String((document.getElementById("esqTel")||{}).value||"").trim();
+  if(!nm) return toast("서명할 사람 이름을 입력하세요",true);
+  var tok=Math.random().toString(36).slice(2,10)+Math.random().toString(36).slice(2,10);
+  showLoading("요청 만드는 중...");
+  try{ await _esgRef(inv).child("req/"+role).set({tok:tok,nm:nm,tel:tel,at:nowKST(true),by:(typeof CID!=="undefined"?CID:"")}); hideLoading(); }
+  catch(e){ hideLoading(); return toast("실패: "+(e.message||e),true); }
+  _esgReqShow(inv,role,{tok:tok,nm:nm,tel:tel});
+}
+function _esgReqShow(inv,role,q){
+  q=q||(_esgOf(inv).req||{})[role]; if(!q) return;
+  var link=_esgLink(inv,role,q.tok);
+  var msg="["+(typeof SYS_NAME!=="undefined"?SYS_NAME:"")+"] "+q.nm+"님, 지출결의서 "+role+" 서명 부탁드립니다.\n"+_esgInvTitle(inv)+"\n"+link;
+  window._esgMsg=msg; window._esgTel=q.tel||"";
+  var h='<h3>🔗 '+esc(role)+' 서명 요청 링크 <button class="close-x" onclick="closePopup2()">&times;</button></h3>';
+  h+='<div style="font-size:13px;margin-bottom:8px"><b>'+esc(q.nm)+'</b>님이 이 링크를 열면 로그인 없이 결의서를 보고 서명할 수 있어요.</div>';
+  h+='<textarea id="esgMsgBox" readonly style="width:100%;height:110px;font-size:13px;padding:8px">'+esc(msg)+'</textarea>';
+  h+='<div class="popStickyFoot" style="justify-content:flex-end">';
+  h+='<button class="btn" style="background:#475569;color:#fff" onclick="closePopup2()">닫기</button>';
+  h+='<button class="btn" style="background:#15803d;color:#fff;font-weight:700" onclick="_esgCopy()">📋 문구+링크 복사 (카톡용)</button>';
+  if(q.tel) h+='<button class="btn" style="background:#7c3aed;color:#fff;font-weight:700" onclick="_esgSms()">💬 문자 보내기</button>';
+  h+='</div>';
+  openPopup2(h,520);
+}
+function _esgCopy(){
+  var t=window._esgMsg||"";
+  var ok=function(){ toast("📋 복사됨 — 카톡이나 문자에 붙여넣기"); };
+  if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(ok,function(){ var ta=document.getElementById("esgMsgBox"); ta.select(); document.execCommand("copy"); ok(); });
+  else { var ta=document.getElementById("esgMsgBox"); ta.select(); document.execCommand("copy"); ok(); }
+}
+async function _esgSms(){
+  var tel=String(window._esgTel||"").replace(/[^0-9]/g,""); if(!tel) return toast("휴대폰 번호가 없어요",true);
+  if(!confirm(window._esgTel+" 번호로 아래 문자를 보낼까요?\n\n"+window._esgMsg)) return;
+  showLoading("문자 보내는 중...");
+  var r=await api("sendSmsAligo",{tels:[tel], msg:window._esgMsg, title:"결의서 서명 요청"});
+  hideLoading();
+  if(r&&r.ok&&(r.sent||0)>0) toast("💬 문자 보냄"); else toast("문자 실패: "+((r&&r.err)||"발송 0건 — 문자 설정 확인"),true);
+}
+
+// ── 로그인 없이 여는 서명 페이지 (?esign=evt&inv=&role=&t=) ──
+async function renderEsignPage(){
+  var sp=new URLSearchParams(location.search), evt=sp.get("esign")||"", inv=sp.get("inv")||"", role=sp.get("role")||"", tok=sp.get("t")||"";
+  var root=document.createElement("div"); root.id="esignPage";
+  root.style.cssText="max-width:560px;margin:0 auto;padding:16px;font-family:inherit";
+  document.body.appendChild(root);
+  var box=function(html){ root.innerHTML='<div style="background:#fff;border-radius:14px;box-shadow:0 4px 20px rgba(0,0,0,.08);padding:18px">'+html+'</div>'; };
+  box('<div style="text-align:center;padding:30px;color:#64748b">불러오는 중...</div>');
+  try{
+    var base='/evtData/'+evt;
+    var es=(await fbDb.ref(base+'/Esig/'+_esgKey(inv)).once('value')).val()||{};
+    var q=(es.req||{})[role];
+    if(!q||q.tok!==tok){ box('<div style="text-align:center;padding:30px"><div style="font-size:40px">⚠️</div><b>유효하지 않은 서명 링크예요.</b><div style="color:#64748b;margin-top:6px;font-size:13px">요청한 분께 새 링크를 받아 주세요.</div></div>'); return; }
+    var pv=(await fbDb.ref(base+'/Purs').once('value')).val()||{};
+    var items=Object.keys(pv).map(function(k){return pv[k];}).filter(function(p){return p&&(p.inv||p.id)===inv;});
+    var p0=items[0]||{}, tot=0; items.forEach(function(x){tot+=parseInt(String(x.tot||0).replace(/,/g,""))||0;});
+    var signed=(es.roles||{})[role];
+    var h='<div style="font-size:13px;color:#64748b">'+esc(typeof SYS_PARENT!=="undefined"?SYS_PARENT:"")+'</div>';
+    h+='<h2 style="margin:4px 0 12px;font-size:20px">✍ 지출결의서 서명 요청</h2>';
+    h+='<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:14px"><b>'+esc(q.nm)+'</b>님, <b>'+esc(role)+'</b> 결재칸에 서명 부탁드립니다.</div>';
+    h+='<table style="width:100%;border-collapse:collapse;font-size:14px;margin-bottom:12px">';
+    var row=function(k,v){ return '<tr><td style="padding:6px 8px;background:#f8fafc;border:1px solid #e2e8f0;width:30%;font-weight:700">'+k+'</td><td style="padding:6px 8px;border:1px solid #e2e8f0">'+v+'</td></tr>'; };
+    h+=row("결의서 번호",esc(p0.mgmtNo||"-"))+row("날짜",esc(p0.dtIni||p0.dt||"-"))+row("관 · 항 · 목",esc([p0.gwan,p0.expTp,p0.expMid].filter(Boolean).join(" › ")||"-"))+row("지급처",esc(p0.vendorName||"-"))+row("지출 금액",'<b style="font-size:16px;color:#7c3aed">'+tot.toLocaleString()+'원</b>');
+    h+='</table>';
+    h+='<div style="font-weight:700;margin-bottom:4px">품목</div><table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:14px">';
+    items.forEach(function(x){ h+='<tr><td style="padding:5px 8px;border:1px solid #e2e8f0">'+esc(x.it||"")+'</td><td style="padding:5px 8px;border:1px solid #e2e8f0;text-align:right;white-space:nowrap">'+esc(x.qt||"")+'개 · '+(parseInt(String(x.tot||0).replace(/,/g,""))||0).toLocaleString()+'원</td></tr>'; });
+    h+='</table>';
+    var others=ESIG_ROLES.filter(function(r){return r!==role && es.roles && es.roles[r] && es.roles[r].img;});
+    if(others.length){ h+='<div style="font-size:12px;color:#64748b;margin-bottom:10px">다른 결재: '+others.map(function(r){return r+" ✅ "+esc(es.roles[r].nm||"");}).join(" · ")+'</div>'; }
+    if(signed&&signed.img){
+      h+='<div style="text-align:center;padding:14px;background:#f0fdf4;border:1px solid #86efac;border-radius:10px"><div style="font-size:30px">✅</div><b>이미 서명하셨어요</b><div><img src="'+signed.img+'" style="height:60px;margin-top:6px"></div><div style="font-size:12px;color:#64748b">'+esc(signed.nm||"")+' · '+esc(signed.at||"")+'</div></div>';
+      box(h); return;
+    }
+    h+=_esgPadHtml(q.nm);
+    h+='<button id="esgSubmit" style="width:100%;margin-top:14px;padding:15px;font-size:17px;font-weight:800;border:none;border-radius:10px;background:#2563eb;color:#fff;cursor:pointer">서명 제출</button>';
+    box(h);
+    window._esgPad=_sigPadInit(document.getElementById("esgPad"));
+    document.getElementById("esgSubmit").onclick=async function(){
+      if(window._esgPad.isEmpty()) return alert("서명을 해 주세요");
+      var nm=String(document.getElementById("esgNm").value||"").trim(); if(!nm) return alert("이름을 입력하세요");
+      this.disabled=true; this.textContent="제출 중...";
+      try{
+        var now=nowKST(true);
+        await fbDb.ref(base+'/Esig/'+_esgKey(inv)+'/roles/'+role).set({img:window._esgPad.toData(),nm:nm,at:now,via:"link"});
+        await fbDb.ref(base+'/Esig/'+_esgKey(inv)+'/req/'+role+'/done').set(now);
+        box('<div style="text-align:center;padding:30px"><div style="font-size:48px">✅</div><h2 style="margin:8px 0">서명 완료</h2><div style="color:#64748b">감사합니다. 이 창은 닫으셔도 돼요.</div></div>');
+      }catch(e){ this.disabled=false; this.textContent="서명 제출"; alert("제출 실패: "+(e.message||e)); }
+    };
+  }catch(e){ box('<div style="padding:20px;color:#dc2626">불러오기 실패: '+esc(e.message||e)+'</div>'); }
 }
 
 // ===== 🧾 계좌이체 증빙 — 보탬e: 계좌이체는 전자세금계산서 필수 / 강사료·원고료·행사보험은 대체 증빙(증서·수령증) =====
@@ -7780,10 +8012,10 @@ function vchInv(invId){
   +'<tr>'
   +  '<td class="th ctr">관</td>'
   +  '<td class="ctr" colspan="2">'+esc(gwan||"-")+'</td>'
-  +  '<td class="sig" rowspan="3"></td>'
-  +  '<td class="sig" rowspan="3"></td>'
-  +  '<td class="sig" rowspan="3"></td>'
-  +  '<td class="sig" rowspan="3"></td>'
+  +  _esgCell(invId,'담당')
+  +  _esgCell(invId,'사무국장')
+  +  _esgCell(invId,'부회장')
+  +  _esgCell(invId,'회장')
   +'</tr>'
   +'<tr>'
   +  '<td class="th ctr">항</td>'
@@ -8000,7 +8232,7 @@ function vchMulti(){
         '<tr>'+
           '<td class="th ctr">관</td>'+
           '<td class="ctr">'+esc(gwan||"-")+'</td>'+
-          '<td class="ctr sig" rowspan="3" colspan="4"></td>'+
+          _esgCell(G.inv,'담당')+_esgCell(G.inv,'사무국장')+_esgCell(G.inv,'부회장')+_esgCell(G.inv,'회장')+
         '</tr>'+
         '<tr>'+
           '<td class="th ctr">항</td>'+
