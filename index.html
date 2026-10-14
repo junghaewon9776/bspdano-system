@@ -10146,25 +10146,48 @@ function dExp(){
         +  '<th style="padding:8px;text-align:left">비고</th>'
         +  '<th style="padding:8px;width:110px"></th>'
         +  '</tr></thead><tbody>';
-      midRows.forEach(function(r){
-        var used = txnSumFor(function(x){ return x.expTp===t && x.expMid===r.mid && (r.sub?x.expSub===r.sub:true); });
-        var rem = (Number(r.planAm)||0) - used;
-        var over = rem < 0;
-        h += '<tr style="border-top:1px solid #edf2f7">';
-        h += '<td style="padding:8px"><b>'+esc(r.mid||'(미분류)')+'</b>'+(r.sub?'<br><span style="color:#718096">└ '+esc(r.sub)+'</span>':'')+'</td>';
-        h += '<td style="padding:8px;text-align:right">'+fmtKRW(r.planAm)+'</td>';
-        h += '<td style="padding:8px;text-align:right;color:'+(used>0?'#744210':'#a0aec0')+'">'+fmtKRW(used)+'</td>';
-        h += '<td style="padding:8px;text-align:right;color:'+(over?'#c53030':'#22543d')+';font-weight:'+(over?'700':'500')+'">'
-          +  (over?'⚠ 예산초과 ':'')+fmtKRW(rem)+'</td>';
-        var pre = preSumFor(function(x){ return x.expTp===t && x.expMid===r.mid && (r.sub?x.expSub===r.sub:true); });
-        var avail = rem - pre;
-        h += '<td style="padding:8px;text-align:right;color:'+(pre>0?'#92400e':'#a0aec0')+'">'+(pre>0?fmtKRW(pre):'-')+'</td>';
-        h += '<td style="padding:8px;text-align:right;font-weight:800;color:'+(avail<0?'#c53030':'#0f172a')+'">'+(avail<0?'⚠ ':'')+fmtKRW(avail)+(avail<0&&!over?'<div style="font-size:10px">오버 예상</div>':'')+'</td>';
-        h += '<td style="padding:8px;color:#718096;font-size:12px">'+esc(r.note||'')+'</td>';
-        h += '<td style="padding:8px;text-align:right;white-space:nowrap">';
-        h += '<button class="btn btn-s" style="background:#2563eb;color:#fff;font-weight:700" onclick="expEdit('+r._idx+')">수정</button> ';
-        h += '<button class="btn btn-s" style="background:#c53030;color:#fff" onclick="expDel('+r._idx+')">삭제</button>';
-        h += '</td></tr>';
+      // 같은 중분류는 한 묶음: 묶음 줄(합계·사용·결제 전·가용) + 소분류 줄(예산·수정·삭제). 소분류 없는 중분류는 한 줄
+      var _grpOrder=[], _grp={};
+      midRows.forEach(function(r){ if(!_grp[r.mid]){ _grp[r.mid]=[]; _grpOrder.push(r.mid); } _grp[r.mid].push(r); });
+      var _btns=function(r){ return '<button class="btn btn-s" style="background:#2563eb;color:#fff;font-weight:700" onclick="expEdit('+r._idx+')">수정</button> <button class="btn btn-s" style="background:#c53030;color:#fff" onclick="expDel('+r._idx+')">삭제</button>'; };
+      var _nums=function(plan,used,pre){
+        var rem=plan-used, over=rem<0, avail=rem-pre, h2='';
+        h2 += '<td style="padding:8px;text-align:right;color:'+(used>0?'#744210':'#a0aec0')+'">'+fmtKRW(used)+'</td>';
+        h2 += '<td style="padding:8px;text-align:right;color:'+(over?'#c53030':'#22543d')+';font-weight:'+(over?'700':'500')+'">'+(over?'⚠ 예산초과 ':'')+fmtKRW(rem)+'</td>';
+        h2 += '<td style="padding:8px;text-align:right;color:'+(pre>0?'#92400e':'#a0aec0')+'">'+(pre>0?fmtKRW(pre):'-')+'</td>';
+        h2 += '<td style="padding:8px;text-align:right;font-weight:800;color:'+(avail<0?'#c53030':'#0f172a')+'">'+(avail<0?'⚠ ':'')+fmtKRW(avail)+(avail<0&&!over?'<div style="font-size:10px">오버 예상</div>':'')+'</td>';
+        return h2;
+      };
+      _grpOrder.forEach(function(mid){
+        var rs=_grp[mid], single=(rs.length===1 && !rs[0].sub);
+        var used = txnSumFor(function(x){ return x.expTp===t && x.expMid===mid; });
+        var pre  = preSumFor(function(x){ return x.expTp===t && x.expMid===mid; });
+        if(single){
+          var r=rs[0];
+          h += '<tr style="border-top:1px solid #edf2f7">';
+          h += '<td style="padding:8px"><b>'+esc(mid||'(미분류)')+'</b></td>';
+          h += '<td style="padding:8px;text-align:right">'+fmtKRW(r.planAm)+'</td>';
+          h += _nums(Number(r.planAm)||0, used, pre);
+          h += '<td style="padding:8px;color:#718096;font-size:12px">'+esc(r.note||'')+'</td>';
+          h += '<td style="padding:8px;text-align:right;white-space:nowrap">'+_btns(r)+'</td></tr>';
+          return;
+        }
+        var plan=0; rs.forEach(function(r){ plan+=Number(r.planAm)||0; });
+        // 묶음 줄 (중분류)
+        h += '<tr style="border-top:2px solid #cbd5e1;background:#f8fafc">';
+        h += '<td style="padding:8px"><b style="font-size:14px">'+esc(mid||'(미분류)')+'</b> <span style="font-size:11px;color:#64748b">소분류 '+rs.filter(function(r){return r.sub;}).length+'</span></td>';
+        h += '<td style="padding:8px;text-align:right;font-weight:800">'+fmtKRW(plan)+'</td>';
+        h += _nums(plan, used, pre);
+        h += '<td></td><td></td></tr>';
+        // 소분류 줄
+        rs.forEach(function(r){
+          h += '<tr style="border-top:1px dashed #e2e8f0">';
+          h += '<td style="padding:6px 8px 6px 22px;color:#334155">└ '+esc(r.sub||'(중분류 공통)')+'</td>';
+          h += '<td style="padding:6px 8px;text-align:right;color:#334155">'+fmtKRW(r.planAm)+'</td>';
+          h += '<td colspan="4"></td>';
+          h += '<td style="padding:6px 8px;color:#718096;font-size:12px">'+esc(r.note||'')+'</td>';
+          h += '<td style="padding:6px 8px;text-align:right;white-space:nowrap">'+_btns(r)+'</td></tr>';
+        });
       });
       h += '</tbody></table>';
     }
