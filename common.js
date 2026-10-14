@@ -456,7 +456,7 @@ function _getUserEvts(acctId, globalRole) {
 function _buildUserMap() {
   var us = {};
   (_cache.Users || []).forEach(function(u) {
-    us[u.id] = {nm:u.nm, r:u.r, ar:u.ar, tel:u.tel};
+    us[u.id] = {nm:u.nm, r:u.r, ar:u.ar, tel:u.tel, tg:u.tg||""};
   });
   return us;
 }
@@ -1071,7 +1071,7 @@ function _apiAddAcct(p) {
   if (users.some(function(u) { return u.id === p.id; })) {
     return Promise.resolve({ok:false, err:"이미 존재하는 아이디입니다"});
   }
-  var user = {id:p.id, pw:p.pw||"1234", r:p.r||"user", ar:p.ar||"", nm:p.nm||"", tel:p.tel||""};
+  var user = {id:p.id, pw:p.pw||"1234", r:p.r||"user", ar:p.ar||"", nm:p.nm||"", tel:p.tel||"", tg:p.tg||""};
   users.push(user);
   // Firebase Auth에도 계정 생성
   var secAuth = getSecondaryAuth();
@@ -1589,6 +1589,7 @@ function _apiNotifyTg(p) {
   var text = p.text + "\n\n<a href=\"" + TG_SYS_URL + "\">🔗 링크열기</a>";
   var url = "https://api.telegram.org/bot" + botToken + "/sendMessage";
   var ids = chatIds.split(/[,\s]+/).filter(Boolean);
+  (p.to || []).forEach(function(t) { t = String(t||"").trim(); if (t && ids.indexOf(t) < 0) ids.push(t); });   // 계정별 텔레그램 (받을 사람)
   return Promise.all(ids.map(function(chatId) {
     return fetch(url, {method:'POST', headers:{'Content-Type':'application/json'},
       body:JSON.stringify({chat_id:chatId, text:text, parse_mode:'HTML', disable_web_page_preview:true})

@@ -458,7 +458,7 @@ label{display:block;font-size:10px;color:#999;margin-bottom:3px}
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <!-- firebase-storage 제거: 구글 드라이브 프록시로 대체 -->
 <script src="firebase-config.js"></script>
-<script src="common.js?v=20261014tg"></script>
+<script src="common.js?v=20261014tgu"></script>
 <script src="mod-engine.js?v=20260929v4"></script>
 
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" onerror="console.warn('XLSX CDN load failed')"></script>
@@ -7023,6 +7023,98 @@ function _attPrevInput(inp, boxId){
 function _attFirstItem(p){ var iv=p.inv||p.id; for(var i=0;i<(purs||[]).length;i++) if((purs[i].inv||purs[i].id)===iv) return purs[i]; return p; }
 function _attEditHtml(p){ var fp=_attFirstItem(p); _attReset("ep",fp); return '<div style="margin-top:14px">'+_attAllHtml("ep")+'</div>'; }
 
+// ===== 📱 계정별 텔레그램 알림 =====
+//   Users[].tg = 텔레그램 채팅 ID. 알림은 기존 관리자 방(TG_CHAT_IDS) + 받을 사람들의 tg 로 보냄
+function _tgOf(uid){ var u=(typeof US!=="undefined"&&US)?US[uid]:null; return u&&u.tg?String(u.tg).trim():""; }
+function _tgAdminUids(){ return Object.keys(US||{}).filter(function(id){ var u=US[id]; return u&&u.tg&&(u.r==="super"||u.r==="admin"||u.r==="subAdm"); }); }
+function _tgNotify(text, uids){
+  try{
+    var to=[], seen={};
+    (uids||[]).forEach(function(uid){ var t=_tgOf(uid); if(t&&!seen[t]){ seen[t]=1; to.push(t); } });
+    api("notifyTg",{text:text, to:to}).catch(function(){});
+  }catch(e){}
+}
+// 구매 등록 알림 (관리자들)
+function _tgPurNotify(items, info){
+  try{
+    var tot=0; items.forEach(function(x){ tot+=parseInt(String(x.tot||0).replace(/,/g,""))||0; });
+    var t="<b>🛒 ["+esc(typeof SYS_NAME!=="undefined"?SYS_NAME:"")+"] 구매 등록</b>"
+      +"\n• 건: "+esc((info.dt||"")+" · "+(items[0]?items[0].it:"")+(items.length>1?" 외 "+(items.length-1)+"건":"")+" · "+tot.toLocaleString()+"원")
+      +(info.cat?"\n• 분류: "+esc(info.cat):"")
+      +(info.pay?"\n• 결제: "+esc(info.pay):"")
+      +(info.vendor?"\n• 지급처: "+esc(info.vendor):"")
+      +"\n• 등록: "+esc(((ME&&ME.nm)||"")+" ("+CID+")")
+      +"\n• 시각: "+nowKST(true);
+    _tgNotify(t, _tgAdminUids());
+  }catch(e){}
+}
+// 텔레그램 ID 입력칸 + 자동 연결
+function _tgConnectHtml(inputId, val){
+  return '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"><input type="text" id="'+inputId+'" value="'+esc(val||"")+'" placeholder="숫자 ID (예: 8613833560)" style="flex:1;min-width:150px;font-family:monospace">'
+    +'<button type="button" class="btn btn-s" style="background:#0088cc;color:#fff;font-weight:700" onclick="_tgAutoLink(\''+inputId+'\')">🤖 자동 연결</button>'
+    +'<button type="button" class="btn btn-s" style="background:#475569;color:#fff" onclick="_tgTestTo(\''+inputId+'\')">🔔 테스트</button></div>'
+    +'<div style="font-size:11px;color:#64748b;margin-top:3px">알림 받을 사람의 텔레그램. 「자동 연결」 누르고 안내대로 봇에 코드만 보내면 자동으로 채워져요.</div>';
+}
+var _TG_BOT_NAME=null;
+async function _tgBotName(){
+  if(_TG_BOT_NAME) return _TG_BOT_NAME;
+  try{ var r=await (await fetch("https://api.telegram.org/bot"+TG_BOT_TOKEN+"/getMe")).json(); _TG_BOT_NAME=(r&&r.result&&r.result.username)||""; }catch(e){ _TG_BOT_NAME=""; }
+  return _TG_BOT_NAME;
+}
+async function _tgAutoLink(inputId){
+  var code="연결"+Math.floor(100000+Math.random()*900000);
+  window._tgLink={inputId:inputId, code:code};
+  var bn=await _tgBotName();
+  var h='<h3>🤖 텔레그램 자동 연결 <button class="close-x" onclick="closePopup2()">&times;</button></h3>';
+  h+='<ol style="font-size:14px;line-height:1.9;padding-left:20px;margin:0 0 10px">';
+  h+='<li>알림 받을 사람 폰에서 텔레그램 봇 열기 '+(bn?'→ <a href="https://t.me/'+esc(bn)+'" target="_blank" style="font-weight:800;color:#0088cc">@'+esc(bn)+' 열기</a>':'(봇 이름을 못 불러왔어요 — 관리자 봇을 검색)')+'</li>';
+  h+='<li><b>시작(Start)</b> 누르기</li>';
+  h+='<li>아래 코드를 봇에게 메시지로 보내기<div style="font-size:26px;font-weight:900;letter-spacing:2px;background:#eff6ff;border:2px dashed #3b82f6;border-radius:10px;padding:8px;text-align:center;margin:6px 0;user-select:all">'+esc(code)+'</div></li>';
+  h+='<li>보낸 뒤 아래 <b>[확인]</b> 누르기</li></ol>';
+  h+='<div id="tgLinkMsg" style="font-size:13px;color:#64748b;min-height:18px"></div>';
+  h+='<div class="popStickyFoot" style="justify-content:flex-end"><button class="btn" style="background:#475569;color:#fff" onclick="closePopup2()">닫기</button><button class="btn" style="background:#0088cc;color:#fff;font-weight:700" onclick="_tgAutoCheck()">확인</button></div>';
+  openPopup2(h,480);
+}
+async function _tgAutoCheck(){
+  var L=window._tgLink||{}, msg=document.getElementById("tgLinkMsg");
+  if(msg) msg.textContent="확인 중...";
+  try{
+    var r=await (await fetch("https://api.telegram.org/bot"+TG_BOT_TOKEN+"/getUpdates?limit=100")).json();
+    var found=null;
+    ((r&&r.result)||[]).forEach(function(u){ var m=u.message||u.edited_message; if(m&&m.text&&String(m.text).replace(/\s/g,"").indexOf(L.code)>=0) found=m; });
+    if(!found){ if(msg){ msg.style.color="#dc2626"; msg.textContent="아직 코드 메시지를 못 찾았어요. 봇에게 "+L.code+" 를 보냈는지 확인하고 다시 [확인]"; } return; }
+    var id=String(found.chat.id), nm=[found.chat.first_name,found.chat.last_name].filter(Boolean).join(" ")||found.chat.username||"";
+    var inp=document.getElementById(L.inputId); if(inp) inp.value=id;
+    closePopup2(); toast("✅ 텔레그램 연결됨 — "+nm+" ("+id+") · 저장을 눌러야 반영돼요");
+  }catch(e){ if(msg){ msg.style.color="#dc2626"; msg.textContent="확인 실패: "+(e.message||e); } }
+}
+function _tgTestTo(inputId){
+  var id=String((document.getElementById(inputId)||{}).value||"").trim();
+  if(!id) return toast("텔레그램 ID를 먼저 넣어 주세요",true);
+  fetch("https://api.telegram.org/bot"+TG_BOT_TOKEN+"/sendMessage",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({chat_id:id,text:"🔔 ["+(typeof SYS_NAME!=="undefined"?SYS_NAME:"")+"] 테스트 알림 — 이 텔레그램으로 결재·구매 알림이 와요."})})
+    .then(function(r){return r.json();}).then(function(j){ if(j&&j.ok) toast("🔔 테스트 알림 보냄 — 폰을 확인하세요"); else toast("보내기 실패: "+((j&&j.description)||"봇과 대화를 먼저 시작했는지 확인"),true); })
+    .catch(function(e){ toast("보내기 실패: "+(e.message||e),true); });
+}
+// 내 정보 — 내 텔레그램 알림 연결
+function _tgMyCard(){
+  var cur=_tgOf(CID);
+  var h='<div class="card" style="border:1px solid #7dd3fc;background:#f0f9ff"><h3 style="margin:0 0 6px">📱 내 텔레그램 알림</h3>';
+  h+='<div style="font-size:13px;color:#475569;margin-bottom:8px">연결해 두면 <b>나에게 온 결재 요청</b>, <b>내가 등록·요청한 건의 승인/반려</b>'+(_isGlobalAdm()?', <b>구매 등록</b>':'')+' 알림이 텔레그램으로 와요. '+(cur?'<b style="color:#16a34a">✅ 연결됨</b>':'<b style="color:#dc2626">아직 연결 안 됨</b>')+'</div>';
+  h+=_tgConnectHtml("myTg", cur);
+  h+='<div style="text-align:right;margin-top:8px"><button class="btn btn-b" onclick="_tgSaveMine()">저장</button></div></div>';
+  return h;
+}
+async function _tgSaveMine(){
+  var v=String((document.getElementById("myTg")||{}).value||"").trim();
+  showLoading("저장 중...");
+  var r=await api("updateAcct",{id:CID, tg:v});
+  hideLoading();
+  if(!r||!r.ok) return toast((r&&r.err)||"저장 실패",true);
+  if(US[CID]) US[CID].tg=v;
+  toast(v?"📱 텔레그램 알림 연결 저장":"텔레그램 알림 해제"); draw();
+}
+
 // ===== ✍ 지출결의서 전자결재 (모두싸인 방식 · 각자 로그인해서 승인/반려) =====
 //   /evtData/{evt}/Esig/{inv} = { roles:{역할:{img,nm,at,via,by}}, req:{역할:{tok,uid,nm,tel,at,done}}, rej:{역할:{nm,at,reason,by}} }
 //   요청 링크 ?esign={evt}&inv=&role=&t= → 로그인(폰은 자동 로그인) → 결재 화면 자동 열림
@@ -7050,11 +7142,11 @@ function _esgTitleOf(items){
 }
 function _esgInvTitle(inv){ var it=_esgInvItems(inv); return it.length?_esgTitleOf(it):(window._esgRvTitle||inv); }
 // 텔레그램 알림 (자동 로그인이어도 결재 관련은 울림)
-function _esgTg(head, inv, role, extra){
+function _esgTg(head, inv, role, extra, uids){
   try{
     var who=((typeof ME!=="undefined"&&ME&&ME.nm)||"")+(typeof CID!=="undefined"&&CID?" ("+CID+")":"");
     var t="<b>"+esc(head)+"</b>\n• 결재칸: "+esc(role)+"\n• 건: "+esc(_esgInvTitle(inv))+"\n• 처리자: "+esc(who)+(extra?"\n"+esc(extra):"")+"\n• 시각: "+nowKST(true);
-    api("notifyTg",{text:t}).catch(function(){});
+    _tgNotify(t, uids||[]);
   }catch(e){}
 }
 function _esgLink(inv,role,tok){
@@ -7132,6 +7224,7 @@ async function _esgReview(inv,role,evt){
   if(!items.length) return toast("구매 건을 찾을 수 없어요 (삭제됐을 수 있어요)",true);
   var p0=items[0], tot=0; items.forEach(function(x){tot+=pn(x.tot);});
   window._esgRvTitle=[p0.expTp,p0.expMid].filter(Boolean).join(" › ")+" · "+_esgTitleOf(items);
+  window._esgRvTo=[p0.by, ((es.req||{})[role]||{}).by].filter(Boolean);   // 승인·반려 알림 받을 사람: 구매 등록자 + 결재 요청자
   var q=(es.req||{})[role], signed=(es.roles||{})[role], rj=(es.rej||{})[role];
   var me=(typeof CID!=="undefined"?CID:"");
   var notMine = q&&q.uid&&q.uid!==me&&!(typeof isA==="function"&&isA());
@@ -7201,7 +7294,7 @@ async function _esgApproveSave(){
     var q=(await ref.child("req/"+rv.role).once('value')).val();
     if(q&&!q.done) await ref.child("req/"+rv.role+"/done").set(now);
     hideLoading(); closePopup2(); toast("✅ "+rv.role+" 승인(서명) 완료");
-    _esgTg("✅ ["+(typeof SYS_NAME!=="undefined"?SYS_NAME:"")+"] 결의서 승인", rv.inv, rv.role, "• 서명 이름: "+nm);
+    _esgTg("✅ ["+(typeof SYS_NAME!=="undefined"?SYS_NAME:"")+"] 결의서 승인", rv.inv, rv.role, "• 서명 이름: "+nm, window._esgRvTo);
     if(document.getElementById("esgInbox")) _esgInbox();
   }catch(e){ hideLoading(); toast("저장 실패: "+(e.message||e),true); }
 }
@@ -7218,7 +7311,7 @@ async function _esgReject(){
     var q=(await ref.child("req/"+rv.role).once('value')).val();
     if(q&&!q.done) await ref.child("req/"+rv.role+"/done").set(now);
     hideLoading(); closePopup2(); toast("↩ "+rv.role+" 반려 — 사유: "+reason);
-    _esgTg("↩ ["+(typeof SYS_NAME!=="undefined"?SYS_NAME:"")+"] 결의서 반려", rv.inv, rv.role, "• 사유: "+reason);
+    _esgTg("↩ ["+(typeof SYS_NAME!=="undefined"?SYS_NAME:"")+"] 결의서 반려", rv.inv, rv.role, "• 사유: "+reason, window._esgRvTo);
     if(document.getElementById("esgInbox")) _esgInbox();
   }catch(e){ hideLoading(); toast("저장 실패: "+(e.message||e),true); }
 }
@@ -7253,7 +7346,7 @@ async function _esgReqMake(inv,role){
   showLoading("요청 만드는 중...");
   try{ await _esgRef(inv).child("req/"+role).set({tok:tok,uid:uid,nm:nm,tel:tel,at:nowKST(true),by:(typeof CID!=="undefined"?CID:"")}); hideLoading(); }
   catch(e){ hideLoading(); return toast("실패: "+(e.message||e),true); }
-  _esgTg("📨 ["+(typeof SYS_NAME!=="undefined"?SYS_NAME:"")+"] 결의서 결재 요청", inv, role, "• 받는 사람: "+nm+" ("+uid+")");
+  _esgTg("📨 ["+(typeof SYS_NAME!=="undefined"?SYS_NAME:"")+"] 결의서 결재 요청", inv, role, "• 받는 사람: "+nm+" ("+uid+")\n• 로그인해서 📥 내 결재함 또는 문자/카톡 링크로 결재", [uid]);
   _esgReqShow(inv,role,{tok:tok,uid:uid,nm:nm,tel:tel});
 }
 function _esgReqShow(inv,role,q){
@@ -7955,6 +8048,7 @@ async function addP(){
     if(r.ok){payload.id=r.id;payload.mgmtNo=r.mgmtNo||"";if(!firstMgmt)firstMgmt=r.mgmtNo||"";purs.push(payload);ok++;}
   }
   hideLoading();
+  if(ok) _tgPurNotify(items, {dt:d, cat:[expTp,expMid].filter(Boolean).join(" › "), pay:[card,payM].filter(Boolean).join(" · "), vendor:vendorName});
   closePopup();toast(ok+"건 구매 등록 완료"+(ok<items.length?" ("+(items.length-ok)+"건 실패)":"")+(_taxMiss?" · 🧾 "+(_tax.tp==="alt"?"대체 증빙":"세금계산서")+"는 나중에 목록의 '+세금계산서'로 첨부하세요":""));draw();
   refreshData(false);
 }
@@ -16440,6 +16534,7 @@ function dMyInfo(){
   h+='<div style="margin-bottom:12px;font-size:13px;color:#555">아이디: <b>'+esc(ME.id)+'</b> · 이름: <b>'+esc(ME.nm||'-')+'</b></div>';
   h+='<div class="frow fr3"><div><label>현재 비밀번호</label><input type="password" id="myPwCur"></div><div><label>새 비밀번호</label><input type="password" id="myPwNew" placeholder="4자 이상"></div><div><label>새 비밀번호 확인</label><input type="password" id="myPwNew2"></div></div>';
   h+='<div style="text-align:right;margin-top:10px"><button class="btn btn-b" onclick="chgMyPw()">변경</button></div></div>';
+  h+=_tgMyCard();
   return h;
 }
 
@@ -16453,6 +16548,7 @@ function dAcct(){
   h+='<div class="card"><h3>🔑 내 비밀번호 변경</h3>';
   h+='<div class="frow fr3"><div><label>현재 비밀번호</label><input type="password" id="myPwCur"></div><div><label>새 비밀번호</label><input type="password" id="myPwNew" placeholder="4자 이상"></div><div><label>새 비밀번호 확인</label><input type="password" id="myPwNew2"></div></div>';
   h+='<div style="text-align:right;margin-top:10px"><button class="btn btn-b" onclick="chgMyPw()">변경</button></div></div>';
+  h+=_tgMyCard();
   // 행사별 관리자(교육사 등)는 비밀번호 변경만 표시
   if(isA() && !_isGlobalAdm()) return h;
   // super/admin/subAdm: 회계담당자 이름 설정 (행사별, 지출결의서에 찍힘)
@@ -17193,23 +17289,25 @@ function popEditAcct(areaName,curId){
     '<div><label>비밀번호 *</label><input type="text" id="eaPw" value="'+esc(u.pw)+'"></div></div>'+
     '<div style="margin-bottom:12px"><label>이름</label><input type="text" id="eaNm" value="'+esc(u.nm||(areaName+" 담당자"))+'"></div>'+
     '<div style="margin-bottom:12px"><label>연락처</label><input type="text" id="eaTel" value="'+esc(u.tel||"")+'" oninput="this.value=fmTel(this.value)"></div>'+
+    '<div style="margin-bottom:12px"><label>📱 텔레그램 (알림 받을 ID)</label>'+_tgConnectHtml("eaTg", u.tg||"")+'</div>'+
     roleHtml+
     '<div style="text-align:right"><button class="btn btn-b" onclick="saveAcctX(\''+esc(curId)+"','"+esc(areaName)+"')\">저장</button></div>");
 }
 async function saveAcctX(oldId,areaName){
   var nwId=document.getElementById("eaId").value.trim(),pw=document.getElementById("eaPw").value,nm=document.getElementById("eaNm").value.trim(),tel=document.getElementById("eaTel").value;
+  var tg=String((document.getElementById("eaTg")||{}).value||"").trim();
   var roleSel=document.getElementById("eaRole");
   var role=roleSel?roleSel.value:"area";
   if(!nwId||!pw){alert("아이디/비번 필수");return}
   if(pw.length<4){alert("비번 4자 이상");return}
   showLoading("저장 중...");
   var r;
-  if(oldId&&oldId!="-"){r=await api("updateAcct",{oldId:oldId,id:nwId,pw:pw,nm:nm,tel:tel,ar:areaName,r:role});}
-  else{r=await api("addAcct",{id:nwId,pw:pw,r:role,ar:areaName,nm:nm,tel:tel});}
+  if(oldId&&oldId!="-"){r=await api("updateAcct",{oldId:oldId,id:nwId,pw:pw,nm:nm,tel:tel,tg:tg,ar:areaName,r:role});}
+  else{r=await api("addAcct",{id:nwId,pw:pw,r:role,ar:areaName,nm:nm,tel:tel,tg:tg});}
   hideLoading();
   if(!r.ok){alert(r.err);return}
   if(oldId&&oldId!=nwId&&US[oldId])delete US[oldId];
-  US[nwId]={pw:pw,r:role,ar:areaName,nm:nm,tel:tel};
+  US[nwId]={pw:pw,r:role,ar:areaName,nm:nm,tel:tel,tg:tg};
   if(oldId&&oldId!=nwId){
     acts.forEach(function(a){if(a.by==oldId)a.by=nwId});
     purs.forEach(function(p){if(p.by==oldId)p.by=nwId});
