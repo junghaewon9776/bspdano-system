@@ -110,6 +110,7 @@ label{display:block;font-size:10px;color:#999;margin-bottom:3px}
 .purList .pCard tbody td{font-size:16.5px!important;color:#0f172a!important;overflow:hidden;text-overflow:ellipsis}
 .purList .pCard tbody td:first-child{font-size:17px!important}
 .purList .pAmt > div:nth-child(2){font-size:22px!important}
+.purList .pCard{margin-bottom:26px!important;border-top-width:2px!important;border-right-width:2px!important;border-bottom-width:2px!important;border-left-width:6px!important;box-shadow:0 3px 10px rgba(15,23,42,.14);border-radius:10px!important}
 .purList .pAmt > div:nth-child(n+3){font-size:14px!important;line-height:1.5}
 @media(max-width:600px){ .purList .pAmt > div:nth-child(n+3){font-size:12.5px!important} }
 .purList .pCard tbody td{padding-top:10px!important;padding-bottom:10px!important}
@@ -6920,10 +6921,11 @@ function dPur(){
       var _bad=_noTax||_zero||_rej;
       h+='<div class="pCard" style="border:1px solid '+(_bad?'#fca5a5':'#cbd5e1')+';border-left:4px solid '+(_bad?'#dc2626':(_isPreG(G)?'#d97706':'#334155'))+';border-radius:8px;margin-bottom:14px;background:#fff;overflow:hidden">';
       // ① 머리줄: 날짜 · 순번 · 결의서번호  ······  합계 / 잔액
-      h+='<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;padding:10px 12px 4px;flex-wrap:wrap">';
+      var _pk=_payKind(firstP.payM);
+      h+='<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;padding:10px 12px 8px;flex-wrap:wrap;background:'+_pk.tint+';border-bottom:1px solid '+_pk.line+';margin-bottom:8px">';
       h+='<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0">';
       h+='<input type="checkbox" class="purChk" '+checked+' onchange="purTog(\''+G.inv+'\',this.checked)" style="width:16px;height:16px;cursor:pointer">';
-      h+='<span style="font-weight:800;font-size:18px;color:#0f172a">'+esc(fmtDK(G.dt))+'</span>'+_purSeqUi(G.inv)+(_isPreG(G)?' <span style="background:#fef3c7;color:#92400e;border:1px solid #fcd34d;padding:2px 8px;border-radius:10px;font-size:12px;font-weight:800">⏳ 결제 전</span>':'');
+      h+='<span style="font-weight:800;font-size:18px;color:#0f172a">'+esc(fmtDK(G.dt))+'</span>'+(_pk.lb?' <span style="background:'+_pk.bg+';color:#fff;font-weight:900;font-size:15px;padding:3px 12px;border-radius:7px;white-space:nowrap">'+_pk.lb+'</span>':'')+_purSeqUi(G.inv)+(_isPreG(G)?' <span style="background:#fef3c7;color:#92400e;border:1px solid #fcd34d;padding:2px 8px;border-radius:10px;font-size:12px;font-weight:800">⏳ 결제 전</span>':'');
       if(G.mgmtNo) h+='<span style="font-size:12px;color:#475569">No. '+esc(G.mgmtNo)+'</span>';
       h+='</div>';
       if(canSeeAmt()){
@@ -6945,7 +6947,7 @@ function dPur(){
       // ② 부가정보 한 줄 (회색)
       var _meta=[G.ar||"공통",[G.expTp,G.expMid].filter(Boolean).join(" › "),G.gwan?("관 "+G.gwan):"",G.card||"",firstP.vendorName?("지급처 "+firstP.vendorName):""].filter(Boolean);
       var _catTxt=[G.expTp,G.expMid].filter(Boolean).join(" › ");
-      h+='<div class="pMeta" style="padding:2px 14px 10px;font-size:15px;color:#1e293b;line-height:1.6">'+_meta.map(function(m){ return m===_catTxt?'<b style="color:#0f172a">'+esc(m)+'</b>':(m===G.card?esc(m)+_payBadge(firstP.payM):esc(m)); }).join(' <span style="color:#94a3b8">|</span> ')+' <span style="color:#94a3b8">|</span> '+_purStatusTxt(G)+'</div>';
+      h+='<div class="pMeta" style="padding:2px 14px 10px;font-size:15px;color:#1e293b;line-height:1.6">'+_meta.map(function(m){ return m===_catTxt?'<b style="color:#0f172a">'+esc(m)+'</b>':esc(m); }).join(' <span style="color:#94a3b8">|</span> ')+' <span style="color:#94a3b8">|</span> '+_purStatusTxt(G)+'</div>';
       // ③ 경고 (문제 있을 때만 빨강)
       var _warns=[]; if(_zero) _warns.push("금액 0원 — 수정에서 합계 확인"); if(_noTax) _warns.push(_payWord(firstP.payM)+" — "+_taxDocName(firstP)+" 미첨부"); if(_rej) _warns.push("반려됨 — ✍ 서명에서 사유 확인");
       if(_warns.length) h+='<div style="margin:0 12px 8px;padding:5px 9px;background:#fef2f2;border:1px solid #fecaca;border-radius:6px;color:#b91c1c;font-size:12.5px;font-weight:700">⚠ '+_warns.map(esc).join(' · ')+'</div>';
@@ -7488,6 +7490,14 @@ function _purFinalBal(){
   Object.keys(RB.cards).forEach(function(c){ var cc=RB.cards[c]; if(hasDep&&!(cc.depN>0)) return; var v=hasDep?cc.bal:cc.planBal; now+=v; cards.push({card:c,now:v}); });
   (purs||[]).forEach(function(p){ if(_isPre(p)) pre+=pn(p.tot); });
   return {now:now, pre:pre, fin:now-pre, hasDep:hasDep, cards:cards};
+}
+// 결제방법 종류별 색 (카드 머리줄)
+function _payKind(pm){
+  pm=String(pm||"").trim();
+  if(/이체|계좌/.test(pm)) return {lb:"🏦 "+pm, bg:"#c2410c", tint:"#ffedd5", line:"#fdba74"};
+  if(/현금/.test(pm))      return {lb:"💵 "+pm, bg:"#15803d", tint:"#dcfce7", line:"#86efac"};
+  if(/카드/.test(pm))      return {lb:"💳 "+pm, bg:"#1d4ed8", tint:"#dbeafe", line:"#93c5fd"};
+  return {lb:pm?pm:"", bg:"#475569", tint:"#f1f5f9", line:"#cbd5e1"};
 }
 // 결제방법 배지 (구매 카드)
 function _payBadge(pm){
