@@ -8645,7 +8645,6 @@ function edPur(id){
     '<div><label>세출 대분류</label><select id="epExpTp" onchange="onPurExpTpChg(\'ep\')">'+actExpTpOpts(p.expTp||"")+'</select></div>'+
     '<div><label>세출 중분류</label><select id="epExpMid" onchange="onPurExpMidChg(\'ep\')">'+actExpMidOpts(p.expTp||"",p.expMid||"")+'</select></div></div>'+
     '<div id="epBudgetInfo" style="padding:8px 12px;background:#f0f9ff;border:1px solid #bfdbfe;border-radius:6px;margin-top:8px;font-size:13px"></div>'+
-    _epItemsHtml(p)+
     '<div class="frow fr2" style="margin-top:10px"><div><label>사용 카드/통장</label><select id="epCard" onchange="_refreshEpPayM()">'+purCardOpts(p.card||"")+'</select></div>'+
     '<div><label>결제방법</label><select id="epPayM" onchange="_taxToggle(\'ep\')">'+incPayOpts(p.card||"", p.payM||"")+'</select></div></div>'+
     '<div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;margin-top:10px;font-size:14px"><label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:700"><input type="checkbox" id="epPre" style="width:18px;height:18px"'+(_isPre(p)?' checked':'')+'> ⏳ 아직 결제 전 (계약·예정)</label><span style="font-size:11.5px;color:#64748b">체크 = 통장 잔액에 안 들어감. 체크 풀고 저장 = 결제 완료 (같은 명세서 물품 전체)</span></div>'+
@@ -8664,7 +8663,8 @@ function edPur(id){
     '</div>'+
     '<div class="frow fr1" style="margin-top:10px"><div><label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="epNoMgmt"'+(noM?" checked":"")+'> 지출결의서 번호 없음</label>'+
     '<input type="text" id="epMgmtNo" placeholder="관리번호" value="'+esc(p.mgmtNo||"")+'" style="font-size:13px;padding:8px;margin-top:4px;width:100%"></div></div>'+
-    '<div id="epAddBox" style="margin-top:12px"></div>'+
+    _epItemsHtml(p)+
+    '<div id="epAddBox" style="display:none"></div>'+
     '<div class="popStickyFoot" style="justify-content:space-between"><button class="btn btn-g" onclick="_epAddRow()">+ 항목 추가</button><div style="display:flex;gap:8px;margin-left:auto"><button class="btn" style="background:#475569;color:#fff;padding:12px 18px;font-size:15px" onclick="closePopup()">취소</button><button class="btn btn-b" style="padding:12px 32px;font-size:15px;font-weight:700" onclick="savePur(\''+id+'\')">저장</button></div></div>');
   purRowCnt=purs.filter(function(x){return (x.inv||x.id)===(p.inv||p.id);}).length;   // 추가 물품 번호는 기존 물품 다음부터
   _taxToggle("ep");
@@ -8673,12 +8673,10 @@ function edPur(id){
 function _cm(v){ var d=String(v==null?"":v).replace(/[^0-9]/g,""); return d?d.replace(/\B(?=(\d{3})+(?!\d))/g,","):""; }
 // 수정 화면 — 같은 명세서에 물품 추가 (저장 누를 때 함께 등록)
 function _epAddRow(){
-  var box=document.getElementById("epAddBox"); if(!box) return;
-  box.oninput=function(){ setTimeout(_epSumUpd,0); };
-  if(!box.children.length) box.insertAdjacentHTML("beforeend",'<div style="font-weight:700;color:#15803d;margin-bottom:6px">➕ 같은 명세서에 추가할 물품</div>');
-  purRowCnt++;
-  box.insertAdjacentHTML("beforeend", purCardHtml(Math.max(2,purRowCnt)));
-  var last=box.lastElementChild; if(last){ var it=last.querySelector(".pIt"); if(it) it.focus(); }
+  var box=document.getElementById("epItems"); if(!box) return;
+  box.insertAdjacentHTML("beforeend", _epRowHtml(null));
+  var last=box.lastElementChild; if(last){ var it=last.querySelector(".eIt"); if(it){ it.focus(); if(last.scrollIntoView) last.scrollIntoView({block:"nearest"}); } }
+  _epSumUpd();
 }
 function _epCalcTot(){
   var q=parseFloat(String((document.getElementById("epQ")||{}).value||"").replace(/,/g,"")), u=parseFloat(String((document.getElementById("epU")||{}).value||"").replace(/,/g,""));
@@ -8692,19 +8690,24 @@ function _epItemsHtml(p){
   h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><b style="font-size:14px">📦 물품 ('+items.length+'개)</b><span id="epSum" style="font-size:14px"></span></div>';
   h+='<div style="display:flex;gap:6px;font-size:11.5px;color:#64748b;padding:0 2px"><span style="flex:2 1 150px">물품명</span><span style="flex:1 1 56px">수량</span><span style="flex:1 1 80px">단가(원)</span><span style="flex:1 1 90px">합계(원)</span><span style="width:40px"></span></div>';
   h+='<div id="epItems">';
-  items.forEach(function(x){
-    var tot=String(x.tot||"").replace(/,/g,"")||((pn(x.qt)&&pn(x.un))?pn(x.qt)*pn(x.un):"");
-    h+='<div class="epItem" data-id="'+esc(x.id)+'" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:6px 0;border-top:1px dashed #e2e8f0">';
-    h+='<input type="text" class="eIt" value="'+esc(x.it||"")+'" placeholder="물품명" style="flex:2 1 150px;min-width:0;padding:8px">';
-    h+='<input type="number" class="eQt" value="'+esc(x.qt||"")+'" placeholder="수량" oninput="_epRowCalc(this)" style="flex:1 1 56px;min-width:0;padding:8px">';
-    h+='<input type="text" inputmode="numeric" class="eUn" value="'+esc(_cm(x.un))+'" placeholder="단가" oninput="this.value=_cm(this.value);_epRowCalc(this)" style="flex:1 1 80px;min-width:0;padding:8px">';
-    h+='<input type="text" inputmode="numeric" class="eTot" value="'+esc(_cm(tot))+'" placeholder="합계" oninput="this.value=_cm(this.value);_epSumUpd()" style="flex:1 1 90px;min-width:0;padding:8px;font-weight:700">';
-    h+='<button type="button" class="btn btn-s" style="background:#dc2626;color:#fff;width:40px" title="이 물품 빼기" onclick="_epDelTog(this)">🗑</button>';
-    h+='</div>';
-  });
-  h+='</div></div>';
+  items.forEach(function(x){ h+=_epRowHtml(x); });
+  h+='</div>';
+  h+='<button type="button" class="btn" style="background:#15803d;color:#fff;font-weight:700;margin-top:8px;width:100%" onclick="_epAddRow()">+ 물품 추가 (이 명세서에)</button>';
+  h+='</div>';
   setTimeout(_epSumUpd,0);
   return h;
+}
+function _epRowHtml(x){
+  x=x||{}; var isNew=!x.id;
+  var tot=String(x.tot||"").replace(/,/g,"")||((pn(x.qt)&&pn(x.un))?pn(x.qt)*pn(x.un):"");
+  var h='<div class="epItem" data-id="'+esc(x.id||"")+'" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:6px 0;border-top:1px dashed #e2e8f0'+(isNew?';background:#f0fdf4':'')+'">';
+  h+='<input type="text" class="eIt" value="'+esc(x.it||"")+'" placeholder="'+(isNew?'새 물품명':'물품명')+'" style="flex:2 1 150px;min-width:0;padding:8px">';
+  h+='<input type="number" class="eQt" value="'+esc(x.qt||"")+'" placeholder="수량" oninput="_epRowCalc(this)" style="flex:1 1 56px;min-width:0;padding:8px">';
+  h+='<input type="text" inputmode="numeric" class="eUn" value="'+esc(_cm(x.un))+'" placeholder="단가" oninput="this.value=_cm(this.value);_epRowCalc(this)" style="flex:1 1 80px;min-width:0;padding:8px">';
+  h+='<input type="text" inputmode="numeric" class="eTot" value="'+esc(_cm(tot))+'" placeholder="합계" oninput="this.value=_cm(this.value);_epSumUpd()" style="flex:1 1 90px;min-width:0;padding:8px;font-weight:700">';
+  h+=isNew?'<button type="button" class="btn btn-s" style="background:#dc2626;color:#fff;width:40px" title="이 줄 지우기" onclick="this.closest(\'.epItem\').remove();_epSumUpd()">✕</button>'
+          :'<button type="button" class="btn btn-s" style="background:#dc2626;color:#fff;width:40px" title="이 물품 빼기" onclick="_epDelTog(this)">🗑</button>';
+  return h+'</div>';
 }
 function _epRowCalc(el){
   var r=el.closest(".epItem"); if(!r) return;
@@ -8724,7 +8727,7 @@ function _epDelTog(btn){
 function _epSumUpd(){
   var el=document.getElementById("epSum"); if(!el) return;
   var s=0, n=0, d=0;
-  document.querySelectorAll("#epItems .epItem").forEach(function(r){ if(r.getAttribute("data-del")==="1"){ d++; return; } n++; s+=pn(String(r.querySelector(".eTot").value||"").replace(/,/g,"")); });
+  document.querySelectorAll("#epItems .epItem").forEach(function(r){ if(r.getAttribute("data-del")==="1"){ d++; return; } if(!r.getAttribute("data-id")&&!r.querySelector(".eIt").value.trim()&&!r.querySelector(".eTot").value.trim()) return; n++; s+=pn(String(r.querySelector(".eTot").value||"").replace(/,/g,"")); });
   document.querySelectorAll("#epAddBox .pRowCard .pTot").forEach(function(t){ var v=pn(String(t.value||"").replace(/,/g,"")); if(v){ s+=v; n++; } });
   el.innerHTML='합계 <b style="font-size:16px">'+fmtKRW(s)+'</b> <span style="color:#64748b;font-size:12px">(물품 '+n+'개'+(d?' · 빼기 '+d+'개':'')+')</span>';
 }
@@ -8759,12 +8762,18 @@ async function savePur(id){
     vendorId:pv("epVendorId"), vendorName:pv("epVendorName"), vendorCeo:pv("epVendorCeo"), vendorAddr:pv("epVendorAddr")};
 
   // 기존 물품 줄
-  var rows=[], dels=[], bad="";
+  var rows=[], dels=[], bad="", _addsNew=[];
   document.querySelectorAll("#epItems .epItem").forEach(function(r){
     var rid=r.getAttribute("data-id");
     if(r.getAttribute("data-del")==="1"){ dels.push(rid); return; }
     var it=(r.querySelector(".eIt").value||"").trim(), q=_n(r.querySelector(".eQt").value), u=_n(r.querySelector(".eUn").value), t=_n(r.querySelector(".eTot").value);
     if(t===""&&isFinite(parseFloat(q))&&isFinite(parseFloat(u))) t=String(Math.round(parseFloat(q)*parseFloat(u)));
+    if(!rid){   // 새로 추가한 줄
+      if(!it&&!t) return;
+      if(!it&&!bad) bad="새 물품의 물품명을 입력하세요";
+      if(t===""&&!bad) bad="「"+it+"」 합계(원)를 입력하세요";
+      _addsNew.push({it:it,qt:q,un:u,tot:t}); return;
+    }
     if(!it&&!bad) bad="물품명이 빈 줄이 있어요";
     if(t===""&&!bad) bad="「"+(it||"물품")+"」 합계(원)를 입력하세요";
     rows.push({id:rid,it:it,qt:q,un:u,tot:t});
@@ -8776,6 +8785,7 @@ async function savePur(id){
     if(!t && isFinite(parseFloat(q)) && isFinite(parseFloat(u))) t=String(Math.round(parseFloat(q)*parseFloat(u)));
     if(it.trim() && t) _adds.push({it:it.trim(),qt:q,un:u,tot:t});
   });
+  _adds=_addsNew.concat(_adds);
   if(bad){ alert(bad); return; }
   if(!rows.length && !_adds.length){
     if(confirm("물품을 모두 뺐어요. 이 명세서를 통째로 삭제할까요?")){ closePopup(); await _delInv(iv); }
