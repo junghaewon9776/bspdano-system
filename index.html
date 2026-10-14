@@ -101,11 +101,15 @@ label{display:block;font-size:10px;color:#999;margin-bottom:3px}
 .purList .abtn{font-size:12px;padding:4px 9px;border-radius:5px;margin:1px}
 .purList .btn-s{padding:4px 8px!important;font-size:12px!important;line-height:1.3}
 .purList .photoTh{width:46px;height:36px;border-radius:4px}
+.purList .attMany{display:inline-flex;flex-wrap:wrap;gap:2px}
+.purList .attOne{display:none}
 @media(max-width:600px){
  .purList .pCard .btn-s,.purList .pCard .btn{min-height:0!important;padding:4px 7px!important;font-size:11px!important;line-height:1.3!important}
  .purList .abtn{font-size:11.5px;padding:4px 8px}
  .purList .tag{font-size:11px;padding:1px 6px}
  .purList .photoTh{width:42px;height:32px}
+ .purList .attMany{display:none}
+ .purList .attOne{display:inline-block}
 }
 
 .modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:999;align-items:center;justify-content:center}
@@ -6891,7 +6895,8 @@ function dPur(){
       h+=_purDocChips(stSrc,'st',firstP.id,'📋 거래명세표','#f1f5f9','#334155','#cbd5e1');
       h+=_purDocChips(txSrc,'tax',firstP.id,'🧾 '+_taxDocName(firstP),'#f1f5f9','#334155','#cbd5e1');
       if(!phSrc.length&&!rcSrc.length&&!txSrc.length&&!qdSrc.length&&!stSrc.length&&!pcSrc.length)h+='<span style="color:#94a3b8;font-size:12px">없음</span> ';
-      h+='<button class="abtn" style="background:#334155" onclick="_attPick(\''+firstP.id+'\','+(_bank?1:0)+')">＋ 증빙</button>';
+      h+='<span class="attMany">'+_attBtnsHtml(firstP.id,_bank)+'</span>';
+      h+='<button class="abtn attOne" style="background:#334155" onclick="_attPick(\''+firstP.id+'\','+(_bank?1:0)+')">＋ 증빙</button>';
       h+='</div>';
       // ⑥ 버튼 줄 (작게, 한 색)
       h+='<div style="display:flex;gap:4px;flex-wrap:wrap;padding:7px 12px;border-top:1px solid #e2e8f0;background:#f8fafc">';
@@ -7043,6 +7048,11 @@ function _attPrevInput(inp, boxId){
 function _attFirstItem(p){ var iv=p.inv||p.id; for(var i=0;i<(purs||[]).length;i++) if((purs[i].inv||purs[i].id)===iv) return purs[i]; return p; }
 function _attEditHtml(p){ var fp=_attFirstItem(p); _attReset("ep",fp); return '<div style="margin-top:14px">'+_attAllHtml("ep")+'</div>'; }
 
+// PC용 — 증빙 추가 버튼 6개 (아이콘)
+function _attBtnsHtml(pid, bank){
+  var it=[["pc","🛒 상품캡처"],["pur","📷 물품사진"],["qt","📄 견적서"],["rc","🧾 영수증"],["st","📋 거래명세표"],["tax","🧾 세금계산서"]];
+  return it.map(function(x){ return '<button class="abtn" style="background:'+(x[0]==="tax"&&bank?'#c2410c':'#334155')+'" onclick="attStart(\''+x[0]+'\',\''+pid+'\')">+'+x[1]+'</button>'; }).join("");
+}
 // 목록 [＋ 증빙 추가] → 종류 고르기
 function _attPick(pid, bank){
   var it=[["pc","🛒 상품캡처","#d97706"],["pur","📷 물품사진","#7c3aed"],["qt","📄 견적서","#4f46e5"],["rc","🧾 영수증","#ea580c"],["st","📋 거래명세표","#15803d"],["tax",bank?"🧾 세금계산서 (계좌이체·현금)":"🧾 세금계산서","#c2410c"]];
