@@ -8105,6 +8105,37 @@ function popPur(){
   h+='<div id="purGrandTot" style="text-align:right;margin:-4px 0 10px;font-size:14px;color:#334155"></div>';
   h+='<div class="popStickyFoot" style="justify-content:space-between"><button class="btn btn-g" onclick="addPurRow()">+ 항목 추가</button><div style="display:flex;gap:8px;margin-left:auto"><button class="btn" style="background:#475569;color:#fff;padding:12px 18px;font-size:15px" onclick="closePopup()">취소</button><button class="btn btn-b" style="padding:12px 32px;font-size:15px;font-weight:700" onclick="addP()">등록하기</button></div></div>';
   openPopup(h,720);
+  _purLastLoad();
+}
+// ↺ 구매 등록: 지난번에 고른 분류·카드·결제방법 기억 (행사별, 이 기기)
+var _PUR_LAST_IDS=["pIncTp","pIncSub","pGwan","pExpTp","pExpMid","pCard","pPayM"];
+function _purLastKey(){ return "purLast_"+((typeof CUR_EVT!=="undefined"&&CUR_EVT&&CUR_EVT.evtId)||""); }
+function _purLastSave(){
+  try{ var o={}; _PUR_LAST_IDS.forEach(function(id){ var e=document.getElementById(id); if(e) o[id]=e.value||""; }); localStorage.setItem(_purLastKey(), JSON.stringify(o)); }catch(e){}
+}
+function _purLastSet(id,v,after){
+  var e=document.getElementById(id); if(!e||v==null) return;
+  e.value=v; if(e.value!==v) e.value="";
+  if(after) try{ after(); }catch(x){}
+}
+function _purLastLoad(){
+  var o=null; try{ o=JSON.parse(localStorage.getItem(_purLastKey())||"null"); }catch(e){}
+  if(!o) return;
+  _purLastSet("pIncTp", o.pIncTp, function(){ onPurIncTpChg("p"); });
+  _purLastSet("pIncSub", o.pIncSub, function(){ onPurIncSubChg("p"); });
+  _purLastSet("pGwan", o.pGwan);
+  _purLastSet("pExpTp", o.pExpTp, function(){ onPurExpTpChg("p"); });
+  _purLastSet("pExpMid", o.pExpMid, function(){ onPurExpMidChg("p"); });
+  _purLastSet("pCard", o.pCard, function(){ onPurCardChg(); });
+  _purLastSet("pPayM", o.pPayM, function(){ _taxToggle("p"); });
+  var any=_PUR_LAST_IDS.some(function(id){ var e=document.getElementById(id); return e&&e.value; });
+  var box=document.getElementById("pIncTp"); box=box&&box.closest(".frow");
+  if(any&&box) box.insertAdjacentHTML("beforebegin",'<div id="purLastNote" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:#eef2ff;border:1px solid #a5b4fc;border-radius:8px;padding:6px 10px;margin-bottom:10px;font-size:13px;color:#3730a3"><span>↺ 지난번 고른 분류·카드·결제방법을 그대로 불러왔어요</span><button type="button" class="btn btn-s" style="background:#475569;color:#fff;margin-left:auto" onclick="_purLastClear()">선택 비우기</button></div>');
+}
+function _purLastClear(){
+  ["pPayM","pCard","pExpMid","pExpTp","pGwan","pIncSub","pIncTp"].forEach(function(id){ var e=document.getElementById(id); if(e) e.value=""; });
+  try{ onPurIncTpChg("p"); onPurExpTpChg("p"); onPurCardChg(); }catch(e){}
+  var n=document.getElementById("purLastNote"); if(n) n.remove();
 }
 function onPurExpTpChg(prefix){
   var tp=document.getElementById(prefix+"ExpTp").value;
@@ -8616,6 +8647,7 @@ async function addP(){
   }
   hideLoading();
   if(ok) _tgPurNotify(items, {dt:d, cat:[expTp,expMid].filter(Boolean).join(" › "), pay:[card,payM].filter(Boolean).join(" · "), vendor:vendorName});
+  if(ok) _purLastSave();
   closePopup();toast(ok+"건 구매 등록 완료"+(ok<items.length?" ("+(items.length-ok)+"건 실패)":"")+(_taxMiss?" · 🧾 "+(_tax.tp==="alt"?"대체 증빙":"세금계산서")+"는 나중에 목록의 '+세금계산서'로 첨부하세요":""));draw();
   refreshData(false);
 }
