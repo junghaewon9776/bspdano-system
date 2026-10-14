@@ -361,6 +361,7 @@ function _dispatch(p) {
 
         // 텔레그램 알림
         case "notifyLogin": _apiNotifyLogin(p).then(resolve); return;
+        case "notifyTg":    _apiNotifyTg(p).then(resolve); return;
 
         // 첨부파일 ZIP 다운로드
         case "buildGalleryZip": _apiBuildGalleryZip(p).then(resolve); return;
@@ -1577,6 +1578,20 @@ function _apiNotifyLogin(p) {
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({chat_id:chatId, text:text, parse_mode:'HTML'})
+    }).catch(function(e) { console.warn('텔레그램 전송 실패:', e); });
+  })).then(function() { return {ok:true}; });
+}
+
+// 범용 텔레그램 알림 (결재 요청·승인·반려 등) — p.text 는 HTML(굵게 <b>) 가능, 앞에 시스템 링크 붙임
+function _apiNotifyTg(p) {
+  var botToken = TG_BOT_TOKEN, chatIds = TG_CHAT_IDS;
+  if (!botToken || !chatIds || !p || !p.text) return Promise.resolve({ok:true});
+  var text = p.text + "\n\n<a href=\"" + TG_SYS_URL + "\">🔗 링크열기</a>";
+  var url = "https://api.telegram.org/bot" + botToken + "/sendMessage";
+  var ids = chatIds.split(/[,\s]+/).filter(Boolean);
+  return Promise.all(ids.map(function(chatId) {
+    return fetch(url, {method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({chat_id:chatId, text:text, parse_mode:'HTML', disable_web_page_preview:true})
     }).catch(function(e) { console.warn('텔레그램 전송 실패:', e); });
   })).then(function() { return {ok:true}; });
 }

@@ -458,7 +458,7 @@ label{display:block;font-size:10px;color:#999;margin-bottom:3px}
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <!-- firebase-storage 제거: 구글 드라이브 프록시로 대체 -->
 <script src="firebase-config.js"></script>
-<script src="common.js?v=20260908a"></script>
+<script src="common.js?v=20261014tg"></script>
 <script src="mod-engine.js?v=20260929v4"></script>
 
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" onerror="console.warn('XLSX CDN load failed')"></script>
@@ -7048,7 +7048,15 @@ function _esgTitleOf(items){
   var p=items[0], tot=0; items.forEach(function(x){tot+=pn(x.tot);});
   return (p.mgmtNo?p.mgmtNo+" · ":"")+fmtDK(p.dt)+" · "+(p.it||"")+(items.length>1?" 외 "+(items.length-1)+"건":"")+" · "+fm(tot)+"원";
 }
-function _esgInvTitle(inv){ var it=_esgInvItems(inv); return it.length?_esgTitleOf(it):inv; }
+function _esgInvTitle(inv){ var it=_esgInvItems(inv); return it.length?_esgTitleOf(it):(window._esgRvTitle||inv); }
+// 텔레그램 알림 (자동 로그인이어도 결재 관련은 울림)
+function _esgTg(head, inv, role, extra){
+  try{
+    var who=((typeof ME!=="undefined"&&ME&&ME.nm)||"")+(typeof CID!=="undefined"&&CID?" ("+CID+")":"");
+    var t="<b>"+esc(head)+"</b>\n• 결재칸: "+esc(role)+"\n• 건: "+esc(_esgInvTitle(inv))+"\n• 처리자: "+esc(who)+(extra?"\n"+esc(extra):"")+"\n• 시각: "+nowKST(true);
+    api("notifyTg",{text:t}).catch(function(){});
+  }catch(e){}
+}
 function _esgLink(inv,role,tok){
   return location.href.split("?")[0].split("#")[0]+"?esign="+encodeURIComponent(CUR_EVT.evtId)+"&inv="+encodeURIComponent(inv)+"&role="+encodeURIComponent(role)+"&t="+tok;
 }
@@ -7123,6 +7131,7 @@ async function _esgReview(inv,role,evt){
   var items=Object.keys(pv).map(function(k){return pv[k];}).filter(function(p){return p&&(p.inv||p.id)===inv;});
   if(!items.length) return toast("구매 건을 찾을 수 없어요 (삭제됐을 수 있어요)",true);
   var p0=items[0], tot=0; items.forEach(function(x){tot+=pn(x.tot);});
+  window._esgRvTitle=[p0.expTp,p0.expMid].filter(Boolean).join(" › ")+" · "+_esgTitleOf(items);
   var q=(es.req||{})[role], signed=(es.roles||{})[role], rj=(es.rej||{})[role];
   var me=(typeof CID!=="undefined"?CID:"");
   var notMine = q&&q.uid&&q.uid!==me&&!(typeof isA==="function"&&isA());
@@ -7192,6 +7201,7 @@ async function _esgApproveSave(){
     var q=(await ref.child("req/"+rv.role).once('value')).val();
     if(q&&!q.done) await ref.child("req/"+rv.role+"/done").set(now);
     hideLoading(); closePopup2(); toast("✅ "+rv.role+" 승인(서명) 완료");
+    _esgTg("✅ ["+(typeof SYS_NAME!=="undefined"?SYS_NAME:"")+"] 결의서 승인", rv.inv, rv.role, "• 서명 이름: "+nm);
     if(document.getElementById("esgInbox")) _esgInbox();
   }catch(e){ hideLoading(); toast("저장 실패: "+(e.message||e),true); }
 }
@@ -7208,6 +7218,7 @@ async function _esgReject(){
     var q=(await ref.child("req/"+rv.role).once('value')).val();
     if(q&&!q.done) await ref.child("req/"+rv.role+"/done").set(now);
     hideLoading(); closePopup2(); toast("↩ "+rv.role+" 반려 — 사유: "+reason);
+    _esgTg("↩ ["+(typeof SYS_NAME!=="undefined"?SYS_NAME:"")+"] 결의서 반려", rv.inv, rv.role, "• 사유: "+reason);
     if(document.getElementById("esgInbox")) _esgInbox();
   }catch(e){ hideLoading(); toast("저장 실패: "+(e.message||e),true); }
 }
@@ -7242,6 +7253,7 @@ async function _esgReqMake(inv,role){
   showLoading("요청 만드는 중...");
   try{ await _esgRef(inv).child("req/"+role).set({tok:tok,uid:uid,nm:nm,tel:tel,at:nowKST(true),by:(typeof CID!=="undefined"?CID:"")}); hideLoading(); }
   catch(e){ hideLoading(); return toast("실패: "+(e.message||e),true); }
+  _esgTg("📨 ["+(typeof SYS_NAME!=="undefined"?SYS_NAME:"")+"] 결의서 결재 요청", inv, role, "• 받는 사람: "+nm+" ("+uid+")");
   _esgReqShow(inv,role,{tok:tok,uid:uid,nm:nm,tel:tel});
 }
 function _esgReqShow(inv,role,q){
@@ -7317,7 +7329,8 @@ async function _esgOpenDeep(de){
   if(!CUR_EVT||CUR_EVT.evtId!==de.evt){ toast("이 결재 요청의 행사에 접근할 수 없어요 — 행사를 확인하세요",true); return; }
   var q=null; try{ q=(await _esgRef(de.inv,de.evt).child("req/"+de.role).once('value')).val(); }catch(e){}
   if(!q||q.tok!==de.t){ toast("유효하지 않은 결재 링크예요 — 새 링크를 받아 주세요",true); return; }
-  _esgReview(de.inv,de.role,de.evt);
+  await _esgReview(de.inv,de.role,de.evt);
+  _esgTg("👀 ["+(typeof SYS_NAME!=="undefined"?SYS_NAME:"")+"] 결재 링크로 접속", de.inv, de.role, "• 요청 대상: "+(q.nm||"")+(q.uid&&q.uid!==CID?" ⚠ 다른 계정으로 열람":""));
 }
 function renderEsignPage(){}
 
