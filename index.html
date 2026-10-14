@@ -94,6 +94,11 @@ label{display:block;font-size:10px;color:#999;margin-bottom:3px}
 .photoTh{width:36px;height:28px;border-radius:3px;object-fit:cover;cursor:pointer;border:1px solid #ddd;vertical-align:middle}
 .abtn{background:#7c3aed;color:#fff;border:none;border-radius:4px;padding:3px 7px;font-size:10px;cursor:pointer;font-weight:600;margin-left:2px}
 .abtn2{background:#ea580c}
+.purList .tag{font-size:12.5px;padding:3px 9px}
+.purList .pst{font-size:12.5px}
+.purList .abtn{font-size:13px;padding:6px 11px;border-radius:6px;margin:2px}
+.purList .photoTh{width:60px;height:46px;border-radius:5px}
+@media(max-width:600px){.purList .abtn{font-size:14px;padding:8px 12px}.purList .photoTh{width:70px;height:54px}}
 
 .modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:999;align-items:center;justify-content:center}
 .modal.show{display:flex}
@@ -6529,6 +6534,28 @@ function purBadge(g){
   if(g.prtD)  return '<span class="pst pst-pr">📄 발행 '+esc(g.prtD)+'</span>';
   return '<span class="pst pst-no">❌ 미발행</span>';
 }
+// 💳 카드/통장별 잔액 — 세입(inc.card) 합계 − 구매(purs.card)·지출(exps.card) 을 날짜순 누적
+//   byInv[명세서] = {card, after(이 건 결제 후 잔액)} / cards[이름] = {inc, used, bal}
+function _purCardRunBal(){
+  var cards={}, byInv={};
+  (inc||[]).forEach(function(r){ var c=String(r.card||"").trim(); if(!c) return; (cards[c]=cards[c]||{inc:0,used:0,bal:0}).inc+=pn(r.am); });
+  var ev=[], invIdx={};
+  (purs||[]).forEach(function(p){
+    var c=String(p.card||"").trim(); if(!c) return;
+    var iv=p.inv||p.id;
+    if(invIdx[iv]==null){ invIdx[iv]=ev.length; ev.push({k:"pur",inv:iv,card:c,dt:normD(p.dt)||"",ca:String(p.createdAt||""),am:0}); }
+    ev[invIdx[iv]].am+=pn(p.tot);
+  });
+  (exps||[]).forEach(function(e){ var c=String(e.card||"").trim(); if(!c) return; ev.push({k:"exp",card:c,dt:normD(e.dt)||"",ca:String(e.createdAt||""),am:pn(e.am)}); });
+  ev.sort(function(a,b){ return a.dt<b.dt?-1:a.dt>b.dt?1:(a.ca<b.ca?-1:a.ca>b.ca?1:0); });
+  ev.forEach(function(x){
+    var c=(cards[x.card]=cards[x.card]||{inc:0,used:0,bal:0});
+    c.used+=x.am;
+    if(x.k==="pur") byInv[x.inv]={card:x.card, after:c.inc-c.used};
+  });
+  Object.keys(cards).forEach(function(k){ cards[k].bal=cards[k].inc-cards[k].used; });
+  return {cards:cards, byInv:byInv};
+}
 function dPur(){
   // 자동 로드 제거 — 탭 바로 열고 🔄 새로고침 버튼으로 수동 로드
   var af=isA()?(purAr=="all"?null:purAr):myar();
@@ -6700,26 +6727,42 @@ function dPur(){
   h+='<div style="font-size:11px;color:#888;margin-top:6px">※ "일괄 출력"은 선택 명세서의 결의서를 한 PDF로 모아서 출력합니다. 인쇄 후 서명 → 각 명세서의 "서명본 업로드" 버튼으로 PDF/사진 올려주세요.</div>';
   h+='</div>';
 
-  h+='<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:6px"><h3 style="margin:0">구매 내역 (명세서 '+gList.length+(gList.length!=gListAll.length?"/"+gListAll.length:"")+'건 / 물품 '+fp.length+"건)</h3></div>";
+  h+='<div class="card purList"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:6px"><h3 style="margin:0">구매 내역 (명세서 '+gList.length+(gList.length!=gListAll.length?"/"+gListAll.length:"")+'건 / 물품 '+fp.length+"건)</h3></div>";
+  var _RB=_purCardRunBal();
+  var _rbKeys=Object.keys(_RB.cards);
+  if(_rbKeys.length && canSeeAmt()){
+    h+='<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px">';
+    _rbKeys.forEach(function(k){
+      var c=_RB.cards[k], neg=c.bal<0;
+      h+='<div style="flex:1;min-width:220px;border:1.5px solid '+(neg?'#fca5a5':'#bfdbfe')+';background:'+(neg?'#fef2f2':'#eff6ff')+';border-radius:10px;padding:8px 12px">';
+      h+='<div style="font-weight:800;font-size:14px;color:#0f172a">💳 '+esc(k)+'</div>';
+      h+='<div style="font-size:13px;color:#334155;margin-top:2px">세입 '+fm(c.inc)+'원 − 사용 '+fm(c.used)+'원</div>';
+      h+='<div style="font-size:17px;font-weight:800;color:'+(neg?'#dc2626':'#1d4ed8')+';margin-top:2px">잔액 '+fm(c.bal)+'원'+(neg?' ⚠':'')+'</div>';
+      h+='</div>';
+    });
+    h+='</div>';
+  }
   if(!gList.length)h+='<div class="empty2">'+(PUR_SHOW_UNPRT||PUR_SHOW_UNSIGN?"조건에 맞는 명세서가 없습니다":"등록된 구매가 없습니다")+'</div>';
   else{
     for(var g=0;g<gList.length;g++){
       var G=gList[g];
       var canEd=isA()||(G.by==CID);
       var checked=PUR_SEL[G.inv]?" checked":"";
-      h+='<div style="border:1px solid #e5e7eb;border-radius:10px;margin-bottom:12px;overflow:hidden">';
+      var _f0=G.items[0]||{}, _noTax=_isBankPay(_f0.payM)&&!((_f0.taxDoc||[]).length), _zero=!(pn(G.tot)>0);
+      var _bar=(_noTax||_zero)?'#dc2626':(G.signU?'#16a34a':(G.prtD?'#7c3aed':'#94a3b8'));
+      h+='<div style="border:1px solid #e2e8f0;border-left:6px solid '+_bar+';border-radius:10px;margin-bottom:16px;overflow:hidden;box-shadow:0 1px 4px rgba(15,23,42,.08);background:#fff">';
       // 명세서 헤더
       h+='<div style="background:#f8fafc;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;border-bottom:1px solid #e5e7eb">';
       h+='<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">';
       h+='<input type="checkbox" class="purChk" '+checked+' onchange="purTog(\''+G.inv+'\',this.checked)" style="width:16px;height:16px;cursor:pointer">';
-      h+=' <span class="tag tag-b">'+esc(G.ar||"공통")+'</span> <span style="font-weight:600">'+esc(fmtDK(G.dt))+'</span> <span style="color:#888;font-size:11px">물품 '+G.items.length+'개</span> '+purBadge(G);
-      if(G.mgmtNo) h+=' <span style="background:#dbeafe;color:#1e40af;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600">📋 '+esc(G.mgmtNo)+'</span>';
-      else if(G.noMgmt) h+=' <span style="background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600">번호없음</span>';
-      if(G.gwan) h+=' <span style="background:#fce7f3;color:#be185d;padding:2px 8px;border-radius:10px;font-size:11px">관:'+esc(G.gwan)+'</span>';
-      if(G.expTp) h+=' <span style="background:#f3e8ff;color:#7c3aed;padding:2px 8px;border-radius:10px;font-size:11px">'+esc(G.expTp)+(G.expMid?" › "+esc(G.expMid):"")+'</span>';
-      if(G.card) h+=' <span style="background:#e0f2fe;color:#075985;padding:2px 8px;border-radius:10px;font-size:11px">💳 '+esc(G.card)+'</span>';
+      h+=' <span class="tag tag-b">'+esc(G.ar||"공통")+'</span> <span style="font-weight:700;font-size:15px;color:#0f172a">'+esc(fmtDK(G.dt))+'</span> <span style="color:#475569;font-size:13px">물품 '+G.items.length+'개</span> '+purBadge(G);
+      if(G.mgmtNo) h+=' <span style="background:#dbeafe;color:#1e40af;padding:3px 10px;border-radius:10px;font-size:13px;font-weight:600;font-weight:600">📋 '+esc(G.mgmtNo)+'</span>';
+      else if(G.noMgmt) h+=' <span style="background:#fef3c7;color:#92400e;padding:3px 10px;border-radius:10px;font-size:13px;font-weight:600;font-weight:600">번호없음</span>';
+      if(G.gwan) h+=' <span style="background:#fce7f3;color:#be185d;padding:3px 10px;border-radius:10px;font-size:13px;font-weight:600">관:'+esc(G.gwan)+'</span>';
+      if(G.expTp) h+=' <span style="background:#f3e8ff;color:#7c3aed;padding:3px 10px;border-radius:10px;font-size:13px;font-weight:600">'+esc(G.expTp)+(G.expMid?" › "+esc(G.expMid):"")+'</span>';
+      if(G.card) h+=' <span style="background:#e0f2fe;color:#075985;padding:3px 10px;border-radius:10px;font-size:13px;font-weight:600">💳 '+esc(G.card)+'</span>';
       h+='</div>';
-      h+='<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">'+(canSeeAmt()?'<span style="font-weight:700;color:#7c3aed;font-size:15px">'+fm(G.tot)+'원</span>':'<span style="font-weight:700;color:#999;font-size:12px">금액 비공개</span>');
+      h+='<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">'+(canSeeAmt()?((!(pn(G.tot)>0)?'<span style="background:#dc2626;color:#fff;font-size:12.5px;font-weight:700;padding:3px 9px;border-radius:10px">⚠ 금액 0원 — 수정에서 합계 확인</span> ':'')+'<span style="font-weight:800;color:#7c3aed;font-size:18px">'+fm(G.tot)+'원</span>'+((_RB.byInv[G.inv])?' <span style="font-size:13px;font-weight:700;padding:3px 9px;border-radius:10px;background:'+(_RB.byInv[G.inv].after<0?'#fee2e2;color:#b91c1c':'#e0f2fe;color:#075985')+'" title="'+esc(_RB.byInv[G.inv].card)+' — 이 건까지 날짜순으로 쓴 뒤 남은 금액">잔액 '+fm(_RB.byInv[G.inv].after)+'원</span>':'')):'<span style="font-weight:700;color:#999;font-size:12px">금액 비공개</span>');
       h+=' <button class="btn btn-s mobile-hide" style="background:#7c3aed;color:#fff" onclick="vchInv(\''+G.inv+'\')">📄 결의서</button>';
       h+=' <button class="btn btn-s" style="background:#0d9488;color:#fff" onclick="vchXlsxDL(\''+G.inv+'\')">📗 엑셀</button>';
       h+=' <button class="btn btn-s" style="background:#16a34a;color:#fff" onclick="resAttach(\''+G.inv+'\')">📎 서명본</button>';
@@ -6729,9 +6772,9 @@ function dPur(){
       h+='<div style="padding:4px 12px">';
       for(var k=0;k<G.items.length;k++){
         var p=G.items[k];
-        h+='<div style="padding:8px 0;border-bottom:1px dashed #eee;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px">';
+        h+='<div style="padding:10px 0;border-bottom:1px dashed #e2e8f0;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px">';
         var amtLine=canSeeAmt()?(esc(p.qt||"")+'개 × '+fm(p.un)+'원 = <b style="color:#111">'+fm(p.tot)+'원</b>'):('수량 '+esc(p.qt||"")+'개');
-        h+='<div style="flex:1;min-width:150px"><div style="font-weight:600;font-size:13px">'+esc(p.it)+'</div><div style="font-size:11px;color:#666">'+amtLine+'</div><div style="font-size:10px;color:#888">비목: '+esc(bn(p.bi))+'</div></div>';
+        h+='<div style="flex:1;min-width:150px"><div style="font-weight:700;font-size:16px;color:#0f172a;line-height:1.35">'+esc(p.it)+'</div><div style="font-size:14px;color:#334155;margin-top:2px">'+amtLine+'</div>'+(bn(p.bi)?'<div style="font-size:12.5px;color:#475569;margin-top:1px">비목: '+esc(bn(p.bi))+'</div>':'')+'</div>';
         if(canEd)h+='<div style="display:flex;gap:4px"><button class="btn btn-b btn-s" onclick="edPur(\''+p.id+'\')">수정</button><button class="btn btn-r btn-s" onclick="delP(\''+p.id+'\')">삭제</button></div>';
         h+='</div>';
       }
@@ -6739,15 +6782,15 @@ function dPur(){
       // 증빙(사진/영수증) - 명세서 첫 물품에 저장됨
       var firstP=G.items[0];
       var phSrc=firstP.ph||[],rcSrc=firstP.rc||[];
-      h+='<div style="padding:10px 12px;background:#fafafa;border-top:1px solid #eee"><div style="font-size:11px;color:#666;margin-bottom:4px">📎 증빙</div><div>';
+      h+='<div style="padding:10px 12px;background:#f8fafc;border-top:1px solid #e2e8f0"><div style="font-size:13px;color:#334155;font-weight:700;margin-bottom:6px">📎 증빙</div><div style="display:flex;flex-wrap:wrap;align-items:center;gap:4px">';
       for(var j=0;j<phSrc.length;j++)h+='<span style="position:relative;display:inline-block;margin-right:2px"><img class="photoTh" src="'+imgSrc(phSrc[j])+'" onclick="showPh(this)"><button style="position:absolute;top:-4px;right:-4px;background:#dc2626;color:#fff;border:none;border-radius:50%;width:14px;height:14px;font-size:8px;cursor:pointer;line-height:14px;padding:0" onclick="delPh(\'pur\',\''+firstP.id+'\','+j+')">×</button></span> ';
       for(var j=0;j<rcSrc.length;j++)h+='<span style="position:relative;display:inline-block;margin-right:2px"><img class="photoTh" src="'+imgSrc(rcSrc[j])+'" onclick="showPh(this)" style="border-color:#f59e0b"><button style="position:absolute;top:-4px;right:-4px;background:#dc2626;color:#fff;border:none;border-radius:50%;width:14px;height:14px;font-size:8px;cursor:pointer;line-height:14px;padding:0" onclick="delPh(\'rc\',\''+firstP.id+'\','+j+')">×</button></span> ';
       var txSrc=firstP.taxDoc||[], _bank=_isBankPay(firstP.payM);
       for(var j=0;j<txSrc.length;j++)h+='<span style="position:relative;display:inline-block;margin-right:4px"><a href="'+esc(txSrc[j])+'" target="_blank" style="display:inline-block;background:#ffedd5;color:#9a3412;border:1px solid #fb923c;border-radius:6px;padding:3px 8px;font-size:11px;font-weight:700;text-decoration:none">🧾 '+esc(_taxDocName(firstP))+(txSrc.length>1?' '+(j+1):'')+'</a><button style="position:absolute;top:-6px;right:-6px;background:#dc2626;color:#fff;border:none;border-radius:50%;width:14px;height:14px;font-size:8px;cursor:pointer;line-height:14px;padding:0" onclick="delPh(\'tax\',\''+firstP.id+'\','+j+')">×</button></span> ';
-      if(!phSrc.length&&!rcSrc.length&&!txSrc.length)h+='<span style="color:#ccc;font-size:11px">없음</span> ';
+      if(!phSrc.length&&!rcSrc.length&&!txSrc.length)h+='<span style="color:#94a3b8;font-size:13px">없음</span> ';
       h+='<button class="abtn" onclick="attStart(\'pur\',\''+firstP.id+'\')">+물품사진</button> <button class="abtn abtn2" onclick="attStart(\'rc\',\''+firstP.id+'\')">+영수증</button>';
       if(_bank) h+=' <button class="abtn" style="background:#ea580c;color:#fff;border-color:#ea580c" onclick="attStart(\'tax\',\''+firstP.id+'\')">+'+esc(_taxDocName(firstP))+'</button>';
-      if(_bank && !txSrc.length) h+=' <span style="font-size:11px;color:#fff;background:#dc2626;padding:2px 8px;border-radius:10px;font-weight:700">⚠ 계좌이체 — '+esc(_taxDocName(firstP))+' 미첨부</span>';
+      if(_bank && !txSrc.length) h+=' <span style="font-size:13px;color:#fff;background:#dc2626;padding:4px 10px;border-radius:10px;font-weight:700">⚠ 계좌이체 — '+esc(_taxDocName(firstP))+' 미첨부</span>';
       h+='</div></div>';
       h+='</div>';
     }
@@ -7421,8 +7464,8 @@ function edPur(id){
     '<div id="epBudgetInfo" style="padding:8px 12px;background:#f0f9ff;border:1px solid #bfdbfe;border-radius:6px;margin-top:8px;font-size:13px"></div>'+
     '<div class="frow fr2"><div><label>물품명</label><input type="text" id="epI" value="'+esc(p.it)+'"></div>'+
     '<div><label>수량</label><input type="number" id="epQ" value="'+esc(p.qt)+'" oninput="_epCalcTot()"></div></div>'+
-    '<div class="frow fr2"><div><label>단가(원)</label><input type="number" id="epU" value="'+esc(p.un)+'" oninput="_epCalcTot()"></div>'+
-    '<div><label>합계(원)</label><input type="number" id="epT" value="'+esc(p.tot)+'"></div></div>'+
+    '<div class="frow fr2"><div><label>단가(원)</label><input type="text" inputmode="numeric" id="epU" value="'+esc(_cm(p.un))+'" oninput="this.value=_cm(this.value);_epCalcTot()"></div>'+
+    '<div><label>합계(원)</label><input type="text" inputmode="numeric" id="epT" style="font-weight:700" value="'+esc(_cm(String(p.tot||"").replace(/,/g,"")||((pn(p.qt)&&pn(p.un))?pn(p.qt)*pn(p.un):"")))+'" oninput="this.value=_cm(this.value)"></div></div>'+
     '<div class="frow fr2" style="margin-top:10px"><div><label>사용 카드/통장</label><select id="epCard" onchange="_refreshEpPayM()">'+purCardOpts(p.card||"")+'</select></div>'+
     '<div><label>결제방법</label><select id="epPayM" onchange="_taxToggle(\'ep\')">'+incPayOpts(p.card||"", p.payM||"")+'</select></div></div>'+
     taxBoxHtml("ep", p)+
@@ -7442,9 +7485,11 @@ function edPur(id){
     '<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button class="btn" style="background:#475569;color:#fff" onclick="closePopup()">취소</button><button class="btn btn-b" onclick="savePur(\''+id+'\')">저장</button></div>');
   _taxToggle("ep");
 }
+// 숫자에 천단위 콤마 (입력칸용: 숫자 외 문자 제거)
+function _cm(v){ var d=String(v==null?"":v).replace(/[^0-9]/g,""); return d?d.replace(/\B(?=(\d{3})+(?!\d))/g,","):""; }
 function _epCalcTot(){
-  var q=parseFloat((document.getElementById("epQ")||{}).value), u=parseFloat((document.getElementById("epU")||{}).value);
-  var t=document.getElementById("epT"); if(t && isFinite(q) && isFinite(u)) t.value=Math.round(q*u);
+  var q=parseFloat(String((document.getElementById("epQ")||{}).value||"").replace(/,/g,"")), u=parseFloat(String((document.getElementById("epU")||{}).value||"").replace(/,/g,""));
+  var t=document.getElementById("epT"); if(t && isFinite(q) && isFinite(u)) t.value=_cm(Math.round(q*u));
 }
 async function savePur(id){
   var pv=function(i){var e=document.getElementById(i);return e?e.value:""};
@@ -7459,6 +7504,10 @@ async function savePur(id){
     gwan:pv("epGwan"),expTp:pv("epExpTp"),expMid:pv("epExpMid"),incTp:pv("epIncTp"),incSub:pv("epIncSub"),card:pv("epCard"),
     noMgmt:pc("epNoMgmt"),mgmtNo:pv("epMgmtNo").trim(),
     vendorId:pv("epVendorId"), vendorName:pv("epVendorName"), vendorCeo:pv("epVendorCeo"), vendorAddr:pv("epVendorAddr")};
+  var _n=function(v){return String(v==null?"":v).replace(/,/g,"").trim();};
+  p.qt=_n(p.qt); p.un=_n(p.un); p.tot=_n(p.tot);
+  if(p.tot===""){ var _q=parseFloat(p.qt), _u=parseFloat(p.un); if(isFinite(_q)&&isFinite(_u)) p.tot=String(Math.round(_q*_u)); }
+  if(p.tot===""){ alert("합계(원)를 입력하세요"); return; }
   showLoading("저장 중...");
   if(_isBankPay(_payE)){
     p.taxTp=_taxE.tp; p.taxAltRs=_taxE.rs;
