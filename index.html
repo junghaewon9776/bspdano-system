@@ -6645,9 +6645,10 @@ function dPur(){
       invSet[iv]=true;
     });
     var totInv=Object.keys(invSet).length;
-    var noPh=0, noRc=0, cPrtFilt=0, cSignFilt=0;
+    var noPh=0, noRc=0, cPrtFilt=0, cSignFilt=0, noTax=0;
     Object.keys(invMainMap).forEach(function(iv){
       var p=invMainMap[iv];
+      if(_isBankPay(p.payM) && !(p.taxDoc&&p.taxDoc.length)) noTax++;
       if(!(p.ph&&p.ph.length>0)) noPh++;
       if(!(p.rc&&p.rc.length>0)) noRc++;
       if(p.prtD) cPrtFilt++;
@@ -6656,6 +6657,7 @@ function dPur(){
     h+='<span style="margin-left:auto;font-size:12px;color:#64748b">등록 <b style="color:#111">'+totInv+'건</b></span>';
     h+=' <span style="font-size:12px;color:#dc2626" title="물품사진 미첨부">📷 미첨부 <b>'+noPh+'</b>/'+totInv+'</span>';
     h+=' <span style="font-size:12px;color:#dc2626" title="영수증 미첨부">🧾 미첨부 <b>'+noRc+'</b>/'+totInv+'</span>';
+    if(noTax) h+=' <span style="font-size:12px;color:#fff;background:#ea580c;padding:2px 8px;border-radius:10px;font-weight:700" title="계좌이체인데 세금계산서(대체 증빙) 미첨부">⚠ 계좌이체 증빙 미첨부 '+noTax+'건</span>';
     h+=' <span style="font-size:12px;color:#7c3aed" title="결의서 발행">📄 결의서 <b>'+cPrtFilt+'</b>/'+totInv+'</span>';
     h+=' <span style="font-size:12px;color:#16a34a" title="결의서 서명본">✅ 서명 <b>'+cSignFilt+'</b>/'+totInv+'</span>';
     h+=' | <span style="font-size:13px;font-weight:700;color:#16a34a">집행 '+fmu(filterTot)+'원</span>';
@@ -6740,8 +6742,12 @@ function dPur(){
       h+='<div style="padding:10px 12px;background:#fafafa;border-top:1px solid #eee"><div style="font-size:11px;color:#666;margin-bottom:4px">📎 증빙</div><div>';
       for(var j=0;j<phSrc.length;j++)h+='<span style="position:relative;display:inline-block;margin-right:2px"><img class="photoTh" src="'+imgSrc(phSrc[j])+'" onclick="showPh(this)"><button style="position:absolute;top:-4px;right:-4px;background:#dc2626;color:#fff;border:none;border-radius:50%;width:14px;height:14px;font-size:8px;cursor:pointer;line-height:14px;padding:0" onclick="delPh(\'pur\',\''+firstP.id+'\','+j+')">×</button></span> ';
       for(var j=0;j<rcSrc.length;j++)h+='<span style="position:relative;display:inline-block;margin-right:2px"><img class="photoTh" src="'+imgSrc(rcSrc[j])+'" onclick="showPh(this)" style="border-color:#f59e0b"><button style="position:absolute;top:-4px;right:-4px;background:#dc2626;color:#fff;border:none;border-radius:50%;width:14px;height:14px;font-size:8px;cursor:pointer;line-height:14px;padding:0" onclick="delPh(\'rc\',\''+firstP.id+'\','+j+')">×</button></span> ';
-      if(!phSrc.length&&!rcSrc.length)h+='<span style="color:#ccc;font-size:11px">없음</span> ';
+      var txSrc=firstP.taxDoc||[], _bank=_isBankPay(firstP.payM);
+      for(var j=0;j<txSrc.length;j++)h+='<span style="position:relative;display:inline-block;margin-right:4px"><a href="'+esc(txSrc[j])+'" target="_blank" style="display:inline-block;background:#ffedd5;color:#9a3412;border:1px solid #fb923c;border-radius:6px;padding:3px 8px;font-size:11px;font-weight:700;text-decoration:none">🧾 '+esc(_taxDocName(firstP))+(txSrc.length>1?' '+(j+1):'')+'</a><button style="position:absolute;top:-6px;right:-6px;background:#dc2626;color:#fff;border:none;border-radius:50%;width:14px;height:14px;font-size:8px;cursor:pointer;line-height:14px;padding:0" onclick="delPh(\'tax\',\''+firstP.id+'\','+j+')">×</button></span> ';
+      if(!phSrc.length&&!rcSrc.length&&!txSrc.length)h+='<span style="color:#ccc;font-size:11px">없음</span> ';
       h+='<button class="abtn" onclick="attStart(\'pur\',\''+firstP.id+'\')">+물품사진</button> <button class="abtn abtn2" onclick="attStart(\'rc\',\''+firstP.id+'\')">+영수증</button>';
+      if(_bank) h+=' <button class="abtn" style="background:#ea580c;color:#fff;border-color:#ea580c" onclick="attStart(\'tax\',\''+firstP.id+'\')">+'+esc(_taxDocName(firstP))+'</button>';
+      if(_bank && !txSrc.length) h+=' <span style="font-size:11px;color:#fff;background:#dc2626;padding:2px 8px;border-radius:10px;font-weight:700">⚠ 계좌이체 — '+esc(_taxDocName(firstP))+' 미첨부</span>';
       h+='</div></div>';
       h+='</div>';
     }
@@ -6780,6 +6786,55 @@ function purCardOpts(sel, filterTp, filterSub){
   return h;
 }
 
+// ===== 🧾 계좌이체 증빙 — 보탬e: 계좌이체는 전자세금계산서 필수 / 강사료·원고료·행사보험은 대체 증빙(증서·수령증) =====
+var TAX_ALT_REASONS=["강사료","원고료","행사보험 (보험증서)","기타"];
+function _isBankPay(payM){ return /계좌이체/.test(String(payM||"")); }
+// px: 등록="p" / 수정="ep"
+function taxBoxHtml(px, p){
+  p=p||{};
+  var alt=(p.taxTp==="alt"), rs=p.taxAltRs||"", isEtc=rs&&TAX_ALT_REASONS.indexOf(rs)<0;
+  var docs=p.taxDoc||[];
+  var h='<div id="'+px+'TaxBox" style="display:none;background:#fff7ed;border:2px solid #fb923c;border-radius:8px;padding:10px 12px;margin-bottom:12px">';
+  h+='<div style="font-weight:700;color:#c2410c;margin-bottom:8px">🧾 계좌이체 증빙 <span style="font-weight:400;font-size:12px;color:#9a3412">(보탬e: 계좌이체는 전자세금계산서 첨부 필수)</span></div>';
+  h+='<div style="display:flex;gap:14px;flex-wrap:wrap;font-size:13px;margin-bottom:8px">';
+  h+='<label style="display:flex;align-items:center;gap:5px;cursor:pointer"><input type="radio" name="'+px+'TaxTp" value="etax"'+(alt?'':' checked')+' onchange="_taxTpChg(\''+px+'\')"> 전자세금계산서</label>';
+  h+='<label style="display:flex;align-items:center;gap:5px;cursor:pointer"><input type="radio" name="'+px+'TaxTp" value="alt"'+(alt?' checked':'')+' onchange="_taxTpChg(\''+px+'\')"> 세금계산서가 안 나오는 경우 (강사료·원고료·행사보험 등)</label>';
+  h+='</div>';
+  h+='<div id="'+px+'TaxAltBox" style="display:'+(alt?'flex':'none')+';gap:8px;flex-wrap:wrap;margin-bottom:8px">';
+  h+='<select id="'+px+'TaxAltRs" onchange="_taxTpChg(\''+px+'\')" style="padding:7px;border:1px solid #fdba74;border-radius:6px">';
+  TAX_ALT_REASONS.forEach(function(r){ h+='<option'+((r===rs)||(isEtc&&r==="기타")?' selected':'')+'>'+esc(r)+'</option>'; });
+  h+='</select>';
+  h+='<input type="text" id="'+px+'TaxAltEtc" placeholder="사유 직접 입력" value="'+esc(isEtc?rs:"")+'" style="display:'+(isEtc?'block':'none')+';flex:1;min-width:140px;padding:7px;border:1px solid #fdba74;border-radius:6px">';
+  h+='</div>';
+  if(docs.length) h+='<div style="font-size:12px;color:#166534;margin-bottom:6px">✅ 이미 첨부된 증빙 '+docs.length+'개 (추가하려면 아래에서 파일 선택)</div>';
+  h+='<label id="'+px+'TaxLbl" style="font-size:12px;color:#7c2d12;font-weight:600">'+(alt?'대체 증빙 파일 (보험증서·수령증 등)':'전자세금계산서 파일')+' <span style="font-weight:400;color:#9a3412">— 사진 또는 PDF, 여러 개 가능</span></label>';
+  h+='<input type="file" id="'+px+'Tax" multiple accept="image/*,application/pdf" style="width:100%;margin-top:4px">';
+  h+='</div>';
+  return h;
+}
+function _taxToggle(px){
+  var box=document.getElementById(px+"TaxBox"); if(!box) return;
+  box.style.display=_isBankPay((document.getElementById(px+"PayM")||{}).value)?"block":"none";
+}
+function _taxTpChg(px){
+  var t=_taxRead(px);
+  var ab=document.getElementById(px+"TaxAltBox"); if(ab) ab.style.display=(t.tp==="alt")?"flex":"none";
+  var sel=document.getElementById(px+"TaxAltRs"), etc=document.getElementById(px+"TaxAltEtc");
+  if(etc) etc.style.display=(t.tp==="alt"&&sel&&sel.value==="기타")?"block":"none";
+  var lb=document.getElementById(px+"TaxLbl");
+  if(lb) lb.firstChild.nodeValue=(t.tp==="alt")?"대체 증빙 파일 (보험증서·수령증 등) ":"전자세금계산서 파일 ";
+}
+function _taxRead(px){
+  var r=document.querySelector('input[name="'+px+'TaxTp"]:checked');
+  var tp=r?r.value:"etax", rs="";
+  if(tp==="alt"){
+    rs=(document.getElementById(px+"TaxAltRs")||{}).value||"";
+    if(rs==="기타") rs=String((document.getElementById(px+"TaxAltEtc")||{}).value||"").trim()||"기타";
+  }
+  return {tp:tp, rs:rs};
+}
+function _taxDocName(p){ return (p&&p.taxTp==="alt")?((p.taxAltRs||"대체")+" 증빙"):"세금계산서"; }
+
 var purRowCnt=1;
 function popPur(){
   purRowCnt=1;
@@ -6802,7 +6857,8 @@ function popPur(){
     '<div><label>세출 중분류 (세부행사)</label><select id="pExpMid" onchange="onPurExpMidChg(\'p\')">'+actExpMidOpts("","")+'</select></div></div>';
   h+='<div id="pBudgetInfo" style="padding:8px 12px;background:#f0f9ff;border:1px solid #bfdbfe;border-radius:6px;margin-bottom:10px;font-size:13px"></div>';
   h+='<div class="frow fr2" style="margin-bottom:10px"><div><label>사용 카드/통장 <span style="color:#888;font-size:11px">(물품 결제에 사용한 것)</span></label><select id="pCard" onchange="onPurCardChg()">'+purCardOpts("")+'</select></div>'+
-    '<div><label>결제방법 <span style="color:#888;font-size:11px">(지정카드/계좌이체 등)</span></label><select id="pPayM">'+incPayOpts("","")+'</select></div></div>';
+    '<div><label>결제방법 <span style="color:#888;font-size:11px">(지정카드/계좌이체 등)</span></label><select id="pPayM" onchange="_taxToggle(\'p\')">'+incPayOpts("","")+'</select></div></div>';
+  h+=taxBoxHtml("p");
   // 거래처(지급처) 정보 — 검색 후 자동 채움, 없으면 직접 입력
   h+='<div style="background:#f0f9ff;border:1px solid #bfdbfe;border-radius:8px;padding:10px 12px;margin-bottom:12px">';
   h+='<label style="font-weight:600;display:block;margin-bottom:6px">🏢 지급처 (거래처)</label>';
@@ -6818,6 +6874,7 @@ function popPur(){
   h+='<div id="purRowBox" style="margin-bottom:10px">';
   h+=purCardHtml(1,bo);
   h+='</div>';
+  h+='<div id="purGrandTot" style="text-align:right;margin:-4px 0 10px;font-size:14px;color:#334155"></div>';
   h+='<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><button class="btn btn-g" onclick="addPurRow()">+ 항목 추가</button><button class="btn btn-b" style="padding:12px 32px;font-size:15px" onclick="addP()">등록하기</button></div>';
   openPopup(h,720);
 }
@@ -7184,6 +7241,7 @@ function _refreshEpPayM(){
   pays.forEach(function(p){ h+='<option value="'+esc(p)+'">'+esc(p)+'</option>'; });
   payEl.innerHTML=h;
   if(pays.length===1) payEl.value=pays[0];
+  _taxToggle(payEl.id==="pPayM"?"p":"ep");
 }
 // 구매 등록 — 카드 변경 시 결제방법 옵션 재구성
 function onPurCardChg(){
@@ -7197,6 +7255,7 @@ function onPurCardChg(){
   pays.forEach(function(p){ h+='<option value="'+esc(p)+'">'+esc(p)+'</option>'; });
   payEl.innerHTML=h;
   if(pays.length===1) payEl.value=pays[0];
+  _taxToggle(payEl.id==="pPayM"?"p":"ep");
 }
 // 세입 대분류→중분류 옵션
 function purIncSubOpts(tp,sel){
@@ -7240,10 +7299,10 @@ function purCardHtml(n,bo){
     '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><span style="font-weight:700;color:#2563eb;font-size:13px">물품 '+n+'</span>'+rm+'</div>'+
     '<div style="margin-bottom:8px"><label style="font-size:12px;color:#666">물품명 *</label><input type="text" class="pIt" placeholder="예: 집게, 장갑, 쓰레기봉투" style="width:100%;font-size:15px;padding:10px"></div>'+
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">'+
-      '<div><label style="font-size:12px;color:#666">수량</label><input type="number" inputmode="numeric" class="pQt" placeholder="개" style="width:100%;font-size:15px;padding:10px"></div>'+
-      '<div><label style="font-size:12px;color:#666">단가(원)</label><input type="text" inputmode="numeric" class="pUn" placeholder="원" style="width:100%;font-size:15px;padding:10px" oninput="this.value=this.value.replace(/[^0-9]/g,\'\').replace(/\\B(?=(\\d{3})+(?!\\d))/g,\',\')" onblur="calcPurCard(this)"></div>'+
+      '<div><label style="font-size:12px;color:#666">수량</label><input type="number" inputmode="numeric" class="pQt" placeholder="개" style="width:100%;font-size:15px;padding:10px" oninput="calcPurCard(this)"></div>'+
+      '<div><label style="font-size:12px;color:#666">단가(원)</label><input type="text" inputmode="numeric" class="pUn" placeholder="원" style="width:100%;font-size:15px;padding:10px" oninput="this.value=this.value.replace(/[^0-9]/g,\'\').replace(/\\B(?=(\\d{3})+(?!\\d))/g,\',\');calcPurCard(this)"></div>'+
     '</div>'+
-    '<div style="margin-bottom:8px"><label style="font-size:12px;color:#666">합계(원) *</label><input type="text" inputmode="numeric" class="pTot" placeholder="합계 금액" style="width:100%;font-size:15px;padding:10px;font-weight:600" oninput="this.value=this.value.replace(/[^0-9]/g,\'\').replace(/\\B(?=(\\d{3})+(?!\\d))/g,\',\')"></div>'+
+    '<div style="margin-bottom:8px"><label style="font-size:12px;color:#666">합계(원) * <span style="color:#94a3b8;font-weight:400">— 수량×단가 자동, 직접 고쳐도 됨</span></label><input type="text" inputmode="numeric" class="pTot" placeholder="합계 금액" style="width:100%;font-size:15px;padding:10px;font-weight:600" oninput="this.value=this.value.replace(/[^0-9]/g,\'\').replace(/\\B(?=(\\d{3})+(?!\\d))/g,\',\');_purGrandTotal()"></div>'+
     '</div>';
 }
 function addPurRow(){
@@ -7253,18 +7312,24 @@ function addPurRow(){
   div.innerHTML=purCardHtml(purRowCnt);
   box.appendChild(div.firstChild);
 }
-function rmPurRow(n){var r=document.getElementById("pRow"+n);if(r)r.remove()}
+function rmPurRow(n){var r=document.getElementById("pRow"+n);if(r)r.remove();_purGrandTotal()}
 function calcPurCard(el){
-  var card=el.closest(".pRowCard");
-  var qt=String(card.querySelector(".pQt").value||"").replace(/,/g,"");
-  var un=String(card.querySelector(".pUn").value||"").replace(/,/g,"");
-  if(qt&&un){
-    var total=parseInt(qt)*parseInt(un);
-    if(isFinite(total)){
-      // 천단위 콤마 적용
-      card.querySelector(".pTot").value=total.toString().replace(/\B(?=(\d{3})+(?!\d))/g,",");
-    }
+  var card=el.closest(".pRowCard"); if(!card) return;
+  var qt=parseFloat(String(card.querySelector(".pQt").value||"").replace(/,/g,""));
+  var un=parseFloat(String(card.querySelector(".pUn").value||"").replace(/,/g,""));
+  if(isFinite(qt)&&isFinite(un)){
+    var total=Math.round(qt*un);
+    // 천단위 콤마 적용
+    card.querySelector(".pTot").value=total.toString().replace(/\B(?=(\d{3})+(?!\d))/g,",");
   }
+  _purGrandTotal();
+}
+// 등록 화면 — 물품 전체 총 합계
+function _purGrandTotal(){
+  var el=document.getElementById("purGrandTot"); if(!el) return;
+  var sum=0, n=0;
+  document.querySelectorAll("#purRowBox .pTot").forEach(function(t){ var v=parseFloat(String(t.value||"").replace(/,/g,"")); if(isFinite(v)){ sum+=v; n++; } });
+  el.innerHTML=n?('🧮 총 합계 <b style="font-size:17px;color:#7c3aed">'+sum.toLocaleString()+'원</b> <span style="color:#94a3b8;font-size:12px">(물품 '+n+'개)</span>'):'';
 }
 // 기존 함수명 호환
 function calcPurRow(el){calcPurCard(el)}
@@ -7284,8 +7349,18 @@ async function addP(){
     items.push({it:it,qt:r.querySelector(".pQt").value,un:r.querySelector(".pUn").value,tot:tot,bi:biVal});
   }
   if(!items.length){alert("물품명과 합계를 1건 이상 입력하세요");return}
+  var _payM0=(document.getElementById("pPayM")||{}).value||"";
+  var _tax=_taxRead("p"), _taxInp=document.getElementById("pTax");
+  if(_isBankPay(_payM0) && !(_taxInp&&_taxInp.files&&_taxInp.files.length)){
+    alert(_tax.tp==="alt"
+      ? "계좌이체는 증빙이 꼭 필요해요.\n\n'"+_tax.rs+"' 대체 증빙(보험증서·수령증 등) 파일을 첨부해 주세요."
+      : "계좌이체는 전자세금계산서 첨부가 필수예요 (보탬e).\n\n세금계산서 파일을 첨부하거나,\n강사료·원고료·행사보험처럼 세금계산서가 안 나오는 경우는\n'세금계산서가 안 나오는 경우'를 고르고 대체 증빙을 첨부해 주세요.");
+    return;
+  }
   var ar=myar()||"";
   showLoading("저장 중...");
+  var taxUrls=[];
+  if(_isBankPay(_payM0)){ var taxFiles=await readFiles(_taxInp); taxUrls=taxFiles.length?await uploadAll(taxFiles,ar,"세금계산서"):[]; }
   var phFiles=await readFiles(document.getElementById("pPh"));
   var rcFiles=await readFiles(document.getElementById("pRc"));
   var phUrls=phFiles.length?await uploadAll(phFiles,ar,"물품사진"):[];
@@ -7310,6 +7385,7 @@ async function addP(){
     var it=items[i];
     showLoading("저장 중 ("+(i+1)+"/"+items.length+")");
     var payload={dt:d,dtIni:dtIni,ar:ar,it:it.it,qt:_stripComma(it.qt),un:_stripComma(it.un),tot:_stripComma(it.tot),bi:it.bi,by:CID,ph:phUrls.slice(),rc:rcUrls.slice(),inv:invId,payM:payM,gwan:gwan,expTp:expTp,expMid:expMid,incTp:incTp,incSub:incSub,card:card,noMgmt:noMgmt,mgmtNo:firstMgmt||mgmtNo,vendorId:vendorId,vendorName:vendorName,vendorCeo:vendorCeo,vendorAddr:vendorAddr};
+    if(_isBankPay(payM)){ payload.taxTp=_tax.tp; payload.taxAltRs=_tax.rs; payload.taxDoc=taxUrls.slice(); }
     var r=await api("addPur",payload);
     if(r.ok){payload.id=r.id;payload.mgmtNo=r.mgmtNo||"";if(!firstMgmt)firstMgmt=r.mgmtNo||"";purs.push(payload);ok++;}
   }
@@ -7344,11 +7420,12 @@ function edPur(id){
     '<div><label>세출 중분류</label><select id="epExpMid" onchange="onPurExpMidChg(\'ep\')">'+actExpMidOpts(p.expTp||"",p.expMid||"")+'</select></div></div>'+
     '<div id="epBudgetInfo" style="padding:8px 12px;background:#f0f9ff;border:1px solid #bfdbfe;border-radius:6px;margin-top:8px;font-size:13px"></div>'+
     '<div class="frow fr2"><div><label>물품명</label><input type="text" id="epI" value="'+esc(p.it)+'"></div>'+
-    '<div><label>수량</label><input type="number" id="epQ" value="'+esc(p.qt)+'"></div></div>'+
-    '<div class="frow fr2"><div><label>단가(원)</label><input type="number" id="epU" value="'+esc(p.un)+'"></div>'+
+    '<div><label>수량</label><input type="number" id="epQ" value="'+esc(p.qt)+'" oninput="_epCalcTot()"></div></div>'+
+    '<div class="frow fr2"><div><label>단가(원)</label><input type="number" id="epU" value="'+esc(p.un)+'" oninput="_epCalcTot()"></div>'+
     '<div><label>합계(원)</label><input type="number" id="epT" value="'+esc(p.tot)+'"></div></div>'+
     '<div class="frow fr2" style="margin-top:10px"><div><label>사용 카드/통장</label><select id="epCard" onchange="_refreshEpPayM()">'+purCardOpts(p.card||"")+'</select></div>'+
-    '<div><label>결제방법</label><select id="epPayM">'+incPayOpts(p.card||"", p.payM||"")+'</select></div></div>'+
+    '<div><label>결제방법</label><select id="epPayM" onchange="_taxToggle(\'ep\')">'+incPayOpts(p.card||"", p.payM||"")+'</select></div></div>'+
+    taxBoxHtml("ep", p)+
     // 거래처(지급처) — 검색 + 주소/상호/대표자 수정 가능
     '<div style="background:#f0f9ff;border:1px solid #bfdbfe;border-radius:8px;padding:10px 12px;margin-top:12px">'+
     '<label style="font-weight:600;display:block;margin-bottom:6px">🏢 지급처 (거래처)</label>'+
@@ -7363,15 +7440,32 @@ function edPur(id){
     '<div class="frow fr1" style="margin-top:10px"><div><label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="epNoMgmt"'+(noM?" checked":"")+'> 지출결의서 번호 없음</label>'+
     '<input type="text" id="epMgmtNo" placeholder="관리번호" value="'+esc(p.mgmtNo||"")+'" style="font-size:13px;padding:8px;margin-top:4px;width:100%"></div></div>'+
     '<div style="text-align:right;margin-top:14px"><button class="btn btn-b" onclick="savePur(\''+id+'\')">저장</button></div>');
+  _taxToggle("ep");
+}
+function _epCalcTot(){
+  var q=parseFloat((document.getElementById("epQ")||{}).value), u=parseFloat((document.getElementById("epU")||{}).value);
+  var t=document.getElementById("epT"); if(t && isFinite(q) && isFinite(u)) t.value=Math.round(q*u);
 }
 async function savePur(id){
   var pv=function(i){var e=document.getElementById(i);return e?e.value:""};
   var pc=function(i){var e=document.getElementById(i);return e?e.checked:false};
+  var _old=null; for(var oi=0;oi<purs.length;oi++) if(purs[oi].id==id){_old=purs[oi];break}
+  var _payE=pv("epPayM"), _taxE=_taxRead("ep"), _taxInpE=document.getElementById("epTax");
+  var _taxNew=(_taxInpE&&_taxInpE.files)?_taxInpE.files.length:0, _taxOld=((_old&&_old.taxDoc)||[]).length;
+  if(_isBankPay(_payE) && !_taxNew && !_taxOld){
+    if(!confirm("계좌이체인데 "+(_taxE.tp==="alt"?"대체 증빙":"전자세금계산서")+"이(가) 첨부되지 않았어요.\n(보탬e: 계좌이체는 증빙 첨부 필수)\n\n그래도 저장할까요? 나중에 목록의 '+세금계산서' 버튼으로 붙일 수 있어요.")) return;
+  }
   var p={id:id,dt:pv("epD"),dtIni:pv("epDtIni"),it:pv("epI"),qt:pv("epQ"),un:pv("epU"),tot:pv("epT"),payM:pv("epPayM"),
     gwan:pv("epGwan"),expTp:pv("epExpTp"),expMid:pv("epExpMid"),incTp:pv("epIncTp"),incSub:pv("epIncSub"),card:pv("epCard"),
     noMgmt:pc("epNoMgmt"),mgmtNo:pv("epMgmtNo").trim(),
     vendorId:pv("epVendorId"), vendorName:pv("epVendorName"), vendorCeo:pv("epVendorCeo"), vendorAddr:pv("epVendorAddr")};
   showLoading("저장 중...");
+  if(_isBankPay(_payE)){
+    p.taxTp=_taxE.tp; p.taxAltRs=_taxE.rs;
+    var _tu=[];
+    if(_taxNew){ var _tf=await readFiles(_taxInpE); _tu=_tf.length?await uploadAll(_tf,(_old&&_old.ar)||"","세금계산서"):[]; showLoading("저장 중..."); }
+    p.taxDoc=((_old&&_old.taxDoc)||[]).concat(_tu);
+  }
   var r=await api("updatePur",p);
   hideLoading();
   if(!r.ok){alert(r.err||"실패");return}
@@ -16566,7 +16660,7 @@ async function delAdm(uid){
 }
 
 // ===== 사진 첨부 =====
-function attStart(tp,id){ATT={t:tp,i:id};document.getElementById("attF").click()}
+function attStart(tp,id){ATT={t:tp,i:id};var f=document.getElementById("attF");f.accept=(tp=="tax")?"image/*,application/pdf":"image/*";f.click()}
 async function doAttach(inp){
   if(!ATT||!inp.files||!inp.files.length)return;
   var tp=ATT.t,id=ATT.i,item=null,ar="";
@@ -16576,13 +16670,18 @@ async function doAttach(inp){
   ar=item.ar||"";
   showLoading("사진 업로드...");
   var files=await readFiles(inp);
-  var type=tp=="act"?"활동사진":tp=="rc"?"영수증":"물품사진";
+  var type=tp=="act"?"활동사진":tp=="rc"?"영수증":tp=="tax"?"세금계산서":"물품사진";
   var urls=await uploadAll(files,ar,type);
   if(urls.length){
     if(tp=="act"){
       var newPh=(item.ph||[]).concat(urls);
       var r=await api("updateAct",{id:id,ph:newPh});
       if(r.ok){item.ph=newPh;toast("사진 "+urls.length+"장 첨부");}
+      else toast(r.err,true);
+    } else if(tp=="tax"){
+      var newTx=(item.taxDoc||[]).concat(urls);
+      var r=await api("updatePur",{id:id,taxDoc:newTx,taxTp:item.taxTp||"etax"});
+      if(r.ok){item.taxDoc=newTx;item.taxTp=item.taxTp||"etax";toast("🧾 증빙 "+urls.length+"개 첨부");}
       else toast(r.err,true);
     } else if(tp=="rc"){
       var newRc=(item.rc||[]).concat(urls);
@@ -16604,7 +16703,7 @@ async function delPh(tp,id,idx){
   if(tp=="act"){for(var i=0;i<acts.length;i++)if(acts[i].id==id){item=acts[i];break}}
   else{for(var i=0;i<purs.length;i++)if(purs[i].id==id){item=purs[i];break}}
   if(!item)return;
-  var arr=tp=="rc"?(item.rc||[]):(item.ph||[]);
+  var arr=tp=="rc"?(item.rc||[]):tp=="tax"?(item.taxDoc||[]):(item.ph||[]);
   var url=arr[idx];
   showLoading("삭제 중...");
   await api("deletePhoto",{url:url});
@@ -16612,6 +16711,7 @@ async function delPh(tp,id,idx){
   var r;
   if(tp=="act")r=await api("updateAct",{id:id,ph:arr});
   else if(tp=="rc")r=await api("updatePur",{id:id,rc:arr});
+  else if(tp=="tax"){item.taxDoc=arr;r=await api("updatePur",{id:id,taxDoc:arr});}
   else r=await api("updatePur",{id:id,ph:arr});
   hideLoading();
   if(!r.ok){toast(r.err,true);return}
