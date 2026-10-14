@@ -6952,6 +6952,8 @@ function purCardOpts(sel, filterTp, filterSub){
   return h;
 }
 
+// 📷 첨부 열기 — mode 'img' = 사진·갤러리(폰: 사진 선택기, 여러 장) / 'pdf' = PDF 파일(파일 탐색기)
+function _pickFile(inputId, mode){ var i=document.getElementById(inputId); if(!i) return; i.accept=(mode==='pdf')?'application/pdf':'image/*'; i.click(); }
 // ===== 📎 증빙 첨부 칸 (등록·수정 공용) — 파일 선택 버튼 + 미리보기 + × 빼기 (+상품캡처는 Ctrl+V) =====
 //   px: 등록 "p" / 수정 "ep".  _ATT[px+k]=새로 고른 파일들, _ATT_EX[px+k]=이미 저장된 주소, _ATT_DEL[px+k]={주소:1} 뺄 것
 var ATT_TYPES=[
@@ -6974,7 +6976,8 @@ function _attSlotHtml(px, t){
   h+='</div>';
   h+='<input type="file" id="'+id+'" multiple accept="'+t.acc+'" style="display:none" onchange="_attAdd(\''+px+'\',\''+t.k+'\',this)">';
   h+='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">';
-  h+='<button type="button" onclick="document.getElementById(\''+id+'\').click()" style="background:'+t.fg+';color:#fff;border:none;border-radius:6px;padding:8px 12px;font-size:13px;font-weight:700;cursor:pointer">📁 파일 선택</button>';
+  h+='<button type="button" onclick="_pickFile(\''+id+'\',\'img\')" style="background:'+t.fg+';color:#fff;border:none;border-radius:6px;padding:8px 12px;font-size:13px;font-weight:700;cursor:pointer">🖼 사진·갤러리</button>';
+  if(/pdf/.test(t.acc)) h+='<button type="button" onclick="_pickFile(\''+id+'\',\'pdf\')" style="background:#475569;color:#fff;border:none;border-radius:6px;padding:8px 12px;font-size:13px;font-weight:700;cursor:pointer">📄 PDF 파일</button>';
   if(t.paste) h+='<div tabindex="0" onpaste="_attPaste(event,\''+px+'\',\''+t.k+'\')" onclick="this.focus()" style="flex:1;min-width:160px;padding:8px;border:1.5px dashed '+t.bd+';border-radius:6px;background:#fff;color:'+t.fg+';font-size:12.5px;text-align:center;cursor:text">📋 여기 누르고 <b>Ctrl+V</b> (캡처 붙여넣기)</div>';
   h+='</div>';
   h+='<div id="'+id+'_prev" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">'+_attPrevHtml(px,t.k)+'</div>';
@@ -7612,7 +7615,8 @@ function taxBoxHtml(px, p){
   h+='</div>';
   if(docs.length) h+='<div style="font-size:12px;color:#166534;margin-bottom:6px">✅ 이미 첨부된 증빙 '+docs.length+'개 (추가하려면 아래에서 파일 선택)</div>';
   h+='<label id="'+px+'TaxLbl" style="font-size:12px;color:#7c2d12;font-weight:600">'+(alt?'대체 증빙 파일 (보험증서·수령증 등)':'전자세금계산서 파일')+' <span style="font-weight:400;color:#9a3412">— 사진 또는 PDF, 여러 개 가능</span></label>';
-  h+='<input type="file" id="'+px+'Tax" multiple accept="image/*,application/pdf" style="width:100%;margin-top:4px" onchange="_attPrevInput(this,\''+px+'TaxPrev\')">';
+  h+='<input type="file" id="'+px+'Tax" multiple accept="image/*,application/pdf" style="display:none" onchange="_attPrevInput(this,\''+px+'TaxPrev\')">';
+  h+='<div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap"><button type="button" onclick="_pickFile(\''+px+'Tax\',\'img\')" style="background:#c2410c;color:#fff;border:none;border-radius:6px;padding:8px 12px;font-size:13px;font-weight:700;cursor:pointer">🖼 사진·갤러리</button><button type="button" onclick="_pickFile(\''+px+'Tax\',\'pdf\')" style="background:#475569;color:#fff;border:none;border-radius:6px;padding:8px 12px;font-size:13px;font-weight:700;cursor:pointer">📄 PDF 파일</button><span style="font-size:11px;color:#9a3412;align-self:center">※ 다시 고르면 앞에 고른 건 바뀌어요</span></div>';
   h+='<div id="'+px+'TaxPrev" style="display:flex;flex-wrap:wrap"></div>';
   h+='</div>';
   return h;
@@ -17646,7 +17650,9 @@ async function delAdm(uid){
 }
 
 // ===== 사진 첨부 =====
-function attStart(tp,id){ATT={t:tp,i:id};var f=document.getElementById("attF");f.accept=(tp=="tax"||tp=="qt"||tp=="st"||tp=="rc"||tp=="pc")?"image/*,application/pdf":"image/*";f.click()}
+function attStart(tp,id){ATT={t:tp,i:id};var f=document.getElementById("attF");var doc=(tp=="tax"||tp=="qt"||tp=="st"||tp=="rc"||tp=="pc");
+  if(doc&&IS_MOBILE){ openPopup2('<h3>첨부 방법 <button class="close-x" onclick="closePopup2()">&times;</button></h3><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><button type="button" onclick="closePopup2();_pickFile(\'attF\',\'img\')" style="background:#334155;color:#fff;border:none;border-radius:10px;padding:18px 8px;font-size:15px;font-weight:700">🖼 사진·갤러리<div style="font-size:11px;font-weight:400;margin-top:3px">여러 장 골라 넣기</div></button><button type="button" onclick="closePopup2();_pickFile(\'attF\',\'pdf\')" style="background:#475569;color:#fff;border:none;border-radius:10px;padding:18px 8px;font-size:15px;font-weight:700">📄 PDF 파일<div style="font-size:11px;font-weight:400;margin-top:3px">세금계산서·견적서 PDF</div></button></div>',420); return; }
+  f.accept=doc?"image/*,application/pdf":"image/*";f.click()}
 async function doAttach(inp){
   if(!ATT||!inp.files||!inp.files.length)return;
   var tp=ATT.t,id=ATT.i,item=null,ar="";
