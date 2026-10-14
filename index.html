@@ -9964,11 +9964,22 @@ function incCardDel(name){
 }
 
 // ===== 세출관리 (ExpBG) =====
+// ⏳ 결제 전(계약·예정) 합계 — 세출 가용 계산용
+function preSumFor(match){
+  var s=0;
+  (purs||[]).forEach(function(p){
+    if (!(typeof _isPre==="function" && _isPre(p))) return;
+    var obj = { expTp:p.expTp||"", expMid:p.expMid||"", expSub:p.expSub||"", outAm:Number(p.tot)||0 };
+    if (match(obj)) s += obj.outAm;
+  });
+  return s;
+}
 function txnSumFor(match){
   // 실제 집행 합계 = purs + exps (기존 txn 배열은 빈 채로 유지)
   var s=0;
   // purs 는 {expTp, expMid, expSub, tot} 형태
   (purs||[]).forEach(function(p){
+    if (typeof _isPre==="function" && _isPre(p)) return;   // 결제 전(예정)은 집행에서 제외
     var obj = { expTp:p.expTp||"", expMid:p.expMid||"", expSub:p.expSub||"", outAm:Number(p.tot)||0 };
     if (match(obj)) s += obj.outAm;
   });
@@ -10005,6 +10016,7 @@ function dExp(){
   (purs||[]).forEach(function(p){
     if (f.tp && p.expTp !== f.tp) return;
     if (f.gwan && p.gwan !== f.gwan) return;
+    if (typeof _isPre==="function" && _isPre(p)) return;   // 결제 전 제외
     totUse += (Number(p.tot)||0);
   });
   (exps||[]).forEach(function(e){
@@ -10093,6 +10105,7 @@ function dExp(){
     });
     // 대분류 집행 직접 기록분도 포함 (mid 없이 바로 대분류로 집행된 건)
     useSum += txnSumFor(function(x){ return x.expTp===t && (!x.expMid || x.expMid===""); });
+    var preSum = preSumFor(function(x){ return x.expTp===t; });   // ⏳ 결제 전 (이 대분류 전체)
     // 대분류 예산이 0이면 중분류 합으로 대체
     var effectiveBudget = (bigBudget>0) ? bigBudget : midPlanSum;
     // 대분류 미배정 잔여 = 대분류 예산 - 중분류 배정 합 (대분류 0이면 0)
@@ -10113,6 +10126,9 @@ function dExp(){
     h += '<div style="background:#fff;border:1px solid '+(unallocated<0?"#fca5a5":"#86efac")+';border-radius:6px;padding:8px;text-align:center"><div style="color:'+(unallocated<0?"#b91c1c":"#166534")+';font-weight:600">미배정 잔여</div><div style="font-size:16px;font-weight:800;color:'+(unallocated<0?"#991b1b":"#14532d")+'">'+(unallocated<0?"⚠ ":"")+fmtKRW(unallocated)+'</div></div>';
     h += '<div style="background:#fff;border:1px solid #fb923c;border-radius:6px;padding:8px;text-align:center"><div style="color:#ea580c;font-weight:600">실제 집행</div><div style="font-size:16px;font-weight:800;color:#9a3412">'+fmtKRW(useSum)+'</div></div>';
     h += '<div style="background:#fff;border:1px solid '+(bigRem<0?"#fca5a5":"#86efac")+';border-radius:6px;padding:8px;text-align:center"><div style="color:'+(bigRem<0?"#b91c1c":"#166534")+';font-weight:600">예산 남음</div><div style="font-size:16px;font-weight:800;color:'+(bigRem<0?"#991b1b":"#14532d")+'">'+(bigRem<0?"⚠ ":"")+fmtKRW(bigRem)+'</div></div>';
+    var bigAvail = effectiveBudget - useSum - preSum;
+    h += '<div style="background:#fff;border:1px solid #fcd34d;border-radius:6px;padding:8px;text-align:center"><div style="color:#92400e;font-weight:600">⏳ 결제 전</div><div style="font-size:16px;font-weight:800;color:#92400e">'+fmtKRW(preSum)+'</div></div>';
+    h += '<div style="background:#fff;border:2px solid '+(bigAvail<0?"#dc2626":"#334155")+';border-radius:6px;padding:8px;text-align:center"><div style="color:'+(bigAvail<0?"#b91c1c":"#0f172a")+';font-weight:700">남은 가용</div><div style="font-size:16px;font-weight:900;color:'+(bigAvail<0?"#b91c1c":"#0f172a")+'">'+(bigAvail<0?"⚠ ":"")+fmtKRW(bigAvail)+'</div></div>';
     h += '</div></div>';
     var planSum=midPlanSum, remSum=bigRem;
 
@@ -10125,6 +10141,8 @@ function dExp(){
         +  '<th style="padding:8px;text-align:right">사업계획비</th>'
         +  '<th style="padding:8px;text-align:right">사용금액</th>'
         +  '<th style="padding:8px;text-align:right">남은금액</th>'
+        +  '<th style="padding:8px;text-align:right;color:#92400e">⏳ 결제 전</th>'
+        +  '<th style="padding:8px;text-align:right">남은 가용</th>'
         +  '<th style="padding:8px;text-align:left">비고</th>'
         +  '<th style="padding:8px;width:110px"></th>'
         +  '</tr></thead><tbody>';
@@ -10138,6 +10156,10 @@ function dExp(){
         h += '<td style="padding:8px;text-align:right;color:'+(used>0?'#744210':'#a0aec0')+'">'+fmtKRW(used)+'</td>';
         h += '<td style="padding:8px;text-align:right;color:'+(over?'#c53030':'#22543d')+';font-weight:'+(over?'700':'500')+'">'
           +  (over?'⚠ 예산초과 ':'')+fmtKRW(rem)+'</td>';
+        var pre = preSumFor(function(x){ return x.expTp===t && x.expMid===r.mid && (r.sub?x.expSub===r.sub:true); });
+        var avail = rem - pre;
+        h += '<td style="padding:8px;text-align:right;color:'+(pre>0?'#92400e':'#a0aec0')+'">'+(pre>0?fmtKRW(pre):'-')+'</td>';
+        h += '<td style="padding:8px;text-align:right;font-weight:800;color:'+(avail<0?'#c53030':'#0f172a')+'">'+(avail<0?'⚠ ':'')+fmtKRW(avail)+(avail<0&&!over?'<div style="font-size:10px">오버 예상</div>':'')+'</td>';
         h += '<td style="padding:8px;color:#718096;font-size:12px">'+esc(r.note||'')+'</td>';
         h += '<td style="padding:8px;text-align:right;white-space:nowrap">';
         h += '<button class="btn btn-s" style="background:#2563eb;color:#fff;font-weight:700" onclick="expEdit('+r._idx+')">수정</button> ';
@@ -10149,7 +10171,6 @@ function dExp(){
     h += '</div>';
   });
   h += '</div></div>';
-  h=_plBudgetTable()+h;   // 📊 항목별 가용 예산 (예산 − 결제 완료 − 결제 전)
   return h;
 }
 
