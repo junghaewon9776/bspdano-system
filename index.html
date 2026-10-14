@@ -6622,9 +6622,12 @@ function _purSeqUi(inv){
 // 💳 카드/통장별 잔액 — 세입(inc.card) 합계 − 구매(purs.card)·지출(exps.card) 을 날짜순 누적
 //   byInv[명세서] = {card, after(이 건 결제 후 잔액)} / cards[이름] = {inc, used, bal}
 function _purCardRunBal(){
+  // 카드/통장별: 입금(dpst) − 사용(구매·지출) = 실제 잔액 / 예산(inc) − 사용 = 예산 잔액. 날짜순 누적(같은 날은 입금 먼저)
   var cards={}, byInv={};
-  (inc||[]).forEach(function(r){ var c=String(r.card||"").trim(); if(!c) return; (cards[c]=cards[c]||{inc:0,used:0,bal:0}).inc+=pn(r.am); });
+  var C=function(c){ return cards[c]=cards[c]||{plan:0,dep:0,used:0,bal:0,planBal:0,depN:0}; };
+  (inc||[]).forEach(function(r){ var c=String(r.card||"").trim(); if(!c) return; C(c).plan+=pn(r.am); });
   var ev=[], invIdx={};
+  (dpst||[]).forEach(function(d){ var c=String(d.payM||"").trim(); if(!c) return; C(c).depN++; ev.push({k:"dep",card:c,dt:normD(d.dt)||"",ca:"",ord:null,am:pn(d.am)}); });
   (purs||[]).forEach(function(p){
     var c=String(p.card||"").trim(); if(!c) return;
     var iv=p.inv||p.id;
@@ -6633,14 +6636,16 @@ function _purCardRunBal(){
   });
   (exps||[]).forEach(function(e){ var c=String(e.card||"").trim(); if(!c) return; ev.push({k:"exp",card:c,dt:normD(e.dt)||"",ca:String(e.createdAt||""),am:pn(e.am)}); });
   var _DO=_purDayOrder();
-  ev.forEach(function(x){ if(x.k==="pur"&&_DO.meta[x.inv]){ x.ord=_DO.meta[x.inv].ord; x.ca=_DO.meta[x.inv].ca; } else x.ord=null; });
+  ev.forEach(function(x){ if(x.k==="pur"&&_DO.meta[x.inv]){ x.ord=_DO.meta[x.inv].ord; x.ca=_DO.meta[x.inv].ca; } else if(x.k!=="dep") x.ord=null; });
   ev.sort(_purSeqCmp);
   ev.forEach(function(x){
-    var c=(cards[x.card]=cards[x.card]||{inc:0,used:0,bal:0});
+    var c=C(x.card);
+    if(x.k==="dep"){ c.dep+=x.am; return; }
     c.used+=x.am;
-    if(x.k==="pur") byInv[x.inv]={card:x.card, after:c.inc-c.used};
+    if(x.k==="pur") byInv[x.inv]={card:x.card, after:c.dep-c.used, planAfter:c.plan-c.used};
   });
-  Object.keys(cards).forEach(function(k){ cards[k].bal=cards[k].inc-cards[k].used; });
+  Object.keys(cards).forEach(function(k){ var c=cards[k]; c.bal=c.dep-c.used; c.planBal=c.plan-c.used; });
+  Object.keys(byInv).forEach(function(iv){ byInv[iv].hasDep=cards[byInv[iv].card].depN>0; });
   return {cards:cards, byInv:byInv};
 }
 // 구매 목록 카드 보조 — 발행/서명 상태 글자, 증빙 썸네일
@@ -6828,11 +6833,18 @@ function dPur(){
   if(_rbKeys.length && canSeeAmt()){
     h+='<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px">';
     _rbKeys.forEach(function(k){
-      var c=_RB.cards[k], neg=c.bal<0;
-      h+='<div style="flex:1;min-width:220px;border:1.5px solid '+(neg?'#fca5a5':'#bfdbfe')+';background:'+(neg?'#fef2f2':'#eff6ff')+';border-radius:10px;padding:8px 12px">';
+      var c=_RB.cards[k], hasDep=c.depN>0, show=hasDep?c.bal:c.planBal, neg=show<0;
+      h+='<div style="flex:1;min-width:220px;border:1.5px solid '+(neg?'#fca5a5':'#cbd5e1')+';background:'+(neg?'#fef2f2':'#fff')+';border-radius:10px;padding:8px 12px">';
       h+='<div style="font-weight:800;font-size:14px;color:#0f172a">💳 '+esc(k)+'</div>';
-      h+='<div style="font-size:13px;color:#334155;margin-top:2px">세입 '+fm(c.inc)+'원 − 사용 '+fm(c.used)+'원</div>';
-      h+='<div style="font-size:17px;font-weight:800;color:'+(neg?'#dc2626':'#1d4ed8')+';margin-top:2px">잔액 '+fm(c.bal)+'원'+(neg?' ⚠':'')+'</div>';
+      if(hasDep){
+        h+='<div style="font-size:13px;color:#334155;margin-top:2px">입금 '+fm(c.dep)+'원 − 사용 '+fm(c.used)+'원</div>';
+        h+='<div style="font-size:17px;font-weight:800;color:'+(neg?'#dc2626':'#0f172a')+';margin-top:2px">잔액 '+fm(c.bal)+'원'+(neg?' ⚠':'')+'</div>';
+        if(c.plan) h+='<div style="font-size:11.5px;color:#64748b">예산 '+fm(c.plan)+'원 · 예산 잔액 '+fm(c.planBal)+'원</div>';
+      } else {
+        h+='<div style="font-size:12.5px;color:#c2410c;font-weight:700;margin-top:2px">⚠ 입금 미등록 — 세입관리 [+ 입금 등록]</div>';
+        h+='<div style="font-size:16px;font-weight:800;color:'+(neg?'#dc2626':'#334155')+';margin-top:2px">예산 잔액 '+fm(c.planBal)+'원</div>';
+        h+='<div style="font-size:11.5px;color:#64748b">예산 '+fm(c.plan)+'원 − 사용 '+fm(c.used)+'원</div>';
+      }
       h+='</div>';
     });
     h+='</div>';
@@ -6857,7 +6869,8 @@ function dPur(){
       h+='</div>';
       if(canSeeAmt()){
         h+='<div style="text-align:right;margin-left:auto"><div style="font-size:11px;color:#64748b">합계</div><div style="font-weight:900;font-size:19px;color:#0f172a;line-height:1.15">'+fm(G.tot)+'원</div>';
-        if(_RB.byInv[G.inv]) h+='<div style="font-size:12px;color:'+(_RB.byInv[G.inv].after<0?'#dc2626;font-weight:700':'#475569')+'">'+esc(_RB.byInv[G.inv].card)+' 잔액 '+fm(_RB.byInv[G.inv].after)+'원</div>';
+        var _rb=_RB.byInv[G.inv];
+        if(_rb){ var _rv=_rb.hasDep?_rb.after:_rb.planAfter; h+='<div style="font-size:12px;color:'+(_rv<0?'#dc2626;font-weight:700':'#475569')+'">'+esc(_rb.card)+(_rb.hasDep?' 잔액 ':' 예산 잔액 ')+fm(_rv)+'원'+(_rb.hasDep?'':' <span style="color:#c2410c">(입금 미등록)</span>')+'</div>'; }
         h+='</div>';
       }
       h+='</div>';
