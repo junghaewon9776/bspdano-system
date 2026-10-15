@@ -6764,13 +6764,13 @@ function dPur(){
     });
   }
   var pdf=getDF("pur");
-  if(pdf.f)fp=fp.filter(function(p){return inRange(p.dt,pdf.f,pdf.t)});
+  if(pdf.f)fp=fp.filter(function(p){return (_isPre(p)&&!p.dt)||inRange(p.dt,pdf.f,pdf.t)});
   // 명세서 단위로 그룹화 (inv 기준) — 대표행(첫 물품)의 prtD/signU 사용
   var groups={};var order=[];
   for(var i=0;i<fp.length;i++){var p=fp[i];var iv=p.inv||p.id;if(!groups[iv]){groups[iv]={inv:iv,dt:p.dt,ar:p.ar,by:p.by,items:[],tot:0,prtD:p.prtD||"",signU:p.signU||"",mgmtNo:p.mgmtNo||"",noMgmt:(p.noMgmt==="Y"||p.noMgmt===true),gwan:p.gwan||"",expTp:p.expTp||"",expMid:p.expMid||"",card:p.card||""};order.push(iv)}groups[iv].items.push(p);groups[iv].tot+=pn(p.tot);if(!groups[iv].prtD&&p.prtD)groups[iv].prtD=p.prtD;if(!groups[iv].signU&&p.signU)groups[iv].signU=p.signU;if(!groups[iv].mgmtNo&&p.mgmtNo)groups[iv].mgmtNo=p.mgmtNo;}
   _esigListen(); _plListen();
   var _PM=window._PUR_PM=_purDayOrder();
-  var gListAll=order.map(function(iv){return groups[iv]}).sort(function(a,b){return -_purSeqCmp(_PM.meta[a.inv]||{dt:normD(a.dt)},_PM.meta[b.inv]||{dt:normD(b.dt)});});
+  var gListAll=order.map(function(iv){return groups[iv]}).sort(function(a,b){ var ap=_isPreG(a), bp=_isPreG(b); if(ap!==bp) return ap?-1:1; var an=!normD(a.dt), bn_=!normD(b.dt); if(an!==bn_) return an?-1:1; return -_purSeqCmp(_PM.meta[a.inv]||{dt:normD(a.dt)},_PM.meta[b.inv]||{dt:normD(b.dt)});});
   // 필터 적용 (미발행/미서명)
   var gList=gListAll.filter(function(G){
     if(PUR_SHOW_UNPRT && G.prtD) return false;
@@ -6950,7 +6950,7 @@ function dPur(){
       h+='<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;padding:10px 12px 8px;flex-wrap:wrap;background:'+_pk.tint+';border-bottom:1px solid '+_pk.line+';margin-bottom:8px">';
       h+='<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0">';
       h+='<input type="checkbox" class="purChk" '+checked+' onchange="purTog(\''+G.inv+'\',this.checked)" style="width:16px;height:16px;cursor:pointer">';
-      h+='<span style="font-weight:800;font-size:18px;color:#0f172a">'+esc(fmtDK(G.dt))+'</span>'+(_pk.lb?' <span style="background:'+_pk.bg+';color:#fff;font-weight:900;font-size:15px;padding:3px 12px;border-radius:7px;white-space:nowrap">'+_pk.lb+'</span>':'')+_purSeqUi(G.inv)+(_isPreG(G)?' <span style="background:#fef3c7;color:#92400e;border:1px solid #fcd34d;padding:2px 8px;border-radius:10px;font-size:12px;font-weight:800">⏳ 결제 전</span>':'');
+      h+=(G.dt?'<span style="font-weight:800;font-size:18px;color:#0f172a">'+esc(fmtDK(G.dt))+'</span>':'<span style="font-weight:800;font-size:17px;color:#92400e">📅 결제일 미정</span>')+(_pk.lb?' <span style="background:'+_pk.bg+';color:#fff;font-weight:900;font-size:15px;padding:3px 12px;border-radius:7px;white-space:nowrap">'+_pk.lb+'</span>':'')+_purSeqUi(G.inv)+(_isPreG(G)?' <span style="background:#fef3c7;color:#92400e;border:1px solid #fcd34d;padding:2px 8px;border-radius:10px;font-size:12px;font-weight:800">⏳ 결제 전</span>':'');
       if(G.mgmtNo) h+='<span style="font-size:12px;color:#475569">No. '+esc(G.mgmtNo)+'</span>';
       h+='</div>';
       if(canSeeAmt()){
@@ -7586,6 +7586,15 @@ function _purColWApply(){
   });
   if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",_purColWApply); else _purColWApply();
 })();
+// 결제 전(계약)은 날짜 없이 — 결제 처리할 때 결제일이 생김
+function _preDateToggle(px,on){
+  var d=document.getElementById(px+"D"); if(!d) return;
+  if(on){ d.setAttribute("data-keep",d.value); d.value=""; d.disabled=true; d.style.background="#fef3c7"; d.title="결제일 미정 — [✅ 결제 처리] 할 때 입력"; }
+  else { d.disabled=false; d.style.background=""; d.title=""; if(!d.value) d.value=d.getAttribute("data-keep")||today(); }
+  var n=document.getElementById(px+"DNote");
+  if(!n){ d.insertAdjacentHTML("afterend",'<div id="'+px+'DNote" style="font-size:12px;color:#92400e;font-weight:700;margin-top:2px"></div>'); n=document.getElementById(px+"DNote"); }
+  n.textContent=on?"⏳ 결제일 미정 — 결제 처리할 때 입력해요":"";
+}
 function _purPayFilterBar(all){
   var pre=all.filter(_isPreG), preTot=0, late=0, td=today(), allTot=0;
   pre.forEach(function(G){ preTot+=pn(G.tot); if(normD(G.dt)&&normD(G.dt)<td) late++; });
@@ -8125,7 +8134,7 @@ function popPur(){
   h+='<div id="pBudgetInfo" style="padding:8px 12px;background:#f0f9ff;border:1px solid #bfdbfe;border-radius:6px;margin-bottom:10px;font-size:13px"></div>';
   h+='<div class="frow fr2" style="margin-bottom:10px"><div><label>사용 카드/통장 <b style="color:#dc2626" title="나중에라도 꼭 선택 (비워도 등록은 돼요)">*</b> <span style="color:#888;font-size:11px">(물품 결제에 사용한 것)</span></label><select id="pCard" onchange="onPurCardChg()">'+purCardOpts("")+'</select></div>'+
     '<div><label>결제방법 <b style="color:#dc2626" title="나중에라도 꼭 선택 (비워도 등록은 돼요)">*</b> <span style="color:#888;font-size:11px">(지정카드/계좌이체 등)</span></label><select id="pPayM" onchange="_taxToggle(\'p\')">'+incPayOpts("","")+'</select></div></div>';
-  h+='<div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:14px"><label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:700"><input type="checkbox" id="pPre" style="width:18px;height:18px"> ⏳ 아직 결제 전 (계약·예정)으로 등록</label><span style="font-size:11.5px;color:#64748b">보통은 체크 없이 = 결제 완료. 체크하면 통장 잔액에 안 들어가고, 결제 후 목록에서 [✅ 결제 처리]</span></div>';
+  h+='<div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:14px"><label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:700"><input type="checkbox" id="pPre" style="width:18px;height:18px" onchange="_preDateToggle(\'p\',this.checked)"> ⏳ 아직 결제 전 (계약·예정)으로 등록</label><span style="font-size:11.5px;color:#64748b">보통은 체크 없이 = 결제 완료. 체크하면 통장 잔액에 안 들어가고, 결제 후 목록에서 [✅ 결제 처리]</span></div>';
   h+=taxBoxHtml("p");
   // 거래처(지급처) 정보 — 검색 후 자동 채움, 없으면 직접 입력
   h+='<div style="background:#f0f9ff;border:1px solid #bfdbfe;border-radius:8px;padding:10px 12px;margin-bottom:12px">';
@@ -8640,7 +8649,8 @@ function calcPurRow(el){calcPurCard(el)}
 function purRowHtml(n,bo){return purCardHtml(n,bo)}
 async function addP(){
   var d=document.getElementById("pD").value;
-  if(!d){alert("구매일을 입력하세요");return}
+  var _preReg=!!(document.getElementById("pPre")||{}).checked;
+  if(!d && !_preReg){alert("구매일을 입력하세요");return}
   var dtIni=(document.getElementById("pDtIni")&&document.getElementById("pDtIni").value)||"";
   var rows=document.querySelectorAll("#purRowBox .pRowCard");
   var items=[];
@@ -8720,7 +8730,7 @@ function edPur(id){
     '<div id="epBudgetInfo" style="padding:8px 12px;background:#f0f9ff;border:1px solid #bfdbfe;border-radius:6px;margin-top:8px;font-size:13px"></div>'+
     '<div class="frow fr2" style="margin-top:10px"><div><label>사용 카드/통장 <b style="color:#dc2626" title="나중에라도 꼭 선택 (비워도 등록은 돼요)">*</b></label><select id="epCard" onchange="_refreshEpPayM()">'+purCardOpts(p.card||"")+'</select></div>'+
     '<div><label>결제방법 <b style="color:#dc2626" title="나중에라도 꼭 선택 (비워도 등록은 돼요)">*</b></label><select id="epPayM" onchange="_taxToggle(\'ep\')">'+incPayOpts(p.card||"", p.payM||"")+'</select></div></div>'+
-    '<div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;margin-top:10px;font-size:14px"><label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:700"><input type="checkbox" id="epPre" style="width:18px;height:18px"'+(_isPre(p)?' checked':'')+'> ⏳ 아직 결제 전 (계약·예정)</label><span style="font-size:11.5px;color:#64748b">체크 = 통장 잔액에 안 들어감. 체크 풀고 저장 = 결제 완료 (같은 명세서 물품 전체)</span></div>'+
+    '<div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;margin-top:10px;font-size:14px"><label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:700"><input type="checkbox" id="epPre" style="width:18px;height:18px" onchange="_preDateToggle(\'ep\',this.checked)"'+(_isPre(p)?' checked':'')+'> ⏳ 아직 결제 전 (계약·예정)</label><span style="font-size:11.5px;color:#64748b">체크 = 통장 잔액에 안 들어감. 체크 풀고 저장 = 결제 완료 (같은 명세서 물품 전체)</span></div>'+
     taxBoxHtml("ep", p)+
     _attEditHtml(p)+
     // 거래처(지급처) — 검색 + 주소/상호/대표자 수정 가능
@@ -8741,6 +8751,7 @@ function edPur(id){
     '<div class="popStickyFoot" style="justify-content:space-between"><button class="btn btn-g" onclick="_epAddRow()">+ 항목 추가</button><div style="display:flex;gap:8px;margin-left:auto"><button class="btn" style="background:#475569;color:#fff;padding:12px 18px;font-size:15px" onclick="closePopup()">취소</button><button class="btn btn-b" style="padding:12px 32px;font-size:15px;font-weight:700" onclick="savePur(\''+id+'\')">저장</button></div></div>');
   purRowCnt=purs.filter(function(x){return (x.inv||x.id)===(p.inv||p.id);}).length;   // 추가 물품 번호는 기존 물품 다음부터
   _taxToggle("ep");
+  if(_isPre(p)) _preDateToggle("ep",true);
 }
 // 숫자에 천단위 콤마 (입력칸용: 숫자 외 문자 제거)
 function _cm(v){ var d=String(v==null?"":v).replace(/[^0-9]/g,""); return d?d.replace(/\B(?=(\d{3})+(?!\d))/g,","):""; }
@@ -8868,6 +8879,8 @@ async function savePur(id){
 
   // 결제 전 ↔ 결제 완료
   var _preNew=pc("epPre"), _preOld=_isPre(_old), _preChg=(_preNew!==_preOld);
+  if(_preNew) { if(_preChg) sh.dt=""; }                 // 결제 전 = 결제일 미정
+  else if(!sh.dt) sh.dt=today();                          // 결제 완료인데 날짜 없으면 오늘
   if(_preChg){ sh.payState=_preNew?"pre":""; sh.paidDt=_preNew?"":sh.dt; sh.paidAt=_preNew?"":((typeof now_==="function")?now_():new Date().toISOString()); if(!_preNew) sh.ord=""; }
   if(_isBankPay(_payE)){ sh.taxTp=_taxE.tp; sh.taxAltRs=_taxE.rs; }
 
