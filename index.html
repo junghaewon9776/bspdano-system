@@ -6607,6 +6607,25 @@ function purBadge(g){
 }
 // 📅 같은 날 결제 순서 — 명세서(inv)별 {dt, ord(사용자가 정한 순서), ca(등록시각), ids}
 //   정렬: 날짜 → ord(둘 다 있을 때) → 등록시각. ⬆⬇ 로 바꾸면 그 날짜 명세서 전체에 ord 10,20,30… 저장
+// 결제 전 건: 지금 잔액에서 날짜순(같은 날은 순서)으로 앞 건까지 누적해서 뺀 잔액. byInv[명세서]=잔액
+function _purPreAfter(RB){
+  var ev={}, list=[], DO=_purDayOrder(), out={}, cum={};
+  (purs||[]).forEach(function(p){
+    if(!_isPre(p)) return;
+    var c=String(p.card||"").trim(); if(!c) return;
+    var iv=p.inv||p.id;
+    if(!ev[iv]){ var m=DO.meta[iv]||{}; ev[iv]={inv:iv, card:c, dt:normD(p.dt)||"", ord:m.ord, ca:m.ca||"", am:0}; list.push(ev[iv]); }
+    ev[iv].am+=pn(p.tot);
+  });
+  list.sort(_purSeqCmp);
+  list.forEach(function(x){
+    var cc=RB.cards[x.card]; if(!cc) return;
+    var now=cc.depN>0?cc.bal:cc.planBal;
+    cum[x.card]=(cum[x.card]||0)+x.am;
+    out[x.inv]={after:now-cum[x.card], before:now-cum[x.card]+x.am};
+  });
+  return out;
+}
 function _purSeqCmp(a,b){
   var ad=a.dt||"", bd=b.dt||"";
   if(ad!==bd) return ad<bd?-1:1;
@@ -6894,7 +6913,7 @@ function dPur(){
   h+='<div class="card purList"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:6px"><h3 style="margin:0">구매 내역 (명세서 '+gList.length+(gList.length!=gListAll.length?"/"+gListAll.length:"")+'건 / 물품 '+fp.length+"건)</h3></div>";
   h+='<div style="display:flex;gap:6px;align-items:center;margin-bottom:10px"><div style="position:relative;flex:1;max-width:520px"><input type="search" id="purQ" value="'+esc(PUR_Q)+'" placeholder="🔍 검색 — 품목, 거래처, 분류, 카드, 금액, 날짜…" oninput="_purQIn(this)" oncompositionstart="_purQC=true" oncompositionend="_purQC=false;_purQIn(this)" autocomplete="off" style="width:100%;padding:10px 12px;font-size:15px;border:2px solid '+(PUR_Q?'#2563eb':'#cbd5e1')+';border-radius:8px"></div>'+(PUR_Q?'<span style="font-size:14px;font-weight:700;color:#1d4ed8;white-space:nowrap">'+gList.length+'건 찾음</span><button class="btn btn-s" style="background:#475569;color:#fff" onclick="PUR_Q=\'\';draw()">✕ 지우기</button>':'')+'</div>';
   h+=_purPayFilterBar(gListAll);
-  var _RB=_purCardRunBal(), _CB=_purCatRunBal();
+  var _RB=_purCardRunBal(), _CB=_purCatRunBal(), _PA=_purPreAfter(_RB);
   var _rbKeys=Object.keys(_RB.cards);
   if(_rbKeys.length && canSeeAmt()){
     h+='<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px">';
@@ -6939,8 +6958,8 @@ function dPur(){
         var _rb=_isPreG(G)?null:_RB.byInv[G.inv];
         if(_isPreG(G)){
           var _pc=String(G.card||"").trim(), _cc=_pc&&_RB.cards?_RB.cards[_pc]:null, _pam=pn(G.tot);
-          if(_cc){ var _hasD=_cc.depN>0, _now=_hasD?_cc.bal:_cc.planBal, _aft=_now-_pam;
-            h+='<div class="pAfter" style="color:'+(_aft<0?'#dc2626':'#92400e')+';background:'+(_aft<0?'#fee2e2':'#fef3c7')+';border:1px solid '+(_aft<0?'#fca5a5':'#fcd34d')+';border-radius:6px;padding:2px 8px;margin:3px 0;display:inline-block" title="지금 '+esc(_pc)+' 잔액 '+fm(_now)+'원에서 이 건을 결제하면">결제하면 '+esc(_pc)+(_hasD?' 잔액 ':' 예산 잔액 ')+(_aft<0?'⚠ ':'')+fm(_aft)+'원'+(_hasD?'':' <span style="color:#c2410c">(입금 미등록)</span>')+'</div>'; }
+          if(_cc){ var _hasD=_cc.depN>0, _now=_hasD?_cc.bal:_cc.planBal, _pa=_PA[G.inv], _aft=_pa?_pa.after:_now-_pam;
+            h+='<div class="pAfter" style="color:'+(_aft<0?'#dc2626':'#92400e')+';background:'+(_aft<0?'#fee2e2':'#fef3c7')+';border:1px solid '+(_aft<0?'#fca5a5':'#fcd34d')+';border-radius:6px;padding:2px 8px;margin:3px 0;display:inline-block" title="'+(_pa?'앞의 결제 전 건까지 결제한 잔액 '+fm(_pa.before)+'원에서 이 건 '+fm(_pam)+'원을 결제하면':'지금 '+esc(_pc)+' 잔액 '+fm(_now)+'원에서 이 건을 결제하면')+'">💰 가용잔액 '+(_aft<0?'⚠ ':'')+fm(_aft)+'원'+(_aft<0?' 부족':'')+(_hasD?'':' <span style="color:#c2410c">(입금 미등록)</span>')+'</div>'; }
           else h+='<div style="font-size:12px;color:#64748b">통장 잔액엔 아직 안 빠짐</div>';
         }
         var _cb=_CB[G.inv];
