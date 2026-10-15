@@ -6937,7 +6937,6 @@ function dPur(){
         var _rb=_isPreG(G)?null:_RB.byInv[G.inv];
         if(_isPreG(G)){
           var _pc=String(G.card||"").trim(), _cc=_pc&&_RB.cards?_RB.cards[_pc]:null, _pam=pn(G.tot);
-          h+='<div style="font-size:12.5px;color:#92400e;font-weight:700">⏳ 결제할 금액 '+fm(_pam)+'원</div>';
           if(_cc){ var _hasD=_cc.depN>0, _now=_hasD?_cc.bal:_cc.planBal, _aft=_now-_pam;
             h+='<div style="font-size:12px;color:'+(_aft<0?'#dc2626;font-weight:800':'#475569')+'" title="지금 '+esc(_pc)+' 잔액 '+fm(_now)+'원에서 이 건을 결제하면">결제하면 '+esc(_pc)+(_hasD?' 잔액 ':' 예산 잔액 ')+(_aft<0?'⚠ ':'')+fm(_aft)+'원'+(_hasD?'':' <span style="color:#c2410c">(입금 미등록)</span>')+'</div>'; }
           else h+='<div style="font-size:12px;color:#64748b">통장 잔액엔 아직 안 빠짐</div>';
