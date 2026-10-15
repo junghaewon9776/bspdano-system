@@ -115,6 +115,8 @@ label{display:block;font-size:10px;color:#999;margin-bottom:3px}
 .purList .pCard{margin-bottom:26px!important;border-top-width:2px!important;border-right-width:2px!important;border-bottom-width:2px!important;border-left-width:6px!important;box-shadow:0 3px 10px rgba(15,23,42,.14);border-radius:10px!important}
 .purList .pAmt > div:nth-child(n+3){font-size:14px!important;line-height:1.5}
 @media(max-width:600px){ .purList .pAmt > div:nth-child(n+3){font-size:12.5px!important} }
+.purList .pAmt > div.pAfter{font-size:16px!important;font-weight:800}
+@media(max-width:600px){ .purList .pAmt > div.pAfter{font-size:14px!important} }
 .purList .pCard tbody td{padding-top:10px!important;padding-bottom:10px!important}
 .purList .pCard tbody td:first-child{font-weight:700!important;font-size:17px}
 @media(max-width:600px){
@@ -6938,7 +6940,7 @@ function dPur(){
         if(_isPreG(G)){
           var _pc=String(G.card||"").trim(), _cc=_pc&&_RB.cards?_RB.cards[_pc]:null, _pam=pn(G.tot);
           if(_cc){ var _hasD=_cc.depN>0, _now=_hasD?_cc.bal:_cc.planBal, _aft=_now-_pam;
-            h+='<div style="font-size:12px;color:'+(_aft<0?'#dc2626;font-weight:800':'#475569')+'" title="지금 '+esc(_pc)+' 잔액 '+fm(_now)+'원에서 이 건을 결제하면">결제하면 '+esc(_pc)+(_hasD?' 잔액 ':' 예산 잔액 ')+(_aft<0?'⚠ ':'')+fm(_aft)+'원'+(_hasD?'':' <span style="color:#c2410c">(입금 미등록)</span>')+'</div>'; }
+            h+='<div class="pAfter" style="color:'+(_aft<0?'#dc2626':'#92400e')+';background:'+(_aft<0?'#fee2e2':'#fef3c7')+';border:1px solid '+(_aft<0?'#fca5a5':'#fcd34d')+';border-radius:6px;padding:2px 8px;margin:3px 0;display:inline-block" title="지금 '+esc(_pc)+' 잔액 '+fm(_now)+'원에서 이 건을 결제하면">결제하면 '+esc(_pc)+(_hasD?' 잔액 ':' 예산 잔액 ')+(_aft<0?'⚠ ':'')+fm(_aft)+'원'+(_hasD?'':' <span style="color:#c2410c">(입금 미등록)</span>')+'</div>'; }
           else h+='<div style="font-size:12px;color:#64748b">통장 잔액엔 아직 안 빠짐</div>';
         }
         var _cb=_CB[G.inv];
