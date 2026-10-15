@@ -104,6 +104,9 @@ label{display:block;font-size:10px;color:#999;margin-bottom:3px}
 .purList .photoTh{width:46px;height:36px;border-radius:4px}
 .purList .attMany{display:inline-flex;flex-wrap:wrap;gap:2px}
 .purList .attOne{display:none}
+.purFab{position:fixed;right:22px;bottom:24px;z-index:60;background:#2563eb;color:#fff;border:none;border-radius:30px;padding:14px 22px;font-size:17px;font-weight:900;box-shadow:0 6px 18px rgba(37,99,235,.45);cursor:pointer}
+.purFab:hover{background:#1d4ed8}
+@media(max-width:600px){ .purFab{right:14px;bottom:16px;padding:12px 18px;font-size:15px} }
 .purList .pCard table{font-size:16.5px!important}
 .purList .pCard thead tr{background:#e2e8f0!important;color:#0f172a!important}
 .purList .pCard thead th{font-size:17px!important;color:#0f172a!important;padding-top:9px!important;padding-bottom:9px!important;font-weight:800!important;position:relative;border-right:2px solid #cbd5e1;overflow:hidden;text-overflow:ellipsis}
@@ -6778,6 +6781,7 @@ function dPur(){
     if(PUR_PAYF==="pre" && !_isPreG(G)) return false;
     if(PUR_PAYF==="paid" && _isPreG(G)) return false;
     if(PUR_Q && !_purMatch(G,PUR_Q)) return false;
+    if(PUR_EVF && !_purEvMiss(G,PUR_EVF)) return false;
     return true;
   });
   // 선택 상태 정리 (화면에 없는 invId 제거)
@@ -6911,7 +6915,10 @@ function dPur(){
   h+='</div>';
 
   h+='<div class="card purList"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:6px"><h3 style="margin:0">구매 내역 (명세서 '+gList.length+(gList.length!=gListAll.length?"/"+gListAll.length:"")+'건 / 물품 '+fp.length+"건)</h3></div>";
-  h+='<div style="display:flex;gap:6px;align-items:center;margin-bottom:10px"><div style="position:relative;flex:1;max-width:520px"><input type="search" id="purQ" value="'+esc(PUR_Q)+'" placeholder="🔍 검색 — 품목, 거래처, 분류, 카드, 금액, 날짜…" oninput="_purQIn(this)" oncompositionstart="_purQC=true" oncompositionend="_purQC=false;_purQIn(this)" autocomplete="off" style="width:100%;padding:10px 12px;font-size:15px;border:2px solid '+(PUR_Q?'#2563eb':'#cbd5e1')+';border-radius:8px"></div>'+(PUR_Q?'<span style="font-size:14px;font-weight:700;color:#1d4ed8;white-space:nowrap">'+gList.length+'건 찾음</span><button class="btn btn-s" style="background:#475569;color:#fff" onclick="PUR_Q=\'\';draw()">✕ 지우기</button>':'')+'</div>';
+  h+='<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:10px"><div style="position:relative;flex:1 1 240px;max-width:520px"><input type="search" id="purQ" value="'+esc(PUR_Q)+'" placeholder="🔍 검색 — 품목, 거래처, 분류, 카드, 금액, 날짜…" oninput="_purQIn(this)" oncompositionstart="_purQC=true" oncompositionend="_purQC=false;_purQIn(this)" autocomplete="off" style="width:100%;padding:10px 12px;font-size:15px;border:2px solid '+(PUR_Q?'#2563eb':'#cbd5e1')+';border-radius:8px"></div>'+(PUR_Q?'<span style="font-size:14px;font-weight:700;color:#1d4ed8;white-space:nowrap">'+gList.length+'건 찾음</span><button class="btn btn-s" style="background:#475569;color:#fff" onclick="PUR_Q=\'\';draw()">✕ 지우기</button>':'')
+    +'<select onchange="PUR_EVF=this.value;draw()" style="padding:9px 8px;font-size:14px;font-weight:700;border:2px solid '+(PUR_EVF?'#c2410c':'#cbd5e1')+';border-radius:8px;background:'+(PUR_EVF?'#fff7ed':'#fff')+';color:'+(PUR_EVF?'#9a3412':'#0f172a')+'">'+_PUR_EVF_OPTS.map(function(o){ var n=o[0]?gListAll.filter(function(G){return _purEvMiss(G,o[0]);}).length:gListAll.length; return '<option value="'+o[0]+'"'+(PUR_EVF===o[0]?' selected':'')+'>'+o[1]+' ('+n+')</option>'; }).join('')+'</select>'
+    +(PUR_EVF&&!PUR_Q?'<span style="font-size:14px;font-weight:700;color:#9a3412;white-space:nowrap">'+gList.length+'건</span>':'')+'</div>';
+  h+='<button class="purFab" onclick="popPur()" title="구매 등록">＋ 구매 등록</button>';
   h+=_purPayFilterBar(gListAll);
   var _RB=_purCardRunBal(), _CB=_purCatRunBal(), _PA=_purPreAfter(_RB);
   var _rbKeys=Object.keys(_RB.cards);
@@ -6994,12 +7001,12 @@ function dPur(){
       h+=_purThumbs(pcSrc,'pc',firstP.id,'상품캡처');
       h+=_purThumbs(phSrc,'pur',firstP.id,'물품사진');
       h+=_purThumbs(rcSrc,'rc',firstP.id,'영수증',1);
-      h+=_purThumbs(qdSrc,'qt',firstP.id,'견적서',1);
+      h+=_purThumbs(qdSrc,'qt',firstP.id,'견적·명세표',1);
       h+=_purThumbs(stSrc,'st',firstP.id,'거래명세표',1);
       h+=_purThumbs(txSrc,'tax',firstP.id,_taxDocName(firstP),1);
       if(!phSrc.length&&!rcSrc.length&&!txSrc.length&&!qdSrc.length&&!stSrc.length&&!pcSrc.length)h+='<span style="color:#94a3b8;font-size:12px">없음</span> ';
       h+='<span class="attMany">'+_attBtnsHtml(firstP.id,_bank,firstP)+'</span>';
-      h+='<button class="abtn attOne" style="background:#334155" onclick="_attPick(\''+firstP.id+'\','+(_bank?1:0)+')">＋ 증빙 <b>'+_evKindsDone(firstP)+'/6</b></button>';
+      h+='<button class="abtn attOne" style="background:#334155" onclick="_attPick(\''+firstP.id+'\','+(_bank?1:0)+')">＋ 증빙 <b>'+_evKindsDone(firstP)+'/'+_EV_KINDS.length+'</b></button>';
       h+='</div>';
       // ⑥ 버튼 줄 (작게, 한 색)
       h+='<div style="display:flex;gap:4px;flex-wrap:wrap;padding:7px 12px;border-top:1px solid #e2e8f0;background:#f8fafc">';
@@ -7018,11 +7025,11 @@ function dPur(){
   h+="</div>";
   if(isA()){
     // 📎 증빙 현황 — 명세서(건) 기준, 지금 목록 필터 그대로. 증빙은 명세서 첫 물품에 저장됨
-    var _evT=[["pcDoc","🛒 상품캡처"],["ph","📷 물품사진"],["qtDoc","📄 견적서"],["rc","🧾 영수증"],["stDoc","📋 거래명세표"]];
+    var _evT=[["pcDoc","🛒 상품캡처"],["ph","📷 물품사진"],["qtDoc","📄 견적·명세표"],["rc","🧾 영수증"]];
     var _evN={}, _evNone=0, _taxNeed=0, _taxHave=0, _evTot=gListAll.length;
     gListAll.forEach(function(G){
       var f=G.items[0]||{}, any=false;
-      _evT.forEach(function(t){ if((f[t[0]]||[]).length){ _evN[t[0]]=(_evN[t[0]]||0)+1; any=true; } });
+      _evT.forEach(function(t){ if(_evCnt(f,t[0])){ _evN[t[0]]=(_evN[t[0]]||0)+1; any=true; } });
       if((f.taxDoc||[]).length) any=true;
       if(_isBankPay(f.payM)&&!_isPre(f)){ _taxNeed++; if((f.taxDoc||[]).length) _taxHave++; }
       if(!any) _evNone++;
@@ -7070,9 +7077,8 @@ function _pickFile(inputId, mode){ var i=document.getElementById(inputId); if(!i
 var ATT_TYPES=[
   {k:"pc",fld:"pcDoc",lb:"🛒 구매 전 상품 캡처",hint:"스마트스토어 등에서 캡처 — Ctrl+V 붙여넣기 가능",acc:"image/*,application/pdf",up:"상품캡처",paste:true,bg:"#fffbeb",bd:"#f59e0b",fg:"#92400e"},
   {k:"ph",fld:"ph",lb:"📷 물품사진",acc:"image/*",up:"물품사진",bg:"#f8fafc",bd:"#cbd5e1",fg:"#334155"},
-  {k:"qt",fld:"qtDoc",lb:"📄 견적서",acc:"image/*,application/pdf",up:"견적서",bg:"#eef2ff",bd:"#a5b4fc",fg:"#3730a3"},
-  {k:"rc",fld:"rc",lb:"🧾 영수증",acc:"image/*,application/pdf",up:"영수증",bg:"#fff7ed",bd:"#fdba74",fg:"#9a3412"},
-  {k:"st",fld:"stDoc",lb:"📋 거래명세표",acc:"image/*,application/pdf",up:"거래명세표",bg:"#f0fdf4",bd:"#86efac",fg:"#166534"}
+  {k:"qt",fld:"qtDoc",lb:"📄 견적서·거래명세표",acc:"image/*,application/pdf",up:"견적서",bg:"#eef2ff",bd:"#a5b4fc",fg:"#3730a3"},
+  {k:"rc",fld:"rc",lb:"🧾 영수증",acc:"image/*,application/pdf",up:"영수증",bg:"#fff7ed",bd:"#fdba74",fg:"#9a3412"}
 ];
 var _ATT={}, _ATT_EX={}, _ATT_DEL={};
 function _attType(k){ return ATT_TYPES.filter(function(t){return t.k===k;})[0]; }
@@ -7255,25 +7261,27 @@ async function _tgSaveMine(){
 }
 
 // 증빙 종류별 [필드, 버튼글자, attStart 타입]
-var _EV_KINDS=[["pcDoc","🛒 상품캡처","pc"],["ph","📷 물품사진","pur"],["qtDoc","📄 견적서","qt"],["rc","🧾 영수증","rc"],["stDoc","📋 거래명세표","st"],["taxDoc","🧾 세금계산서","tax"]];
+var _EV_KINDS=[["pcDoc","🛒 상품캡처","pc"],["ph","📷 물품사진","pur"],["qtDoc","📄 견적·명세표","qt"],["rc","🧾 영수증","rc"],["taxDoc","🧾 세금계산서","tax"]];
+// 견적서·거래명세표는 한 칸 (예전 거래명세표 파일도 같이 셈)
+function _evCnt(f,fld){ var n=(f[fld]||[]).length; if(fld==="qtDoc") n+=(f.stDoc||[]).length; return n; }
 function _evFind(pid){ for(var i=0;i<(purs||[]).length;i++) if(purs[i].id==pid) return purs[i]; return {}; }
 // PC용 — 증빙 버튼 6개: 올린 건 연하게 ✓+건수, 안 올린 건 진하게 +
 function _attBtnsHtml(pid, bank, f){
   f=f||_evFind(pid);
   return _EV_KINDS.map(function(x){
-    var n=(f[x[0]]||[]).length, need=(x[2]==="tax"&&bank&&!n);
+    var n=_evCnt(f,x[0]), need=(x[2]==="tax"&&bank&&!n);
     var st=n?'background:#e2e8f0;color:#334155;border:1px solid #cbd5e1':(need?'background:#c2410c;color:#fff':'background:#334155;color:#fff');
     return '<button class="abtn" style="'+st+'" title="'+(n?'올린 것 '+n+'개 — 눌러서 더 추가':'아직 없음 — 눌러서 추가')+'" onclick="attStart(\''+x[2]+'\',\''+pid+'\')">'+(n?'✓ ':'+')+x[1]+(n?' <b>'+n+'</b>':'')+'</button>';
   }).join("");
 }
-function _evKindsDone(f){ return _EV_KINDS.filter(function(x){return (f[x[0]]||[]).length;}).length; }
+function _evKindsDone(f){ return _EV_KINDS.filter(function(x){return _evCnt(f,x[0]);}).length; }
 // 목록 [＋ 증빙] → 종류 고르기 (올린 건 ✓·건수, 연하게)
 function _attPick(pid, bank){
   var f=_evFind(pid);
   var h='<h3>＋ 증빙 추가 <button class="close-x" onclick="closePopup2()">&times;</button></h3>';
   h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
   _EV_KINDS.forEach(function(x){
-    var n=(f[x[0]]||[]).length, need=(x[2]==="tax"&&bank&&!n);
+    var n=_evCnt(f,x[0]), need=(x[2]==="tax"&&bank&&!n);
     var st=n?'background:#e2e8f0;color:#334155;border:1px solid #cbd5e1':(need?'background:#c2410c;color:#fff;border:none':'background:#334155;color:#fff;border:none');
     h+='<button type="button" onclick="closePopup2();attStart(\''+x[2]+'\',\''+pid+'\')" style="'+st+';border-radius:8px;padding:12px 8px;font-size:14px;font-weight:700;cursor:pointer;text-align:center">'+(n?'✓ ':'+ ')+x[1]+'<div style="font-size:11px;font-weight:600;margin-top:2px">'+(n?'올린 것 '+n+'개 · 더 추가':(need?'계좌이체·현금 — 필요':'아직 없음'))+'</div></button>';
   });
@@ -7479,6 +7487,18 @@ async function _plPay(id){
 var PUR_PAYF="all";
 // 🔍 구매 검색 — 품목·거래처·분류·카드·결제방법·번호·날짜·금액, 띄어쓰기로 여러 단어(모두 포함)
 var PUR_Q="", _purQT=null, _purQC=false;
+var PUR_EVF="";   // 📎 빠진 증빙 필터: "" | any | pcDoc | ph | qtDoc | rc | taxDoc
+var _PUR_EVF_OPTS=[["","📎 증빙 — 전체"],["any","⚠ 증빙 하나라도 빠진 건"],["rc","🧾 영수증 없는 건"],["taxDoc","🧾 세금계산서 없는 건 (계좌이체·현금)"],["qtDoc","📄 견적·명세표 없는 건"],["ph","📷 물품사진 없는 건"],["pcDoc","🛒 상품캡처 없는 건"]];
+function _purEvMiss(G,k){
+  var f=G.items[0]||{}, pre=_isPreG(G), bank=_isBankPay(f.payM);
+  var miss=function(fld){
+    if(fld==="taxDoc") return !pre && bank && !(f.taxDoc||[]).length;   // 결제 끝난 계좌이체·현금만
+    if(fld==="rc") return !pre && !_evCnt(f,"rc");                        // 결제 끝난 건만
+    return !_evCnt(f,fld);
+  };
+  if(k==="any") return ["rc","taxDoc","qtDoc","ph","pcDoc"].some(miss);
+  return miss(k);
+}
 function _purMatch(G,q){
   var t=[G.dt,G.mgmtNo,G.expTp,G.expMid,G.gwan,G.card,G.ar,String(G.tot)];
   (G.items||[]).forEach(function(p){ t.push(p.it,p.vendorName,p.payM,p.expTp,p.expMid,p.incTp,p.incSub,p.dt,String(p.tot||"").replace(/,/g,""),String(p.un||"").replace(/,/g,"")); });
@@ -8887,7 +8907,7 @@ async function savePur(id){
   showLoading("저장 중...");
   // 증빙 담는 물품 = 남는 물품 중 첫 번째 (원래 첫 물품을 빼면 증빙을 다음 물품으로 옮김)
   var _hold0=_attFirstItem(_old), holdId=rows.length?rows[0].id:null;
-  var EVF=ATT_TYPES.map(function(t){return t.fld;}).concat(["taxDoc","signU","prtD"]);
+  var EVF=ATT_TYPES.map(function(t){return t.fld;}).concat(["stDoc","taxDoc","signU","prtD"]);
   var _taxU=[];
   if(_isBankPay(_payE) && _taxNew){ var _tf=await readFiles(_taxInpE); _taxU=_tf.length?await uploadAll(_tf,_hold0.ar||"","세금계산서"):[]; showLoading("저장 중..."); }
 
