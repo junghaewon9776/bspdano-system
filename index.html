@@ -6635,7 +6635,7 @@ function _purSeqCmp(a,b){
 function _purDayOrder(){
   var meta={}, byDate={};
   (purs||[]).forEach(function(p){
-    var iv=p.inv||p.id, ca=String(p.createdAt||"");
+    var iv=p.inv||p.id, ca=String(p.paidAt||p.createdAt||"");   // 결제 처리한 건은 결제한 시각 기준
     var m=meta[iv]||(meta[iv]={inv:iv, dt:normD(p.dt)||"", ord:null, ca:ca, ids:[]});
     m.ids.push(p.id);
     if(m.ord==null && p.ord!=null && p.ord!=="" && isFinite(Number(p.ord))) m.ord=Number(p.ord);
@@ -7629,6 +7629,7 @@ function _purPayPop(inv){
   openPopup2(h,560);
 }
 async function _purPay(inv){
+  var _paidAt=(typeof now_==="function")?now_():new Date().toISOString();   // 결제 처리한 시각 → 결제일 안에서 이 순서로
   var items=(purs||[]).filter(function(p){return (p.inv||p.id)===inv;}); if(!items.length) return;
   var dt=String((document.getElementById("ppDt")||{}).value||""), card=String((document.getElementById("ppCard")||{}).value||""), payM=String((document.getElementById("ppPayM")||{}).value||"");
   if(!dt) return toast("결제일을 넣어 주세요",true);
@@ -7640,7 +7641,7 @@ async function _purPay(inv){
     var tot=0;
     for(var i=0;i<items.length;i++){
       var it=items[i], am=ams[it.id]!=null?ams[it.id]:String(it.tot||"");
-      var up={id:it.id, payState:"", ctDt:it.ctDt||it.dt||"", dt:dt, paidDt:dt, tot:am, card:card, payM:payM};
+      var up={id:it.id, payState:"", ctDt:it.ctDt||it.dt||"", dt:dt, paidDt:dt, tot:am, card:card, payM:payM, ord:"", paidAt:_paidAt};
       if(pn(it.qt)>0 && am!==String(it.tot)) up.un=String(Math.round(pn(am)/pn(it.qt)));
       if(i===0){ up.rc=(it.rc||[]).concat(rcN); if(txN.length||_isBankPay(payM)){ up.taxDoc=(it.taxDoc||[]).concat(txN); up.taxTp=it.taxTp||"etax"; } }
       var r=await api("updatePur",up);
@@ -8867,7 +8868,7 @@ async function savePur(id){
 
   // 결제 전 ↔ 결제 완료
   var _preNew=pc("epPre"), _preOld=_isPre(_old), _preChg=(_preNew!==_preOld);
-  if(_preChg){ sh.payState=_preNew?"pre":""; sh.paidDt=_preNew?"":sh.dt; }
+  if(_preChg){ sh.payState=_preNew?"pre":""; sh.paidDt=_preNew?"":sh.dt; sh.paidAt=_preNew?"":((typeof now_==="function")?now_():new Date().toISOString()); if(!_preNew) sh.ord=""; }
   if(_isBankPay(_payE)){ sh.taxTp=_taxE.tp; sh.taxAltRs=_taxE.rs; }
 
   showLoading("저장 중...");
