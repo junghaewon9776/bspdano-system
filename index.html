@@ -879,7 +879,7 @@ function imgSrc(u){if(!u)return"";var m=String(u).match(/[?&/]id=([^&]+)|\/d\/([
 function normD(s){if(!s)return"";var m=String(s).match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);if(m){var y=+m[1],mo=+m[2],d=+m[3];return y+"-"+(mo<10?"0":"")+mo+"-"+(d<10?"0":"")+d}var dt=new Date(s);if(isNaN(dt.getTime()))return String(s);var y=dt.getFullYear(),mo=dt.getMonth()+1,d=dt.getDate();return y+"-"+(mo<10?"0":"")+mo+"-"+(d<10?"0":"")+d}
 function fmtDK(s){if(!s)return"";var n=normD(s);var m=n.match(/^(\d{4})-(\d{2})-(\d{2})/);if(!m)return String(s);var y=+m[1],mo=+m[2],d=+m[3];var dt=new Date(y,mo-1,d);var w=["일","월","화","수","목","금","토"][dt.getDay()];return y+"년 "+mo+"월 "+d+"일 ("+w+")"}
 function fixDates(){for(var i=0;i<acts.length;i++)acts[i].dt=normD(acts[i].dt);for(var i=0;i<purs.length;i++)purs[i].dt=normD(purs[i].dt);for(var i=0;i<exps.length;i++)exps[i].dt=normD(exps[i].dt);for(var i=0;i<mems.length;i++)if(mems[i].bd)mems[i].bd=normD(mems[i].bd)}
-function showPh(el){var big=el.src.replace(/sz=w\d+/,"sz=w2000");document.getElementById("pImg").src=big;document.getElementById("pModal").className="modal show"}
+function showPh(el){var big=el.src.replace(/sz=w\d+/,"sz=w2000");var im=document.getElementById("pImg");im.src=big;var r=+(el.getAttribute&&el.getAttribute("data-rot"))||0;im.style.transform=r?"rotate("+r+"deg)":"";im.style.maxWidth=(r%180)?"90vh":"";im.style.maxHeight=(r%180)?"90vw":"";document.getElementById("pModal").className="modal show"}
 function pb(p,c){p=Math.min(100,Math.max(0,p));return'<div class="pbar"><div class="pfill" style="width:'+p+"%;background:"+c+'"></div></div>'}
 function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
 function telLink(v){var s=String(v||"");var d=s.replace(/[^0-9]/g,"");if(d.length<9)return esc(s)||"-";return '<a href="tel:'+d+'" style="color:inherit;text-decoration:underline dotted;cursor:pointer" onclick="event.stopPropagation()" title="📞 전화걸기">'+esc(s)+'</a>'}
@@ -7123,7 +7123,7 @@ function _attThumb(src, isImg, name, rmJs, saved, rot, rotJs){
   var body=isImg
     ? '<img src="'+src+'" onclick="window.open(this.src)" style="width:96px;height:76px;object-fit:cover;border-radius:6px;border:1px solid #cbd5e1;cursor:zoom-in;background:#fff;display:block;'+_rotCss(rot||0)+'">'
     : '<a href="'+src+'" target="_blank" style="display:flex;flex-direction:column;align-items:center;justify-content:center;width:96px;height:76px;border-radius:6px;border:1px solid #cbd5e1;background:#fff;font-size:26px;text-decoration:none;color:#334155">📄<span style="font-size:9px;max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(name||"파일")+'</span></a>';
-  var rb=(isImg&&rotJs)?'<button type="button" onclick="'+rotJs+'" title="사진 돌리기 (90°씩)" style="position:absolute;top:-7px;left:-7px;background:#1d4ed8;color:#fff;border:none;border-radius:50%;width:22px;height:22px;font-size:14px;cursor:pointer;line-height:22px;padding:0;box-shadow:0 1px 3px rgba(0,0,0,.3)">↻</button>':'';
+  var rb=(isImg&&rotJs)?'<button type="button" onclick="'+rotJs+'" title="사진 돌리기 (90°씩)" style="position:absolute;top:-9px;left:-9px;background:#1d4ed8;color:#fff;border:2px solid #fff;border-radius:50%;width:30px;height:30px;font-size:17px;font-weight:800;cursor:pointer;line-height:26px;padding:0;box-shadow:0 1px 4px rgba(0,0,0,.35);z-index:2;touch-action:manipulation">↻</button>':'';
   return '<span style="position:relative;display:inline-block">'+body+tag+x+rb+'</span>';
 }
 function _attPrevHtml(px,k){
@@ -7330,11 +7330,19 @@ function _rotDataUrl(du,deg){
     img.src=du;
   });
 }
+function _evOpen(u,r){
+  if(!r){ window.open(u,"_blank"); return; }
+  var big=imgSrc(u); if(big.indexOf("drive.google.com/thumbnail")>=0) big=big.replace(/sz=w\d+/,"sz=w2000");
+  var w=window.open("","_blank"); if(!w){ window.open(u,"_blank"); return; }
+  var sw=(r%180)!==0;
+  w.document.write('<!doctype html><meta charset="utf-8"><title>증빙 보기</title><body style="margin:0;background:#111;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh"><img src="'+esc(big)+'" style="transform:rotate('+r+'deg);'+(sw?'max-width:92vh;max-height:92vw':'max-width:96vw;max-height:92vh')+';object-fit:contain"><a href="'+esc(u)+'" target="_blank" style="position:fixed;top:10px;right:12px;background:#2563eb;color:#fff;padding:8px 14px;border-radius:6px;font:700 14px sans-serif;text-decoration:none">원본 파일 열기</a></body>');
+  w.document.close();
+}
 function _purThumbs(arr,tp,pid,label,orig){
   var h='';
   for(var j=0;j<(arr||[]).length;j++){
-    var u=arr[j], click=orig?('window.open(\''+esc(u)+'\',\'_blank\')'):'showPh(this)';
-    h+='<span style="position:relative;display:inline-block;margin-right:2px" title="'+esc(label)+(orig?' — 눌러서 원본 보기':'')+'"><img class="photoTh" src="'+imgSrc(u)+'" onclick="'+click+'" style="border:1px solid #cbd5e1;background:#f1f5f9;cursor:pointer;'+_rotCss(_evRotOf(_evFind(pid),u))+'"><button title="사진 돌리기 (90°씩)" style="position:absolute;bottom:-4px;right:-4px;background:#1d4ed8;color:#fff;border:none;border-radius:50%;width:17px;height:17px;font-size:11px;cursor:pointer;line-height:17px;padding:0" onclick="event.stopPropagation();_evRotIdx(\''+pid+'\',\''+tp+'\','+j+')">↻</button><span style="position:absolute;left:1px;bottom:1px;background:rgba(15,23,42,.75);color:#fff;font-size:8.5px;padding:0 3px;border-radius:3px">'+esc(label)+'</span><button style="position:absolute;top:-4px;right:-4px;background:#dc2626;color:#fff;border:none;border-radius:50%;width:14px;height:14px;font-size:8px;cursor:pointer;line-height:14px;padding:0" onclick="delPh(\''+tp+'\',\''+pid+'\','+j+')">×</button></span>';
+    var u=arr[j], _r=_evRotOf(_evFind(pid),u), click=orig?('_evOpen(\''+esc(u)+'\','+_r+')'):'showPh(this)';
+    h+='<span style="position:relative;display:inline-block;vertical-align:top;margin-right:4px" title="'+esc(label)+(orig?' — 눌러서 원본 보기':'')+'"><img class="photoTh" data-rot="'+_r+'" src="'+imgSrc(u)+'" onclick="'+click+'" style="border:1px solid #cbd5e1;background:#f1f5f9;cursor:pointer;'+_rotCss(_r)+'"><button title="사진 돌리기 (90°씩)" style="display:block;width:100%;margin-top:2px;background:#1d4ed8;color:#fff;border:none;border-radius:4px;height:22px;font-size:13px;font-weight:800;cursor:pointer;line-height:22px;padding:0;touch-action:manipulation" onclick="event.stopPropagation();_evRotIdx(\''+pid+'\',\''+tp+'\','+j+')">↻</button><span style="position:absolute;left:1px;top:1px;background:rgba(15,23,42,.75);color:#fff;font-size:8.5px;padding:0 3px;border-radius:3px;pointer-events:none">'+esc(label)+'</span><button style="position:absolute;top:-4px;right:-4px;background:#dc2626;color:#fff;border:none;border-radius:50%;width:14px;height:14px;font-size:8px;cursor:pointer;line-height:14px;padding:0" onclick="delPh(\''+tp+'\',\''+pid+'\','+j+')">×</button></span>';
   }
   return h;
 }
@@ -7398,7 +7406,7 @@ function _plListen(){
 function _plCan(){ return (typeof isA==="function"&&isA()) || (typeof _esgIsStaff==="function"&&_esgIsStaff()); }
 function _plOpen(){ return PLANS.filter(function(p){return !p.paid;}); }
 // 항목별(대분류›중분류) 예산 · 결제완료 · 계약(예정) · 견적 · 남은 가용
-function _plThumbs(arr,label){ var h=''; (arr||[]).forEach(function(u){ h+='<a href="'+esc(u)+'" target="_blank" title="'+esc(label)+'" style="position:relative;display:inline-block;margin-right:3px"><img class="photoTh" src="'+imgSrc(u)+'" style="border:1px solid #cbd5e1;background:#f1f5f9"><span style="position:absolute;left:1px;bottom:1px;background:rgba(15,23,42,.75);color:#fff;font-size:8.5px;padding:0 3px;border-radius:3px">'+esc(label)+'</span></a>'; }); return h; }
+function _plThumbs(arr,label){ var h=''; (arr||[]).forEach(function(u){ h+='<a href="'+esc(u)+'" target="_blank" title="'+esc(label)+'" style="position:relative;display:inline-block;margin-right:3px"><img class="photoTh" src="'+imgSrc(u)+'" style="border:1px solid #cbd5e1;background:#f1f5f9"><span style="position:absolute;left:1px;top:1px;background:rgba(15,23,42,.75);color:#fff;font-size:8.5px;padding:0 3px;border-radius:3px;pointer-events:none">'+esc(label)+'</span></a>'; }); return h; }
 function _plView(){
   _plListen(); try{ _esigListen(); }catch(e){}
   var can=_plCan();
