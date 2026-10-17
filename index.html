@@ -6784,6 +6784,7 @@ function dPur(){
     if(PUR_EVF && !_purEvMiss(G,PUR_EVF)) return false;
     return true;
   });
+  window._PUR_VIS=gList.map(function(G){return G.inv;});
   // 선택 상태 정리 (화면에 없는 invId 제거)
   var visibleSet={}; for(var v=0;v<gList.length;v++) visibleSet[gList[v].inv]=true;
   Object.keys(PUR_SEL).forEach(function(k){ if(!visibleSet[k]) delete PUR_SEL[k]; });
@@ -6900,6 +6901,7 @@ function dPur(){
   h+='<button class="btn btn-s" style="background:#e5e7eb;color:#111" onclick="purSelAll(true)">☑ 전체선택</button>';
   h+='<button class="btn btn-s" style="background:#e5e7eb;color:#111" onclick="purSelAll(false)">☐ 전체해제</button>';
   h+='<button class="btn btn-s" style="background:#7c3aed;color:#fff" onclick="vchMulti()">📄 선택 결의서 일괄 출력 ('+selCnt+')</button>';
+  h+='<button class="btn btn-s" style="background:#c2410c;color:#fff;font-weight:700" onclick="_evPrintSel()" title="선택한 건(없으면 지금 화면에 보이는 건)의 증빙을 A4 한 장에 하나씩">📎 증빙 일괄 출력 ('+(selCnt||gList.length)+(selCnt?'':' · 화면 전체')+')</button>';
   h+='<button class="btn btn-s" style="background:#0d9488;color:#fff" onclick="vchXlsxMultiDL()">📗 선택 엑셀 일괄 ('+selCnt+')</button>';
   if(isA())h+='<button class="btn btn-s" style="background:#16a34a;color:#fff" onclick="purMarkPrint()">✓ 선택 발행처리 ('+selCnt+')</button>';
   if(isA())h+='<button class="btn btn-s" style="background:#6b7280;color:#fff" onclick="purUnmarkPrint()">↺ 선택 발행취소 ('+selCnt+')</button>';
@@ -7013,6 +7015,7 @@ function dPur(){
       if(canEd) h+='<button class="btn btn-s" style="background:#2563eb;color:#fff;font-weight:800" onclick="edPur(\''+firstP.id+'\')">✏️ 수정</button>';
       if(_isPreG(G)&&canEd) h+='<button class="btn btn-s" style="background:#16a34a;color:#fff;font-weight:800" onclick="_purPayPop(\''+G.inv+'\')">✅ 결제 처리</button>';
       h+='<button class="btn btn-s" style="background:#334155;color:#fff" onclick="vchInv(\''+G.inv+'\')">📄 결의서</button>';
+      h+='<button class="btn btn-s" style="background:#334155;color:#fff" onclick="_evPrintAsk([\''+G.inv+'\'])">📎 증빙 출력</button>';
       h+='<button class="btn btn-s" style="background:#334155;color:#fff" onclick="vchXlsxDL(\''+G.inv+'\')">📗 엑셀</button>';
       h+=_esgBtn(G.inv);
       h+='<button class="btn btn-s" style="background:#334155;color:#fff" onclick="resAttach(\''+G.inv+'\')">📎 서명본</button>';
@@ -9214,6 +9217,88 @@ async function vchXlsxMultiDL(){
 
 // ===== 결의서 일괄 출력 =====
 // 선택된 명세서(PUR_SEL)를 구매일 오름차순으로 하나의 PDF로 이어붙임
+// 📎 증빙 출력 — 종류별로 따로 뽑기. 문서(세금계산서·영수증·견적서)는 한 장에 하나, 사진은 한 장에 2개/4개 모아서
+var _EV_PRINT_SETS=[
+  ["tax","🧾 세금계산서만","한 장에 하나","#c2410c"],
+  ["qt","📄 견적서·거래명세표만","견적서 따로 한 부 · 한 장에 하나","#4338ca"],
+  ["rc","🧾 영수증만","한 장에 하나","#b45309"],
+  ["photo4","📷 사진 — 한 장에 4개","물품사진·상품캡처 모아찍기","#0f766e"],
+  ["photo2","📷 사진 — 한 장에 2개","물품사진·상품캡처 크게","#0f766e"],
+  ["all","📎 전부 한 번에","문서는 한 장에 하나 + 사진은 한 장에 4개","#334155"]
+];
+var _EV_DOC_KINDS=[["taxDoc","세금계산서"],["rc","영수증"],["qtDoc","견적서·거래명세표"],["stDoc","견적서·거래명세표"]];
+var _EV_PHOTO_KINDS=[["ph","물품사진"],["pcDoc","상품캡처"]];
+function _evPrintBig(u){ var s=imgSrc(u); return s.indexOf("drive.google.com/thumbnail")>=0 ? s.replace(/sz=w\d+/,"sz=w2000") : s; }
+function _evPrintSel(){
+  var ids=Object.keys(PUR_SEL||{});
+  if(!ids.length) ids=(window._PUR_VIS||[]).slice();
+  if(!ids.length){ toast("출력할 명세서가 없어요",true); return; }
+  _evPrintAsk(ids);
+}
+// 어떤 증빙을 뽑을지 고르기
+function _evPrintAsk(ids){
+  window._EVP_IDS=ids;
+  var h='<h3>📎 증빙 출력 — 명세서 '+ids.length+'건 <button class="close-x" onclick="closePopup2()">&times;</button></h3><div style="display:grid;gap:8px">';
+  _EV_PRINT_SETS.forEach(function(o){ h+='<button type="button" onclick="closePopup2();_evPrint(window._EVP_IDS,\''+o[0]+'\')" style="background:'+o[3]+';color:#fff;border:none;border-radius:8px;padding:12px 14px;font-size:16px;font-weight:800;cursor:pointer;text-align:left">'+o[1]+(o[2]?'<div style="font-size:12px;font-weight:500;margin-top:2px;opacity:.9">'+o[2]+'</div>':'')+'</button>'; });
+  h+='</div>';
+  openPopup2(h,420);
+}
+function _evPrint(invIds, set){
+  set=set||"all";
+  var docKinds = set==="tax"?["taxDoc"] : set==="rc"?["rc"] : set==="qt"?["qtDoc","stDoc"] : set==="all"?["taxDoc","rc","qtDoc","stDoc"] : [];
+  var photoOn = (set==="photo4"||set==="photo2"||set==="all"), perPage = set==="photo2"?2:4;
+  var setLb=((_EV_PRINT_SETS.filter(function(o){return o[0]===set;})[0])||[])[1]||"";
+  var groups={};
+  (purs||[]).forEach(function(p){ var iv=p.inv||p.id; if(invIds.indexOf(iv)<0) return; (groups[iv]=groups[iv]||{inv:iv,items:[]}).items.push(p); });
+  var list=invIds.filter(function(iv){ return groups[iv]; }).map(function(iv){ return groups[iv]; });
+  var pages=[], noEv=[], nImg=0;
+  var imgTag=function(u){ return '<img src="'+esc(_evPrintBig(u))+'" onerror="this.outerHTML=\'<div class=evx>이미지를 불러오지 못했어요<br>'+esc(u).replace(/'/g,'&#39;')+'</div>\'">'; };
+  list.forEach(function(G){
+    var f=G.items[0]||{}, tot=0; G.items.forEach(function(x){ tot+=pn(x.tot); });
+    var head=(f.mgmtNo?'No. '+esc(f.mgmtNo)+' · ':'')+esc(f.dt?fmtDK(f.dt):'결제일 미정')+' · '+esc(f.it||'')+(G.items.length>1?' 외 '+(G.items.length-1)+'건':'')+' · '+fm(tot)+'원'+(f.vendorName?' · '+esc(f.vendorName):'');
+    var had=false;
+    // 문서: 한 장에 하나
+    _EV_DOC_KINDS.forEach(function(k){
+      if(docKinds.indexOf(k[0])<0) return;
+      var arr=f[k[0]]||[];
+      arr.forEach(function(u,i){ had=true; nImg++;
+        pages.push('<div class="evp"><div class="evh"><b>'+esc(k[1])+'</b>'+(arr.length>1?' <span>('+(i+1)+'/'+arr.length+')</span>':'')+'<div>'+head+'</div></div><div class="evb">'+imgTag(u)+'</div></div>');
+      });
+    });
+    // 사진: 한 장에 2개/4개
+    if(photoOn){
+      var ph=[]; _EV_PHOTO_KINDS.forEach(function(k){ (f[k[0]]||[]).forEach(function(u){ ph.push({u:u,lb:k[1]}); }); });
+      for(var i=0;i<ph.length;i+=perPage){
+        var chunk=ph.slice(i,i+perPage); had=true; nImg+=chunk.length;
+        pages.push('<div class="evp"><div class="evh"><b>물품사진</b>'+(ph.length>perPage?' <span>('+(Math.floor(i/perPage)+1)+'/'+Math.ceil(ph.length/perPage)+'쪽)</span>':'')+'<div>'+head+'</div></div>'
+          +'<div class="evg g'+perPage+'">'+chunk.map(function(x){ return '<div class="gc">'+imgTag(x.u)+'<div class="gl">'+esc(x.lb)+'</div></div>'; }).join('')+'</div></div>');
+      }
+    }
+    if(!had) noEv.push(head);
+  });
+  if(!pages.length){ toast("고른 명세서에 해당 증빙이 없어요",true); return; }
+  var css='@page{size:A4;margin:10mm}body{font-family:"맑은 고딕","Malgun Gothic",sans-serif;margin:0;background:#e5e7eb}'
+    +'.bar{position:sticky;top:0;background:#1e293b;color:#fff;padding:10px 16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;z-index:5}'
+    +'.bar button{background:#2563eb;color:#fff;border:none;border-radius:6px;padding:9px 18px;font-size:15px;font-weight:700;cursor:pointer}'
+    +'.evp{background:#fff;width:190mm;height:275mm;margin:12px auto;display:flex;flex-direction:column;page-break-after:always;box-sizing:border-box;overflow:hidden}'
+    +'.evp:last-child{page-break-after:auto}'
+    +'.evh{font-size:12px;color:#334155;border-bottom:1px solid #94a3b8;padding:4px 2px 6px;flex:none}.evh b{font-size:14px;color:#0f172a}.evh div{margin-top:2px}'
+    +'.evb{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;padding-top:6px}'
+    +'.evb img{max-width:100%;max-height:100%;object-fit:contain}'
+    +'.evg{flex:1;min-height:0;display:grid;gap:4mm;padding-top:4mm}.evg.g4{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr}.evg.g2{grid-template-columns:1fr;grid-template-rows:1fr 1fr}'
+    +'.gc{min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:center;border:1px solid #e2e8f0;padding:2mm;overflow:hidden}'
+    +'.gc img{max-width:100%;max-height:100%;min-height:0;flex:1;object-fit:contain}.gl{font-size:10px;color:#64748b;flex:none}'
+    +'.evx{font-size:12px;color:#b91c1c;word-break:break-all;padding:12px}'
+    +'.miss{max-width:190mm;margin:12px auto;background:#fff7ed;border:1px solid #fdba74;border-radius:6px;padding:10px 14px;font-size:13px;color:#9a3412}'
+    +'@media print{body{background:#fff}.bar,.miss{display:none}.evp{margin:0;width:auto;height:277mm}}';
+  var html='<!doctype html><html><head><meta charset="utf-8"><title>증빙 출력 — '+esc(setLb)+'</title><style>'+css+'</style></head><body>'
+    +'<div class="bar"><button onclick="window.print()">🖨️ 인쇄 / PDF 저장</button><span><b>'+esc(setLb)+'</b> · 명세서 '+list.length+'건 · '+pages.length+'쪽 (파일 '+nImg+'개)</span><span style="font-size:12px;opacity:.8">PDF 증빙은 첫 장만 나와요 — 여러 장이면 원본에서 따로 인쇄</span></div>'
+    +(noEv.length?'<div class="miss">⚠ 해당 증빙이 없는 건 '+noEv.length+'건 (출력 안 됨):<br>'+noEv.join('<br>')+'</div>':'')
+    +pages.join('')+'</body></html>';
+  var w=window.open("","_blank","width=900,height=1100");
+  if(!w){ toast("팝업이 막혔어요 — 팝업 허용 후 다시 눌러주세요",true); return; }
+  w.document.open(); w.document.write(html); w.document.close();
+}
 function vchMulti(){
   var ids=Object.keys(PUR_SEL);
   if(!ids.length){toast("선택된 명세서가 없습니다",true);return}
