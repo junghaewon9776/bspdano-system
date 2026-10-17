@@ -7086,6 +7086,7 @@ var ATT_TYPES=[
 var _ATT={}, _ATT_EX={}, _ATT_DEL={};
 function _attType(k){ return ATT_TYPES.filter(function(t){return t.k===k;})[0]; }
 function _attReset(px, item){
+  _ATT_HOLD[px]=(item&&item.id)||"";
   ATT_TYPES.forEach(function(t){ _ATT[px+t.k]=[]; _ATT_DEL[px+t.k]={}; _ATT_EX[px+t.k]=((item&&item[t.fld])||[]).slice(); });
 }
 function _attSlotHtml(px, t){
@@ -7115,18 +7116,21 @@ function _attAllHtml(px){
   h+='</div>';
   return h;
 }
-function _attThumb(src, isImg, name, rmJs, saved){
+var _ATT_HOLD={};
+function _attThumb(src, isImg, name, rmJs, saved, rot, rotJs){
   var x='<button type="button" onclick="'+rmJs+'" title="빼기" style="position:absolute;top:-7px;right:-7px;background:#dc2626;color:#fff;border:none;border-radius:50%;width:20px;height:20px;font-size:12px;cursor:pointer;line-height:20px;padding:0;box-shadow:0 1px 3px rgba(0,0,0,.3)">×</button>';
   var tag=saved?'<span style="position:absolute;left:3px;bottom:3px;background:rgba(22,163,74,.9);color:#fff;font-size:9px;padding:0 4px;border-radius:3px">저장됨</span>':'<span style="position:absolute;left:3px;bottom:3px;background:rgba(37,99,235,.9);color:#fff;font-size:9px;padding:0 4px;border-radius:3px">새로</span>';
   var body=isImg
-    ? '<img src="'+src+'" onclick="window.open(this.src)" style="width:96px;height:76px;object-fit:cover;border-radius:6px;border:1px solid #cbd5e1;cursor:zoom-in;background:#fff;display:block">'
+    ? '<img src="'+src+'" onclick="window.open(this.src)" style="width:96px;height:76px;object-fit:cover;border-radius:6px;border:1px solid #cbd5e1;cursor:zoom-in;background:#fff;display:block;'+_rotCss(rot||0)+'">'
     : '<a href="'+src+'" target="_blank" style="display:flex;flex-direction:column;align-items:center;justify-content:center;width:96px;height:76px;border-radius:6px;border:1px solid #cbd5e1;background:#fff;font-size:26px;text-decoration:none;color:#334155">📄<span style="font-size:9px;max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(name||"파일")+'</span></a>';
-  return '<span style="position:relative;display:inline-block">'+body+tag+x+'</span>';
+  var rb=(isImg&&rotJs)?'<button type="button" onclick="'+rotJs+'" title="사진 돌리기 (90°씩)" style="position:absolute;top:-7px;left:-7px;background:#1d4ed8;color:#fff;border:none;border-radius:50%;width:22px;height:22px;font-size:14px;cursor:pointer;line-height:22px;padding:0;box-shadow:0 1px 3px rgba(0,0,0,.3)">↻</button>':'';
+  return '<span style="position:relative;display:inline-block">'+body+tag+x+rb+'</span>';
 }
 function _attPrevHtml(px,k){
   var h='', key=px+k, del=_ATT_DEL[key]||{};
-  (_ATT_EX[key]||[]).forEach(function(u,i){ if(del[u]) return; h+=_attThumb(imgSrc(u), true, "", "_attRm('"+px+"','"+k+"','ex',"+i+")", true); });
-  (_ATT[key]||[]).forEach(function(f,i){ h+=_attThumb(f.url, f.isImg, f.name, "_attRm('"+px+"','"+k+"','new',"+i+")", false); });
+  var hold=_ATT_HOLD[px]?_evFind(_ATT_HOLD[px]):null;
+  (_ATT_EX[key]||[]).forEach(function(u,i){ if(del[u]) return; h+=_attThumb(imgSrc(u), true, "", "_attRm('"+px+"','"+k+"','ex',"+i+")", true, _evRotOf(hold,u), hold&&hold.id?"_attRotEx('"+px+"','"+k+"',"+i+")":""); });
+  (_ATT[key]||[]).forEach(function(f,i){ h+=_attThumb(f.url, f.isImg, f.name, "_attRm('"+px+"','"+k+"','new',"+i+")", false, f.rot||0, (f.isImg&&!f.pdf)?"_attRotNew('"+px+"','"+k+"',"+i+")":""); });
   return h;
 }
 function _attRefresh(px,k){ var el=document.getElementById(px+"Att_"+k+"_prev"); if(el) el.innerHTML=_attPrevHtml(px,k); }
@@ -7155,7 +7159,7 @@ function _attRm(px,k,kind,i){
 async function _attUpload(px,k,ar){
   var list=_ATT[px+k]||[]; if(!list.length) return [];
   var out=[];
-  for(var i=0;i<list.length;i++){ var r=await compressOne(list[i].file); out.push({name:r.name||list[i].name, dataUrl:r.dataUrl}); }
+  for(var i=0;i<list.length;i++){ var r=await compressOne(list[i].file); var du=r.dataUrl; if(list[i].rot && /^data:image\//i.test(du)) du=await _rotDataUrl(du,list[i].rot); out.push({name:r.name||list[i].name, dataUrl:du}); }
   return await uploadAll(out, ar, _attType(k).up);
 }
 // 최종 목록 = 저장된 것(뺀 것 제외) + 새로 올린 것
@@ -7292,11 +7296,45 @@ function _attPick(pid, bank){
   openPopup2(h,420);
 }
 // 목록 썸네일 (사진·PDF 모두 첫 장 미리보기) — 문서는 누르면 원본 열기
+// 🔄 증빙 사진 회전 — 저장된 사진은 명세서 첫 물품 evRot=[{u,r}]에 각도 기억(목록·출력에 그대로), 새로 고른 사진은 돌린 채로 올림
+var _EV_TP_FLD={pc:"pcDoc",pur:"ph",rc:"rc",qt:"qtDoc",st:"stDoc",tax:"taxDoc"};
+function _evRotOf(f,u){ var a=(f&&f.evRot)||[]; for(var i=0;i<a.length;i++) if(a[i]&&a[i].u===u) return +a[i].r||0; return 0; }
+function _rotCss(r){ return r?'transform:rotate('+r+'deg);':''; }
+async function _evRotStep(pid,u,step){
+  var f=_evFind(pid); if(!f||!f.id||!u) return false;
+  var a=(f.evRot||[]).filter(function(x){return x&&x.u!==u;}), r=(_evRotOf(f,u)+(step||90)+360)%360;
+  if(r) a.push({u:u,r:r});
+  var res=await api("updatePur",{id:f.id,evRot:a});
+  if(res&&res.ok){ f.evRot=a; return true; }
+  toast("회전 저장 실패",true); return false;
+}
+async function _evRotIdx(pid,tp,j){
+  var f=_evFind(pid), u=(f[_EV_TP_FLD[tp]]||[])[j];
+  if(await _evRotStep(pid,u,90)) draw();
+}
+async function _attRotEx(px,k,i){
+  var u=(_ATT_EX[px+k]||[])[i], hid=_ATT_HOLD[px];
+  if(await _evRotStep(hid,u,90)){ _attRefresh(px,k); try{ draw(); }catch(e){} }
+}
+function _attRotNew(px,k,i){ var rec=(_ATT[px+k]||[])[i]; if(!rec) return; rec.rot=((rec.rot||0)+90)%360; _attRefresh(px,k); }
+function _rotDataUrl(du,deg){
+  return new Promise(function(res){
+    var img=new Image();
+    img.onload=function(){
+      var c=document.createElement("canvas"), s90=(deg%180)!==0;
+      c.width=s90?img.height:img.width; c.height=s90?img.width:img.height;
+      var x=c.getContext("2d"); x.translate(c.width/2,c.height/2); x.rotate(deg*Math.PI/180); x.drawImage(img,-img.width/2,-img.height/2);
+      res(c.toDataURL(/^data:image\/png/i.test(du)?"image/png":"image/jpeg",0.9));
+    };
+    img.onerror=function(){ res(du); };
+    img.src=du;
+  });
+}
 function _purThumbs(arr,tp,pid,label,orig){
   var h='';
   for(var j=0;j<(arr||[]).length;j++){
     var u=arr[j], click=orig?('window.open(\''+esc(u)+'\',\'_blank\')'):'showPh(this)';
-    h+='<span style="position:relative;display:inline-block;margin-right:2px" title="'+esc(label)+(orig?' — 눌러서 원본 보기':'')+'"><img class="photoTh" src="'+imgSrc(u)+'" onclick="'+click+'" style="border:1px solid #cbd5e1;background:#f1f5f9;cursor:pointer"><span style="position:absolute;left:1px;bottom:1px;background:rgba(15,23,42,.75);color:#fff;font-size:8.5px;padding:0 3px;border-radius:3px">'+esc(label)+'</span><button style="position:absolute;top:-4px;right:-4px;background:#dc2626;color:#fff;border:none;border-radius:50%;width:14px;height:14px;font-size:8px;cursor:pointer;line-height:14px;padding:0" onclick="delPh(\''+tp+'\',\''+pid+'\','+j+')">×</button></span>';
+    h+='<span style="position:relative;display:inline-block;margin-right:2px" title="'+esc(label)+(orig?' — 눌러서 원본 보기':'')+'"><img class="photoTh" src="'+imgSrc(u)+'" onclick="'+click+'" style="border:1px solid #cbd5e1;background:#f1f5f9;cursor:pointer;'+_rotCss(_evRotOf(_evFind(pid),u))+'"><button title="사진 돌리기 (90°씩)" style="position:absolute;bottom:-4px;right:-4px;background:#1d4ed8;color:#fff;border:none;border-radius:50%;width:17px;height:17px;font-size:11px;cursor:pointer;line-height:17px;padding:0" onclick="event.stopPropagation();_evRotIdx(\''+pid+'\',\''+tp+'\','+j+')">↻</button><span style="position:absolute;left:1px;bottom:1px;background:rgba(15,23,42,.75);color:#fff;font-size:8.5px;padding:0 3px;border-radius:3px">'+esc(label)+'</span><button style="position:absolute;top:-4px;right:-4px;background:#dc2626;color:#fff;border:none;border-radius:50%;width:14px;height:14px;font-size:8px;cursor:pointer;line-height:14px;padding:0" onclick="delPh(\''+tp+'\',\''+pid+'\','+j+')">×</button></span>';
   }
   return h;
 }
@@ -8910,7 +8948,7 @@ async function savePur(id){
   showLoading("저장 중...");
   // 증빙 담는 물품 = 남는 물품 중 첫 번째 (원래 첫 물품을 빼면 증빙을 다음 물품으로 옮김)
   var _hold0=_attFirstItem(_old), holdId=rows.length?rows[0].id:null;
-  var EVF=ATT_TYPES.map(function(t){return t.fld;}).concat(["stDoc","taxDoc","signU","prtD"]);
+  var EVF=ATT_TYPES.map(function(t){return t.fld;}).concat(["stDoc","taxDoc","signU","prtD","evRot"]);
   var _taxU=[];
   if(_isBankPay(_payE) && _taxNew){ var _tf=await readFiles(_taxInpE); _taxU=_tf.length?await uploadAll(_tf,_hold0.ar||"","세금계산서"):[]; showLoading("저장 중..."); }
 
@@ -9243,6 +9281,23 @@ function _evPrintAsk(ids){
   h+='</div>';
   openPopup2(h,420);
 }
+// 출력 창: 사진 누르면 90°씩 회전 (돌린 그대로 인쇄)
+function _evpRotInit(){
+  function fit(img){
+    var r=+img.getAttribute("data-rot")||0, box=img.parentNode, lb=box.querySelector(".gl");
+    var bw=box.clientWidth-8, bh=box.clientHeight-8-(lb?lb.offsetHeight:0);
+    if(r%180){ img.style.maxWidth=bh+"px"; img.style.maxHeight=bw+"px"; img.style.flex="none"; }
+    else { img.style.maxWidth=""; img.style.maxHeight=""; img.style.flex=""; }
+    img.style.transform=r?"rotate("+r+"deg)":"";
+  }
+  document.addEventListener("click",function(e){
+    var img=e.target&&e.target.closest?e.target.closest(".evb img,.gc img"):null; if(!img) return;
+    img.setAttribute("data-rot",((+img.getAttribute("data-rot")||0)+90)%360); fit(img);
+  });
+  document.querySelectorAll("img[data-rot]").forEach(function(img){ if(img.complete) fit(img); else img.addEventListener("load",function(){ fit(img); }); });
+  window.addEventListener("beforeprint",function(){ document.querySelectorAll("img[data-rot]").forEach(fit); });
+  window.addEventListener("afterprint",function(){ document.querySelectorAll("img[data-rot]").forEach(fit); });
+}
 function _evPrint(invIds, set){
   set=set||"all";
   var docKinds = set==="tax"?["taxDoc"] : set==="rc"?["rc"] : set==="qt"?["qtDoc","stDoc"] : set==="all"?["taxDoc","rc","qtDoc","stDoc"] : [];
@@ -9252,7 +9307,7 @@ function _evPrint(invIds, set){
   (purs||[]).forEach(function(p){ var iv=p.inv||p.id; if(invIds.indexOf(iv)<0) return; (groups[iv]=groups[iv]||{inv:iv,items:[]}).items.push(p); });
   var list=invIds.filter(function(iv){ return groups[iv]; }).map(function(iv){ return groups[iv]; });
   var pages=[], noEv=[], nImg=0;
-  var imgTag=function(u){ return '<img src="'+esc(_evPrintBig(u))+'" onerror="this.outerHTML=\'<div class=evx>이미지를 불러오지 못했어요<br>'+esc(u).replace(/'/g,'&#39;')+'</div>\'">'; };
+  var imgTag=function(u,f){ return '<img data-rot="'+_evRotOf(f,u)+'" src="'+esc(_evPrintBig(u))+'" onerror="this.outerHTML=\'<div class=evx>이미지를 불러오지 못했어요<br>'+esc(u).replace(/'/g,'&#39;')+'</div>\'">'; };
   list.forEach(function(G){
     var f=G.items[0]||{}, tot=0; G.items.forEach(function(x){ tot+=pn(x.tot); });
     var head=(f.mgmtNo?'No. '+esc(f.mgmtNo)+' · ':'')+esc(f.dt?fmtDK(f.dt):'결제일 미정')+' · '+esc(f.it||'')+(G.items.length>1?' 외 '+(G.items.length-1)+'건':'')+' · '+fm(tot)+'원'+(f.vendorName?' · '+esc(f.vendorName):'');
@@ -9262,7 +9317,7 @@ function _evPrint(invIds, set){
       if(docKinds.indexOf(k[0])<0) return;
       var arr=f[k[0]]||[];
       arr.forEach(function(u,i){ had=true; nImg++;
-        pages.push('<div class="evp"><div class="evh"><b>'+esc(k[1])+'</b>'+(arr.length>1?' <span>('+(i+1)+'/'+arr.length+')</span>':'')+'<div>'+head+'</div></div><div class="evb">'+imgTag(u)+'</div></div>');
+        pages.push('<div class="evp"><div class="evh"><b>'+esc(k[1])+'</b>'+(arr.length>1?' <span>('+(i+1)+'/'+arr.length+')</span>':'')+'<div>'+head+'</div></div><div class="evb">'+imgTag(u,f)+'</div></div>');
       });
     });
     // 사진: 한 장에 2개/4개
@@ -9271,7 +9326,7 @@ function _evPrint(invIds, set){
       for(var i=0;i<ph.length;i+=perPage){
         var chunk=ph.slice(i,i+perPage); had=true; nImg+=chunk.length;
         pages.push('<div class="evp"><div class="evh"><b>물품사진</b>'+(ph.length>perPage?' <span>('+(Math.floor(i/perPage)+1)+'/'+Math.ceil(ph.length/perPage)+'쪽)</span>':'')+'<div>'+head+'</div></div>'
-          +'<div class="evg g'+perPage+'">'+chunk.map(function(x){ return '<div class="gc">'+imgTag(x.u)+'<div class="gl">'+esc(x.lb)+'</div></div>'; }).join('')+'</div></div>');
+          +'<div class="evg g'+perPage+'">'+chunk.map(function(x){ return '<div class="gc">'+imgTag(x.u,f)+'<div class="gl">'+esc(x.lb)+'</div></div>'; }).join('')+'</div></div>');
       }
     }
     if(!had) noEv.push(head);
@@ -9284,7 +9339,7 @@ function _evPrint(invIds, set){
     +'.evp:last-child{page-break-after:auto}'
     +'.evh{font-size:12px;color:#334155;border-bottom:1px solid #94a3b8;padding:4px 2px 6px;flex:none}.evh b{font-size:14px;color:#0f172a}.evh div{margin-top:2px}'
     +'.evb{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;padding-top:6px}'
-    +'.evb img{max-width:100%;max-height:100%;object-fit:contain}'
+    +'.evb img{max-width:100%;max-height:100%;object-fit:contain;cursor:pointer;transition:transform .15s}.gc img{cursor:pointer;transition:transform .15s}'
     +'.evg{flex:1;min-height:0;display:grid;gap:4mm;padding-top:4mm}.evg.g4{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr}.evg.g2{grid-template-columns:1fr;grid-template-rows:1fr 1fr}'
     +'.gc{min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:center;border:1px solid #e2e8f0;padding:2mm;overflow:hidden}'
     +'.gc img{max-width:100%;max-height:100%;min-height:0;flex:1;object-fit:contain}.gl{font-size:10px;color:#64748b;flex:none}'
@@ -9292,9 +9347,9 @@ function _evPrint(invIds, set){
     +'.miss{max-width:190mm;margin:12px auto;background:#fff7ed;border:1px solid #fdba74;border-radius:6px;padding:10px 14px;font-size:13px;color:#9a3412}'
     +'@media print{body{background:#fff}.bar,.miss{display:none}.evp{margin:0;width:auto;height:277mm}}';
   var html='<!doctype html><html><head><meta charset="utf-8"><title>증빙 출력 — '+esc(setLb)+'</title><style>'+css+'</style></head><body>'
-    +'<div class="bar"><button onclick="window.print()">🖨️ 인쇄 / PDF 저장</button><span><b>'+esc(setLb)+'</b> · 명세서 '+list.length+'건 · '+pages.length+'쪽 (파일 '+nImg+'개)</span><span style="font-size:12px;opacity:.8">PDF 증빙은 첫 장만 나와요 — 여러 장이면 원본에서 따로 인쇄</span></div>'
+    +'<div class="bar"><button onclick="window.print()">🖨️ 인쇄 / PDF 저장</button><span><b>'+esc(setLb)+'</b> · 명세서 '+list.length+'건 · '+pages.length+'쪽 (파일 '+nImg+'개)</span><span style="background:#f59e0b;color:#111;font-weight:800;padding:4px 10px;border-radius:6px">🔄 옆으로 찍은 사진은 누르면 90°씩 돌아가요</span><span style="font-size:12px;opacity:.8">PDF 증빙은 첫 장만 나와요 — 여러 장이면 원본에서 따로 인쇄</span></div>'
     +(noEv.length?'<div class="miss">⚠ 해당 증빙이 없는 건 '+noEv.length+'건 (출력 안 됨):<br>'+noEv.join('<br>')+'</div>':'')
-    +pages.join('')+'</body></html>';
+    +pages.join('')+'<script>('+_evpRotInit.toString()+')();<\/script></body></html>';
   var w=window.open("","_blank","width=900,height=1100");
   if(!w){ toast("팝업이 막혔어요 — 팝업 허용 후 다시 눌러주세요",true); return; }
   w.document.open(); w.document.write(html); w.document.close();
