@@ -6902,6 +6902,7 @@ function dPur(){
   h+='<button class="btn btn-s" style="background:#e5e7eb;color:#111" onclick="purSelAll(false)">☐ 전체해제</button>';
   h+='<button class="btn btn-s" style="background:#7c3aed;color:#fff" onclick="vchMulti()">📄 선택 결의서 일괄 출력 ('+selCnt+')</button>';
   h+='<button class="btn btn-s" style="background:#c2410c;color:#fff;font-weight:700" onclick="_evPrintSel()" title="선택한 건(없으면 지금 화면에 보이는 건)의 증빙을 A4 한 장에 하나씩">📎 증빙 일괄 출력 ('+(selCnt||gList.length)+(selCnt?'':' · 화면 전체')+')</button>';
+  h+='<button class="btn btn-s" style="background:#0f766e;color:#fff;font-weight:700" onclick="_evZipSel()" title="선택한 건(없으면 지금 화면에 보이는 건)의 증빙 파일을 건별 폴더로 나눠 ZIP으로">📥 증빙 파일 일괄 받기 ('+(selCnt||gList.length)+(selCnt?'':' · 화면 전체')+')</button>';
   h+='<button class="btn btn-s" style="background:#0d9488;color:#fff" onclick="vchXlsxMultiDL()">📗 선택 엑셀 일괄 ('+selCnt+')</button>';
   if(isA())h+='<button class="btn btn-s" style="background:#16a34a;color:#fff" onclick="purMarkPrint()">✓ 선택 발행처리 ('+selCnt+')</button>';
   if(isA())h+='<button class="btn btn-s" style="background:#6b7280;color:#fff" onclick="purUnmarkPrint()">↺ 선택 발행취소 ('+selCnt+')</button>';
@@ -7021,6 +7022,7 @@ function dPur(){
       if(_isPreG(G)&&canEd) h+='<button class="btn btn-s" style="background:#16a34a;color:#fff;font-weight:800" onclick="_purPayPop(\''+G.inv+'\')">✅ 결제 처리</button>';
       h+='<button class="btn btn-s" style="background:#334155;color:#fff" onclick="vchInv(\''+G.inv+'\')">📄 결의서</button>';
       h+='<button class="btn btn-s" style="background:#334155;color:#fff" onclick="_evPrintAsk([\''+G.inv+'\'])">📎 증빙 출력</button>';
+      h+='<button class="btn btn-s" style="background:#334155;color:#fff" onclick="_evZip([\''+G.inv+'\'])" title="이 건 증빙 파일을 압축(ZIP)으로 받기">📥 파일 받기</button>';
       h+='<button class="btn btn-s" style="background:#334155;color:#fff" onclick="vchXlsxDL(\''+G.inv+'\')">📗 엑셀</button>';
       h+=_esgBtn(G.inv);
       h+='<button class="btn btn-s" style="background:#334155;color:#fff" onclick="resAttach(\''+G.inv+'\')">📎 서명본</button>';
@@ -9404,6 +9406,60 @@ function _evPrint(invIds, set){
   var w=window.open("","_blank","width=900,height=1100");
   if(!w){ toast("팝업이 막혔어요 — 팝업 허용 후 다시 눌러주세요",true); return; }
   w.document.open(); w.document.write(html); w.document.close();
+}
+// 📥 증빙 파일 받기 (ZIP) — 건마다 폴더, 폴더 안에 종류별 이름(영수증_1.jpg …). 돌려 둔 사진은 돌린 방향으로
+var _EV_ZIP_KINDS=[["taxDoc","세금계산서"],["rc","영수증"],["qtDoc","견적서"],["stDoc","거래명세표"],["ph","물품사진"],["pcDoc","상품캡처"]];
+function _zipSafe(t){ return String(t||"").replace(/[\\\/:*?"<>|\r\n\t]+/g,"_").replace(/\s+/g," ").trim().slice(0,60); }
+function _evFileUrl(u){
+  var m=String(u||"").match(/[?&/]id=([^&]+)|\/d\/([^/=?]+)|\/file\/d\/([^/]+)/), id=m?(m[1]||m[2]||m[3]):"";
+  return id ? "https://lh3.googleusercontent.com/d/"+id+"=s0" : u;   // 드라이브 원본 크기 (브라우저에서 바로 받기 가능한 주소)
+}
+function _blobToDataUrl(b){ return new Promise(function(res){ var r=new FileReader(); r.onload=function(){res(r.result);}; r.onerror=function(){res("");}; r.readAsDataURL(b); }); }
+function _evZipSel(){
+  var ids=Object.keys(PUR_SEL||{});
+  if(!ids.length) ids=(window._PUR_VIS||[]).slice();
+  if(!ids.length){ toast("받을 명세서가 없어요",true); return; }
+  _evZip(ids);
+}
+async function _evZip(invIds){
+  if(typeof JSZip==="undefined"){ toast("압축 도구 불러오는 중… 잠시 후 다시 눌러주세요",true); return; }
+  var groups={};
+  (purs||[]).forEach(function(p){ var iv=p.inv||p.id; if(invIds.indexOf(iv)<0) return; (groups[iv]=groups[iv]||{inv:iv,items:[]}).items.push(p); });
+  var list=invIds.filter(function(iv){ return groups[iv]; }).map(function(iv){ return groups[iv]; });
+  var jobs=[], used={};
+  list.forEach(function(G,gi){
+    var f=G.items[0]||{}, tot=0; G.items.forEach(function(x){ tot+=pn(x.tot); });
+    var items=G.items.filter(function(x){return !x.vatLine;});
+    var folder=_zipSafe([String(gi+1).padStart(2,"0"), f.dt?normD(f.dt):"결제일미정", f.mgmtNo?("No"+f.mgmtNo):"", fm(tot)+"원"].filter(Boolean).join("_"))+"_"+_zipSafe(((items[0]||f).it||"")+(items.length>1?" 외"+(items.length-1):"")).slice(0,30);
+    if(used[folder]) folder+="_"+(gi+1); used[folder]=1;
+    _EV_ZIP_KINDS.forEach(function(k){
+      var arr=f[k[0]]||[];
+      arr.forEach(function(u,i){ jobs.push({folder:folder, base:k[1]+(arr.length>1?"_"+(i+1):""), u:u, rot:_evRotOf(f,u)}); });
+    });
+  });
+  if(!jobs.length){ toast("고른 명세서에 올린 증빙이 없어요",true); return; }
+  var zip=new JSZip(), ok=0, fail=[];
+  for(var i=0;i<jobs.length;i++){
+    var j=jobs[i];
+    showLoading("증빙 파일 받는 중 ("+(i+1)+"/"+jobs.length+")");
+    try{
+      var res=await fetch(_evFileUrl(j.u)); if(!res.ok) throw new Error(res.status);
+      var blob=await res.blob(), ct=(blob.type||"").toLowerCase();
+      var ext=ct.indexOf("png")>=0?"png":ct.indexOf("pdf")>=0?"pdf":ct.indexOf("gif")>=0?"gif":ct.indexOf("webp")>=0?"webp":"jpg";
+      if(j.rot && /^image\//.test(ct)){ var du=await _blobToDataUrl(blob); du=await _rotDataUrl(du,j.rot); blob=await (await fetch(du)).blob(); ext=/^data:image\/png/.test(du)?"png":"jpg"; }
+      zip.folder(j.folder).file(j.base+"."+ext, new Uint8Array(await blob.arrayBuffer()));
+      ok++;
+    }catch(e){ fail.push(j.folder+"/"+j.base+" — "+j.u); }
+  }
+  if(fail.length) zip.file("_못받은_파일.txt", "아래 파일은 받지 못했어요. 시스템에서 눌러 원본을 직접 열어 주세요.\r\n\r\n"+fail.join("\r\n"));
+  showLoading("압축 파일 만드는 중...");
+  try{
+    var out=new Blob([await zip.generateAsync({type:"uint8array"})],{type:"application/zip"});
+    var a=document.createElement("a"), nm=(typeof SYS_NAME!=="undefined"&&SYS_NAME?_zipSafe(SYS_NAME)+"_":"")+"증빙_"+(list.length===1?_zipSafe(Object.keys(used)[0]):list.length+"건")+"_"+today().replace(/-/g,"")+".zip";
+    a.href=URL.createObjectURL(out); a.download=nm; document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); },3000);
+    hideLoading();
+    toast("📥 "+list.length+"건 · 파일 "+ok+"개 받음"+(fail.length?" (못 받은 "+fail.length+"개는 압축 안 _못받은_파일.txt 확인)":""), !!fail.length);
+  }catch(e){ hideLoading(); toast("압축 실패: "+(e.message||e),true); }
 }
 function vchMulti(){
   var ids=Object.keys(PUR_SEL);
