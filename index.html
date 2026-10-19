@@ -11048,20 +11048,31 @@ async function expSaveBudget(tp){
   var el = document.getElementById("expBudgAm_"+tp);
   if(!el) return;
   var am = Number(String(el.value||"").replace(/,/g,""))||0;
-  // 기존 대분류 예산 entry 찾기 (tp match + mid 비어있음)
-  var existing = (expBG||[]).filter(function(r){return r.tp===tp && !r.mid;})[0];
+  var evt=CUR_EVT&&CUR_EVT.evtId; if(!evt){ toast("행사 미선택",true); return; }
   showLoading("저장 중...");
-  var r;
-  if (existing) {
-    r = await api("updateExpBG",{id:CID, rowId:existing.id, planAm:am});
-  } else {
-    r = await api("addExpBG",{id:CID, tp:tp, mid:"", sub:"", planAm:am, note:""});
-  }
+  try{
+    var out=await _expBigRows(evt, tp, function(rows){
+      if(rows.length){ var f=rows[0]; f.tp=tp; f.mid=""; f.planAm=am; delete f.amount; delete f.name; if(!f.id) f.id=uid(); return [f]; }   // 하나만 남기고 금액 바꿈
+      return [{id:uid(), tp:tp, mid:"", sub:"", planAm:am, note:"", evtId:evt}];
+    });
+    expBG=_normExpBG(out);
+  }catch(e){ hideLoading(); toast("저장 실패: "+(e.message||e),true); return; }
   hideLoading();
-  if(!r||!r.ok){ toast((r&&r.err)||"저장 실패", true); return; }
   toast(tp+" 예산 저장됨 ("+fmtKRW(am)+"원)");
-  await refreshData(false);
-  expManageTypes();
+  expManageTypes(); try{ draw(); }catch(e){}
+}
+// ExpBG에서 대분류 tp의 예산 행들(중분류 없는 행)을 fn(rows)→새 행들로 바꿔 저장. 저장된 전체 배열 반환
+async function _expBigRows(evt, tp, fn){
+  var cur=(await fbDb.ref('/evtData/'+evt+'/ExpBG').once('value')).val()||[];
+  if(!Array.isArray(cur)) cur=Object.keys(cur).map(function(k){return cur[k];});
+  var isBig=function(r){ return r && !r.mid && (r.tp===tp || (!r.tp && String(r.name||"").trim()===tp)); };
+  var big=cur.filter(isBig), rest=cur.filter(function(r){ return r && !isBig(r); });
+  var pos=cur.indexOf(big[0]);
+  var nw=fn(big)||[];
+  var out=rest.slice(); out.splice(pos<0?out.length:Math.min(pos,out.length),0,...nw);
+  out=JSON.parse(JSON.stringify(out));
+  await fbDb.ref('/evtData/'+evt+'/ExpBG').set(out);
+  return out;
 }
 function expAddType(){
   var nm = document.getElementById("expT_new").value.trim();
@@ -11176,13 +11187,16 @@ async function expRenameType(oldName){
   toast("변경됨"+(cnt.total?" · 연결된 기록 "+cnt.total+"건도 같이 변경":""));
 }
 function expDelType(name){
-  if(!confirm("'"+name+"' 대분류를 삭제하시겠습니까? (연결된 항목이 없어야 삭제 가능)")) return;
+  var mids=(expBG||[]).filter(function(r){ return r.tp===name && r.mid; }).length;
+  if(mids){ alert("'"+name+"' 아래에 중분류가 "+mids+"건 있어서 지울 수 없어요.\n\n예산관리(세출)에서 중분류를 먼저 지우거나, [이름변경]으로 다른 대분류에 합쳐 주세요."); return; }
+  if(!confirm("'"+name+"' 대분류를 삭제할까요?\n대분류 예산 금액도 같이 지워져요.")) return;
   showLoading("삭제 중...");
-  api("deleteExpType",{id:CID,name:name}).then(function(r){
-    hideLoading();
-    if(!r||!r.ok){ toast((r&&r.err)||"실패",true); return; }
+  api("deleteExpType",{id:CID,name:name}).then(async function(r){
+    if(!r||!r.ok){ hideLoading(); toast((r&&r.err)||"실패",true); return; }
     expTypes = r.types||expTypes;
-    expManageTypes();
+    try{ var out=await _expBigRows(CUR_EVT.evtId, name, function(){ return []; }); expBG=_normExpBG(out); }catch(e){ hideLoading(); toast("예산 행 삭제 실패: "+(e.message||e),true); return; }
+    hideLoading();
+    expManageTypes(); try{ draw(); }catch(e){}
     toast("삭제됨");
   });
 }
