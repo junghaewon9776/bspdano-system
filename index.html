@@ -10837,7 +10837,7 @@ function expAddSave(){
   if (!tp){ toast("대분류를 선택하세요", true); return; }
   if (!mid){ toast("중분류(예산 단위)를 입력하세요", true); return; }
   showLoading("저장 중...");
-  api("addExpBG",{id:CID, tp:tp, mid:mid, sub:sub, planAm:am, note:note}).then(function(r){
+  api("addExpBG",{id:uid(), tp:tp, mid:mid, sub:sub, planAm:am, note:note}).then(function(r){
     hideLoading();
     if(!r||!r.ok){ toast((r&&r.err)||"실패", true); return; }
     closePopup();
@@ -11116,6 +11116,7 @@ function expTypeExport(){
 // 대분류 엑셀 가져오기 (추가 모드)
 // 예전 형식 세출 대분류 행({name, amount}, tp 없음) 정리 — "undefined" 대분류·예산 중복 방지
 function _normExpBG(arr){
+  var seen={}; (arr||[]).forEach(function(r){ if(!r) return; if(!r.id||seen[r.id]||r.id===r.evtId||(typeof US!=="undefined"&&US&&US[r.id])) r.id=uid(); seen[r.id]=1; delete r.rowId; });   // 같은 번호(예: admin)로 저장된 행 정리
   var have={}; (arr||[]).forEach(function(r){ if(r&&r.tp&&!r.mid) have[r.tp]=1; });
   return (arr||[]).filter(function(r){
     if(!r) return false;
@@ -11187,18 +11188,65 @@ async function expRenameType(oldName){
   toast("변경됨"+(cnt.total?" · 연결된 기록 "+cnt.total+"건도 같이 변경":""));
 }
 function expDelType(name){
-  var mids=(expBG||[]).filter(function(r){ return r.tp===name && r.mid; }).length;
-  if(mids){ alert("'"+name+"' 아래에 중분류가 "+mids+"건 있어서 지울 수 없어요.\n\n예산관리(세출)에서 중분류를 먼저 지우거나, [이름변경]으로 다른 대분류에 합쳐 주세요."); return; }
-  if(!confirm("'"+name+"' 대분류를 삭제할까요?\n대분류 예산 금액도 같이 지워져요.")) return;
+  var midRows=(expBG||[]).filter(function(r){ return r.tp===name && r.mid; }), mids=midRows.length;
+  if(!mids) return _expDelTypeDo(name,"del","",true);
+  var midSum=0; midRows.forEach(function(r){ midSum+=Number(r.planAm)||0; });
+  var others=(expTypes||[]).slice(); (expBG||[]).forEach(function(r){ if(r.tp&&others.indexOf(r.tp)<0) others.push(r.tp); });
+  others=others.filter(function(t){ return t!==name; });
+  window._EXPDEL_NAME=name; window._EXPDEL_OTHERS=others;
+  var h='<h3>🗑 「'+esc(name)+'」 삭제 <button class="close-x" onclick="closePopup2()">&times;</button></h3>';
+  h+='<div style="background:#fff7ed;border:1px solid #fdba74;border-radius:8px;padding:10px 12px;font-size:14px;margin-bottom:10px">아래에 중분류 <b>'+mids+'건</b>이 있어요 (예산 <b>'+fmtKRW(midSum)+'원</b>)<div style="font-size:12.5px;color:#475569;margin-top:4px">'+midRows.map(function(r){return esc(r.mid+(r.sub?" › "+r.sub:""));}).join(" · ")+'</div></div>';
+  h+='<div style="display:grid;gap:8px">';
+  others.forEach(function(t,i){ h+='<button type="button" onclick="_expDelTypeDo(window._EXPDEL_NAME,\'move\','+i+')" style="background:#1d4ed8;color:#fff;border:none;border-radius:8px;padding:12px 14px;font-size:15px;font-weight:800;cursor:pointer;text-align:left">➡ 중분류를 「'+esc(t)+'」로 옮기고 삭제<div style="font-size:12px;font-weight:500;opacity:.9">예산 금액·이 대분류를 고른 기록도 같이 옮겨져요</div></button>'; });
+  h+='<button type="button" onclick="if(confirm(\'중분류 '+mids+'건(예산 '+fmtKRW(midSum)+'원)까지 지울까요?\'))_expDelTypeDo(window._EXPDEL_NAME,\'del\',\'\')" style="background:#dc2626;color:#fff;border:none;border-radius:8px;padding:12px 14px;font-size:15px;font-weight:800;cursor:pointer;text-align:left">🗑 중분류까지 같이 지우기<div style="font-size:12px;font-weight:500;opacity:.9">이 대분류를 고른 기록은 분류 선택이 풀려요</div></button>';
+  h+='<button type="button" onclick="closePopup2()" style="background:#475569;color:#fff;border:none;border-radius:8px;padding:10px 14px;font-size:14px;font-weight:700;cursor:pointer">취소</button>';
+  h+='</div>';
+  openPopup2(h,460);
+}
+// mode: del = 대분류·중분류 지우고, 고른 기록은 분류 선택 풀기 / move = 중분류·기록을 다른 대분류로 옮기고 대분류만 지움
+async function _expDelTypeDo(name, mode, idx, ask){
+  var target=mode==="move"?(window._EXPDEL_OTHERS||[])[idx]:"";
+  if(mode==="move"&&!target) return;
+  try{ closePopup2(); }catch(e){}
+  var NODES=["Purs","Exps","Acts","Plans"];
+  showLoading("이 대분류를 고른 기록 확인 중...");
+  var cnt=await _expRenameLinks(name,null,name,null,true,NODES);
+  hideLoading();
+  var msg = mode==="move"
+    ? (cnt.total?"이 대분류를 고른 기록도 「"+target+"」로 같이 바뀌어요:\n"+_expLinkMsg(cnt)+"\n\n계속할까요?":"")
+    : (cnt.total?"⚠ 이 대분류를 고른 기록은 대분류·중분류 선택이 풀려요 (빈칸이 돼요):\n"+_expLinkMsg(cnt)+"\n\n확인하면 「"+name+"」 대분류가 삭제돼요.":(ask?"「"+name+"」 대분류를 삭제할까요?\n대분류 예산 금액도 같이 지워져요.":""));
+  if(msg && !confirm(msg)) return;
   showLoading("삭제 중...");
-  api("deleteExpType",{id:CID,name:name}).then(async function(r){
-    if(!r||!r.ok){ hideLoading(); toast((r&&r.err)||"실패",true); return; }
-    expTypes = r.types||expTypes;
-    try{ var out=await _expBigRows(CUR_EVT.evtId, name, function(){ return []; }); expBG=_normExpBG(out); }catch(e){ hideLoading(); toast("예산 행 삭제 실패: "+(e.message||e),true); return; }
-    hideLoading();
-    expManageTypes(); try{ draw(); }catch(e){}
-    toast("삭제됨");
-  });
+  var r=await api("deleteExpType",{id:CID,name:name});
+  if(!r||!r.ok){ hideLoading(); toast((r&&r.err)||"실패",true); return; }
+  expTypes=r.types||expTypes;
+  var n=0;
+  try{
+    var out=await _expBigRows(CUR_EVT.evtId, name, function(){ return []; });   // 대분류 예산 행 지움
+    out=out.filter(function(x){
+      if(!x || x.tp!==name) return true;
+      n++;
+      if(mode==="move"){ x.tp=target; return true; }
+      return false;
+    });
+    if(n) await fbDb.ref('/evtData/'+CUR_EVT.evtId+'/ExpBG').set(JSON.parse(JSON.stringify(out)));
+    expBG=_normExpBG(out);
+    if(cnt.total){
+      showLoading(mode==="move"?"기록 옮기는 중...":"분류 선택 푸는 중...");
+      if(mode==="move"){ await _expRenameLinks(name,null,target,null,false,NODES); _expApplyLocal(name,null,target,null); }
+      else {
+        for(var ni=0;ni<NODES.length;ni++){
+          var snap=await fbDb.ref('/evtData/'+CUR_EVT.evtId+'/'+NODES[ni]).once('value'), val=snap.val()||{}, upd={};
+          Object.keys(val).forEach(function(k){ var x=val[k]; if(x&&typeof x==='object'&&(x.expTp||"")===name){ upd[k+'/expTp']=""; upd[k+'/expMid']=""; if(x.expSub) upd[k+'/expSub']=""; } });
+          if(Object.keys(upd).length) await fbDb.ref('/evtData/'+CUR_EVT.evtId+'/'+NODES[ni]).update(upd);
+        }
+        [purs,exps,acts].forEach(function(arr){ (arr||[]).forEach(function(x){ if(x&&(x.expTp||"")===name){ x.expTp=""; x.expMid=""; if(x.expSub) x.expSub=""; } }); });
+      }
+    }
+  }catch(e){ hideLoading(); toast("정리 실패: "+(e.message||e),true); return; }
+  hideLoading();
+  expManageTypes(); try{ draw(); }catch(e){}
+  toast("「"+name+"」 삭제됨"+(n?(mode==="move"?" · 중분류 "+n+"건 → 「"+target+"」":" · 중분류 "+n+"건 삭제"):"")+(cnt.total?(mode==="move"?" · 기록 "+cnt.total+"건 옮김":" · 기록 "+cnt.total+"건 선택 풀림"):""));
 }
 function expManageGwan(){
   var arr = (gwanTypes||[]).slice();
