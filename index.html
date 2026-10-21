@@ -13175,7 +13175,6 @@ function _fbView(){
   h+='<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px">';
   h+='<h3 style="margin:0;flex:1">💵 회비 <span style="font-size:13px;color:#475569;font-weight:600">회비 통장 기준 · 월 '+fm(_fbAmt())+'원 · '+esc(_fbStartYm())+'부터</span></h3>';
   h+='<button class="btn btn-s" style="background:#ea580c;color:#fff;font-weight:700" onclick="_fbImportPick()">⬆ 엑셀 가져오기</button>';
-  h+='<button class="btn btn-s" style="background:#475569;color:#fff" onclick="FEE_VIEW=\'old\';draw()" title="예전 기간별 회비 화면">예전 화면</button>';
   h+='</div>';
   if(!nTx && !nMem){
     h+='<div style="background:#fff7ed;border:2px solid #fdba74;border-radius:10px;padding:16px;font-size:15px;line-height:1.7">아직 회비 통장 자료가 없어요.<br><b>⬆ 엑셀 가져오기</b>로 「월회비_법성포청년회 ….xlsm」 파일을 고르면 <b>통장 거래내역 · 회원 명단 · 시작/탈퇴 달</b>이 한 번에 들어가요.</div></div>';
@@ -13373,7 +13372,7 @@ function _fbImport(wb){
 }
 function dFee(){
   if(!isA()) return '<div class="card">관리자 전용입니다.</div>';
-  if(FEE_VIEW!=="old") return _fbView();
+  return _fbView();   // 회비는 통장 기준 화면만 (예전 기간별 화면 사용 안 함)
   // 회원별 집계 — 누적 납부 - 누적 청구 = 잔액 (양수=선납/초과, 음수=미납)
   var byMem = {}; // memId → {years:[], totalDue, totalPaid}
   (fees||[]).forEach(function(f){
