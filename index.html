@@ -10780,6 +10780,8 @@ function dExp(){
         return h2;
       };
       var _tP=0,_tU=0,_tPre=0;
+      var _nmU=txnSumFor(function(x){ return x.expTp===t && !x.expMid; }), _nmP=preSumFor(function(x){ return x.expTp===t && !x.expMid; });
+      _tU+=_nmU; _tPre+=_nmP;
       _grpOrder.forEach(function(mid){
         _grp[mid].forEach(function(r){ _tP+=Number(r.planAm)||0; });
         _tU += txnSumFor(function(x){ return x.expTp===t && x.expMid===mid; });
@@ -10816,6 +10818,15 @@ function dExp(){
           h += '<td style="padding:6px 8px;text-align:right;white-space:nowrap">'+_btns(r)+'</td></tr>';
         });
       });
+      if(_nmU||_nmP){
+        h += '<tr style="border-top:1px dashed #e2e8f0;background:#fefce8">';
+        h += '<td style="padding:8px;color:#854d0e"><b>(중분류 미지정)</b><div style="font-size:11px">구매에서 중분류 안 고른 것 — 수정에서 골라 주면 해당 줄로 옮겨가요</div></td>';
+        h += '<td style="padding:8px;text-align:right;color:#a0aec0">-</td>';
+        h += '<td style="padding:8px;text-align:right;color:#744210">'+fmtKRW(_nmU)+'</td>';
+        h += '<td style="padding:8px;text-align:right;color:#a0aec0">-</td>';
+        h += '<td style="padding:8px;text-align:right;color:'+(_nmP?'#92400e':'#a0aec0')+'">'+(_nmP?fmtKRW(_nmP):'-')+'</td>';
+        h += '<td style="padding:8px;text-align:right;color:#a0aec0">-</td><td></td><td></td></tr>';
+      }
       h += '<tr style="border-top:2px solid #334155;background:#f1f5f9;font-weight:800">';
       h += '<td style="padding:9px 8px">합계</td>';
       h += '<td style="padding:9px 8px;text-align:right">'+fmtKRW(_tP)+'</td>';
@@ -17271,6 +17282,8 @@ function _rptExpAccPreview(){
         var rem=p.planAm-p.actAm;
         h+='<tr style="border-bottom:1px solid #f1f5f9"><td style="padding:5px 8px"></td><td style="padding:5px 8px"></td><td style="padding:5px 8px;color:#64748b">└ '+esc(p.mid)+'</td><td style="padding:5px 8px;text-align:right">'+fmu(p.planAm)+'</td><td style="padding:5px 8px;text-align:right">'+fmu(p.actAm)+'</td><td style="padding:5px 8px;text-align:right;color:'+(rem<0?"#dc2626":"#16a34a")+'">'+fmu(rem)+'</td></tr>';
       });
+      var _nm=tpObj.items.filter(function(x){ return !x.mid && x.actAm>0; })[0];
+      if(_nm) h+='<tr style="border-bottom:1px solid #f1f5f9;background:#fefce8"><td style="padding:5px 8px"></td><td style="padding:5px 8px"></td><td style="padding:5px 8px;color:#854d0e">└ (중분류 미지정) <span style="font-size:11px">구매에서 중분류 안 고른 것</span></td><td style="padding:5px 8px;text-align:right">-</td><td style="padding:5px 8px;text-align:right">'+fmu(_nm.actAm)+'</td><td style="padding:5px 8px;text-align:right">-</td></tr>';
       if(tpObj.unalloc>0) h+='<tr style="background:#fff7ed;font-weight:600;border-top:1px solid #fed7aa"><td style="padding:6px 8px"></td><td style="padding:6px 8px;color:#9a3412">'+esc(tp)+'</td><td style="padding:6px 8px;color:#9a3412;font-size:11px">미배정 (중분류에 안 나눈 예산)</td><td style="padding:6px 8px;text-align:right;color:#9a3412">'+fmu(tpObj.unalloc)+'</td><td style="padding:6px 8px;text-align:right;color:#9a3412">-</td><td style="padding:6px 8px;text-align:right;color:#9a3412">'+fmu(tpObj.unalloc)+'</td></tr>';
     });
   });
@@ -17479,6 +17492,8 @@ function rptExpAccExcel(){
         if(!p.mid) return;
         rows.push(["","","  └ "+p.mid, p.planAm, p.actAm, p.planAm-p.actAm, (p.notes||[]).slice(0,3).join(" / ")]);
       });
+      var _nm=tpObj.items.filter(function(x){ return !x.mid && x.actAm>0; })[0];
+      if(_nm) rows.push(["","","  └ (중분류 미지정)","",_nm.actAm,"","구매에서 중분류 안 고른 것"]);
       if(tpObj.unalloc>0) rows.push(["",tp+" 미배정","(중분류에 안 나눈 예산)",tpObj.unalloc,0,tpObj.unalloc,""]);
     });
   });
