@@ -206,6 +206,7 @@ function dMod(key){
   if(isA()) h+='<button class="btn" style="background:#15803d;color:#fff" onclick="_modCopyExcel(\''+key+'\')" title="지금 보이는 명단(필터 적용된 것)을 엑셀에 붙여넣게 복사">📋 엑셀로 복사</button>';
   if(isA() && _modTrackingCol(def)) h+='<button class="btn" style="background:#7c3aed;color:#fff" onclick="popModTrackImport(\''+key+'\')">📦 송장 일괄등록</button>';
   if(feat.excel!==false) h+='<button class="btn" onclick="modExportExcel(\''+key+'\')">📥 내보내기</button>';
+  if((def.columns||[]).some(function(c){return c.type==='tel';})) h+='<button class="btn" style="background:#1d4ed8;color:#fff" onclick="popModVcf(\''+key+'\',_modSelIds(\''+key+'\'))" title="체크한 사람만 (없으면 지금 목록 전체) 폰 연락처 파일로">📇 폰 연락처</button><button class="btn" style="background:#0f766e;color:#fff" onclick="_modTelCopy(\''+key+'\',_modSelIds(\''+key+'\'))" title="체크한 사람만 (없으면 지금 목록 전체) 번호를 쉼표로 이어서 복사">📋 번호 복사</button>';
   if(typeof isSuper==='function'&&isSuper()) h+='<button class="btn" style="background:#7c3aed;color:#fff" onclick="popModLog(\''+key+'\')">📋 로그</button>';
   if(typeof isSuper==='function'&&isSuper()) h+='<button class="btn" style="background:#dc2626;color:#fff" onclick="modResetPrintCount(\''+key+'\')">🖨 출력횟수 초기화</button>';
   h+='</div></div>';
@@ -365,7 +366,7 @@ function _modListHtml(key){
     h+='<b style="color:#2563eb;font-size:13px"><span id="_modSelCnt_'+key+'">'+selCount+'</span>개 선택</b>';
     h+='<button class="btn btn-s" style="background:#475569;color:#fff" onclick="popModLabelSel(\''+key+'\')">🖨 라벨 출력</button>';
     if(feat.epost) h+='<button class="btn btn-s" style="background:#dc2626;color:#fff" onclick="popEpostExport(\''+key+'\',_modSelIds(\''+key+'\'))">📮 사전접수 파일</button>';
-    if((def.columns||[]).some(function(c){return c.type==='tel';})) h+='<button class="btn btn-s" style="background:#8b5cf6;color:#fff" onclick="popModSmsSel(\''+key+'\')">💬 문자 직접 보내기</button>';
+    if((def.columns||[]).some(function(c){return c.type==='tel';})) h+='<button class="btn btn-s" style="background:#8b5cf6;color:#fff" onclick="popModSmsSel(\''+key+'\')">💬 문자 직접 보내기</button><button class="btn btn-s" style="background:#1d4ed8;color:#fff" onclick="popModVcf(\''+key+'\',_modSelIds(\''+key+'\'))">📇 폰 연락처 저장</button><button class="btn btn-s" style="background:#0f766e;color:#fff" onclick="_modTelCopy(\''+key+'\',_modSelIds(\''+key+'\'))" title="번호를 쉼표로 이어서 복사 — 폰 문자에 붙여넣으면 단체문자">📋 번호 복사</button>';
     // 상태배지 칼럼 전부 처리 버튼 표시 (2개 이상이면 칼럼명 prefix)
     var _badgeCols=(def.columns||[]).filter(function(c){return c.type==='badge'&&c.badgeMap;});
     var _multiBadge=_badgeCols.length>1;
@@ -601,6 +602,69 @@ function _modCopyExcel(key, idsArr){
   var txt=lines.join('\n');
   var done=function(){ toast('📋 '+data.length+'건 복사됨 — 엑셀에 붙여넣기(Ctrl+V)'); };
   var fb=function(){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.opacity='0'; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); done(); }catch(e){ toast('복사 실패',true); } };
+  if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(txt).then(done).catch(fb); } else fb();
+}
+// ─── 📇 폰 연락처로 저장 (vCard .vcf / 구글 주소록 CSV) — 선택한 사람, 없으면 지금 목록 전체 ───
+function _modVcfCols(def){
+  var C=def.columns||[], f=function(re){ return C.filter(function(c){ return re.test(String(c.label||c.key||'')); })[0]; };
+  var nm=(def.titleKey&&C.filter(function(c){return c.key===def.titleKey;})[0]) || f(/이름|성명|성함/) || C[0];
+  var tel=C.filter(function(c){return c.type==='tel';})[0] || f(/연락처|휴대|핸드폰|전화/);
+  return {nm:nm, tel:tel, org:f(/소속|마을|단체|기관|회사|상호/), pos:f(/직책|직위|직함/), memo:f(/메모|비고/), addr:f(/^주소|주소$/)};
+}
+function _modVcfRows(key, ids){
+  var def=_modDefs[key]; if(!def) return [];
+  var data=(ids&&ids.length)?(_modData[key]||[]).filter(function(r){ return ids.indexOf(r._id)>=0; }):_modFilteredData(key);
+  var K=_modVcfCols(def), g=function(r,c){ return c?String(r[c.key]==null?'':r[c.key]).trim():''; };
+  return data.map(function(r){
+    var tels=g(r,K.tel).split(/[,\/;\n·|]+/).map(function(s){return s.replace(/[^0-9+]/g,'');}).filter(function(s){return s.length>=8;});
+    return {nm:g(r,K.nm), org:g(r,K.org), pos:g(r,K.pos), tels:tels, memo:g(r,K.memo), addr:g(r,K.addr)};
+  }).filter(function(x){ return x.nm && x.tels.length; });
+}
+function popModVcf(key, ids){
+  var L=_modVcfRows(key, ids); window._MV={key:key, ids:ids||[]};
+  if(!L.length){ toast('저장할 연락처(이름+번호)가 없어요',true); return; }
+  var ex=L[0], disp=[ex.nm,ex.org,ex.pos].filter(Boolean).join(' ');
+  var h='<h3>📇 폰 연락처로 저장 <button class="close-x" onclick="closePopup2()">&times;</button></h3>';
+  h+='<div style="font-size:14px;margin-bottom:10px"><b>'+L.length+'명</b> '+((ids&&ids.length)?'(고른 사람)':'(지금 목록 전체)')+' · 폰에 이렇게 저장돼요: <b>'+esc(disp)+'</b> '+esc(ex.tels[0])+'</div>';
+  h+='<div style="display:grid;gap:8px">';
+  h+='<button type="button" onclick="_modVcfDl(\'vcf\')" style="background:#1d4ed8;color:#fff;border:none;border-radius:8px;padding:13px;font-size:16px;font-weight:800;cursor:pointer;text-align:left">📱 연락처 파일 (.vcf) 받기<div style="font-size:12px;font-weight:500;opacity:.9">폰에서 이 파일을 열면 「연락처에 추가」 — 안드로이드·아이폰 둘 다</div></button>';
+  h+='<button type="button" onclick="_modVcfDl(\'csv\')" style="background:#0f766e;color:#fff;border:none;border-radius:8px;padding:13px;font-size:16px;font-weight:800;cursor:pointer;text-align:left">📄 구글 주소록 CSV 받기<div style="font-size:12px;font-weight:500;opacity:.9">contacts.google.com → 가져오기 (구글 계정 쓰는 안드로이드는 폰에 자동으로 들어가요)</div></button>';
+  h+='</div><div style="font-size:12px;color:#64748b;margin-top:10px">💡 카톡 「나와의 채팅」으로 파일을 보내고 폰에서 열어도 돼요</div>';
+  openPopup2(h,460);
+}
+function _modVcfEsc(s){ return String(s||'').replace(/\\/g,'\\\\').replace(/\n/g,'\\n').replace(/,/g,'\\,').replace(/;/g,'\\;'); }
+function _modVcfDl(kind){
+  var M=window._MV||{}, L=_modVcfRows(M.key, M.ids), def=_modDefs[M.key]||{}, out, type, ext;
+  if(kind==='vcf'){
+    out=L.map(function(x){
+      var fam=x.nm.slice(0,1), giv=x.nm.slice(1), full=[x.nm,x.org,x.pos].filter(Boolean).join(' ');
+      var v=['BEGIN:VCARD','VERSION:3.0','N:'+_modVcfEsc(fam)+';'+_modVcfEsc(giv+(x.org||x.pos?' '+[x.org,x.pos].filter(Boolean).join(' '):''))+';;;','FN:'+_modVcfEsc(full)];
+      if(x.org) v.push('ORG:'+_modVcfEsc(x.org)); if(x.pos) v.push('TITLE:'+_modVcfEsc(x.pos));
+      x.tels.forEach(function(t,i){ v.push('TEL;TYPE='+(i?'WORK':'CELL')+':'+t); });
+      if(x.addr) v.push('ADR;TYPE=HOME:;;'+_modVcfEsc(x.addr)+';;;;');
+      if(x.memo) v.push('NOTE:'+_modVcfEsc(x.memo));
+      v.push('END:VCARD'); return v.join('\r\n');
+    }).join('\r\n')+'\r\n';
+    type='text/vcard;charset=utf-8'; ext='vcf';
+  } else {
+    var q=function(s){ s=String(s||''); return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; };
+    var rows=[['Name','Given Name','Family Name','Organization 1 - Name','Organization 1 - Title','Phone 1 - Type','Phone 1 - Value','Phone 2 - Type','Phone 2 - Value','Notes']];
+    L.forEach(function(x){ rows.push([[x.nm,x.org,x.pos].filter(Boolean).join(' '), x.nm.slice(1)+(x.org||x.pos?' '+[x.org,x.pos].filter(Boolean).join(' '):''), x.nm.slice(0,1), x.org, x.pos, 'Mobile', x.tels[0]||'', x.tels[1]?'Work':'', x.tels[1]||'', x.memo]); });
+    out='\ufeff'+rows.map(function(r){ return r.map(q).join(','); }).join('\r\n');
+    type='text/csv;charset=utf-8'; ext='csv';
+  }
+  var a=document.createElement('a'), nm=String(def.label||'연락처').replace(/[\\\/:*?"<>|]/g,'')+'_연락처_'+L.length+'명.'+ext;
+  a.href=URL.createObjectURL(new Blob([out],{type:type})); a.download=nm; document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); },3000);
+  try{ closePopup2(); }catch(e){} toast('📇 '+L.length+'명 연락처 파일 받았어요');
+}
+// 📋 번호만 쉼표로 이어서 복사 — 폰 문자 받는 사람 칸에 붙여넣기(단체문자)·카톡 전달
+function _modTelCopy(key, ids){
+  var L=_modVcfRows(key, ids), seen={}, tels=[];
+  L.forEach(function(x){ var t=x.tels[0]; if(t && !seen[t]){ seen[t]=1; tels.push(t.replace(/^(\d{3})(\d{3,4})(\d{4})$/,'$1-$2-$3')); } });
+  if(!tels.length){ toast('복사할 번호가 없어요',true); return; }
+  var txt=tels.join(',');
+  var done=function(){ toast('📋 '+tels.length+'명 번호 복사 — 문자 받는 사람 칸에 붙여넣기'); };
+  var fb=function(){ try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.opacity='0'; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); done(); }catch(e){ prompt('복사하세요',txt); } };
   if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(txt).then(done).catch(fb); } else fb();
 }
 function _modCopyExcelSel(key){
