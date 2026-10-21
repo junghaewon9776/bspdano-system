@@ -17242,8 +17242,9 @@ function _rptExpAccPreview(){
     tpObj.actTot+=p.actAm;
     gw.actTot+=p.actAm;
   });
-  gwanTree.forEach(function(gw){ gw.planTot=0; gw.tpOrder.forEach(function(t){ var o=gw.tpMap[t]; o.planTot=(o.bigPlan>0?o.bigPlan:(o.midPlan||0)); o.unalloc=(o.bigPlan>0?o.bigPlan-(o.midPlan||0):0); gw.planTot+=o.planTot; }); });
-  var gPlan=0,gAct=0;
+  // 소계 = 배정(중분류 합, 중분류 없으면 대분류 예산), 미배정 = 대분류 예산 − 배정 (따로 표시)
+  gwanTree.forEach(function(gw){ gw.planTot=0; gw.unalloc=0; gw.tpOrder.forEach(function(t){ var o=gw.tpMap[t]; o.planTot=(o.midPlan>0?o.midPlan:(o.bigPlan||0)); o.unalloc=(o.midPlan>0&&(o.bigPlan||0)>o.midPlan)?o.bigPlan-o.midPlan:0; gw.planTot+=o.planTot; gw.unalloc+=o.unalloc; }); });
+  var gPlan=0,gAct=0,gUn=0; gwanTree.forEach(function(gw){ gUn+=gw.unalloc; });
   gwanTree.forEach(function(gw){ gPlan+=gw.planTot; gAct+=gw.actTot; });
   h+='<div style="overflow:auto;max-height:500px;border:1px solid #e5e7eb;border-radius:6px">';
   h+='<table style="width:100%;border-collapse:collapse;font-size:13px">';
@@ -17255,7 +17256,8 @@ function _rptExpAccPreview(){
   h+='<th style="padding:8px;text-align:right;border-bottom:2px solid #c4b5fd">집행</th>';
   h+='<th style="padding:8px;text-align:right;border-bottom:2px solid #c4b5fd">잔액</th>';
   h+='</tr></thead><tbody>';
-  h+='<tr style="background:#faf5ff;font-weight:700;border-bottom:2px solid #c4b5fd"><td colspan="3" style="padding:8px">총 계</td><td style="padding:8px;text-align:right">'+fmu(gPlan)+'</td><td style="padding:8px;text-align:right">'+fmu(gAct)+'</td><td style="padding:8px;text-align:right;color:'+(gPlan-gAct<0?"#dc2626":"#16a34a")+'">'+fmu(gPlan-gAct)+'</td></tr>';
+  h+='<tr style="background:#faf5ff;font-weight:700;border-bottom:2px solid #c4b5fd"><td colspan="3" style="padding:8px">총 계 <span style="font-weight:400;font-size:11px">(배정)</span></td><td style="padding:8px;text-align:right">'+fmu(gPlan)+'</td><td style="padding:8px;text-align:right">'+fmu(gAct)+'</td><td style="padding:8px;text-align:right;color:'+(gPlan-gAct<0?"#dc2626":"#16a34a")+'">'+fmu(gPlan-gAct)+'</td></tr>';
+  if(gUn>0) h+='<tr style="background:#fff7ed;font-weight:700;border-bottom:2px solid #fed7aa;color:#9a3412"><td colspan="3" style="padding:8px">미배정 계 <span style="font-weight:400;font-size:11px">(대분류 예산 중 중분류에 안 나눈 금액 · 대분류 예산 합 '+fmu(gPlan+gUn)+')</span></td><td style="padding:8px;text-align:right">'+fmu(gUn)+'</td><td style="padding:8px;text-align:right">-</td><td style="padding:8px;text-align:right">'+fmu(gUn)+'</td></tr>';
   if(!gwanTree.length) h+='<tr><td colspan="6" style="text-align:center;padding:20px;color:#999">데이터가 없습니다</td></tr>';
   gwanTree.forEach(function(gw){
     var gRem=gw.planTot-gw.actTot;
@@ -17264,12 +17266,12 @@ function _rptExpAccPreview(){
       var tpObj=gw.tpMap[tp];
       var tRem=tpObj.planTot-tpObj.actTot;
       h+='<tr style="background:#faf8ff;font-weight:600;border-top:1px solid #e9e5f5"><td style="padding:6px 8px"></td><td style="padding:6px 8px;color:#6d28d9">'+esc(tp)+'</td><td style="padding:6px 8px;color:#64748b;font-size:11px">소계</td><td style="padding:6px 8px;text-align:right">'+fmu(tpObj.planTot)+'</td><td style="padding:6px 8px;text-align:right">'+fmu(tpObj.actTot)+'</td><td style="padding:6px 8px;text-align:right;color:'+(tRem<0?"#dc2626":"#16a34a")+'">'+fmu(tRem)+'</td></tr>';
-      if(tpObj.unalloc>0) h+='<tr style="border-bottom:1px solid #f1f5f9;color:#9a3412"><td style="padding:5px 8px"></td><td style="padding:5px 8px"></td><td style="padding:5px 8px">└ (미배정 — 중분류에 아직 안 나눈 예산)</td><td style="padding:5px 8px;text-align:right">'+fmu(tpObj.unalloc)+'</td><td style="padding:5px 8px;text-align:right">-</td><td style="padding:5px 8px;text-align:right">'+fmu(tpObj.unalloc)+'</td></tr>';
       tpObj.items.forEach(function(p){
         if(!p.mid) return;
         var rem=p.planAm-p.actAm;
         h+='<tr style="border-bottom:1px solid #f1f5f9"><td style="padding:5px 8px"></td><td style="padding:5px 8px"></td><td style="padding:5px 8px;color:#64748b">└ '+esc(p.mid)+'</td><td style="padding:5px 8px;text-align:right">'+fmu(p.planAm)+'</td><td style="padding:5px 8px;text-align:right">'+fmu(p.actAm)+'</td><td style="padding:5px 8px;text-align:right;color:'+(rem<0?"#dc2626":"#16a34a")+'">'+fmu(rem)+'</td></tr>';
       });
+      if(tpObj.unalloc>0) h+='<tr style="background:#fff7ed;font-weight:600;border-top:1px solid #fed7aa"><td style="padding:6px 8px"></td><td style="padding:6px 8px;color:#9a3412">'+esc(tp)+'</td><td style="padding:6px 8px;color:#9a3412;font-size:11px">미배정 (중분류에 안 나눈 예산)</td><td style="padding:6px 8px;text-align:right;color:#9a3412">'+fmu(tpObj.unalloc)+'</td><td style="padding:6px 8px;text-align:right;color:#9a3412">-</td><td style="padding:6px 8px;text-align:right;color:#9a3412">'+fmu(tpObj.unalloc)+'</td></tr>';
     });
   });
   h+='</tbody></table></div>';
@@ -17462,20 +17464,22 @@ function rptExpAccExcel(){
     tpObj.actTot+=plan[k].actAm;
     gw.actTot+=plan[k].actAm;
   });
-  gwanTree.forEach(function(gw){ gw.planTot=0; gw.tpOrder.forEach(function(t){ var o=gw.tpMap[t]; o.planTot=(o.bigPlan>0?o.bigPlan:(o.midPlan||0)); o.unalloc=(o.bigPlan>0?o.bigPlan-(o.midPlan||0):0); gw.planTot+=o.planTot; }); });
-  var gPlan=0,gAct=0;
+  // 소계 = 배정(중분류 합, 중분류 없으면 대분류 예산), 미배정 = 대분류 예산 − 배정 (따로 표시)
+  gwanTree.forEach(function(gw){ gw.planTot=0; gw.unalloc=0; gw.tpOrder.forEach(function(t){ var o=gw.tpMap[t]; o.planTot=(o.midPlan>0?o.midPlan:(o.bigPlan||0)); o.unalloc=(o.midPlan>0&&(o.bigPlan||0)>o.midPlan)?o.bigPlan-o.midPlan:0; gw.planTot+=o.planTot; gw.unalloc+=o.unalloc; }); });
+  var gPlan=0,gAct=0,gUn=0; gwanTree.forEach(function(gw){ gUn+=gw.unalloc; });
   gwanTree.forEach(function(gw){ gPlan+=gw.planTot; gAct+=gw.actTot; });
-  rows.push(["총  계","","",gPlan,gAct,gPlan-gAct,""]);
+  rows.push(["총  계 (배정)","","",gPlan,gAct,gPlan-gAct,""]);
+  if(gUn>0) rows.push(["미배정 계","","(대분류 예산 합 "+(gPlan+gUn)+")",gUn,0,gUn,""]);
   gwanTree.forEach(function(gw){
     rows.push(["["+gw.name+"] 소계","","",gw.planTot,gw.actTot,gw.planTot-gw.actTot,""]);
     gw.tpOrder.forEach(function(tp){
       var tpObj=gw.tpMap[tp];
       rows.push(["",tp+" 소계","",tpObj.planTot,tpObj.actTot,tpObj.planTot-tpObj.actTot,""]);
-      if(tpObj.unalloc>0) rows.push(["","","  └ (미배정 — 중분류에 아직 안 나눈 예산)", tpObj.unalloc, 0, tpObj.unalloc, ""]);
       tpObj.items.forEach(function(p){
         if(!p.mid) return;
         rows.push(["","","  └ "+p.mid, p.planAm, p.actAm, p.planAm-p.actAm, (p.notes||[]).slice(0,3).join(" / ")]);
       });
+      if(tpObj.unalloc>0) rows.push(["",tp+" 미배정","(중분류에 안 나눈 예산)",tpObj.unalloc,0,tpObj.unalloc,""]);
     });
   });
   var ws=XLSX.utils.aoa_to_sheet(rows);
