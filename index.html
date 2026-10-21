@@ -13294,7 +13294,7 @@ function _fbMemView(){
 function _ymLastDay(ym){ var y=+ym.slice(0,4), m=+ym.slice(5,7); return ym+"-"+String(new Date(y,m,0).getDate()).padStart(2,"0"); }
 function _fbMemOf(nm){ var n=_fbNm(nm); return (mems||[]).filter(function(x){ return _fbNm(x.nm)===n; })[0]||null; }
 function _fbSyncDiff(){
-  var A=[], J=[], T=[], now=_ymNow();
+  var A=[], J=[], T=[], R=[], now=_ymNow();
   _fbMemList().forEach(function(f){
     var mm=_fbMemOf(f.nm), left=f.endYm && f.endYm<now;
     if(!mm){ if(!left) A.push({t:"add",f:f,lb:"인원관리에 추가 — "+f.nm+" (입회 "+(f.startYm||_fbStartYm())+")"}); return; }
@@ -13302,11 +13302,13 @@ function _fbSyncDiff(){
     if(!f.endYm && mm.leftDt) A.push({t:"unleft",f:f,mm:mm,lb:"회비에선 활동 중인데 인원관리는 탈퇴 — "+f.nm+" (인원관리 탈퇴일 "+mm.leftDt+" → 회비 탈퇴 달로 맞춤)"});
     if(!mm.joinDt && f.startYm) J.push({f:f,mm:mm});
     if(!mm.tel && f.tel) T.push({f:f,mm:mm});
+    if(f.role && _fbNm(mm.ar)!==_fbNm(f.role) && !(f.endYm&&f.endYm<now)) R.push({f:f,mm:mm});
   });
+  if(R.length) A.push({t:"roleAll",items:R,lb:"인원관리 직책 맞추기 — "+R.length+"명 ("+R.map(function(x){return x.f.nm+" "+String(x.mm.ar||"").trim()+"→"+x.f.role;}).join(", ")+")"});
   if(J.length) A.push({t:"joinAll",items:J,lb:"인원관리 입회일 채우기 — "+J.length+"명 (회비 시작 달 1일로: "+J.slice(0,5).map(function(x){return x.f.nm+" "+x.f.startYm;}).join(", ")+(J.length>5?" 외 "+(J.length-5)+"명":"")+")"});
   if(T.length) A.push({t:"telAll",items:T,lb:"인원관리 연락처 채우기 — "+T.length+"명"});
-  (mems||[]).forEach(function(mm){ if(!_fbMatch(mm.nm) && !mm.leftDt) A.push({t:"fee",mm:mm,lb:"회비 명단에 추가 — "+mm.nm+(mm.joinDt?" (시작 "+String(mm.joinDt).slice(0,7)+")":" (시작 "+_ymNow()+")")}); });
-  return {list:A, n:A.length};
+  var only=(mems||[]).filter(function(mm){ return !_fbMatch(mm.nm) && !mm.leftDt; }).map(function(mm){ return mm.nm; });   // 회비 명단이 기준 — 알림만
+  return {list:A, n:A.length, only:only};
 }
 function _fbSyncPop(){
   var D=_fbSyncDiff(); window._FB_SYNC=D.list;
@@ -13314,6 +13316,8 @@ function _fbSyncPop(){
   var h='<h3>🔄 인원관리와 맞추기 <button class="close-x" onclick="closePopup2()">&times;</button></h3>';
   h+='<div style="font-size:13px;color:#475569;margin-bottom:8px">인원관리(지금 행사: <b>'+esc(ev)+'</b>) 명단 '+(mems||[]).length+'명 · 회비 명단 '+_fbMemList().length+'명</div>';
   if(!D.n){ h+='<div style="padding:16px;background:#f0fdf4;border:1px solid #86efac;border-radius:8px;font-weight:700;color:#166534">✓ 두 명단이 맞아요</div>'; openPopup2(h,520); return; }
+  h+='<div style="font-size:13px;color:#1d4ed8;font-weight:700;margin-bottom:6px">회비 명단(지금 기준)에 맞춰 인원관리를 고쳐요</div>';
+  if(D.only&&D.only.length) h+='<div style="font-size:13px;background:#fefce8;border:1px solid #fde047;border-radius:6px;padding:6px 10px;margin-bottom:8px">ℹ 인원관리에만 있는 활동 회원 '+D.only.length+'명: '+esc(D.only.join(", "))+' — 회비 대상이면 회원·설정에서 「＋ 회원 추가」, 아니면 인원관리에서 탈퇴 처리하세요</div>';
   h+='<div style="max-height:55vh;overflow:auto;border:1px solid #e2e8f0;border-radius:8px;padding:6px 10px">'+D.list.map(function(a,i){ return '<label style="display:flex;gap:8px;align-items:flex-start;padding:6px 0;border-bottom:1px dashed #e2e8f0;cursor:pointer;font-size:14px"><input type="checkbox" class="fbSyncChk" data-i="'+i+'" checked style="width:18px;height:18px;margin-top:2px"> <span>'+esc(a.lb)+'</span></label>'; }).join('')+'</div>';
   h+='<div class="popStickyFoot" style="justify-content:flex-end;gap:8px"><button class="btn" style="background:#475569;color:#fff" onclick="closePopup2()">취소</button><button class="btn" style="background:#1d4ed8;color:#fff;font-weight:800" onclick="_fbSyncApply()">✓ 고른 것 반영</button></div>';
   openPopup2(h,560);
@@ -13328,6 +13332,7 @@ async function _fbSyncApply(){
       var r={ok:true};
       if(a.t==="add") r=await api("addMem",{nm:a.f.nm, tel:a.f.tel||"", bd:a.f.tel||"", ar:a.f.role||"회원", joinDt:(a.f.startYm||_fbStartYm())+"-01", leftDt:""});
       else if(a.t==="left"||a.t==="unleft") r=await api("updateMem",{id:a.mm.id, leftDt:a.f.endYm?_ymLastDay(a.f.endYm):""});
+      else if(a.t==="roleAll"){ for(var q=0;q<a.items.length;q++){ var y=a.items[q], old=String(y.mm.ar||""), nar=old.trim()?old.replace(old.trim(),y.f.role):y.f.role; showLoading("직책 맞추는 중 — "+y.f.nm); var r3=await api("updateMem",{id:y.mm.id, ar:nar}); if(!(r3&&r3.ok)) fail++; } }
       else if(a.t==="joinAll"||a.t==="telAll"){ for(var j=0;j<a.items.length;j++){ var x=a.items[j]; showLoading("맞추는 중 — "+x.f.nm); var rr=await api("updateMem",a.t==="joinAll"?{id:x.mm.id, joinDt:x.f.startYm+"-01"}:{id:x.mm.id, tel:x.f.tel}); if(!(rr&&rr.ok)) fail++; } }
       else if(a.t==="fee"){ await _fbRef('mems').push({nm:a.mm.nm, role:String(a.mm.ar||"회원").trim(), tel:a.mm.tel||"", startYm:a.mm.joinDt?String(a.mm.joinDt).slice(0,7):_ymNow(), ord:_fbMemList().length+1}); }
       if(r&&r.ok) ok++; else fail++;
