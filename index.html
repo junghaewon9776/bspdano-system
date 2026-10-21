@@ -13277,7 +13277,8 @@ function _fbMemView(){
   h+='<label style="font-weight:700">월회비 <input id="fbC_amt" value="'+fm(_fbAmt())+'" oninput="this.value=_cm(this.value)" style="width:100px;padding:6px"> 원</label>';
   h+='<label style="font-weight:700">회비 시작 달 <input type="month" id="fbC_st" value="'+esc(_fbStartYm())+'" style="padding:6px"></label>';
   h+='<label style="font-weight:700">회비 통장 <input id="fbC_acct" value="'+esc(FB.cfg.acct||"")+'" placeholder="수협 2010-1021-5982" style="padding:6px;width:200px"></label>';
-  h+='<button class="btn" style="background:#1d4ed8;color:#fff;font-weight:800" onclick="_fbCfgSave()">💾 저장</button></div>';
+  h+='<button class="btn" style="background:#1d4ed8;color:#fff;font-weight:800" onclick="_fbCfgSave()">💾 저장</button>';
+  var _sd=_fbSyncDiff(); h+='<button class="btn" style="background:'+(_sd.n?'#c2410c':'#16a34a')+';color:#fff;font-weight:800;margin-left:auto" onclick="_fbSyncPop()">🔄 인원관리와 맞추기'+(_sd.n?' ('+_sd.n+'건 다름)':' ✓')+'</button></div>';
   h+='<div style="font-size:13px;color:#475569;margin-bottom:6px">시작 달 = 회비를 내기 시작한 달(입회) · 탈퇴 달 = 마지막으로 내야 하는 달. 입금자 이름이 회원 이름과 다르면 「다른 입금자 이름」에 적어 주세요(쉼표로 여러 개).</div>';
   h+='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:14px;min-width:820px"><thead><tr style="background:#1e293b;color:#fff"><th style="padding:7px">순서</th><th style="padding:7px">직책</th><th style="padding:7px">성함</th><th style="padding:7px">연락처</th><th style="padding:7px">시작 달</th><th style="padding:7px">탈퇴 달</th><th style="padding:7px">다른 입금자 이름</th><th></th></tr></thead><tbody>';
   _fbMemList().forEach(function(m){
@@ -13289,9 +13290,61 @@ function _fbMemView(){
   h+='</tbody></table></div><button class="btn" style="background:#0f766e;color:#fff;font-weight:800;margin-top:8px" onclick="_fbMemAdd()">＋ 회원 추가</button>';
   return h;
 }
+// 🔄 인원관리(지금 행사 회원 명단)와 맞추기
+function _ymLastDay(ym){ var y=+ym.slice(0,4), m=+ym.slice(5,7); return ym+"-"+String(new Date(y,m,0).getDate()).padStart(2,"0"); }
+function _fbMemOf(nm){ var n=_fbNm(nm); return (mems||[]).filter(function(x){ return _fbNm(x.nm)===n; })[0]||null; }
+function _fbSyncDiff(){
+  var A=[], J=[], T=[], now=_ymNow();
+  _fbMemList().forEach(function(f){
+    var mm=_fbMemOf(f.nm), left=f.endYm && f.endYm<now;
+    if(!mm){ if(!left) A.push({t:"add",f:f,lb:"인원관리에 추가 — "+f.nm+" (입회 "+(f.startYm||_fbStartYm())+")"}); return; }
+    if(f.endYm && !mm.leftDt) A.push({t:"left",f:f,mm:mm,lb:"인원관리 탈퇴 처리 — "+f.nm+" (탈퇴일 "+_ymLastDay(f.endYm)+")"});
+    if(!f.endYm && mm.leftDt) A.push({t:"unleft",f:f,mm:mm,lb:"회비에선 활동 중인데 인원관리는 탈퇴 — "+f.nm+" (인원관리 탈퇴일 "+mm.leftDt+" → 회비 탈퇴 달로 맞춤)"});
+    if(!mm.joinDt && f.startYm) J.push({f:f,mm:mm});
+    if(!mm.tel && f.tel) T.push({f:f,mm:mm});
+  });
+  if(J.length) A.push({t:"joinAll",items:J,lb:"인원관리 입회일 채우기 — "+J.length+"명 (회비 시작 달 1일로: "+J.slice(0,5).map(function(x){return x.f.nm+" "+x.f.startYm;}).join(", ")+(J.length>5?" 외 "+(J.length-5)+"명":"")+")"});
+  if(T.length) A.push({t:"telAll",items:T,lb:"인원관리 연락처 채우기 — "+T.length+"명"});
+  (mems||[]).forEach(function(mm){ if(!_fbMatch(mm.nm) && !mm.leftDt) A.push({t:"fee",mm:mm,lb:"회비 명단에 추가 — "+mm.nm+(mm.joinDt?" (시작 "+String(mm.joinDt).slice(0,7)+")":" (시작 "+_ymNow()+")")}); });
+  return {list:A, n:A.length};
+}
+function _fbSyncPop(){
+  var D=_fbSyncDiff(); window._FB_SYNC=D.list;
+  var ev=(typeof CUR_EVT!=="undefined"&&CUR_EVT)?(CUR_EVT.nm||CUR_EVT.evtId||""):"";
+  var h='<h3>🔄 인원관리와 맞추기 <button class="close-x" onclick="closePopup2()">&times;</button></h3>';
+  h+='<div style="font-size:13px;color:#475569;margin-bottom:8px">인원관리(지금 행사: <b>'+esc(ev)+'</b>) 명단 '+(mems||[]).length+'명 · 회비 명단 '+_fbMemList().length+'명</div>';
+  if(!D.n){ h+='<div style="padding:16px;background:#f0fdf4;border:1px solid #86efac;border-radius:8px;font-weight:700;color:#166534">✓ 두 명단이 맞아요</div>'; openPopup2(h,520); return; }
+  h+='<div style="max-height:55vh;overflow:auto;border:1px solid #e2e8f0;border-radius:8px;padding:6px 10px">'+D.list.map(function(a,i){ return '<label style="display:flex;gap:8px;align-items:flex-start;padding:6px 0;border-bottom:1px dashed #e2e8f0;cursor:pointer;font-size:14px"><input type="checkbox" class="fbSyncChk" data-i="'+i+'" checked style="width:18px;height:18px;margin-top:2px"> <span>'+esc(a.lb)+'</span></label>'; }).join('')+'</div>';
+  h+='<div class="popStickyFoot" style="justify-content:flex-end;gap:8px"><button class="btn" style="background:#475569;color:#fff" onclick="closePopup2()">취소</button><button class="btn" style="background:#1d4ed8;color:#fff;font-weight:800" onclick="_fbSyncApply()">✓ 고른 것 반영</button></div>';
+  openPopup2(h,560);
+}
+async function _fbSyncApply(){
+  var L=window._FB_SYNC||[], pick=[]; document.querySelectorAll(".fbSyncChk").forEach(function(c){ if(c.checked) pick.push(L[+c.getAttribute("data-i")]); });
+  if(!pick.length) return; closePopup2();
+  var ok=0, fail=0;
+  for(var i=0;i<pick.length;i++){
+    var a=pick[i]; showLoading("맞추는 중 ("+(i+1)+"/"+pick.length+")");
+    try{
+      var r={ok:true};
+      if(a.t==="add") r=await api("addMem",{nm:a.f.nm, tel:a.f.tel||"", bd:a.f.tel||"", ar:a.f.role||"회원", joinDt:(a.f.startYm||_fbStartYm())+"-01", leftDt:""});
+      else if(a.t==="left"||a.t==="unleft") r=await api("updateMem",{id:a.mm.id, leftDt:a.f.endYm?_ymLastDay(a.f.endYm):""});
+      else if(a.t==="joinAll"||a.t==="telAll"){ for(var j=0;j<a.items.length;j++){ var x=a.items[j]; showLoading("맞추는 중 — "+x.f.nm); var rr=await api("updateMem",a.t==="joinAll"?{id:x.mm.id, joinDt:x.f.startYm+"-01"}:{id:x.mm.id, tel:x.f.tel}); if(!(rr&&rr.ok)) fail++; } }
+      else if(a.t==="fee"){ await _fbRef('mems').push({nm:a.mm.nm, role:String(a.mm.ar||"회원").trim(), tel:a.mm.tel||"", startYm:a.mm.joinDt?String(a.mm.joinDt).slice(0,7):_ymNow(), ord:_fbMemList().length+1}); }
+      if(r&&r.ok) ok++; else fail++;
+    }catch(e){ fail++; }
+  }
+  try{ await refreshData(false); }catch(e){}
+  hideLoading(); toast("✓ "+ok+"건 맞췄어요"+(fail?" · 실패 "+fail+"건":""), !!fail); draw();
+}
 function _fbCfgSave(){ var g=function(i){var e=document.getElementById(i);return e?e.value.trim():"";}; _fbRef('cfg').update({amt:Number(g("fbC_amt").replace(/,/g,""))||20000,startYm:g("fbC_st")||"2024-06",acct:g("fbC_acct")}).then(function(){ toast("저장됨"); }); }
 function _fbMemSave(k){ var g=function(i){var e=document.getElementById(i+k);return e?e.value.trim():"";}; if(!g("fbM_nm_")){ alert("성함을 넣어 주세요"); return; }
-  _fbRef('mems/'+k).update({ord:Number(g("fbM_ord_"))||null,role:g("fbM_role_"),nm:g("fbM_nm_"),tel:g("fbM_tel_"),startYm:g("fbM_st_")||null,endYm:g("fbM_end_")||null,alias:g("fbM_al_")}).then(function(){ toast("저장됨"); }); }
+  var st=g("fbM_st_")||null, en=g("fbM_end_")||null;
+  _fbRef('mems/'+k).update({ord:Number(g("fbM_ord_"))||null,role:g("fbM_role_"),nm:g("fbM_nm_"),tel:g("fbM_tel_"),startYm:st,endYm:en,alias:g("fbM_al_")}).then(async function(){
+    var mm=_fbMemOf(g("fbM_nm_")), msg="저장됨";
+    if(mm){ var up={id:mm.id, joinDt:st?st+"-01":(mm.joinDt||""), leftDt:en?_ymLastDay(en):""};
+      if(up.joinDt!==(mm.joinDt||"")||up.leftDt!==(mm.leftDt||"")){ var r=await api("updateMem",up); if(r&&r.ok){ Object.assign(mm,up); msg+=" · 인원관리 입회/탈퇴일도 맞춤"; } } }
+    toast(msg); });
+}
 function _fbMemAdd(){ var nm=prompt("새 회원 성함"); if(!nm) return; var st=prompt("회비 시작 달 (예: "+_ymNow()+")", _ymNow()); if(st===null) return;
   _fbRef('mems').push({nm:nm.trim(),role:"회원",startYm:st||_ymNow(),ord:_fbMemList().length+1}).then(function(){ toast("추가됨"); }); }
 function _fbMemDel(k){ var m=FB.mems[k]; if(!m||!confirm(m.nm+" 회원을 회비 명단에서 지울까요?\n(탈퇴라면 지우지 말고 「탈퇴 달」을 넣는 걸 추천해요)")) return; _fbRef('mems/'+k).remove(); }
