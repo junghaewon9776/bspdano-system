@@ -615,6 +615,13 @@ function nowKST(full){ var d=new Date(); var s=todayKST()+" "+("0"+d.getHours())
       document.getElementById("mainPage").style.display = "none";
       document.title = "📦 자산 조회";
     }
+    // ===== 회원 회비 조회 (?fee=1) — 로그인 없이 이름 + 휴대폰 뒷자리로 내 회비 보기 =====
+    if (sp.get("fee")) {
+      window.IS_FEE_MODE = true;
+      document.getElementById("loginPage").style.display = "none";
+      document.getElementById("mainPage").style.display = "none";
+      document.title = "💵 회비 조회";
+    }
     // ===== 결재 요청 링크 (?esign=evt&inv=&role=&t=) — 로그인(폰은 자동 로그인) 후 결재 화면 =====
     if (sp.get("esign")) {
       DEEP_ESIGN = {evt:sp.get("esign")||"", inv:sp.get("inv")||"", role:sp.get("role")||"", t:sp.get("t")||""};
@@ -635,6 +642,7 @@ document.addEventListener("DOMContentLoaded", function(){
     var lp=document.querySelector("#loginBox p");  if(lp) lp.textContent=SYS_LOGIN_SUB;
     var mh=document.querySelector(".topBar h2");  if(mh) mh.textContent=SYS_ICON+" "+SYS_TITLE;
     var ms=document.querySelector(".topBar small"); if(ms) ms.textContent=SYS_SUBTITLE;
+    if (window.IS_FEE_MODE) { _fbPubInit(); return; }
 
     // ===== 공개 신청폼 모드 =====
     if (IS_APPLY_MODE) {
@@ -13116,7 +13124,8 @@ function feeMemberStart(mem, cycle, startP){
 // ===== 💵 회비 (회비통장 기준) — 통장 입금을 회원·달로 자동 집계, 시작·탈퇴 달, 이월(전년도 미수), 통장 잔액 확인 =====
 //   /main/FeeBank = { cfg:{amt,startYm,acct}, mems:{k:{nm,role,tel,ord,startYm,endYm,alias}}, tx:{k:{dt,nm,inA,out,bal,memo,kind,memK,seq}} }
 //   kind: ""(자동: 회원 이름이면 회비) | "other"(회비 아님) / memK: 직접 연결한 회원
-var FB={loaded:false,cfg:{},mems:{},tx:{}}, FB_TAB="table", FB_YEAR="", FB_TXF="all", FEE_VIEW="bank";
+var FB={loaded:false,cfg:{},mems:{},tx:{}}, FB_TAB="table", FB_YEAR="", FB_TXF="all", FEE_VIEW="bank", FB_TXQ="", _fbQT=null, _fbQC=false;
+function _fbTxQIn(el){ if(_fbQC) return; clearTimeout(_fbQT); _fbQT=setTimeout(function(){ FB_TXQ=el.value; var pos=el.selectionStart; draw(); var e2=document.getElementById("fbTxQ"); if(e2){ e2.focus(); try{ e2.setSelectionRange(pos,pos); }catch(x){} } },250); }
 function _fbRef(p){ return fbDb.ref('/main/FeeBank'+(p?'/'+p:'')); }
 function _fbLoad(){
   if(FB._lis) return; FB._lis=true;
@@ -13167,6 +13176,59 @@ function _fbYears(){ var a=+_fbStartYm().slice(0,4), b=+_ymNow().slice(0,4), out
 // 잔액: 지금 계산 잔액 + 통장 기록(잔액 적힌 마지막 거래) 시점 계산 잔액 비교
 function _fbBal(){ var inS=0,outS=0,last=null; _fbTxList().forEach(function(t){ inS+=Number(t.inA)||0; outS+=Number(t.out)||0; if(t.bal!=null&&t.bal!=="") last={bal:Number(t.bal),dt:t.dt,calc:inS-outS}; }); return {inS:inS,outS:outS,calc:inS-outS,last:last}; }
 
+// ===== 💵 회원용 회비 조회 (?fee=1) =====
+function _fbPubInit(){
+  var d=document.getElementById("feePage");
+  if(!d){ d=document.createElement("div"); d.id="feePage"; document.body.appendChild(d); }
+  d.style.cssText="max-width:640px;margin:0 auto;padding:16px;font-family:inherit";
+  d.innerHTML='<div style="text-align:center;padding:30px;color:#64748b">📡 불러오는 중...</div>';
+  _fbRef().once('value').then(function(sn){ var v=sn.val()||{}; FB.cfg=v.cfg||{}; FB.mems=v.mems||{}; FB.tx=v.tx||{}; FB.loaded=true; _fbPubForm(""); })
+    .catch(function(e){ d.innerHTML='<div style="padding:20px;color:#b91c1c">불러오지 못했어요: '+esc(e.message||e)+'</div>'; });
+}
+function _fbPubForm(err){
+  var d=document.getElementById("feePage");
+  d.innerHTML='<div style="background:#fff;border-radius:14px;box-shadow:0 4px 20px rgba(15,23,42,.12);padding:22px">'
+    +'<h2 style="margin:0 0 4px;font-size:22px">💵 '+esc(typeof SYS_TITLE!=="undefined"?SYS_TITLE.replace(/관리시스템|시스템/g,"").trim():"")+' 회비 조회</h2>'
+    +'<div style="color:#475569;font-size:14px;margin-bottom:16px">이름과 휴대폰 번호 뒷자리 4개를 넣으면 내 회비를 볼 수 있어요</div>'
+    +'<label style="font-weight:700;font-size:14px">이름</label><input id="fbP_nm" autocomplete="name" style="width:100%;padding:12px;font-size:17px;margin:4px 0 12px;border:2px solid #cbd5e1;border-radius:8px;box-sizing:border-box">'
+    +'<label style="font-weight:700;font-size:14px">휴대폰 뒷자리 4개</label><input id="fbP_tel" inputmode="numeric" maxlength="4" style="width:100%;padding:12px;font-size:17px;margin:4px 0 12px;border:2px solid #cbd5e1;border-radius:8px;box-sizing:border-box" onkeydown="if(event.key===\'Enter\')_fbPubGo()">'
+    +(err?'<div style="color:#b91c1c;font-weight:700;margin-bottom:10px">'+esc(err)+'</div>':'')
+    +'<button onclick="_fbPubGo()" style="width:100%;background:#1d4ed8;color:#fff;border:none;border-radius:10px;padding:14px;font-size:18px;font-weight:800;cursor:pointer">조회하기</button></div>';
+}
+function _fbPubGo(){
+  var nm=_fbNm((document.getElementById("fbP_nm")||{}).value), t4=String((document.getElementById("fbP_tel")||{}).value||"").replace(/\D/g,"");
+  if(!nm||t4.length!==4){ _fbPubForm("이름과 휴대폰 뒷자리 4개를 넣어 주세요"); return; }
+  var k=Object.keys(FB.mems).filter(function(k){ var m=FB.mems[k]; return _fbNm(m.nm)===nm && String(m.tel||"").replace(/\D/g,"").slice(-4)===t4; })[0];
+  if(!k){ _fbPubForm("일치하는 회원이 없어요. 이름·번호를 확인하거나 재무국에 문의해 주세요"); return; }
+  _fbPubShow(k);
+}
+function _fbPubShow(k){
+  var m=Object.assign({_k:k},FB.mems[k]), now=_ymNow(), P=(_fbPaid()[k])||{};
+  var due=_fbDue(m,"",now), paid=_fbSumPaid(P,"",now), bal=paid-due;
+  var st=m.startYm||_fbStartYm(), y0=+st.slice(0,4), y1=+now.slice(0,4);
+  var h='<div style="background:#fff;border-radius:14px;box-shadow:0 4px 20px rgba(15,23,42,.12);padding:20px">';
+  h+='<div style="display:flex;align-items:center;gap:8px"><h2 style="margin:0;font-size:22px;flex:1">'+esc(m.nm)+' <span style="font-size:14px;color:#64748b;font-weight:600">'+esc(m.role||"")+'</span></h2><button onclick="_fbPubForm(\'\')" style="background:#475569;color:#fff;border:none;border-radius:8px;padding:8px 12px;font-weight:700;cursor:pointer">다른 사람</button></div>';
+  h+='<div style="font-size:13px;color:#64748b;margin:4px 0 14px">월 '+fm(_fbAmt())+'원 · '+esc(st)+'부터'+(m.endYm?' · '+esc(m.endYm)+'까지':'')+' · '+esc(now)+' 기준</div>';
+  h+='<div style="text-align:center;border-radius:12px;padding:18px;margin-bottom:16px;background:'+(bal<0?'#fef2f2;border:2px solid #fca5a5':bal>0?'#f0fdf4;border:2px solid #86efac':'#eff6ff;border:2px solid #93c5fd')+'">'
+    +(bal<0?'<div style="font-size:15px;color:#991b1b;font-weight:700">아직 안 낸 회비</div><div style="font-size:32px;font-weight:900;color:#dc2626">'+fm(-bal)+'원</div>'
+      :bal>0?'<div style="font-size:15px;color:#166534;font-weight:700">미리 낸 회비</div><div style="font-size:32px;font-weight:900;color:#15803d">'+fm(bal)+'원</div>'
+      :'<div style="font-size:30px;font-weight:900;color:#1d4ed8">✅ 완납</div>')
+    +'<div style="font-size:13px;color:#475569;margin-top:4px">지금까지 낼 돈 '+fm(due)+'원 · 낸 돈 '+fm(paid)+'원</div></div>';
+  if(bal<0 && FB.cfg.acct) h+='<div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:15px">🏦 입금 계좌: <b>'+esc(FB.cfg.acct)+'</b></div>';
+  for(var y=y1;y>=y0;y--){
+    h+='<div style="font-weight:800;margin:10px 0 6px">'+y+'년</div><div style="display:grid;grid-template-columns:repeat(6,1fr);gap:4px">';
+    for(var mo=1;mo<=12;mo++){
+      var ym=y+"-"+String(mo).padStart(2,"0"), v=P[ym]||0, inRange=ym>=st && ym<=now && !(m.endYm&&ym>m.endYm);
+      h+='<div style="border-radius:6px;padding:6px 2px;text-align:center;font-size:12px;background:'+(v?'#dcfce7':inRange?'#f1f5f9':'#fafafa')+';color:'+(v?'#166534':inRange?'#475569':'#cbd5e1')+'"><div style="font-weight:700">'+mo+'월</div><div style="font-weight:800">'+(v?fm(v):(inRange?'-':''))+'</div></div>';
+    }
+    h+='</div>';
+  }
+  var L=_fbTxList().filter(function(t){ return _fbTxMem(t)===k; }).reverse();
+  h+='<div style="font-weight:800;margin:16px 0 6px">입금 내역 ('+L.length+'건)</div><div style="max-height:40vh;overflow:auto;border:1px solid #e2e8f0;border-radius:8px">'
+    +(L.length?L.map(function(t){ return '<div style="display:flex;justify-content:space-between;padding:8px 10px;border-bottom:1px solid #f1f5f9;font-size:15px"><span>'+esc(String(t.dt).slice(0,10))+'</span><b>'+fm(t.inA)+'원</b></div>'; }).join(''):'<div style="padding:12px;color:#94a3b8">입금 내역이 없어요</div>')+'</div>';
+  h+='<div style="font-size:12px;color:#94a3b8;margin-top:12px">내역이 다르면 재무국에 알려 주세요</div></div>';
+  document.getElementById("feePage").innerHTML=h;
+}
 function _fbView(){
   _fbLoad();
   if(!FB.loaded) return '<div class="card mut" style="text-align:center;padding:30px">📡 회비 통장 불러오는 중...</div>';
@@ -13174,6 +13236,7 @@ function _fbView(){
   var h='<div class="card">';
   h+='<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px">';
   h+='<h3 style="margin:0;flex:1">💵 회비 <span style="font-size:13px;color:#475569;font-weight:600">회비 통장 기준 · 월 '+fm(_fbAmt())+'원 · '+esc(_fbStartYm())+'부터</span></h3>';
+  h+='<button class="btn btn-s" style="background:#7c3aed;color:#fff;font-weight:700" onclick="_fbPubLink()" title="회원이 이름+휴대폰 뒷자리로 자기 회비를 보는 링크">🔗 회원 조회 링크</button>';
   h+='<button class="btn btn-s" style="background:#ea580c;color:#fff;font-weight:700" onclick="_fbImportPick()">⬆ 엑셀 가져오기</button>';
   h+='</div>';
   if(!nTx && !nMem){
@@ -13192,12 +13255,24 @@ function _fbView(){
   if(FB_TAB==="tx") h+=_fbTxView(); else if(FB_TAB==="mem") h+=_fbMemView(); else h+=_fbTableView();
   return h+'</div>';
 }
+function _fbPubLink(){
+  var u=location.origin+location.pathname+"?fee=1";
+  var done=function(){ alert("🔗 회원 회비 조회 링크를 복사했어요\n\n"+u+"\n\n단톡방이나 문자에 붙여 넣으세요.\n회원은 이름 + 휴대폰 뒷자리 4개로 자기 회비만 볼 수 있어요."+(FB.cfg.acct?"":"\n\n💡 ⚙ 회원·설정에 「회비 통장」을 적어 두면 미납 회원에게 계좌가 같이 보여요.")); };
+  try{ navigator.clipboard.writeText(u).then(done,function(){ prompt("이 링크를 복사하세요",u); }); }catch(e){ prompt("이 링크를 복사하세요",u); }
+}
+// 월회비 표 필터
+var FB_TBQ="", FB_TBF="all";
 function _fbTableView(){
   var ys=_fbYears(); if(!FB_YEAR||ys.indexOf(FB_YEAR)<0) FB_YEAR=ys[0];
-  var R=_fbYearRows(+FB_YEAR), refM=+R.ref.slice(5,7);
+  var R=_fbYearRows(+FB_YEAR), refM=+R.ref.slice(5,7), _all=R.rows.length;
+  R.rows=R.rows.filter(function(r){ if(FB_TBQ && _fbNm(r.m.nm+(r.m.role||"")).indexOf(_fbNm(FB_TBQ))<0) return false; if(FB_TBF==="unpaid") return r.mis<0; if(FB_TBF==="paid") return r.mis===0; if(FB_TBF==="over") return r.mis>0; return true; });
   var h='<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">';
-  h+=ys.map(function(y){ var on=y===FB_YEAR; return '<button onclick="FB_YEAR=\''+y+'\';draw()" style="border:2px solid '+(on?'#0f766e':'#cbd5e1')+';border-radius:8px;padding:6px 12px;font-size:14px;font-weight:800;cursor:pointer;background:'+(on?'#0f766e':'#fff')+';color:'+(on?'#fff':'#0f172a')+'">'+y+'년</button>'; }).join('');
+  var _yi=ys.indexOf(FB_YEAR), _yo=ys[_yi+1], _yn=ys[_yi-1];
+  var _nb=function(y,lb){ return '<button '+(y?'onclick="FB_YEAR=\''+y+'\';draw()"':'disabled')+' style="border:2px solid '+(y?'#0f766e':'#e2e8f0')+';border-radius:8px;width:42px;height:40px;font-size:18px;font-weight:900;cursor:'+(y?'pointer':'default')+';background:#fff;color:'+(y?'#0f766e':'#cbd5e1')+'">'+lb+'</button>'; };
+  h+=_nb(_yo,'◀')+'<span style="font-size:20px;font-weight:900;color:#0f766e;min-width:90px;text-align:center">'+FB_YEAR+'년</span>'+_nb(_yn,'▶');
   h+='<span style="font-size:13px;color:#475569">기준: <b>'+esc(R.ref)+'</b>까지 · 이월 = 지난해까지 밀린 돈 · 미납금 <b style="color:#dc2626">−</b>는 덜 낸 돈, <b style="color:#15803d">+</b>는 미리 낸 돈</span></div>';
+  var tf=function(k,lb){ var on=FB_TBF===k; return '<button onclick="FB_TBF=\''+k+'\';draw()" style="border:none;border-radius:7px;padding:6px 11px;font-size:13px;font-weight:700;cursor:pointer;background:'+(on?'#0f766e':'#e2e8f0')+';color:'+(on?'#fff':'#0f172a')+'">'+lb+'</button>'; };
+  h+='<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px"><input type="search" id="fbTbQ" list="fbMemDL2" value="'+esc(FB_TBQ)+'" placeholder="🔍 이름 · 직책" oninput="FB_TBQ=this.value;clearTimeout(window._fbTbT);window._fbTbT=setTimeout(function(){ draw(); var e=document.getElementById(\'fbTbQ\'); if(e){ e.focus(); e.setSelectionRange(e.value.length,e.value.length); } },350)" autocomplete="off" style="padding:7px 10px;font-size:14px;border:2px solid '+(FB_TBQ?'#0f766e':'#cbd5e1')+';border-radius:8px;width:180px"><datalist id="fbMemDL2">'+_fbMemList().map(function(m){ return '<option value="'+esc(m.nm)+'">'; }).join('')+'</datalist>'+tf("all","전체")+tf("unpaid","미납만")+tf("paid","완납")+tf("over","미리 낸 사람")+((FB_TBQ||FB_TBF!=="all")?'<span style="font-size:13px;font-weight:700;color:#0f766e">'+R.rows.length+' / '+_all+'명</span>':'')+'</div>';
   h+='<div style="overflow-x:auto"><table style="border-collapse:collapse;font-size:14px;min-width:960px;width:100%">';
   h+='<thead><tr style="background:#1e293b;color:#fff"><th style="padding:7px 6px">직책</th><th style="padding:7px 6px;text-align:left">성함</th><th style="padding:7px 6px;text-align:right">이월</th>';
   for(var i=1;i<=12;i++) h+='<th style="padding:7px 4px;text-align:right'+(i>refM&&FB_YEAR===R.ref.slice(0,4)?';opacity:.5':'')+'">'+i+'월</th>';
@@ -13239,12 +13314,14 @@ function _fbTxView(){
   L.forEach(function(t){ run+=(Number(t.inA)||0)-(Number(t.out)||0); t._run=run; t._mk=_fbTxMem(t); });
   var h='<div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;padding:10px;margin-bottom:10px">';
   h+='<div style="font-weight:800;margin-bottom:6px">✏️ 거래 한 줄 추가 <span style="font-weight:400;font-size:12px;color:#475569">입금자 이름이 회원이면 그 날짜 달 회비로 자동 들어가요</span></div>';
-  h+='<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"><input type="date" id="fbN_dt" value="'+today()+'" style="padding:8px"><input id="fbN_nm" placeholder="입금자 / 적요" style="padding:8px;flex:1 1 140px"><input id="fbN_in" inputmode="numeric" placeholder="입금액" oninput="this.value=_cm(this.value)" style="padding:8px;width:120px"><input id="fbN_out" inputmode="numeric" placeholder="출금액" oninput="this.value=_cm(this.value)" style="padding:8px;width:120px"><input id="fbN_memo" placeholder="메모 (예: 워크숍)" style="padding:8px;flex:1 1 140px"><input id="fbN_bal" inputmode="numeric" placeholder="통장 잔액 (선택)" title="은행 앱에 찍힌 거래 후 잔액 — 적으면 통장과 맞는지 바로 확인돼요" oninput="this.value=_cm(this.value)" style="padding:8px;width:140px;border:2px dashed #94a3b8"><button class="btn" style="background:#1d4ed8;color:#fff;font-weight:800" onclick="_fbTxAdd()">＋ 추가</button></div></div>';
+  h+='<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"><input type="date" id="fbN_dt" value="'+today()+'" style="padding:8px"><input id="fbN_nm" list="fbMemDL" autocomplete="off" placeholder="입금자 — 몇 글자 치면 회원 이름이 떠요" style="padding:8px;flex:1 1 180px;font-weight:700"><datalist id="fbMemDL">'+_fbMemList().filter(function(m){ return !(m.endYm&&m.endYm<_ymNow()); }).map(function(m){ return '<option value="'+esc(m.nm)+'">'+esc((m.role||'')+(m.tel?' · '+m.tel:''))+'</option>'; }).join('')+'</datalist><input id="fbN_in" inputmode="numeric" placeholder="입금액" oninput="this.value=_cm(this.value)" style="padding:8px;width:120px"><input id="fbN_out" inputmode="numeric" placeholder="출금액" oninput="this.value=_cm(this.value)" style="padding:8px;width:120px"><input id="fbN_memo" placeholder="메모 (예: 워크숍)" style="padding:8px;flex:1 1 140px"><input id="fbN_bal" inputmode="numeric" placeholder="통장 잔액 (선택)" title="은행 앱에 찍힌 거래 후 잔액 — 적으면 통장과 맞는지 바로 확인돼요" oninput="this.value=_cm(this.value)" style="padding:8px;width:140px;border:2px dashed #94a3b8"><button class="btn" style="background:#1d4ed8;color:#fff;font-weight:800" onclick="_fbTxAdd()">＋ 추가</button></div></div>';
   var fb=function(k,lb){ var on=FB_TXF===k; return '<button onclick="FB_TXF=\''+k+'\';draw()" style="border:none;border-radius:7px;padding:6px 11px;font-size:13px;font-weight:700;cursor:pointer;background:'+(on?'#0f766e':'#e2e8f0')+';color:'+(on?'#fff':'#0f172a')+'">'+lb+'</button>'; };
   var nUnk=L.filter(function(t){ return Number(t.inA)>0 && !t.kind && !t._mk; }).length;
-  h+='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">'+fb("all","전체")+fb("fee","회비 입금")+fb("unk","❓ 회원 못 찾은 입금 "+nUnk)+fb("out","출금")+'</div>';
+  h+='<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px"><input type="search" id="fbTxQ" value="'+esc(FB_TXQ)+'" placeholder="🔍 검색 — 이름, 메모, 금액, 날짜" oninput="_fbTxQIn(this)" oncompositionstart="_fbQC=true" oncompositionend="_fbQC=false;_fbTxQIn(this)" autocomplete="off" style="flex:1 1 220px;max-width:360px;padding:8px 10px;font-size:14px;border:2px solid '+(FB_TXQ?'#0f766e':'#cbd5e1')+';border-radius:8px">'+fb("all","전체")+fb("fee","회비 입금")+fb("unk","❓ 회원 못 찾은 입금 "+nUnk)+fb("out","출금")+'</div>';
   var V=L.slice().reverse().filter(function(t){
+    if(FB_TXQ){ var hay=[t.dt,t.nm,t.memo,t.inA,t.out,t._mk?FB.mems[t._mk].nm:""].join(" ").toLowerCase(); if(!String(FB_TXQ).toLowerCase().split(/\s+/).filter(Boolean).every(function(w){ return hay.indexOf(w.replace(/,/g,""))>=0; })) return false; }
     if(FB_TXF==="fee") return !!t._mk; if(FB_TXF==="unk") return Number(t.inA)>0 && !t.kind && !t._mk; if(FB_TXF==="out") return Number(t.out)>0; return true; });
+  if(FB_TXQ) h+='<div style="font-size:13px;font-weight:700;color:#0f766e;margin-bottom:6px">🔍 「'+esc(FB_TXQ)+'」 '+V.length+'건 · 입금 '+fm(V.reduce(function(a,t){return a+(Number(t.inA)||0);},0))+'원 · 출금 '+fm(V.reduce(function(a,t){return a+(Number(t.out)||0);},0))+'원 <a href="javascript:void 0" onclick="FB_TXQ=String();draw()">✕ 지우기</a></div>';
   var opts=_fbMemList().map(function(m){ return '<option value="'+m._k+'">'+esc(m.nm)+'</option>'; }).join('');
   h+='<div style="overflow-x:auto;max-height:65vh;overflow-y:auto"><table style="width:100%;border-collapse:collapse;font-size:14px;min-width:760px"><thead style="position:sticky;top:0"><tr style="background:#1e293b;color:#fff"><th style="padding:7px">날짜</th><th style="padding:7px;text-align:left">입금자 / 적요</th><th style="padding:7px;text-align:right">입금</th><th style="padding:7px;text-align:right">출금</th><th style="padding:7px;text-align:right">잔액</th><th style="padding:7px;text-align:left">구분</th><th></th></tr></thead><tbody>';
   V.slice(0,400).forEach(function(t){
