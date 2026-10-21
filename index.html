@@ -13113,8 +13113,267 @@ function feeMemberStart(mem, cycle, startP){
   // 입회일이 시작일보다 나중이면 입회일 사용, 아니면 시작일
   return feePeriodOrder(joinP) > feePeriodOrder(startP) ? joinP : startP;
 }
+// ===== 💵 회비 (회비통장 기준) — 통장 입금을 회원·달로 자동 집계, 시작·탈퇴 달, 이월(전년도 미수), 통장 잔액 확인 =====
+//   /main/FeeBank = { cfg:{amt,startYm,acct}, mems:{k:{nm,role,tel,ord,startYm,endYm,alias}}, tx:{k:{dt,nm,inA,out,bal,memo,kind,memK,seq}} }
+//   kind: ""(자동: 회원 이름이면 회비) | "other"(회비 아님) / memK: 직접 연결한 회원
+var FB={loaded:false,cfg:{},mems:{},tx:{}}, FB_TAB="table", FB_YEAR="", FB_TXF="all", FEE_VIEW="bank";
+function _fbRef(p){ return fbDb.ref('/main/FeeBank'+(p?'/'+p:'')); }
+function _fbLoad(){
+  if(FB._lis) return; FB._lis=true;
+  _fbRef().on('value',function(s){ var v=s.val()||{}; FB.cfg=v.cfg||{}; FB.mems=v.mems||{}; FB.tx=v.tx||{}; FB.loaded=true; if(typeof CTAB!=="undefined"&&CTAB==="fee") draw(); });
+}
+function _fbAmt(){ return Number(FB.cfg.amt)||20000; }
+function _fbStartYm(){ return FB.cfg.startYm||"2024-06"; }
+function _ymAdd(ym,n){ var y=+ym.slice(0,4), m=+ym.slice(5,7)+n; while(m>12){m-=12;y++;} while(m<1){m+=12;y--;} return y+"-"+String(m).padStart(2,"0"); }
+function _ymDiff(a,b){ return (+b.slice(0,4)-+a.slice(0,4))*12+(+b.slice(5,7)-+a.slice(5,7)); }
+function _ymNow(){ return today().slice(0,7); }
+function _fbNm(s){ return String(s||"").replace(/\s+/g,""); }
+function _fbMemList(){ return Object.keys(FB.mems).map(function(k){ return Object.assign({_k:k},FB.mems[k]); }).sort(function(a,b){ return (a.ord||999)-(b.ord||999) || String(a.nm).localeCompare(String(b.nm)); }); }
+function _fbTxList(){ return Object.keys(FB.tx).map(function(k){ return Object.assign({_k:k},FB.tx[k]); }).sort(function(a,b){ return String(a.dt).localeCompare(String(b.dt)) || (a.seq||0)-(b.seq||0) || String(a._k).localeCompare(String(b._k)); }); }
+// 입금자 이름 → 회원 (별칭 포함). '(정화사업)'처럼 괄호 붙은 건 회비 아님
+function _fbMatch(nm){
+  var n=_fbNm(nm); if(!n || /[()（）]/.test(n)) return null;
+  var ks=Object.keys(FB.mems);
+  for(var i=0;i<ks.length;i++){ var m=FB.mems[ks[i]]; if(_fbNm(m.nm)===n) return ks[i]; }
+  for(var j=0;j<ks.length;j++){ var al=String(FB.mems[ks[j]].alias||"").split(/[,\s]+/).map(_fbNm).filter(Boolean); if(al.indexOf(n)>=0) return ks[j]; }
+  return null;
+}
+function _fbTxMem(t){ if(t.kind==="other" || !(Number(t.inA)>0)) return null; if(t.memK && FB.mems[t.memK]) return t.memK; return _fbMatch(t.nm); }
+// 회원별 달별 납부 {memK:{ym:금액}}
+function _fbPaid(){ var P={}; _fbTxList().forEach(function(t){ var k=_fbTxMem(t); if(!k) return; var ym=String(t.dt).slice(0,7); (P[k]=P[k]||{})[ym]=(P[k][ym]||0)+(Number(t.inA)||0); }); return P; }
+function _fbSumPaid(pm,from,to){ var s=0; Object.keys(pm||{}).forEach(function(ym){ if((!from||ym>=from)&&ym<=to) s+=pm[ym]; }); return s; }
+function _fbDue(m,from,to){
+  var a=m.startYm||_fbStartYm(); if(a<_fbStartYm()) a=_fbStartYm(); if(from&&a<from) a=from;
+  var b=to; if(m.endYm&&m.endYm<b) b=m.endYm;
+  return b<a?0:(_ymDiff(a,b)+1)*_fbAmt();
+}
+// 연도 표 계산: 이월(+는 밀린 돈), 1~12월 납부, 합계, 미납(−는 밀린 돈)
+function _fbYearRows(Y){
+  var ref=(String(Y)===_ymNow().slice(0,4))?_ymNow():(Y+"-12"), y0=Y+"-01", prevEnd=(Y-1)+"-12", P=_fbPaid();
+  var rows=[], gone=[];
+  _fbMemList().forEach(function(m){
+    var st=m.startYm||_fbStartYm(), pm=P[m._k]||{};
+    if(st>ref) return;
+    var carry=_fbDue(m,"",prevEnd)-_fbSumPaid(pm,"",prevEnd);
+    var months=[], sum=0; for(var i=1;i<=12;i++){ var v=pm[Y+"-"+String(i).padStart(2,"0")]||0; months.push(v); sum+=v; }
+    var mis=sum-_fbDue(m,y0,ref)-carry;
+    var r={m:m,carry:carry,months:months,sum:sum,mis:mis};
+    if(m.endYm && m.endYm<y0){ if(mis) gone.push(r); return; }
+    rows.push(r);
+  });
+  return {ref:ref, rows:rows, gone:gone};
+}
+function _fbYears(){ var a=+_fbStartYm().slice(0,4), b=+_ymNow().slice(0,4), out=[]; for(var y=b;y>=a;y--) out.push(String(y)); return out; }
+// 잔액: 지금 계산 잔액 + 통장 기록(잔액 적힌 마지막 거래) 시점 계산 잔액 비교
+function _fbBal(){ var inS=0,outS=0,last=null; _fbTxList().forEach(function(t){ inS+=Number(t.inA)||0; outS+=Number(t.out)||0; if(t.bal!=null&&t.bal!=="") last={bal:Number(t.bal),dt:t.dt,calc:inS-outS}; }); return {inS:inS,outS:outS,calc:inS-outS,last:last}; }
+
+function _fbView(){
+  _fbLoad();
+  if(!FB.loaded) return '<div class="card mut" style="text-align:center;padding:30px">📡 회비 통장 불러오는 중...</div>';
+  var nTx=Object.keys(FB.tx).length, nMem=Object.keys(FB.mems).length, B=_fbBal();
+  var h='<div class="card">';
+  h+='<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px">';
+  h+='<h3 style="margin:0;flex:1">💵 회비 <span style="font-size:13px;color:#475569;font-weight:600">회비 통장 기준 · 월 '+fm(_fbAmt())+'원 · '+esc(_fbStartYm())+'부터</span></h3>';
+  h+='<button class="btn btn-s" style="background:#ea580c;color:#fff;font-weight:700" onclick="_fbImportPick()">⬆ 엑셀 가져오기</button>';
+  h+='<button class="btn btn-s" style="background:#475569;color:#fff" onclick="FEE_VIEW=\'old\';draw()" title="예전 기간별 회비 화면">예전 화면</button>';
+  h+='</div>';
+  if(!nTx && !nMem){
+    h+='<div style="background:#fff7ed;border:2px solid #fdba74;border-radius:10px;padding:16px;font-size:15px;line-height:1.7">아직 회비 통장 자료가 없어요.<br><b>⬆ 엑셀 가져오기</b>로 「월회비_법성포청년회 ….xlsm」 파일을 고르면 <b>통장 거래내역 · 회원 명단 · 시작/탈퇴 달</b>이 한 번에 들어가요.</div></div>';
+    return h;
+  }
+  // 통장 잔액 확인
+  var ok=B.last && Math.abs(B.last.bal-B.last.calc)<1;
+  h+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">';
+  h+='<div style="flex:1 1 160px;background:#fff;border:1px solid #cbd5e1;border-radius:8px;padding:8px 12px"><div style="font-size:12px;color:#475569;font-weight:700">입금 합계</div><div style="font-size:18px;font-weight:900;color:#166534">'+fm(B.inS)+'원</div></div>';
+  h+='<div style="flex:1 1 160px;background:#fff;border:1px solid #cbd5e1;border-radius:8px;padding:8px 12px"><div style="font-size:12px;color:#475569;font-weight:700">출금 합계</div><div style="font-size:18px;font-weight:900;color:#b91c1c">'+fm(B.outS)+'원</div></div>';
+  h+='<div style="flex:1 1 220px;background:#fff;border:2px solid '+(B.last?(ok?'#16a34a':'#dc2626'):'#334155')+';border-radius:8px;padding:8px 12px"><div style="font-size:12px;color:#0f172a;font-weight:700">🏦 통장 잔액 (계산)</div><div style="font-size:18px;font-weight:900">'+fm(B.calc)+'원</div><div style="font-size:12px;color:'+(ok?'#15803d':'#b91c1c')+';font-weight:700">'+(B.last?(ok?'✅ '+esc(String(B.last.dt).slice(0,10))+' 통장 잔액 '+fm(B.last.bal)+'원과 맞아요'+(Math.abs(B.calc-B.last.calc)>=1?' · 그 뒤 직접 넣은 거래 '+(B.calc-B.last.calc>0?'+':'')+fm(B.calc-B.last.calc)+'원':''):'⚠ '+esc(String(B.last.dt).slice(0,10))+' 통장 잔액 '+fm(B.last.bal)+'원과 '+fm(B.last.calc-B.last.bal)+'원 차이 — 빠진 거래가 있어요'):'')+'</div></div>';
+  h+='</div>';
+  var tb=function(k,lb){ var on=FB_TAB===k; return '<button onclick="FB_TAB=\''+k+'\';draw()" style="border:none;border-radius:8px;padding:9px 14px;font-size:14px;font-weight:800;cursor:pointer;background:'+(on?'#1d4ed8':'#e2e8f0')+';color:'+(on?'#fff':'#0f172a')+'">'+lb+'</button>'; };
+  h+='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">'+tb("table","📊 회원별 월회비")+tb("tx","📒 회비 통장 거래내역 ("+nTx+")")+tb("mem","⚙ 회원·설정 ("+nMem+")")+'</div>';
+  if(FB_TAB==="tx") h+=_fbTxView(); else if(FB_TAB==="mem") h+=_fbMemView(); else h+=_fbTableView();
+  return h+'</div>';
+}
+function _fbTableView(){
+  var ys=_fbYears(); if(!FB_YEAR||ys.indexOf(FB_YEAR)<0) FB_YEAR=ys[0];
+  var R=_fbYearRows(+FB_YEAR), refM=+R.ref.slice(5,7);
+  var h='<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">';
+  h+=ys.map(function(y){ var on=y===FB_YEAR; return '<button onclick="FB_YEAR=\''+y+'\';draw()" style="border:2px solid '+(on?'#0f766e':'#cbd5e1')+';border-radius:8px;padding:6px 12px;font-size:14px;font-weight:800;cursor:pointer;background:'+(on?'#0f766e':'#fff')+';color:'+(on?'#fff':'#0f172a')+'">'+y+'년</button>'; }).join('');
+  h+='<span style="font-size:13px;color:#475569">기준: <b>'+esc(R.ref)+'</b>까지 · 이월 = 지난해까지 밀린 돈 · 미납금 <b style="color:#dc2626">−</b>는 덜 낸 돈, <b style="color:#15803d">+</b>는 미리 낸 돈</span></div>';
+  h+='<div style="overflow-x:auto"><table style="border-collapse:collapse;font-size:14px;min-width:960px;width:100%">';
+  h+='<thead><tr style="background:#1e293b;color:#fff"><th style="padding:7px 6px">직책</th><th style="padding:7px 6px;text-align:left">성함</th><th style="padding:7px 6px;text-align:right">이월</th>';
+  for(var i=1;i<=12;i++) h+='<th style="padding:7px 4px;text-align:right'+(i>refM&&FB_YEAR===R.ref.slice(0,4)?';opacity:.5':'')+'">'+i+'월</th>';
+  h+='<th style="padding:7px 6px;text-align:right">합계</th><th style="padding:7px 6px;text-align:right">미납금</th></tr></thead><tbody>';
+  var tC=0,tS=0,tMis=0,tM=[0,0,0,0,0,0,0,0,0,0,0,0];
+  var row=function(r,gray){
+    var m=r.m;
+    var s='<tr style="border-bottom:1px solid #e2e8f0'+(gray?';background:#f1f5f9;color:#64748b':'')+'"><td style="padding:6px;text-align:center;font-size:12.5px">'+esc(m.role||'')+'</td><td style="padding:6px;font-weight:800"><a href="javascript:void 0" onclick="_fbMemPop(\''+m._k+'\')" style="color:inherit">'+esc(m.nm)+'</a>'+(m.endYm?' <span style="font-size:11px;color:#b91c1c">탈퇴 '+esc(m.endYm)+'</span>':'')+(m.startYm&&m.startYm>_fbStartYm()?' <span style="font-size:11px;color:#1d4ed8">'+esc(m.startYm)+'~</span>':'')+'</td>';
+    s+='<td style="padding:6px;text-align:right;color:'+(r.carry>0?'#b91c1c':r.carry<0?'#15803d':'#94a3b8')+'">'+(r.carry?fm(r.carry):'-')+'</td>';
+    r.months.forEach(function(v,i){ s+='<td style="padding:6px 4px;text-align:right;'+(v?'font-weight:700;color:#0f172a':'color:#cbd5e1')+'">'+(v?fm(v):'·')+'</td>'; tM[i]+=v; });
+    s+='<td style="padding:6px;text-align:right;font-weight:800">'+fm(r.sum)+'</td>';
+    s+='<td style="padding:6px;text-align:right;font-weight:900;color:'+(r.mis<0?'#dc2626':r.mis>0?'#15803d':'#0f172a')+'">'+(r.mis===0?'완납':(r.mis>0?'+':'')+fm(r.mis))+'</td></tr>';
+    tC+=r.carry; tS+=r.sum; tMis+=r.mis; return s;
+  };
+  R.rows.forEach(function(r){ h+=row(r,false); });
+  h+='<tr style="background:#e2e8f0;font-weight:900;border-top:2px solid #334155"><td></td><td style="padding:7px 6px">합계 ('+R.rows.length+'명)</td><td style="padding:7px 6px;text-align:right">'+fm(tC)+'</td>';
+  tM.forEach(function(v){ h+='<td style="padding:7px 4px;text-align:right">'+(v?fm(v):'')+'</td>'; });
+  h+='<td style="padding:7px 6px;text-align:right">'+fm(tS)+'</td><td style="padding:7px 6px;text-align:right;color:'+(tMis<0?'#dc2626':'#0f172a')+'">'+fm(tMis)+'</td></tr>';
+  if(R.gone.length){
+    h+='<tr><td colspan="16" style="padding:10px 6px 4px;font-weight:800;color:#64748b">탈퇴 회원 — 남은 미납 (회비 계산은 탈퇴 달까지만)</td></tr>';
+    R.gone.forEach(function(r){ h+=row(r,true); });
+  }
+  h+='</tbody></table></div>';
+  var unk=_fbTxList().filter(function(t){ return Number(t.inA)>0 && !t.kind && !_fbTxMem(t) && String(t.dt).slice(0,4)===FB_YEAR; });
+  if(unk.length) h+='<div style="margin-top:10px;background:#fefce8;border:1px solid #fde047;border-radius:8px;padding:8px 12px;font-size:13.5px">ℹ '+FB_YEAR+'년 입금 중 회원 이름과 안 맞는 '+unk.length+'건은 회비에 안 들어갔어요 (예: '+unk.slice(0,4).map(function(t){return esc(t.nm||t.memo||'');}).join(', ')+'). <a href="javascript:void 0" onclick="FB_TAB=\'tx\';FB_TXF=\'unk\';draw()">📒 거래내역에서 확인</a></div>';
+  return h;
+}
+function _fbMemPop(k){
+  var m=FB.mems[k]; if(!m) return; var P=_fbPaid()[k]||{};
+  var list=_fbTxList().filter(function(t){ return _fbTxMem(t)===k; });
+  var h='<h3>'+esc(m.nm)+' 회비 내역 <button class="close-x" onclick="closePopup2()">&times;</button></h3>';
+  h+='<div style="font-size:13px;color:#475569;margin-bottom:8px">시작 '+esc(m.startYm||_fbStartYm())+(m.endYm?' · 탈퇴 '+esc(m.endYm):'')+' · 지금까지 낼 돈 '+fm(_fbDue(m,"",_ymNow()))+'원 · 낸 돈 '+fm(_fbSumPaid(P,"",_ymNow()))+'원</div>';
+  h+='<div style="max-height:50vh;overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:14px">'+list.map(function(t){ return '<tr style="border-bottom:1px solid #e2e8f0"><td style="padding:5px">'+esc(String(t.dt).slice(0,10))+'</td><td style="padding:5px">'+esc(t.nm||'')+'</td><td style="padding:5px;text-align:right;font-weight:800">'+fm(t.inA)+'</td></tr>'; }).join('')+(list.length?'':'<tr><td style="padding:12px;color:#94a3b8">입금 없음</td></tr>')+'</table></div>';
+  openPopup2(h,420);
+}
+// 📒 거래내역: 한 줄씩 써 내려가기 + 회원 연결
+function _fbTxView(){
+  var L=_fbTxList(), run=0;
+  L.forEach(function(t){ run+=(Number(t.inA)||0)-(Number(t.out)||0); t._run=run; t._mk=_fbTxMem(t); });
+  var h='<div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;padding:10px;margin-bottom:10px">';
+  h+='<div style="font-weight:800;margin-bottom:6px">✏️ 거래 한 줄 추가 <span style="font-weight:400;font-size:12px;color:#475569">입금자 이름이 회원이면 그 날짜 달 회비로 자동 들어가요</span></div>';
+  h+='<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"><input type="date" id="fbN_dt" value="'+today()+'" style="padding:8px"><input id="fbN_nm" placeholder="입금자 / 적요" style="padding:8px;flex:1 1 140px"><input id="fbN_in" inputmode="numeric" placeholder="입금액" oninput="this.value=_cm(this.value)" style="padding:8px;width:120px"><input id="fbN_out" inputmode="numeric" placeholder="출금액" oninput="this.value=_cm(this.value)" style="padding:8px;width:120px"><input id="fbN_memo" placeholder="메모 (예: 워크숍)" style="padding:8px;flex:1 1 140px"><button class="btn" style="background:#1d4ed8;color:#fff;font-weight:800" onclick="_fbTxAdd()">＋ 추가</button></div></div>';
+  var fb=function(k,lb){ var on=FB_TXF===k; return '<button onclick="FB_TXF=\''+k+'\';draw()" style="border:none;border-radius:7px;padding:6px 11px;font-size:13px;font-weight:700;cursor:pointer;background:'+(on?'#0f766e':'#e2e8f0')+';color:'+(on?'#fff':'#0f172a')+'">'+lb+'</button>'; };
+  var nUnk=L.filter(function(t){ return Number(t.inA)>0 && !t.kind && !t._mk; }).length;
+  h+='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">'+fb("all","전체")+fb("fee","회비 입금")+fb("unk","❓ 회원 못 찾은 입금 "+nUnk)+fb("out","출금")+'</div>';
+  var V=L.slice().reverse().filter(function(t){
+    if(FB_TXF==="fee") return !!t._mk; if(FB_TXF==="unk") return Number(t.inA)>0 && !t.kind && !t._mk; if(FB_TXF==="out") return Number(t.out)>0; return true; });
+  var opts=_fbMemList().map(function(m){ return '<option value="'+m._k+'">'+esc(m.nm)+'</option>'; }).join('');
+  h+='<div style="overflow-x:auto;max-height:65vh;overflow-y:auto"><table style="width:100%;border-collapse:collapse;font-size:14px;min-width:760px"><thead style="position:sticky;top:0"><tr style="background:#1e293b;color:#fff"><th style="padding:7px">날짜</th><th style="padding:7px;text-align:left">입금자 / 적요</th><th style="padding:7px;text-align:right">입금</th><th style="padding:7px;text-align:right">출금</th><th style="padding:7px;text-align:right">잔액</th><th style="padding:7px;text-align:left">구분</th><th></th></tr></thead><tbody>';
+  V.slice(0,400).forEach(function(t){
+    var warn=(t.bal!=null&&t.bal!==""&&Math.abs(Number(t.bal)-t._run)>=1);
+    var kind = t._mk ? '<span style="background:#dcfce7;color:#166534;font-weight:800;padding:2px 8px;border-radius:5px">회비 · '+esc(FB.mems[t._mk].nm)+'</span>'+(t.memK?'':' <span style="font-size:11px;color:#64748b">자동</span>')
+      : (Number(t.inA)>0 ? (t.kind==="other"?'<span style="color:#64748b">회비 아님</span>':'<select onchange="_fbTxSetMem(\''+t._k+'\',this.value)" style="padding:4px;border:2px solid #f59e0b;border-radius:6px;font-size:13px"><option value="">❓ 회원 고르기</option><option value="__other">회비 아님 (기타 입금)</option>'+opts+'</select>') : '<span style="color:#b91c1c">출금</span>');
+    h+='<tr style="border-bottom:1px solid #e2e8f0"><td style="padding:6px;white-space:nowrap">'+esc(String(t.dt).slice(0,10))+'</td><td style="padding:6px">'+esc(t.nm||'')+(t.memo?' <span style="font-size:12px;color:#64748b">'+esc(t.memo)+'</span>':'')+'</td>';
+    h+='<td style="padding:6px;text-align:right;color:#166534;font-weight:700">'+(Number(t.inA)?fm(t.inA):'')+'</td><td style="padding:6px;text-align:right;color:#b91c1c;font-weight:700">'+(Number(t.out)?fm(t.out):'')+'</td>';
+    h+='<td style="padding:6px;text-align:right'+(warn?';color:#dc2626;font-weight:800" title="통장 기록 잔액 '+fm(t.bal)+'원과 다름':'')+'">'+fm(t._run)+(warn?' ⚠':'')+'</td><td style="padding:6px">'+kind+((t._mk&&t.memK)||t.kind==="other"?' <a href="javascript:void 0" onclick="_fbTxSetMem(\''+t._k+'\',\'\')" style="font-size:11px">되돌리기</a>':'')+'</td>';
+    h+='<td style="padding:6px"><button class="btn btn-s" style="background:#dc2626;color:#fff" onclick="_fbTxDel(\''+t._k+'\')">✕</button></td></tr>';
+  });
+  h+='</tbody></table></div>'+(V.length>400?'<div class="mut" style="font-size:12px;margin-top:6px">최근 400건만 보여요</div>':'');
+  return h;
+}
+function _fbTxAdd(){
+  var g=function(i){ var e=document.getElementById(i); return e?e.value.trim():""; };
+  var dt=g("fbN_dt"), nm=g("fbN_nm"), inA=Number(g("fbN_in").replace(/,/g,""))||0, out=Number(g("fbN_out").replace(/,/g,""))||0;
+  if(!dt||(!inA&&!out)){ alert("날짜와 입금액 또는 출금액을 넣어 주세요"); return; }
+  var mk=inA?_fbMatch(nm):null;
+  _fbRef('tx').push({dt:dt,nm:nm,inA:inA,out:out,memo:g("fbN_memo"),seq:Date.now()}).then(function(){ toast(mk?"✓ "+FB.mems[mk].nm+" "+dt.slice(0,7)+" 회비로 들어갔어요":"✓ 추가됨"+(inA&&!mk?" (회원 이름이 아니라 회비엔 안 들어가요)":"")); });
+}
+function _fbTxSetMem(k,v){
+  var u = v==="__other" ? {kind:"other",memK:null} : (v ? {kind:null,memK:v} : {kind:null,memK:null});
+  _fbRef('tx/'+k).update(u).then(function(){ toast("저장됨"); });
+}
+function _fbTxDel(k){ var t=FB.tx[k]; if(!t||!confirm(String(t.dt).slice(0,10)+" "+(t.nm||"")+" "+fm(t.inA||t.out)+"원 거래를 지울까요?")) return; _fbRef('tx/'+k).remove(); }
+// ⚙ 회원·설정
+function _fbMemView(){
+  var h='<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px;margin-bottom:10px">';
+  h+='<label style="font-weight:700">월회비 <input id="fbC_amt" value="'+fm(_fbAmt())+'" oninput="this.value=_cm(this.value)" style="width:100px;padding:6px"> 원</label>';
+  h+='<label style="font-weight:700">회비 시작 달 <input type="month" id="fbC_st" value="'+esc(_fbStartYm())+'" style="padding:6px"></label>';
+  h+='<label style="font-weight:700">회비 통장 <input id="fbC_acct" value="'+esc(FB.cfg.acct||"")+'" placeholder="수협 2010-1021-5982" style="padding:6px;width:200px"></label>';
+  h+='<button class="btn" style="background:#1d4ed8;color:#fff;font-weight:800" onclick="_fbCfgSave()">💾 저장</button></div>';
+  h+='<div style="font-size:13px;color:#475569;margin-bottom:6px">시작 달 = 회비를 내기 시작한 달(입회) · 탈퇴 달 = 마지막으로 내야 하는 달. 입금자 이름이 회원 이름과 다르면 「다른 입금자 이름」에 적어 주세요(쉼표로 여러 개).</div>';
+  h+='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:14px;min-width:820px"><thead><tr style="background:#1e293b;color:#fff"><th style="padding:7px">순서</th><th style="padding:7px">직책</th><th style="padding:7px">성함</th><th style="padding:7px">연락처</th><th style="padding:7px">시작 달</th><th style="padding:7px">탈퇴 달</th><th style="padding:7px">다른 입금자 이름</th><th></th></tr></thead><tbody>';
+  _fbMemList().forEach(function(m){
+    var k=m._k;
+    h+='<tr style="border-bottom:1px solid #e2e8f0'+(m.endYm?';background:#f1f5f9':'')+'"><td style="padding:4px"><input id="fbM_ord_'+k+'" value="'+esc(m.ord||"")+'" style="width:44px;padding:5px"></td><td style="padding:4px"><input id="fbM_role_'+k+'" value="'+esc(m.role||"")+'" style="width:80px;padding:5px"></td><td style="padding:4px"><input id="fbM_nm_'+k+'" value="'+esc(m.nm||"")+'" style="width:80px;padding:5px;font-weight:800"></td><td style="padding:4px"><input id="fbM_tel_'+k+'" value="'+esc(m.tel||"")+'" style="width:120px;padding:5px"></td>';
+    h+='<td style="padding:4px"><input type="month" id="fbM_st_'+k+'" value="'+esc(m.startYm||"")+'" style="padding:5px"></td><td style="padding:4px"><input type="month" id="fbM_end_'+k+'" value="'+esc(m.endYm||"")+'" style="padding:5px"></td><td style="padding:4px"><input id="fbM_al_'+k+'" value="'+esc(m.alias||"")+'" style="width:130px;padding:5px"></td>';
+    h+='<td style="padding:4px;white-space:nowrap"><button class="btn btn-s" style="background:#16a34a;color:#fff" onclick="_fbMemSave(\''+k+'\')">💾</button> <button class="btn btn-s" style="background:#dc2626;color:#fff" onclick="_fbMemDel(\''+k+'\')">✕</button></td></tr>';
+  });
+  h+='</tbody></table></div><button class="btn" style="background:#0f766e;color:#fff;font-weight:800;margin-top:8px" onclick="_fbMemAdd()">＋ 회원 추가</button>';
+  return h;
+}
+function _fbCfgSave(){ var g=function(i){var e=document.getElementById(i);return e?e.value.trim():"";}; _fbRef('cfg').update({amt:Number(g("fbC_amt").replace(/,/g,""))||20000,startYm:g("fbC_st")||"2024-06",acct:g("fbC_acct")}).then(function(){ toast("저장됨"); }); }
+function _fbMemSave(k){ var g=function(i){var e=document.getElementById(i+k);return e?e.value.trim():"";}; if(!g("fbM_nm_")){ alert("성함을 넣어 주세요"); return; }
+  _fbRef('mems/'+k).update({ord:Number(g("fbM_ord_"))||null,role:g("fbM_role_"),nm:g("fbM_nm_"),tel:g("fbM_tel_"),startYm:g("fbM_st_")||null,endYm:g("fbM_end_")||null,alias:g("fbM_al_")}).then(function(){ toast("저장됨"); }); }
+function _fbMemAdd(){ var nm=prompt("새 회원 성함"); if(!nm) return; var st=prompt("회비 시작 달 (예: "+_ymNow()+")", _ymNow()); if(st===null) return;
+  _fbRef('mems').push({nm:nm.trim(),role:"회원",startYm:st||_ymNow(),ord:_fbMemList().length+1}).then(function(){ toast("추가됨"); }); }
+function _fbMemDel(k){ var m=FB.mems[k]; if(!m||!confirm(m.nm+" 회원을 회비 명단에서 지울까요?\n(탈퇴라면 지우지 말고 「탈퇴 달」을 넣는 걸 추천해요)")) return; _fbRef('mems/'+k).remove(); }
+
+// ⬆ 엑셀 가져오기 — 월회비 엑셀(전자통장 + 연도별 월회비 표) 또는 은행 거래내역 엑셀
+function _fbImportPick(){
+  if(typeof XLSX==="undefined"){ toast("엑셀 도구 불러오는 중… 잠시 후 다시",true); return; }
+  var inp=document.createElement("input"); inp.type="file"; inp.accept=".xlsx,.xlsm,.xls";
+  inp.onchange=function(){ var f=inp.files&&inp.files[0]; if(!f) return; showLoading("엑셀 읽는 중...");
+    f.arrayBuffer().then(function(buf){ try{ var wb=XLSX.read(buf,{type:"array",cellDates:true}); _fbImport(wb); }catch(e){ hideLoading(); alert("엑셀을 읽지 못했어요: "+(e.message||e)); } }); };
+  inp.click();
+}
+function _fbYmOf(d){ if(d && typeof d==="object" && typeof d.getTime==="function"){ var t=new Date(d.getTime()+12*3600e3); return t.getFullYear()+"-"+String(t.getMonth()+1).padStart(2,"0")+"-"+String(t.getDate()).padStart(2,"0"); } var s=String(d||"").trim().replace(/[./]/g,"-"); var m=s.match(/(\d{4})-(\d{1,2})-(\d{1,2})/); return m?m[1]+"-"+m[2].padStart(2,"0")+"-"+m[3].padStart(2,"0"):""; }
+function _fbParse(wb){
+  // 1) 통장 거래내역: '거래일시'·'입금' 머리줄 찾기
+  var tx=[], name=wb.SheetNames.filter(function(n){ return /전자통장|거래내역/.test(n); })[0]||wb.SheetNames[0];
+  var R=XLSX.utils.sheet_to_json(wb.Sheets[name],{header:1,raw:true,defval:null}), hi=-1, H=null;
+  for(var i=0;i<Math.min(R.length,40);i++){ var row=(R[i]||[]).map(function(c){return String(c==null?"":c).trim();}); if(row.some(function(c){return /거래일/.test(c);}) && row.some(function(c){return /입금/.test(c);})){ hi=i; H=row; break; } }
+  if(hi<0) throw new Error("「거래일시」「입금액」 머리줄을 못 찾았어요 ("+name+")");
+  var ci=function(re){ for(var j=0;j<H.length;j++) if(re.test(H[j])) return j; return -1; };
+  var cDt=ci(/거래일/), cNm=ci(/입금자|의뢰인|받는분|내용|적요/), cOut=ci(/출금/), cIn=ci(/입금액|^입금$/), cMemo=ci(/기재내용|메모|비고/), cMemo2=ci(/^적요$/);
+  var cBal=ci(/잔액/); if(cBal<0 && cIn>=0) cBal=cIn+1;
+  for(var r=hi+1;r<R.length;r++){ var x=R[r]||[]; var dt=_fbYmOf(x[cDt]); if(!dt) continue;
+    var inA=Number(String(x[cIn]==null?"":x[cIn]).replace(/,/g,""))||0, out=Number(String(x[cOut]==null?"":x[cOut]).replace(/,/g,""))||0; if(!inA&&!out) continue;
+    var bal=x[cBal]; bal=(bal===null||bal===""||isNaN(Number(String(bal).replace(/,/g,""))))?null:Number(String(bal).replace(/,/g,""));
+    var memo=[cMemo2>=0&&cMemo2!==cNm?x[cMemo2]:null, cMemo>=0?x[cMemo]:null].filter(function(v){return v!=null&&String(v).trim();}).join(" ");
+    tx.push({dt:dt,nm:String(x[cNm]==null?"":x[cNm]).trim(),inA:inA,out:out,bal:bal,memo:memo,seq:r}); }
+  // 2) 연도별 월회비 표 → 회원 명단·시작/탈퇴 달
+  var ys=wb.SheetNames.map(function(n){ var m=n.match(/^NEW\s*(\d{4})\s*월회비/); return m?{y:m[1],n:n}:null; }).filter(Boolean).sort(function(a,b){return a.y.localeCompare(b.y);});
+  var nowY=today().slice(0,4); ys=ys.filter(function(Y){ return Y.y<=nowY; });   // 아직 안 온 해(미리 만든 표)는 빼기
+  var mems={}, order=[], amt=0, firstBase=0;
+  ys.forEach(function(Y){
+    var S=XLSX.utils.sheet_to_json(wb.Sheets[Y.n],{header:1,raw:true,defval:null}), base=12;
+    (S.slice(0,3)).forEach(function(rw){ (rw||[]).forEach(function(c,j){ if(String(c||"").trim()==="기준월") base=Number(rw[j+1])||base; if(String(c||"").trim()==="월회비"&&Number(rw[j+1])) amt=Number(rw[j+1]); }); });
+    var hasCarry=(S[1]||[]).some(function(c){ return String(c||"").trim()==="이월액"; }), off=hasCarry?5:4;
+    if(!firstBase) firstBase=base;
+    S.slice(3).forEach(function(rw){ var nm=String((rw||[])[2]||"").trim(); if(!nm||/#N\/A|계좌안내/.test(nm)) return;
+      if(!mems[nm]){ mems[nm]={nm:nm,years:[]}; order.push(nm); }
+      var M=mems[nm]; M.years.push(Y.y); M.pos=(S.indexOf(rw)); M.role=String(rw[1]||M.role||"").trim(); if(rw[3]&&!/#REF/.test(String(rw[3]))) M.tel=String(rw[3]).trim();
+      var mis=rw[off+13]; M.last={y:Y.y, base:base, mis:(Y.y===ys[0].y&&!hasCarry)?((mis==="완납"||mis==null)?0:-Number(mis)||0):(Number(mis)||0)}; });
+  });
+  return {tx:tx, mems:mems, order:order, amt:amt||20000, sheet:name, years:ys.map(function(x){return x.y;}), firstBase:firstBase};
+}
+function _fbImport(wb){
+  var D; try{ D=_fbParse(wb); }catch(e){ hideLoading(); alert(e.message||e); return; }
+  // 기존과 같은 거래는 건너뜀
+  var have={}; _fbTxList().forEach(function(t){ have[[t.dt,_fbNm(t.nm),Number(t.inA)||0,Number(t.out)||0,t.bal==null?"":Number(t.bal)].join("|")]=1; });
+  var newTx=D.tx.filter(function(t){ return !have[[t.dt,_fbNm(t.nm),t.inA,t.out,t.bal==null?"":t.bal].join("|")]; });
+  // 회원 시작/탈퇴 달: 마지막 표의 미납금 = 낸 돈 − 낼 돈 → 낼 달 수로 거꾸로 계산
+  var startYm=_fbStartYm();
+  var allTx=_fbTxList().concat(newTx);   // 이미 있는 거래 + 새 거래 (겹치지 않게)
+  if(D.order.length){
+    var firstY=D.years[0], lastY=D.years[D.years.length-1];
+    D.order.forEach(function(nm,i){
+      var M=D.mems[nm], L=M.last, ref=(L.y<today().slice(0,4))?L.y+"-12":L.y+"-"+String(L.base).padStart(2,"0");   // 지난해 표는 12월까지, 올해 표는 기준월까지
+      var paid=0; allTx.forEach(function(t){ if(_fbNm(t.nm)===_fbNm(nm) && Number(t.inA)>0 && String(t.dt).slice(0,7)<=ref) paid+=Number(t.inA); });
+      var months=Math.round((paid-L.mis)/D.amt);
+      M.startYm=months>0?_ymAdd(ref,-(months-1)):ref; M.endYm=(L.y!==lastY)?L.y+"-12":null; M.ord=(L.y===lastY?0:1000)+(M.pos||i);   // 최신 명단 순서, 탈퇴는 뒤로
+    });
+    var ys0=D.order.map(function(nm){ return D.mems[nm].startYm; }).sort()[0]; startYm=ys0||startYm;
+    if(D.firstBase && D.firstBase<12) startYm=D.years[0]+"-"+String(13-D.firstBase).padStart(2,"0");   // 첫해 기준월 7 → 6월부터
+  }
+  var exist={}; _fbMemList().forEach(function(m){ exist[_fbNm(m.nm)]=m._k; });
+  var msg="📥 가져올 내용\n\n• 통장 거래 "+D.tx.length+"건 중 새 거래 "+newTx.length+"건 ("+D.sheet+")";
+  if(D.order.length) msg+="\n• 회원 "+D.order.length+"명 ("+D.years.join("·")+"년 월회비 표) — 시작/탈퇴 달 자동 계산\n• 월회비 "+fm(D.amt)+"원 · 시작 "+startYm;
+  msg+="\n\n가져올까요?";
+  hideLoading(); if(!confirm(msg)) return;
+  showLoading("저장 중...");
+  var upd={};
+  newTx.forEach(function(t){ upd['tx/'+_fbRef('tx').push().key]=t; });
+  if(D.order.length){
+    upd['cfg/amt']=D.amt; upd['cfg/startYm']=startYm;
+    D.order.forEach(function(nm){ var M=D.mems[nm], k=exist[_fbNm(nm)]||_fbRef('mems').push().key;
+      upd['mems/'+k+'/nm']=nm; upd['mems/'+k+'/role']=M.role||"회원"; if(M.tel) upd['mems/'+k+'/tel']=M.tel; upd['mems/'+k+'/startYm']=M.startYm; upd['mems/'+k+'/endYm']=M.endYm||null; upd['mems/'+k+'/ord']=M.ord; });
+  }
+  _fbRef().update(upd).then(function(){ hideLoading(); toast("✓ 거래 "+newTx.length+"건"+(D.order.length?" · 회원 "+D.order.length+"명":"")+" 들어갔어요"); FB_TAB="table"; draw(); })
+    .catch(function(e){ hideLoading(); alert("저장 실패: "+(e.message||e)); });
+}
 function dFee(){
   if(!isA()) return '<div class="card">관리자 전용입니다.</div>';
+  if(FEE_VIEW!=="old") return _fbView();
   // 회원별 집계 — 누적 납부 - 누적 청구 = 잔액 (양수=선납/초과, 음수=미납)
   var byMem = {}; // memId → {years:[], totalDue, totalPaid}
   (fees||[]).forEach(function(f){
@@ -13167,6 +13426,7 @@ function dFee(){
   var cycleLbl = {yearly:"연회비",halfYearly:"반기회비",quarterly:"분기회비",monthly:"월회비",none:"비활성"}[FEE_CYCLE]||"연회비";
   // [0행] 유틸 버튼 (연말이월/양식/엑셀) — 맨 위 우측
   h += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;justify-content:flex-end">';
+  h += '<button class="btn btn-s" style="background:#0f766e;color:#fff;font-weight:800;padding:8px 14px" onclick="FEE_VIEW=\'bank\';draw()">📒 회비 통장 화면으로</button>';
   h += '<button class="btn btn-s" style="background:#f59e0b;color:#fff;font-weight:700;padding:8px 14px" onclick="feeRolloverPopup()">🔁 연말이월</button>';
   h += '<button class="btn btn-s" style="background:#8b5cf6;color:#fff;font-weight:700;padding:8px 14px" onclick="feeTmpl()">📋 양식</button>';
   h += '<button class="btn btn-s" style="background:#059669;color:#fff;font-weight:700;padding:8px 14px" onclick="feeExport()">⬇ 내보내기</button>';
