@@ -13229,6 +13229,73 @@ function _fbPubShow(k){
   h+='<div style="font-size:12px;color:#94a3b8;margin-top:12px">내역이 다르면 재무국에 알려 주세요</div></div>';
   document.getElementById("feePage").innerHTML=h;
 }
+// ===== 📩 회비 문자 (엑셀 SENS 문자발송 문구 그대로) — 사람마다 이름·직책·금액 바꿔서 한 명씩 =====
+var FB_SMS_T_UNPAID="{이름} {직책}님 법성포청년회 재무국입니다.\n{연}년 {월}월까지 회비가 {금액}원으로 확인됩니다. 많은 도움 부탁드리겠습니다. 착오가 있거나 문의사항 있으시면 연락 부탁드리겠습니다. 항상 법성포 청년회를 위하여 힘 써주셔서 감사드립니다.\n({계좌})\n마지막 업데이트 : {오늘}";
+var FB_SMS_T_PAID="{이름} {직책}님 법성포청년회 재무국입니다.\n{연}년 {월}월 까지  완납해주셔서 감사드립니다 항상 법성포 청년회를 위하여 힘 써주셔서 감사드립니다.";
+function _fbSmsList(){
+  var now=_ymNow(), P=_fbPaid();
+  return _fbMemList().filter(function(m){ return !(m.endYm && m.endYm<now); }).map(function(m){
+    var bal=_fbSumPaid(P[m._k]||{},"",now)-_fbDue(m,"",now);
+    return {m:m, bal:bal, tel:String(m.tel||"").replace(/[^0-9]/g,"")};
+  });
+}
+function _fbSmsMsg(x, tpl){
+  var now=_ymNow(), t=new Date(), role=String(x.m.role||"회원").trim()||"회원";
+  return String(tpl||"").replace(/\{이름\}/g,x.m.nm).replace(/\{직책\}/g,role)
+    .replace(/\{연\}/g,now.slice(0,4)).replace(/\{월\}/g,String(+now.slice(5,7)))
+    .replace(/\{금액\}/g,fm(Math.abs(Math.min(0,x.bal)))).replace(/\{계좌\}/g,FB.cfg.acct||"")
+    .replace(/\{오늘\}/g,t.getFullYear()+"년 "+String(t.getMonth()+1).padStart(2,"0")+"월 "+String(t.getDate()).padStart(2,"0")+"일");
+}
+function _fbSmsBytes(s){ var b=0; for(var i=0;i<s.length;i++) b+=(s.charCodeAt(i)>127?2:1); return b; }
+function _fbSmsPop(){
+  var L=_fbSmsList(); window._FB_SMS_L=L;
+  var tu=FB.cfg.smsUnpaid||FB_SMS_T_UNPAID, tp=FB.cfg.smsPaid||FB_SMS_T_PAID;
+  var nU=L.filter(function(x){return x.bal<0;}).length;
+  var h='<h3>📩 회비 문자 보내기 <button class="close-x" onclick="closePopup()">&times;</button></h3>';
+  h+='<div style="font-size:13px;color:#475569;margin-bottom:8px">'+esc(_ymNow())+' 기준 · 미납 '+nU+'명 / 완납·미리 낸 '+(L.length-nU)+'명 · 사람마다 이름·직책·금액이 바뀐 문자가 한 통씩 가요</div>';
+  if(!FB.cfg.acct) h+='<div style="background:#fff7ed;border:1px solid #fdba74;border-radius:6px;padding:6px 10px;font-size:13px;margin-bottom:8px">💡 ⚙ 회원·설정에 「회비 통장」(예: 수협 2010-1021-5982 법성포청년회)을 적어 두면 {계좌}에 들어가요</div>';
+  h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">';
+  h+='<div><label style="font-weight:800;color:#b91c1c">미납 회원 문구</label><textarea id="fbS_tu" oninput="_fbSmsPrev()" style="width:100%;height:150px;padding:8px;font-size:13px;box-sizing:border-box">'+esc(tu)+'</textarea></div>';
+  h+='<div><label style="font-weight:800;color:#15803d">완납 회원 문구</label><textarea id="fbS_tp" oninput="_fbSmsPrev()" style="width:100%;height:150px;padding:8px;font-size:13px;box-sizing:border-box">'+esc(tp)+'</textarea></div></div>';
+  h+='<div style="font-size:12px;color:#64748b;margin:4px 0 8px">바뀌는 칸: {이름} {직책} {연} {월} {금액} {계좌} {오늘} · <a href="javascript:void 0" onclick="_fbSmsSaveTpl()">💾 문구 저장</a> · <a href="javascript:void 0" onclick="document.getElementById(\'fbS_tu\').value=FB_SMS_T_UNPAID;document.getElementById(\'fbS_tp\').value=FB_SMS_T_PAID;_fbSmsPrev()">원래 문구로</a></div>';
+  h+='<label style="font-weight:700">제목 (긴 문자일 때)</label> <input id="fbS_title" value="'+esc(FB.cfg.smsTitle||"법성포 청년회입니다.")+'" style="padding:6px;width:240px">';
+  h+='<div style="display:flex;gap:6px;flex-wrap:wrap;margin:10px 0 6px"><button class="btn btn-s" style="background:#b91c1c;color:#fff" onclick="_fbSmsSel(\'unpaid\')">미납만 고르기</button><button class="btn btn-s" style="background:#15803d;color:#fff" onclick="_fbSmsSel(\'paid\')">완납만 고르기</button><button class="btn btn-s" style="background:#334155;color:#fff" onclick="_fbSmsSel(\'all\')">전체</button><button class="btn btn-s" style="background:#475569;color:#fff" onclick="_fbSmsSel(\'none\')">모두 빼기</button><span id="fbS_cnt" style="font-weight:800;align-self:center"></span></div>';
+  h+='<div style="max-height:28vh;overflow:auto;border:1px solid #e2e8f0;border-radius:8px">';
+  L.forEach(function(x,i){ h+='<label style="display:flex;gap:8px;align-items:center;padding:6px 10px;border-bottom:1px solid #f1f5f9;cursor:pointer;font-size:14px"><input type="checkbox" class="fbSChk" data-i="'+i+'"'+(x.bal<0&&x.tel?' checked':'')+(x.tel?'':' disabled')+' onchange="_fbSmsPrev()" style="width:18px;height:18px"><b style="min-width:60px">'+esc(x.m.nm)+'</b><span style="color:#64748b;min-width:60px">'+esc(x.m.role||'')+'</span><span style="flex:1;color:#64748b">'+(x.tel||'<span style="color:#dc2626">번호 없음</span>')+'</span><b style="color:'+(x.bal<0?'#dc2626':'#15803d')+'">'+(x.bal<0?'미납 '+fm(-x.bal):x.bal>0?'+'+fm(x.bal):'완납')+'</b></label>'; });
+  h+='</div><div style="font-weight:800;margin:10px 0 4px">미리보기 <span id="fbS_pvw" style="font-weight:400;font-size:12px;color:#64748b"></span></div><pre id="fbS_pv" style="white-space:pre-wrap;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px;font-size:13px;margin:0;max-height:18vh;overflow:auto"></pre>';
+  h+='<div class="popStickyFoot" style="justify-content:space-between;gap:8px;flex-wrap:wrap"><span><input id="fbS_me" inputmode="numeric" placeholder="내 번호로 먼저 테스트" style="padding:8px;width:170px"> <button class="btn" style="background:#7c3aed;color:#fff" onclick="_fbSmsSend(true)">테스트 1통</button></span><span><button class="btn" style="background:#475569;color:#fff" onclick="closePopup()">취소</button> <button class="btn" style="background:#1d4ed8;color:#fff;font-weight:800" onclick="_fbSmsSend(false)">📩 고른 회원에게 보내기</button></span></div>';
+  openPopup(h,760); _fbSmsPrev();
+}
+function _fbSmsPicked(){ var L=window._FB_SMS_L||[], out=[]; document.querySelectorAll(".fbSChk").forEach(function(c){ if(c.checked) out.push(L[+c.getAttribute("data-i")]); }); return out; }
+function _fbSmsSel(k){ var L=window._FB_SMS_L||[]; document.querySelectorAll(".fbSChk").forEach(function(c){ var x=L[+c.getAttribute("data-i")]; if(!x.tel) return; c.checked = k==="all" || (k==="unpaid"&&x.bal<0) || (k==="paid"&&x.bal>=0); }); _fbSmsPrev(); }
+function _fbSmsPrev(){
+  var P=_fbSmsPicked(), c=document.getElementById("fbS_cnt"); if(c) c.textContent=P.length+"명 고름";
+  var x=P[0]||(window._FB_SMS_L||[])[0], pv=document.getElementById("fbS_pv"); if(!x||!pv) return;
+  var msg=_fbSmsMsg(x, document.getElementById(x.bal<0?"fbS_tu":"fbS_tp").value);
+  pv.textContent=msg; var w=document.getElementById("fbS_pvw"); if(w) w.textContent="("+x.m.nm+" · "+_fbSmsBytes(msg)+"바이트 · "+(_fbSmsBytes(msg)>90?"장문(LMS)":"단문")+")";
+}
+function _fbSmsSaveTpl(){ _fbRef('cfg').update({smsUnpaid:document.getElementById("fbS_tu").value, smsPaid:document.getElementById("fbS_tp").value, smsTitle:document.getElementById("fbS_title").value}).then(function(){ toast("💾 문구 저장됨"); }); }
+async function _fbSmsSend(test){
+  var tu=document.getElementById("fbS_tu").value, tp=document.getElementById("fbS_tp").value, title=document.getElementById("fbS_title").value;
+  var P=_fbSmsPicked();
+  if(test){
+    var me=String(document.getElementById("fbS_me").value||"").replace(/\D/g,""); if(me.length<10){ alert("테스트 받을 내 휴대폰 번호를 넣어 주세요"); return; }
+    var x=P[0]||(window._FB_SMS_L||[])[0]; if(!x) return;
+    showLoading("테스트 보내는 중..."); var r=await api("sendSms",{tels:[me], msg:"[테스트] "+_fbSmsMsg(x, x.bal<0?tu:tp), title:title}); hideLoading();
+    alert(r&&r.ok?"✓ 테스트 문자를 보냈어요 ("+x.m.nm+" 문구)":"✗ 실패: "+((r&&r.err)||"")); return;
+  }
+  if(!P.length){ alert("보낼 회원을 골라 주세요"); return; }
+  if(!confirm(P.length+"명에게 문자를 보낼까요?\n(미납 "+P.filter(function(x){return x.bal<0;}).length+" · 완납 "+P.filter(function(x){return x.bal>=0;}).length+")")) return;
+  var ok=0, bad=[];
+  for(var i=0;i<P.length;i++){
+    var y=P[i]; showLoading("📩 보내는 중 ("+(i+1)+"/"+P.length+") "+y.m.nm);
+    try{ var rr=await api("sendSms",{tels:[y.tel], msg:_fbSmsMsg(y, y.bal<0?tu:tp), title:title}); if(rr&&rr.ok) ok++; else bad.push(y.m.nm+" — "+((rr&&rr.err)||"실패")); }catch(e){ bad.push(y.m.nm+" — "+(e.message||e)); }
+  }
+  hideLoading();
+  _fbRef('cfg').update({smsUnpaid:tu, smsPaid:tp, smsTitle:title, smsLast:today()+" · "+ok+"명"});
+  alert("✓ "+ok+"명에게 보냈어요"+(bad.length?"\n\n✗ 못 보낸 "+bad.length+"명:\n"+bad.join("\n"):""));
+  if(!bad.length) closePopup();
+}
 function _fbView(){
   _fbLoad();
   if(!FB.loaded) return '<div class="card mut" style="text-align:center;padding:30px">📡 회비 통장 불러오는 중...</div>';
@@ -13236,6 +13303,7 @@ function _fbView(){
   var h='<div class="card">';
   h+='<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px">';
   h+='<h3 style="margin:0;flex:1">💵 회비 <span style="font-size:13px;color:#475569;font-weight:600">회비 통장 기준 · 월 '+fm(_fbAmt())+'원 · '+esc(_fbStartYm())+'부터</span></h3>';
+  h+='<button class="btn btn-s" style="background:#1d4ed8;color:#fff;font-weight:800" onclick="_fbSmsPop()">📩 문자 보내기</button>';
   h+='<button class="btn btn-s" style="background:#7c3aed;color:#fff;font-weight:700" onclick="_fbPubLink()" title="회원이 이름+휴대폰 뒷자리로 자기 회비를 보는 링크">🔗 회원 조회 링크</button>';
   h+='<button class="btn btn-s" style="background:#ea580c;color:#fff;font-weight:700" onclick="_fbImportPick()">⬆ 엑셀 가져오기</button>';
   h+='</div>';
@@ -13331,7 +13399,7 @@ function _fbTxView(){
     h+='<tr style="border-bottom:1px solid #e2e8f0"><td style="padding:6px;white-space:nowrap">'+esc(String(t.dt).slice(0,10))+'</td><td style="padding:6px">'+esc(t.nm||'')+(t.memo?' <span style="font-size:12px;color:#64748b">'+esc(t.memo)+'</span>':'')+'</td>';
     h+='<td style="padding:6px;text-align:right;color:#166534;font-weight:700">'+(Number(t.inA)?fm(t.inA):'')+'</td><td style="padding:6px;text-align:right;color:#b91c1c;font-weight:700">'+(Number(t.out)?fm(t.out):'')+'</td>';
     h+='<td style="padding:6px;text-align:right'+(warn?';color:#dc2626;font-weight:800" title="통장 기록 잔액 '+fm(t.bal)+'원과 다름':'')+'">'+fm(t._run)+(warn?' ⚠':'')+'</td><td style="padding:6px">'+kind+((t._mk&&t.memK)||t.kind==="other"?' <a href="javascript:void 0" onclick="_fbTxSetMem(\''+t._k+'\',\'\')" style="font-size:11px">되돌리기</a>':'')+'</td>';
-    h+='<td style="padding:6px"><button class="btn btn-s" style="background:#dc2626;color:#fff" onclick="_fbTxDel(\''+t._k+'\')">✕</button></td></tr>';
+    h+='<td style="padding:6px"><button class="btn btn-s" style="background:#2563eb;color:#fff" onclick="_fbTxEdit(\''+t._k+'\')">✏️</button> <button class="btn btn-s" style="background:#dc2626;color:#fff" onclick="_fbTxDel(\''+t._k+'\')">✕</button></td></tr>';
   });
   h+='</tbody></table></div>'+(V.length>400?'<div class="mut" style="font-size:12px;margin-top:6px">최근 400건만 보여요</div>':'');
   return h;
@@ -13347,6 +13415,29 @@ function _fbTxAdd(){
 function _fbTxSetMem(k,v){
   var u = v==="__other" ? {kind:"other",memK:null} : (v ? {kind:null,memK:v} : {kind:null,memK:null});
   _fbRef('tx/'+k).update(u).then(function(){ toast("저장됨"); });
+}
+// ✏️ 거래 고치기
+function _fbTxEdit(k){
+  var t=FB.tx[k]; if(!t) return;
+  var cm=function(v){ return (v===null||v===undefined||v==="")?"":_cm(String(v)); };
+  var h='<h3>✏️ 거래 고치기 <button class="close-x" onclick="closePopup2()">&times;</button></h3>';
+  h+='<div style="display:grid;grid-template-columns:110px 1fr;gap:8px;align-items:center;font-size:14px">';
+  h+='<label style="font-weight:700">날짜</label><input type="date" id="fbE_dt" value="'+esc(String(t.dt||"").slice(0,10))+'" style="padding:8px">';
+  h+='<label style="font-weight:700">입금자 / 적요</label><input id="fbE_nm" list="fbMemDL3" value="'+esc(t.nm||"")+'" autocomplete="off" style="padding:8px;font-weight:700"><datalist id="fbMemDL3">'+_fbMemList().map(function(m){ return '<option value="'+esc(m.nm)+'">'; }).join('')+'</datalist>';
+  h+='<label style="font-weight:700;color:#166534">입금액</label><input id="fbE_in" inputmode="numeric" value="'+cm(t.inA)+'" oninput="this.value=_cm(this.value)" style="padding:8px">';
+  h+='<label style="font-weight:700;color:#b91c1c">출금액</label><input id="fbE_out" inputmode="numeric" value="'+cm(t.out)+'" oninput="this.value=_cm(this.value)" style="padding:8px">';
+  h+='<label style="font-weight:700">통장 잔액</label><input id="fbE_bal" inputmode="numeric" value="'+cm(t.bal)+'" oninput="this.value=_cm(this.value)" placeholder="(선택)" style="padding:8px">';
+  h+='<label style="font-weight:700">메모</label><input id="fbE_memo" value="'+esc(t.memo||"")+'" style="padding:8px">';
+  h+='</div>';
+  h+='<div class="popStickyFoot" style="justify-content:flex-end;gap:8px"><button class="btn" style="background:#475569;color:#fff" onclick="closePopup2()">취소</button><button class="btn" style="background:#1d4ed8;color:#fff;font-weight:800" onclick="_fbTxEditSave(\''+k+'\')">💾 저장</button></div>';
+  openPopup2(h,460);
+}
+function _fbTxEditSave(k){
+  var g=function(i){ var e=document.getElementById(i); return e?e.value.trim():""; }, n=function(i){ var v=g(i).replace(/,/g,""); return v===""?null:Number(v); };
+  var dt=g("fbE_dt"), inA=n("fbE_in")||0, out=n("fbE_out")||0;
+  if(!dt||(!inA&&!out)){ alert("날짜와 입금액 또는 출금액을 넣어 주세요"); return; }
+  var u={dt:dt, nm:g("fbE_nm"), inA:inA, out:out, bal:n("fbE_bal"), memo:g("fbE_memo")};
+  _fbRef('tx/'+k).update(u).then(function(){ closePopup2(); var mk=_fbTxMem(Object.assign({},FB.tx[k],u)); toast("💾 고쳤어요"+(mk?" · "+FB.mems[mk].nm+" "+dt.slice(0,7)+" 회비":"")); });
 }
 function _fbTxDel(k){ var t=FB.tx[k]; if(!t||!confirm(String(t.dt).slice(0,10)+" "+(t.nm||"")+" "+fm(t.inA||t.out)+"원 거래를 지울까요?")) return; _fbRef('tx/'+k).remove(); }
 // ⚙ 회원·설정
