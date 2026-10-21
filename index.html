@@ -13239,7 +13239,7 @@ function _fbTxView(){
   L.forEach(function(t){ run+=(Number(t.inA)||0)-(Number(t.out)||0); t._run=run; t._mk=_fbTxMem(t); });
   var h='<div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;padding:10px;margin-bottom:10px">';
   h+='<div style="font-weight:800;margin-bottom:6px">✏️ 거래 한 줄 추가 <span style="font-weight:400;font-size:12px;color:#475569">입금자 이름이 회원이면 그 날짜 달 회비로 자동 들어가요</span></div>';
-  h+='<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"><input type="date" id="fbN_dt" value="'+today()+'" style="padding:8px"><input id="fbN_nm" placeholder="입금자 / 적요" style="padding:8px;flex:1 1 140px"><input id="fbN_in" inputmode="numeric" placeholder="입금액" oninput="this.value=_cm(this.value)" style="padding:8px;width:120px"><input id="fbN_out" inputmode="numeric" placeholder="출금액" oninput="this.value=_cm(this.value)" style="padding:8px;width:120px"><input id="fbN_memo" placeholder="메모 (예: 워크숍)" style="padding:8px;flex:1 1 140px"><button class="btn" style="background:#1d4ed8;color:#fff;font-weight:800" onclick="_fbTxAdd()">＋ 추가</button></div></div>';
+  h+='<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"><input type="date" id="fbN_dt" value="'+today()+'" style="padding:8px"><input id="fbN_nm" placeholder="입금자 / 적요" style="padding:8px;flex:1 1 140px"><input id="fbN_in" inputmode="numeric" placeholder="입금액" oninput="this.value=_cm(this.value)" style="padding:8px;width:120px"><input id="fbN_out" inputmode="numeric" placeholder="출금액" oninput="this.value=_cm(this.value)" style="padding:8px;width:120px"><input id="fbN_memo" placeholder="메모 (예: 워크숍)" style="padding:8px;flex:1 1 140px"><input id="fbN_bal" inputmode="numeric" placeholder="통장 잔액 (선택)" title="은행 앱에 찍힌 거래 후 잔액 — 적으면 통장과 맞는지 바로 확인돼요" oninput="this.value=_cm(this.value)" style="padding:8px;width:140px;border:2px dashed #94a3b8"><button class="btn" style="background:#1d4ed8;color:#fff;font-weight:800" onclick="_fbTxAdd()">＋ 추가</button></div></div>';
   var fb=function(k,lb){ var on=FB_TXF===k; return '<button onclick="FB_TXF=\''+k+'\';draw()" style="border:none;border-radius:7px;padding:6px 11px;font-size:13px;font-weight:700;cursor:pointer;background:'+(on?'#0f766e':'#e2e8f0')+';color:'+(on?'#fff':'#0f172a')+'">'+lb+'</button>'; };
   var nUnk=L.filter(function(t){ return Number(t.inA)>0 && !t.kind && !t._mk; }).length;
   h+='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">'+fb("all","전체")+fb("fee","회비 입금")+fb("unk","❓ 회원 못 찾은 입금 "+nUnk)+fb("out","출금")+'</div>';
@@ -13263,8 +13263,9 @@ function _fbTxAdd(){
   var g=function(i){ var e=document.getElementById(i); return e?e.value.trim():""; };
   var dt=g("fbN_dt"), nm=g("fbN_nm"), inA=Number(g("fbN_in").replace(/,/g,""))||0, out=Number(g("fbN_out").replace(/,/g,""))||0;
   if(!dt||(!inA&&!out)){ alert("날짜와 입금액 또는 출금액을 넣어 주세요"); return; }
-  var mk=inA?_fbMatch(nm):null;
-  _fbRef('tx').push({dt:dt,nm:nm,inA:inA,out:out,memo:g("fbN_memo"),seq:Date.now()}).then(function(){ toast(mk?"✓ "+FB.mems[mk].nm+" "+dt.slice(0,7)+" 회비로 들어갔어요":"✓ 추가됨"+(inA&&!mk?" (회원 이름이 아니라 회비엔 안 들어가요)":"")); });
+  var mk=inA?_fbMatch(nm):null, bs=g("fbN_bal").replace(/,/g,""), row={dt:dt,nm:nm,inA:inA,out:out,memo:g("fbN_memo"),seq:Date.now()};
+  if(bs!=="" && !isNaN(Number(bs))) row.bal=Number(bs);
+  _fbRef('tx').push(row).then(function(){ toast(mk?"✓ "+FB.mems[mk].nm+" "+dt.slice(0,7)+" 회비로 들어갔어요":"✓ 추가됨"+(inA&&!mk?" (회원 이름이 아니라 회비엔 안 들어가요)":"")); });
 }
 function _fbTxSetMem(k,v){
   var u = v==="__other" ? {kind:"other",memK:null} : (v ? {kind:null,memK:v} : {kind:null,memK:null});
