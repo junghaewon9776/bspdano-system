@@ -17140,18 +17140,19 @@ function dReport(){
   h+='</div>';
 
   // 데이터 상태 요약
-  var incTot=0, purTot=0, expTot=0;
+  var incTot=0, purTot=0, expTot=0, paidTot=0, paidN=0, preTot=0, preN={}, paidInv={};
   (inc||[]).forEach(function(r){incTot+=pn(r.am);});
-  (purs||[]).forEach(function(p){purTot+=pn(p.tot);});
+  (purs||[]).forEach(function(p){ var t=pn(p.tot); purTot+=t; if(_isPre(p)){ preTot+=t; preN[p.inv||p.id]=1; } else { paidTot+=t; paidInv[p.inv||p.id]=1; } });
   (exps||[]).forEach(function(e){expTot+=pn(e.am);});
-  var bgTot=0; (expBG||[]).forEach(function(r){ if(!r.mid) bgTot+=pn(r.planAm); }); // 대분류만
+  paidN=Object.keys(paidInv).length;
+  var bgTot=0, midN=0, midTot=0; (expBG||[]).forEach(function(r){ if(!r.mid) bgTot+=pn(r.planAm); else { midN++; midTot+=pn(r.planAm); } });
   h+='<div class="card" style="margin-top:12px;background:#f8fafc">';
   h+='<h4 style="margin:0 0 8px">📈 현재 데이터 현황</h4>';
   h+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;font-size:13px">';
   h+='<div><span class="mut">세입 등록:</span> <b>'+(inc||[]).length+'건</b> <span style="color:#16a34a">'+fmu(incTot)+'원</span></div>';
-  h+='<div><span class="mut">세출예산:</span> <b>'+(expBG||[]).length+'건</b> <span style="color:#2563eb">'+fmu(bgTot)+'원</span></div>';
-  h+='<div><span class="mut">구매 내역:</span> <b>'+(purs||[]).length+'건</b> <span style="color:#dc2626">'+fmu(purTot)+'원</span></div>';
-  h+='<div><span class="mut">지출 내역:</span> <b>'+(exps||[]).length+'건</b> <span style="color:#dc2626">'+fmu(expTot)+'원</span></div>';
+  h+='<div><span class="mut">세출예산 (대분류):</span> <span style="color:#2563eb;font-weight:700">'+fmu(bgTot)+'원</span><div style="font-size:12px;color:#64748b">중분류 '+midN+'건 배정 '+fmu(midTot)+'원'+(bgTot>midTot?' · 미배정 '+fmu(bgTot-midTot)+'원':'')+'</div></div>';
+  h+='<div><span class="mut">실제 지출 (결제 완료):</span> <b>'+(paidN+(exps||[]).length)+'건</b> <span style="color:#dc2626;font-weight:700">'+fmu(paidTot+expTot)+'원</span><div style="font-size:12px;color:#64748b">구매 '+paidN+'건'+((exps||[]).length?' + 기타 지출 '+(exps||[]).length+'건':'')+'</div></div>';
+  h+='<div><span class="mut">⏳ 결제 전 (계약):</span> <b>'+Object.keys(preN).length+'건</b> <span style="color:#92400e">'+fmu(preTot)+'원</span><div style="font-size:12px;color:#64748b">결산서 집행에는 안 들어가요</div></div>';
   h+='</div>';
   h+='</div>';
 
@@ -17219,7 +17220,7 @@ function _rptExpAccPreview(){
     if(!plan[key]){ plan[key]={gwan:g,tp:t,mid:m,planAm:0,actAm:0}; planOrder.push(key); }
     plan[key].actAm+=pn(amt);
   };
-  (purs||[]).forEach(function(p){ byKeyAct(p.gwan,p.expTp,p.expMid,p.tot); });
+  (purs||[]).forEach(function(p){ if(_isPre(p)) return; byKeyAct(p.gwan,p.expTp,p.expMid,p.tot); });
   (exps||[]).forEach(function(e){ byKeyAct(e.gwan,e.expTp,e.expMid,e.am); });
   // 정렬: 관 > 대분류 > 중분류
   planOrder.sort(function(a,b){
@@ -17237,10 +17238,11 @@ function _rptExpAccPreview(){
     if(!gw.tpMap[tp]){ gw.tpMap[tp]={name:tp,items:[],planTot:0,actTot:0}; gw.tpOrder.push(tp); }
     var tpObj=gw.tpMap[tp];
     tpObj.items.push(p);
-    if(!p.mid){ tpObj.planTot+=p.planAm; gw.planTot+=p.planAm; }
+    if(!p.mid) tpObj.bigPlan=(tpObj.bigPlan||0)+p.planAm; else tpObj.midPlan=(tpObj.midPlan||0)+p.planAm;
     tpObj.actTot+=p.actAm;
     gw.actTot+=p.actAm;
   });
+  gwanTree.forEach(function(gw){ gw.planTot=0; gw.tpOrder.forEach(function(t){ var o=gw.tpMap[t]; o.planTot=(o.bigPlan>0?o.bigPlan:(o.midPlan||0)); o.unalloc=(o.bigPlan>0?o.bigPlan-(o.midPlan||0):0); gw.planTot+=o.planTot; }); });
   var gPlan=0,gAct=0;
   gwanTree.forEach(function(gw){ gPlan+=gw.planTot; gAct+=gw.actTot; });
   h+='<div style="overflow:auto;max-height:500px;border:1px solid #e5e7eb;border-radius:6px">';
@@ -17262,6 +17264,7 @@ function _rptExpAccPreview(){
       var tpObj=gw.tpMap[tp];
       var tRem=tpObj.planTot-tpObj.actTot;
       h+='<tr style="background:#faf8ff;font-weight:600;border-top:1px solid #e9e5f5"><td style="padding:6px 8px"></td><td style="padding:6px 8px;color:#6d28d9">'+esc(tp)+'</td><td style="padding:6px 8px;color:#64748b;font-size:11px">소계</td><td style="padding:6px 8px;text-align:right">'+fmu(tpObj.planTot)+'</td><td style="padding:6px 8px;text-align:right">'+fmu(tpObj.actTot)+'</td><td style="padding:6px 8px;text-align:right;color:'+(tRem<0?"#dc2626":"#16a34a")+'">'+fmu(tRem)+'</td></tr>';
+      if(tpObj.unalloc>0) h+='<tr style="border-bottom:1px solid #f1f5f9;color:#9a3412"><td style="padding:5px 8px"></td><td style="padding:5px 8px"></td><td style="padding:5px 8px">└ (미배정 — 중분류에 아직 안 나눈 예산)</td><td style="padding:5px 8px;text-align:right">'+fmu(tpObj.unalloc)+'</td><td style="padding:5px 8px;text-align:right">-</td><td style="padding:5px 8px;text-align:right">'+fmu(tpObj.unalloc)+'</td></tr>';
       tpObj.items.forEach(function(p){
         if(!p.mid) return;
         var rem=p.planAm-p.actAm;
@@ -17285,7 +17288,7 @@ function _rptExpCatPreview(){
     byTp[tp].mids[mid].total+=pn(amt);
     byTp[tp].mids[mid].cnt++;
   };
-  (purs||[]).forEach(function(p){ add(p.expTp, p.expMid, p.tot); });
+  (purs||[]).forEach(function(p){ if(_isPre(p)) return; add(p.expTp, p.expMid, p.tot); });
   (exps||[]).forEach(function(e){ add(e.expTp, e.expMid, e.am); });
   var grand=0,gcnt=0;
   tpOrder.forEach(function(tp){ grand+=byTp[tp].total; gcnt+=byTp[tp].cnt; });
@@ -17328,7 +17331,7 @@ function _rptExpSrcPreview(){
   srcList.forEach(function(src){
     var incSum=0; (inc||[]).forEach(function(r){ if(r.tp===src) incSum+=pn(r.am); });
     var expSum=0;
-    (purs||[]).forEach(function(p){ if(p.incTp===src) expSum+=pn(p.tot); });
+    (purs||[]).forEach(function(p){ if(_isPre(p)) return; if(p.incTp===src) expSum+=pn(p.tot); });
     (exps||[]).forEach(function(e){ if(e.incTp===src) expSum+=pn(e.am); });
     var rem=incSum-expSum;
     h+='<tr style="border-bottom:1px solid #f1f5f9">';
@@ -17398,7 +17401,7 @@ function rptExpCatExcel(){
     byTp[tp].mids[mid].cnt++;
     if(note) byTp[tp].mids[mid].notes.push(note);
   };
-  (purs||[]).forEach(function(p){ add(p.expTp, p.expMid, p.tot, p.it||""); });
+  (purs||[]).forEach(function(p){ if(_isPre(p)) return; add(p.expTp, p.expMid, p.tot, p.it||""); });
   (exps||[]).forEach(function(e){ add(e.expTp, e.expMid, e.am, e.nm||e.note||""); });
   var grand=0,gcnt=0;
   tpOrder.forEach(function(tp){ grand+=byTp[tp].total; gcnt+=byTp[tp].cnt; });
@@ -17438,7 +17441,7 @@ function rptExpAccExcel(){
     if(!plan[key]){ plan[key]={gwan:g,tp:t,mid:m,planAm:0,actAm:0,notes:[]}; planOrder.push(key); }
     plan[key].actAm+=pn(amt);
   };
-  (purs||[]).forEach(function(p){ byKeyAct(p.gwan,p.expTp,p.expMid,p.tot); });
+  (purs||[]).forEach(function(p){ if(_isPre(p)) return; byKeyAct(p.gwan,p.expTp,p.expMid,p.tot); });
   (exps||[]).forEach(function(e){ byKeyAct(e.gwan,e.expTp,e.expMid,e.am); });
   planOrder.sort(function(a,b){
     var pa=plan[a], pb=plan[b];
@@ -17455,10 +17458,11 @@ function rptExpAccExcel(){
     if(!gw.tpMap[tp]){ gw.tpMap[tp]={name:tp,items:[],planTot:0,actTot:0}; gw.tpOrder.push(tp); }
     var tpObj=gw.tpMap[tp];
     tpObj.items.push(plan[k]);
-    if(!plan[k].mid){ tpObj.planTot+=plan[k].planAm; gw.planTot+=plan[k].planAm; }
+    if(!plan[k].mid) tpObj.bigPlan=(tpObj.bigPlan||0)+plan[k].planAm; else tpObj.midPlan=(tpObj.midPlan||0)+plan[k].planAm;
     tpObj.actTot+=plan[k].actAm;
     gw.actTot+=plan[k].actAm;
   });
+  gwanTree.forEach(function(gw){ gw.planTot=0; gw.tpOrder.forEach(function(t){ var o=gw.tpMap[t]; o.planTot=(o.bigPlan>0?o.bigPlan:(o.midPlan||0)); o.unalloc=(o.bigPlan>0?o.bigPlan-(o.midPlan||0):0); gw.planTot+=o.planTot; }); });
   var gPlan=0,gAct=0;
   gwanTree.forEach(function(gw){ gPlan+=gw.planTot; gAct+=gw.actTot; });
   rows.push(["총  계","","",gPlan,gAct,gPlan-gAct,""]);
@@ -17467,6 +17471,7 @@ function rptExpAccExcel(){
     gw.tpOrder.forEach(function(tp){
       var tpObj=gw.tpMap[tp];
       rows.push(["",tp+" 소계","",tpObj.planTot,tpObj.actTot,tpObj.planTot-tpObj.actTot,""]);
+      if(tpObj.unalloc>0) rows.push(["","","  └ (미배정 — 중분류에 아직 안 나눈 예산)", tpObj.unalloc, 0, tpObj.unalloc, ""]);
       tpObj.items.forEach(function(p){
         if(!p.mid) return;
         rows.push(["","","  └ "+p.mid, p.planAm, p.actAm, p.planAm-p.actAm, (p.notes||[]).slice(0,3).join(" / ")]);
@@ -17503,7 +17508,7 @@ function rptExpSrcExcel(){
       tree[key].amt+=pn(amt);
       if(note) tree[key].notes.push(note);
     };
-    (purs||[]).forEach(function(p){ if(p.incTp===src) add(p.gwan, p.expTp, p.tot, p.it||""); });
+    (purs||[]).forEach(function(p){ if(_isPre(p)) return; if(p.incTp===src) add(p.gwan, p.expTp, p.tot, p.it||""); });
     (exps||[]).forEach(function(e){ if(e.incTp===src) add(e.gwan, e.expTp, e.am, e.nm||""); });
     var expSum=0; order.forEach(function(k){ expSum+=tree[k].amt; });
     rows.push(["총  계","",incSum,expSum,incSum-expSum,""]);
@@ -17539,7 +17544,7 @@ function _settleData(){
   var incPlan=0; (inc||[]).forEach(function(r){incPlan+=pn(r.am);});
   // 지출: 구매(purs) + 기타지출(exps)
   var expTotal=0, expByTp={}, expRows=[];
-  (purs||[]).forEach(function(p){
+  (purs||[]).forEach(function(p){ if(_isPre(p)) return;
     var am=pn(p.tot); expTotal+=am;
     var tp=p.expTp||"(미분류)";
     expByTp[tp]=(expByTp[tp]||0)+am;
