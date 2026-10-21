@@ -23168,7 +23168,7 @@ function loadFiles(fid){
   api("listFiles", {folderId:fid, evtId:(CUR_EVT&&CUR_EVT.evtId)||""}).then(function(r){
     if(!r||!r.ok){ if(w) w.innerHTML='<div class="card" style="color:#dc2626">'+esc((r&&r.err)||"실패")+'</div>'; return; }
     FILES_DATA.files = r.files||[];
-    _drawFiles(fid);
+    _filesLoadLinks(fid).then(function(){ _drawFiles(fid); });
   });
 }
 
@@ -23178,15 +23178,31 @@ function _drawFiles(fid){
   var h = '<div class="card">';
   h += '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px">';
   h += '<div><strong style="font-size:16px">📁 '+esc(folder?folder.name:"")+'</strong>';
-  h += '<span class="mut" style="font-size:12px;margin-left:6px">('+files.length+'개)</span></div>';
+  var links=(FILES_DATA.links||[]);
+  h += '<span class="mut" style="font-size:12px;margin-left:6px">('+files.length+'개'+(links.length?' · 링크 '+links.length+'개':'')+')</span></div>';
   if(isA()){
     h += '<div style="display:flex;gap:6px">';
     h += '<button class="btn btn-b btn-s" onclick="filesUpload(\''+esc(fid)+'\')">📤 업로드</button>';
+    h += '<button class="btn btn-s" style="background:#0f766e;color:#fff;font-weight:700" onclick="filesAddLink(\''+esc(fid)+'\')" title="큰 파일(30MB 넘는 것)은 구글 드라이브에 올리고 링크로 등록">🔗 링크 추가</button>';
     h += '<button class="btn btn-r btn-s" onclick="filesDeleteFolder(\''+esc(fid)+'\')">🗑 삭제</button>';
     h += '</div>';
   }
   h += '</div>';
-  if(!files.length){
+  if(links.length){
+    h += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-bottom:10px">';
+    links.forEach(function(L){
+      h += '<div style="border:2px solid #5eead4;border-radius:8px;padding:10px;background:#f0fdfa">';
+      h += '<div style="font-size:30px;text-align:center">🔗</div>';
+      h += '<div style="font-size:13px;font-weight:700;text-align:center;word-break:break-all;line-height:1.3;margin-top:6px">'+esc(L.name||L.url)+'</div>';
+      h += '<div class="mut" style="font-size:10px;text-align:center;margin-top:4px">링크'+(L.size?' · '+esc(L.size):'')+' · '+esc(String(L.at||"").slice(0,10))+'</div>';
+      h += '<div style="display:flex;gap:4px;margin-top:8px">';
+      h += '<a href="'+esc(L.url)+'" target="_blank" class="btn btn-s" style="flex:1;text-align:center;text-decoration:none;font-size:11px;background:#0f766e;color:#fff">🔗 열기</a>';
+      if(isA()) h += '<button class="btn btn-r btn-s" onclick="filesDelLink(\''+esc(L.key)+'\',\''+esc(fid)+'\')" style="font-size:11px">x</button>';
+      h += '</div></div>';
+    });
+    h += '</div>';
+  }
+  if(!files.length && !links.length){
     h += '<div class="empty mut" style="text-align:center;padding:40px">파일 없음';
     if(isA()) h += '<br><button class="btn btn-b" onclick="filesUpload(\''+esc(fid)+'\')" style="margin-top:14px">📤 업로드</button>';
     h += '</div>';
@@ -23297,38 +23313,80 @@ function filesUpload(fid){
   inp.onchange = function(){
     var files = inp.files;
     if(!files || !files.length) return;
-    _filesUploadMulti(fid, Array.prototype.slice.call(files), 0, 0);
+    var all=Array.prototype.slice.call(files), big=all.filter(function(f){ return f.size>30*1024*1024; }), okF=all.filter(function(f){ return f.size<=30*1024*1024; });
+    if(big.length){
+      alert("⚠ 너무 커서 시스템으로는 못 올리는 파일이 있어요 (한 파일 30MB까지)\n\n"+big.map(function(f){ return "• "+f.name+" ("+_fileSize(f.size)+")"; }).join("\n")
+        +"\n\n👉 구글 드라이브에 직접 올린 뒤, 자료실 [🔗 링크 추가]로 그 링크를 등록하세요."+(okF.length?"\n\n나머지 "+okF.length+"개는 지금 올릴게요.":""));
+      if(!okF.length){ filesAddLink(fid, big[0].name, _fileSize(big[0].size)); return; }
+    }
+    _filesUploadMulti(fid, okF, 0, 0);
   };
   inp.click();
 }
 
-function _filesUploadMulti(fid, files, idx, ok){
-  if(idx>=files.length){
-    hideLoading();
-    toast("✓ " + ok + "/" + files.length + " 업로드 완료");
-    loadFiles(fid);
-    loadFileFolders();
-    return;
-  }
-  var f = files[idx];
-  if(f.size > 30*1024*1024){
-    toast("⚠ " + f.name + " 30MB 초과 - 스킵", true);
-    _filesUploadMulti(fid, files, idx+1, ok);
-    return;
-  }
-  showLoading("업로드 중... (" + (idx+1) + "/" + files.length + ")");
-  var reader = new FileReader();
-  reader.onload = function(){
-    var b64 = String(reader.result||"").replace(/^data:[^;]+;base64,/,"");
-    api("uploadFile", { folderId:fid, filename:f.name, mime:f.type||"application/octet-stream", base64:b64, size:f.size, evtId:(CUR_EVT&&CUR_EVT.evtId)||"" }).then(function(r){
-      _filesUploadMulti(fid, files, idx+1, ok+(r&&r.ok?1:0));
-    }).catch(function(){
-      _filesUploadMulti(fid, files, idx+1, ok);
-    });
-  };
-  reader.readAsDataURL(f);
+// 자료실 올리기: 3개씩 동시에, 큰 사진은 긴 쪽 2560px로 줄여서, 하나 끝날 때마다 바로 저장(10개마다 목록 새로고침)
+function _filesShrink(f){
+  return new Promise(function(res){
+    if(!/^image\/(jpe?g|png|webp)$/i.test(f.type||"") || f.size<=1.5*1024*1024) return res(null);
+    var u=URL.createObjectURL(f), img=new Image();
+    img.onload=function(){
+      var W=img.naturalWidth, H=img.naturalHeight, M=2560, sc=Math.min(1, M/Math.max(W,H));
+      if(sc>=1 && f.size<=4*1024*1024){ URL.revokeObjectURL(u); return res(null); }
+      var c=document.createElement("canvas"); c.width=Math.round(W*sc); c.height=Math.round(H*sc);
+      c.getContext("2d").drawImage(img,0,0,c.width,c.height); URL.revokeObjectURL(u);
+      var du=c.toDataURL("image/jpeg",0.86); res({b64:du.replace(/^data:[^;]+;base64,/,""), mime:"image/jpeg", name:f.name.replace(/\.(png|webp|jpe?g)$/i,"")+".jpg"});
+    };
+    img.onerror=function(){ URL.revokeObjectURL(u); res(null); };
+    img.src=u;
+  });
 }
-
+function _filesRead64(f){ return new Promise(function(res){ var r=new FileReader(); r.onload=function(){ res(String(r.result||"").replace(/^data:[^;]+;base64,/,"")); }; r.onerror=function(){ res(""); }; r.readAsDataURL(f); }); }
+async function _filesUploadMulti(fid, files, idx, ok){
+  var N=files.length, done=0, good=0, bad=[], next=0, evt=(CUR_EVT&&CUR_EVT.evtId)||"";
+  var show=function(cur){ showLoading("📤 올라감 "+done+" / "+N+(bad.length?" · 실패 "+bad.length:"")+(cur?"  ·  지금: "+cur:"")+"  (올라간 파일은 바로 저장돼요 — 창을 닫지 마세요)"); };
+  show("");
+  async function worker(){
+    while(next<N){
+      var f=files[next++];
+      try{
+        var sh=await _filesShrink(f);
+        show(f.name+" · "+_fileSize(f.size)+(sh?" → 줄임":""));
+        var b64=sh?sh.b64:await _filesRead64(f);
+        var r=await api("uploadFile",{ folderId:fid, filename:sh?sh.name:f.name, mime:sh?sh.mime:(f.type||"application/octet-stream"), base64:b64, size:f.size, evtId:evt });
+        if(r&&r.ok) good++; else bad.push(f.name);
+      }catch(e){ bad.push(f.name); }
+      done++; show("");
+      if(done%10===0 && done<N && FILES_CUR_FOLDER===fid) loadFiles(fid);   // 올라간 것 바로 보이게
+    }
+  }
+  var pool=[]; for(var w=0;w<Math.min(3,N);w++) pool.push(worker());
+  await Promise.all(pool);
+  hideLoading();
+  if(bad.length) alert("✓ "+good+"개 올림 · ⚠ "+bad.length+"개 실패\n\n"+bad.slice(0,20).join("\n")+(bad.length>20?"\n…":"")+"\n\n실패한 것만 다시 올려 주세요.");
+  else toast("✓ "+good+"/"+N+" 업로드 완료");
+  loadFiles(fid);
+  loadFileFolders();
+}
+function _filesLinkRef(){ return fbDb.ref('/evtData/'+((CUR_EVT&&CUR_EVT.evtId)||"general")+'/FileLinks'); }
+function _filesLoadLinks(fid){
+  return _filesLinkRef().once('value').then(function(sn){
+    var v=sn.val()||{}; FILES_DATA.links=Object.keys(v).map(function(k){ var L=v[k]||{}; L.key=k; return L; }).filter(function(L){ return L.fid===fid; }).sort(function(a,b){ return String(b.at||"").localeCompare(String(a.at||"")); });
+  }).catch(function(){ FILES_DATA.links=[]; });
+}
+function filesAddLink(fid, nm, sz){
+  var url=prompt("구글 드라이브 공유 링크를 붙여 넣으세요\n(드라이브에서 파일 우클릭 → 공유 → 링크 복사)");
+  if(!url) return; url=String(url).trim();
+  if(!/^https?:\/\//i.test(url)){ alert("http로 시작하는 링크를 붙여 넣어 주세요"); return; }
+  var name=prompt("자료실에 보일 이름", nm||""); if(name===null) return; name=String(name).trim()||url;
+  showLoading("링크 저장 중...");
+  _filesLinkRef().push({fid:fid, name:name, url:url, size:sz||"", at:(typeof now_==="function"?now_():new Date().toISOString()), by:(typeof CID!=="undefined"?CID:"")}).then(function(){
+    hideLoading(); toast("🔗 링크 추가됨"); loadFiles(fid);
+  }).catch(function(e){ hideLoading(); toast("저장 실패: "+(e.message||e),true); });
+}
+function filesDelLink(key, fid){
+  if(!confirm("이 링크를 자료실에서 뺄까요? (드라이브 파일은 그대로 있어요)")) return;
+  _filesLinkRef().child(key).remove().then(function(){ toast("빠졌어요"); loadFiles(fid); }).catch(function(e){ toast("실패: "+(e.message||e),true); });
+}
 function filesDelete(fid){
   if(!confirm("파일 삭제?")) return;
   showLoading("삭제 중...");
