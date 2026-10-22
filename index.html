@@ -1468,6 +1468,7 @@ function mkTabs(){
   if(isA() && HM("budget")) c2.push({k:"rpt",l:"결산서"});
   if(isA() && HM("fee"))    c2.push({k:"fee",l:"회비"});
   if(isA() && HM("fee"))    c2.push({k:"bank",l:"입출금 (통장)"});
+  else if(HM("fee") && typeof _esgIsMember==="function" && _esgIsMember()) c2.push({k:"bank",l:"정산서 결재"});   // 결재선 담당자(관리자 아님)
   if(c2.length) cats.push({id:"finance",label:"💰 재정",items:c2});
 
   // ── 운영 ──
@@ -7788,6 +7789,7 @@ function _esgLineLoad(){
   try{ fbDb.ref('/main/EsigLine').on('value',function(s){
     var v=s.val(); if(v&&!Array.isArray(v)) v=Object.keys(v).sort().map(function(k){return v[k];});
     if(v&&v.length===4){ ESIG_LINE=v.map(function(x){return {role:String((x&&x.role)||""),uid:String((x&&x.uid)||"")};}); ESIG_ROLES=ESIG_LINE.map(function(x){return x.role;}); }
+    try{ if(typeof ME!=="undefined"&&ME&&typeof isA==="function"&&!isA()&&typeof mkTabs==="function") mkTabs(); }catch(e){}   // 결재자면 「정산서 결재」 메뉴
     if(typeof CTAB!=="undefined"&&CTAB==="pur"&&typeof draw==="function"&&!document.getElementById("esgPadBox")) try{ draw(); }catch(e){}
   }); }catch(e){}
 }
@@ -14070,7 +14072,7 @@ function _bkSumView(){
   if(BK_BIG && bl.indexOf(BK_BIG)<0) bl.unshift(BK_BIG);
   h+='<div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center"><b style="width:60px">대분류</b>'+pill(!BK_BIG,'전체','BK_BIG=\'\';draw()','#7c3aed')+bl.map(function(b){ return pill(BK_BIG===b,esc(b),'BK_BIG='+_bkJs(b).replace(/"/g,'&quot;')+';draw()','#7c3aed'); }).join('')+'</div></div>';
   var sv=function(k,lb){ var on=BK_SV===k; return '<button onclick="BK_SV=\''+k+'\';draw()" style="border:none;border-radius:8px;padding:9px 16px;font-size:15px;font-weight:900;cursor:pointer;background:'+(on?'#1d4ed8':'#e2e8f0')+';color:'+(on?'#fff':'#0f172a')+'">'+lb+'</button>'; };
-  h+='<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:12px">'+sv("dash","📊 대시보드")+sv("report","📄 정산보고서")+(BK_SV==="report"?'<label style="display:flex;gap:5px;align-items:center;font-weight:700;margin-left:8px"><input type="checkbox" '+(BK_DET?'checked':'')+' onchange="BK_DET=this.checked;draw()" style="width:18px;height:18px"> 거래 상세 내역도 넣기</label>':'')+'</div>';
+  h+='<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:12px">'+(isA()?sv("dash","📊 대시보드")+sv("report","📄 정산보고서"):'')+(BK_SV==="report"?'<label style="display:flex;gap:5px;align-items:center;font-weight:700;margin-left:8px"><input type="checkbox" '+(BK_DET?'checked':'')+' onchange="BK_DET=this.checked;draw()" style="width:18px;height:18px"> 거래 상세 내역도 넣기</label>':'')+'</div>';
   if(!A.length) return h+'<div class="mut">통장을 하나 이상 골라 주세요</div>';
   if(BK_SV==="report") return h+_bkRsPicker()+'<div style="background:#fff;border:1px solid #cbd5e1;border-radius:10px;padding:18px;max-width:'+(BK_RS==="month"?'100%':'900px')+';margin:0 auto">'+_bkReportHtml()+'</div>';
   var card=function(lb,v,col){ return '<div style="flex:1 1 150px;background:#fff;border:1px solid #cbd5e1;border-radius:8px;padding:8px 12px"><div style="font-size:12px;color:#475569;font-weight:700">'+lb+'</div><div style="font-size:19px;font-weight:900;color:'+col+'">'+fm(v)+'원</div></div>'; };
@@ -14298,6 +14300,7 @@ function _bkRepTitle(){ return (BK_BIG?BK_BIG+" ":"")+_bkPeriodLabel()+" 정산�
 function _bkEsgRoles(){ return (typeof ESIG_ROLES!=="undefined"&&ESIG_ROLES.length)?ESIG_ROLES:BK_SIGN; }
 function _bkEsgOf(){ return (BK.esig||{})[_bkRepKey()]||{}; }
 function _bkEsgHand(role){ return ((BK.esigCfg||{}).hand||[]).indexOf(role)>=0; }   // ✋ 수기 서명 직책 (결재란 빈칸으로 인쇄)
+function _bkEsgProxy(){ return (typeof isA==="function"&&isA()) && (BK.esigCfg||{}).proxy!==false; }   // 관리자는 이 기기에서 대신 받기 가능 (설정에서 끌 수 있음)
 function _bkEsgDone(g){ return !!(g&&(g.img||g.ok)); }
 function _bkEsgCount(){ var r=_bkEsgOf().roles||{}; return _bkEsgRoles().filter(function(k){ return _bkEsgDone(r[k]); }).length; }
 function _bkEsgBtn(){
@@ -14321,8 +14324,8 @@ function _bkEsgPop(){
     }
     h+='<div style="flex:1;min-width:140px;font-size:13px">'+(s&&s.img?'<img src="'+s.img+'" style="height:38px;vertical-align:middle;border:1px solid #d1d5db;border-radius:4px;background:#fff"> <b>'+esc(s.nm||'')+'</b> <span style="color:#64748b;font-size:12px">'+esc(s.at||'')+'</span>':'<span style="color:#94a3b8">서명 전</span>')+'</div>';
     h+='<div style="display:flex;gap:6px;flex-wrap:wrap">';
-    if(!mine&&!adm) h+='<span style="font-size:12px;color:#64748b">👁 '+esc(role)+' 계정으로 로그인해야 서명돼요</span>';
-    if(mine||adm) h+='<button class="btn btn-s" style="background:#2563eb;color:#fff;font-weight:700" onclick="_bkEsgSign(\''+esc(role)+'\')">✍ '+(mine?'서명하기':'이 기기에서 서명받기')+'</button>';
+    if(!mine&&!_bkEsgProxy()) h+='<span style="font-size:12px;color:#64748b">👁 '+(uid?esc(_esgUserNm(uid))+' 계정으로':'결재선에 담당자를 지정하고 그 계정으로')+' 로그인해야 서명돼요</span>';
+    if(mine||_bkEsgProxy()) h+='<button class="btn btn-s" style="background:#2563eb;color:#fff;font-weight:700" onclick="_bkEsgSign(\''+esc(role)+'\')">✍ '+(mine?'서명하기':'이 기기에서 서명받기')+'</button>';
     if(uid&&adm&&!(s&&s.img)) h+='<button class="btn btn-s" style="background:#334155;color:#fff;font-weight:700" onclick="_bkEsgReq(\''+esc(role)+'\')">📨 텔레그램 요청</button><button class="btn btn-s" style="background:#0f766e;color:#fff;font-weight:700" onclick="_bkEsgLinkCopy(\''+esc(role)+'\')">🔗 링크 복사</button>';
     if(s&&s.img&&(adm||mine)) h+='<button class="btn btn-s" style="background:#dc2626;color:#fff" onclick="_bkEsgClear(\''+esc(role)+'\')">지우기</button>';
     h+='</div></div>';
@@ -14330,6 +14333,7 @@ function _bkEsgPop(){
   h+='<div id="bkEsgPadBox" style="display:none;border:2px solid #2563eb;border-radius:10px;padding:10px;margin-top:8px"><div style="font-weight:800;margin-bottom:6px" id="bkEsgPadTtl"></div>';
   h+='<canvas id="bkEsgPad" style="width:100%;height:150px;border:1px dashed #94a3b8;border-radius:8px;background:#fff;display:block"></canvas>';
   h+='<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px"><input id="bkEsgNm" placeholder="이름" style="padding:7px;width:120px;font-weight:700"><label style="font-size:12.5px"><input type="checkbox" id="bkEsgRem" checked> 내 서명 기억</label><span style="flex:1"></span><button class="btn btn-s" style="background:#475569;color:#fff" onclick="window._bkEsgPadO&&window._bkEsgPadO.clear()">다시 쓰기</button><button class="btn" style="background:#16a34a;color:#fff;font-weight:900" onclick="_bkEsgSave()">✅ 서명 저장</button></div></div>';
+  if(adm) h+='<div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center"><button class="btn btn-s" style="background:#334155;color:#fff;font-weight:800" onclick="_esgLineEdit()">⚙ 결재선 설정 (직책별 담당자 계정)</button><label style="font-size:12.5px;cursor:pointer"><input type="checkbox" '+(_bkEsgProxy()?'checked':'')+' onchange="fbDb.ref(\'/main/BankEsigCfg/proxy\').set(this.checked).then(_bkEsgPop)"> 관리자가 이 기기에서 대신 받기 허용 (회의 자리용)</label></div>';
   if(adm) h+='<div style="margin-top:8px;font-size:13px;background:#fff7ed;border:1px solid #fdba74;border-radius:8px;padding:7px 10px"><b>✋ 수기로 받는 직책</b> '+_bkEsgRoles().map(function(r){ return '<label style="margin-left:8px;cursor:pointer"><input type="checkbox" '+(_bkEsgHand(r)?'checked':'')+' onchange="_bkEsgHandSet(\''+esc(r)+'\',this.checked)"> '+esc(r)+'</label>'; }).join('')+'</div>';
   h+='<div style="font-size:12px;color:#64748b;margin-top:8px;line-height:1.6">결재자·직책은 물품/구매 결의서와 같은 <b>결재선</b>을 써요 (구매 결재 창 ⚙ 결재선 설정). 서명은 <b>지금 고른 기간·통장 정산서에만</b> 저장돼서, 달마다 따로 받아요. 정산서 결재란과 인쇄에 그대로 찍혀요.</div>';
   openPopup2(h,560);
@@ -14406,6 +14410,7 @@ async function _bkEsgSave(){
   if(pad.isEmpty()) return toast("서명을 해 주세요",true);
   var nm=String((document.getElementById("bkEsgNm")||{}).value||"").trim(); if(!nm) return toast("이름을 넣어 주세요",true);
   var img=pad.toData(), mine=(typeof _esgCanSign==="function")&&_esgCanSign(role);
+  if(!mine&&!_bkEsgProxy()) return toast(role+" 담당자 계정으로 로그인해야 서명돼요",true);
   try{ if(mine&&(document.getElementById("bkEsgRem")||{}).checked) localStorage.setItem("esigMine_"+CID,img); }catch(e){}
   var key=_bkRepKey(), u={}; u[key+'/title']=_bkRepTitle(); u[key+'/q']=_bkEsgQ(); u[key+'/roles/'+role]={img:img,nm:nm,at:nowKST(true),by:(typeof CID!=="undefined"?CID:""),via:mine?"self":"admin"};
   showLoading("서명 저장 중...");
@@ -14607,9 +14612,12 @@ function _bkEvPrint(per){
   w.document.open(); w.document.write(html); w.document.close();
 }
 function dBank(){
-  if(!isA()) return '<div class="card">관리자 전용입니다.</div>';
+  var _mem=(typeof _esgIsMember==="function")&&_esgIsMember();
+  if(!isA() && !_mem) return '<div class="card">관리자 전용입니다.</div>';
   _bkLoad();
   if(!BK.loaded || !FB.loaded) return '<div class="card mut" style="text-align:center;padding:30px">📡 통장 불러오는 중...</div>';
+  if(!isA()){ BK_ACC="_sum"; BK_SV="report"; if(BK_RS==="big"&&!window._bkMemInit){ BK_RS="gov"; window._bkMemInit=1; }
+    return '<div class="card"><h3 style="margin:0 0 6px">✍ 정산서 결재 <span style="font-size:13px;color:#475569;font-weight:600">기간을 고르고 「✍ 결재 받기」에서 내 칸에 서명해요</span></h3>'+_bkSumView()+'</div>'; }
   var A=_bkAccts();
   if(!BK_ACC || (BK_ACC!=="_sum" && !_bkAcct(BK_ACC))) BK_ACC=A.length>1?A[0]._k:"_sum";
   var h='<div class="card">';
