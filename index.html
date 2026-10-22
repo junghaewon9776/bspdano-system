@@ -13785,7 +13785,7 @@ function _bkEvSavedHtml(t){
     var body=pdf?'<a href="'+esc(e.u)+'" target="_blank" style="display:flex;align-items:center;justify-content:center;width:110px;height:90px;border:1px solid #cbd5e1;border-radius:6px;font-size:30px;text-decoration:none;background:#fff">📄</a>'
       :'<img src="'+esc(src)+'" onclick="window.open(\''+esc(e.u)+'\')" style="width:110px;height:90px;object-fit:cover;border:1px solid #cbd5e1;border-radius:6px;cursor:zoom-in;background:#fff;display:block;'+_rotCss(e.r||0)+'">';
     return '<div style="width:110px;font-size:11.5px;text-align:center"><div style="position:relative">'+body+'<button type="button" onclick="_bkEvDel('+i+')" title="빼기" style="position:absolute;top:-7px;right:-7px;background:#dc2626;color:#fff;border:none;border-radius:50%;width:22px;height:22px;cursor:pointer;padding:0">×</button></div>'
-      +'<div style="font-weight:700;margin-top:3px">'+esc(e.k||'')+'</div>'+(pdf?'':'<button type="button" onclick="_bkEvRot('+i+')" style="margin-top:2px;background:#1d4ed8;color:#fff;border:none;border-radius:5px;padding:2px 8px;font-size:12px;cursor:pointer">↻ 돌리기</button>')+'</div>';
+      +'<div style="font-weight:700;margin-top:3px">'+esc(e.k||'')+'</div><div onclick="_bkEvCap('+i+')" title="눌러서 제목 넣기·고치기" style="cursor:pointer;margin-top:2px;'+(e.c?'color:#0f172a;font-weight:700':'color:#94a3b8')+'">'+(e.c?esc(e.c):'✎ 제목')+'</div>'+(pdf?'':'<button type="button" onclick="_bkEvRot('+i+')" style="margin-top:2px;background:#1d4ed8;color:#fff;border:none;border-radius:5px;padding:2px 8px;font-size:12px;cursor:pointer">↻ 돌리기</button>')+'</div>';
   }).join('');
 }
 function _bkEvNewHtml(){
@@ -14054,7 +14054,7 @@ function _bkSumView(){
   h+='<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:8px"><b style="width:60px">통장</b>';
   h+='<button onclick="BK_SEL={};draw()" style="border:2px solid #0f766e;border-radius:8px;padding:4px 10px;font-weight:800;cursor:pointer;background:#fff;color:#0f766e">전체 통장</button>';
   all.forEach(function(a){ var on=BK_SEL[a._k]!==false; h+='<label style="display:flex;gap:5px;align-items:center;font-weight:700;cursor:pointer"><input type="checkbox" '+(on?'checked':'')+' onchange="BK_SEL[\''+a._k+'\']=this.checked;draw()" style="width:18px;height:18px">'+esc(a.nm)+' <a href="javascript:void 0" onclick="event.preventDefault();_bkOnly(\''+a._k+'\')" style="font-size:11.5px;font-weight:600">이것만</a></label>'; });
-  h+='<span style="flex:1"></span><button class="btn btn-s" style="background:#15803d;color:#fff;font-weight:800" onclick="_bkSumXlsx()">📗 엑셀</button><button class="btn btn-s" style="background:#1d4ed8;color:#fff;font-weight:800" onclick="BK_SV===\'report\'?_bkReportPrint():_bkSumPrint()">🖨 인쇄</button></div>';
+  h+='<span style="flex:1"></span><button class="btn btn-s" style="background:#15803d;color:#fff;font-weight:800" onclick="_bkSumXlsx()">📗 엑셀</button><button class="btn btn-s" style="background:#1d4ed8;color:#fff;font-weight:800" onclick="BK_SV===\'report\'?_bkReportPrint():_bkSumPrint()">🖨 인쇄</button><button class="btn btn-s" style="background:#b45309;color:#fff;font-weight:800" onclick="_bkEvPrintAsk(\'sum\')">📎 증빙 출력</button></div>';
   // 대분류 슬라이서
   var bl=Object.keys(R.bigs).sort(function(a,b){ return R.bigs[b]-R.bigs[a]; });
   if(BK_BIG && bl.indexOf(BK_BIG)<0) bl.unshift(BK_BIG);
@@ -14159,6 +14159,65 @@ function _bkReportHtml(){
   if(R.none.length) h+='<div style="margin-top:10px;font-size:12px;color:#b45309">※ 분류 안 한 거래 '+R.none.length+'건은 「❓ 분류 안 함」으로 들어가 있어요</div>';
   return h+'<div style="margin-top:12px;font-size:12px;color:#334155">출력 '+esc(today())+'</div></div>';
 }
+// ── 📎 입출금 증빙 출력 — 엑셀 증빙자료처럼 한 장에 1·2·4칸, 사진 밑에 제목 ──
+function _bkEvCap(i){
+  var E=window._BKEV, L=JSON.parse(JSON.stringify(_bkTxGet(E.ak,E.k).ev||[])), t=_bkTxGet(E.ak,E.k)||{}; if(!L[i]) return;
+  var v=prompt("사진 밑에 들어갈 제목 (출력에도 나와요)\n예: 연합청년회 정화활동 식사", L[i].c||t.desc||t.nm||""); if(v===null) return;
+  v=v.trim(); if(v) L[i].c=v; else delete L[i].c; _bkEvRef().set(L).then(_bkEvRedraw);
+}
+// scope: "sum"=결산 화면(기간·통장·대분류 그대로), 그 밖=통장 하나(연도 거르기 그대로)
+function _bkEvPrintAsk(scope){
+  window._BKEVP=scope;
+  var L=_bkEvPrintTx(scope), n=0; L.forEach(function(t){ n+=(t.ev||[]).length; });
+  var h='<h3>📎 증빙 출력 <button class="close-x" onclick="closePopup2()">&times;</button></h3>';
+  h+='<div style="font-size:14px;margin-bottom:10px">'+esc(_bkEvPrintLabel(scope))+' · 증빙 붙은 거래 <b>'+L.filter(function(t){ return (t.ev||[]).length; }).length+'건</b> · 파일 <b>'+n+'개</b></div><div style="display:grid;gap:8px">';
+  [[1,"📄 한 장에 1개","영수증·세금계산서 크게","#b45309"],[2,"📷 한 장에 2개","엑셀 증빙자료 2칸 양식처럼","#0f766e"],[4,"📷 한 장에 4개","엑셀 증빙자료 4칸 양식처럼","#1d4ed8"]].forEach(function(o){
+    h+='<button type="button" onclick="closePopup2();_bkEvPrint('+o[0]+')" style="background:'+o[3]+';color:#fff;border:none;border-radius:8px;padding:12px 14px;font-size:16px;font-weight:800;cursor:pointer;text-align:left">'+o[1]+'<div style="font-size:12px;font-weight:500;margin-top:2px;opacity:.9">'+o[2]+'</div></button>'; });
+  h+='</div><div style="font-size:12px;color:#64748b;margin-top:10px">사진 밑 제목은 각 거래 📎 창의 「✎ 제목」에서 넣어요 (안 넣으면 거래 내용·적요가 들어가요)</div>';
+  openPopup2(h,420);
+}
+function _bkEvPrintLabel(scope){ if(scope==="sum") return _bkPeriodLabel()+(BK_BIG?" · "+BK_BIG:""); var a=_bkAcct(scope)||{}; return (a.nm||"")+(BK_Y?" · "+BK_Y+"년":" · 전체 기간"); }
+function _bkEvPrintTx(scope){
+  var L;
+  if(scope==="sum") L=_bkSumCalc().list;
+  else L=_bkTxList(scope).filter(function(t){ return (!BK_Y||String(t.dt).slice(0,4)===BK_Y) && !_bkSkip(t.big); });
+  return L.slice().sort(function(a,b){ return String(a.dt).localeCompare(String(b.dt)) || (a.seq||0)-(b.seq||0); });
+}
+function _bkEvPrint(per){
+  var scope=window._BKEVP, L=_bkEvPrintTx(scope), an={}; _bkAccts().forEach(function(a){ an[a._k]=a.nm; });
+  var cells=[], miss=[];
+  L.forEach(function(t){
+    var ev=t.ev||[], amt=Number(t.out)?"출금 "+fm(t.out):"입금 "+fm(t.inA);
+    if(!ev.length){ if(Number(t.out)>0) miss.push(esc(String(t.dt).slice(0,10))+" "+esc(t.desc||t.nm||"")+" "+amt+"원"); return; }
+    ev.forEach(function(e){ cells.push({u:e.u, r:e.r||0, cap:e.c||t.desc||t.nm||"", sub:String(t.dt).slice(0,10)+" · "+[t.big,t.mid].filter(Boolean).join(" › ")+" · "+amt+"원 · "+(an[t._a]||"")+(e.k?" · "+e.k:"")}); });
+  });
+  if(!cells.length){ toast("이 기간에 올린 증빙이 없어요",true); return; }
+  var img=function(c){ return '<img data-rot="'+c.r+'" src="'+esc(_evPrintBig(c.u))+'" onerror="this.outerHTML=\'<div class=evx>이미지를 불러오지 못했어요 (PDF면 원본에서 인쇄)<br>'+esc(c.u).replace(/'/g,'&#39;')+'</div>\'">'; };
+  var title=_bkEvPrintLabel(scope), pages=[];
+  for(var i=0;i<cells.length;i+=per){
+    var ch=cells.slice(i,i+per);
+    pages.push('<div class="evp"><div class="evh"><b>증빙자료</b> <span>'+esc(title)+' ('+(Math.floor(i/per)+1)+'/'+Math.ceil(cells.length/per)+'쪽)</span></div><div class="evg g'+per+'">'
+      +ch.map(function(c){ return '<div class="gc">'+img(c)+'<div class="gt">'+esc(c.cap)+'<div style="font-size:10.5px;font-weight:500;color:#475569">'+esc(c.sub)+'</div></div></div>'; }).join('')+'</div></div>');
+  }
+  var css='@page{size:A4;margin:0}body{font-family:"맑은 고딕","Malgun Gothic",sans-serif;margin:0;background:#e5e7eb}'
+    +'.bar{position:sticky;top:0;background:#1e293b;color:#fff;padding:10px 16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;z-index:5}'
+    +'.bar button{background:#2563eb;color:#fff;border:none;border-radius:6px;padding:9px 18px;font-size:15px;font-weight:700;cursor:pointer}'
+    +'.evp{background:#fff;width:190mm;height:275mm;margin:12px auto;display:flex;flex-direction:column;page-break-after:always;box-sizing:border-box;overflow:hidden}.evp:last-child{page-break-after:auto}'
+    +'.evh{font-size:12px;color:#334155;border-bottom:2px solid #334155;padding:4px 2px 6px;flex:none;text-align:center}.evh b{font-size:18px;color:#0f172a}'
+    +'.evg{flex:1;min-height:0;display:grid;gap:4mm;padding-top:4mm}.evg.g1{grid-template-columns:1fr;grid-template-rows:1fr}.evg.g4{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr}.evg.g2{grid-template-columns:1fr;grid-template-rows:1fr 1fr}'
+    +'.gc{min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:center;border:1px solid #94a3b8;padding:2mm;overflow:hidden}'
+    +'.gc img{max-width:100%;max-height:100%;min-height:0;flex:1;object-fit:contain;cursor:pointer;transition:transform .15s}'
+    +'.gt{font-size:15px;font-weight:800;color:#0f172a;flex:none;text-align:center;padding-top:2mm;border-top:1px solid #94a3b8;width:100%}'
+    +'.evx{font-size:12px;color:#b91c1c;word-break:break-all;padding:12px}'
+    +'.miss{max-width:190mm;margin:12px auto;background:#fff7ed;border:1px solid #fdba74;border-radius:6px;padding:10px 14px;font-size:13px;color:#9a3412}'
+    +'@media print{body{background:#fff}.bar,.miss{display:none}.evp{margin:0;width:210mm;height:296mm;padding:10mm}}';
+  var html='<!doctype html><html><head><meta charset="utf-8"><title>&#8203;</title><style>'+css+'</style></head><body>'
+    +'<div class="bar"><button onclick="window.print()">🖨️ 인쇄 / PDF 저장</button><span><b>증빙자료</b> · '+esc(title)+' · '+pages.length+'쪽 (파일 '+cells.length+'개)</span><span style="background:#f59e0b;color:#111;font-weight:800;padding:4px 10px;border-radius:6px">🔄 옆으로 찍은 사진은 누르면 90°씩 돌아가요</span></div>'
+    +(miss.length?'<div class="miss">⚠ 증빙이 없는 출금 '+miss.length+'건 (출력 안 됨):<br>'+miss.join('<br>')+'</div>':'')
+    +pages.join('')+'<script>('+_evpRotInit.toString().replace('querySelector(".gl")','querySelector(".gl,.gt")')+')();<\/script></body></html>';
+  var w=window.open("","_blank","width=900,height=1100"); if(!w){ toast("팝업이 막혔어요 — 팝업 허용 후 다시",true); return; }
+  w.document.open(); w.document.write(html); w.document.close();
+}
 function dBank(){
   if(!isA()) return '<div class="card">관리자 전용입니다.</div>';
   _bkLoad();
@@ -14186,6 +14245,7 @@ function _bkAcctView(ak){
   var ok=B.last && Math.abs(B.last.bal-B.last.calc)<1;
   h+='<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px"><div style="flex:1;font-size:14px;color:#334155"><b style="font-size:16px">'+esc(a.nm)+'</b> '+esc(a.no||'')+'</div>';
   h+='<button class="btn btn-s" style="background:#1d4ed8;color:#fff;font-weight:900" onclick="_bkReg(\''+ak+'\')">＋ 거래 등록</button>';
+  h+='<button class="btn btn-s" style="background:#b45309;color:#fff;font-weight:800" onclick="_bkEvPrintAsk(\''+ak+'\')" title="위 연도 거르기 그대로">📎 증빙 출력</button>';
   if(a.fee) h+='<button class="btn btn-s" style="background:#0f766e;color:#fff;font-weight:800" onclick="CTAB=\'fee\';FB_TAB=\'tx\';draw()">💵 회비 탭에서 입력하기</button>';
   else {
     h+='<button class="btn btn-s" style="background:#ea580c;color:#fff;font-weight:800" onclick="_bkImportPick(\''+ak+'\')">⬆ 엑셀 가져오기</button>';
