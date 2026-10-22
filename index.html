@@ -13722,7 +13722,7 @@ function _fbImport(wb){
 //   /main/Bank = { accts:{k:{nm,no,ord}}, tx:{acctK:{k:{dt,nm,inA,out,bal,vendor,desc,big,mid,memo,seq}}} }
 //   회비통장은 /main/FeeBank/tx 를 그대로 읽음(입력은 회비 탭) — 여기선 대분류·계정과목만 붙임
 //   대분류 「통장간 이체」·「이월」은 수입·지출 합계에서 뺌
-var BK={loaded:false,accts:{},tx:{}}, BK_ACC="", BK_Y="", BK_F="all", BK_Q="", _bkQT=null, _bkQC=false, BK_SEL=null, BK_FROM="", BK_TO="", BK_SV="dash", BK_DET=true, BK_AF="", BK_AT="";
+var BK={loaded:false,accts:{},tx:{}}, BK_ACC="", BK_Y="", BK_F="all", BK_Q="", _bkQT=null, _bkQC=false, BK_SEL=null, BK_FROM="", BK_TO="", BK_SV="dash", BK_DET=true, BK_AF="", BK_AT="", BK_M=0;   // BK_M: 통장 화면 월 (0=전체)
 var BK_PICK={};   // 증빙 출력용으로 고른 거래 {"통장|거래키":1}
 var BK_XFER="통장간 이체", BK_CARRY="이월", BK_FEE="_fee";
 function _bkRef(p){ return fbDb.ref('/main/Bank'+(p?'/'+p:'')); }
@@ -14243,8 +14243,8 @@ function dBank(){
 }
 
 // 통장 화면 거르기 (연도·필터·검색) — 최근이 위
-function _bkInAcctPer(t){ var d=String(t.dt).slice(0,10); if(BK_Y && d.slice(0,4)!==BK_Y) return false; if(BK_AF && d<BK_AF) return false; if(BK_AT && d>BK_AT) return false; return true; }
-function _bkAcctPerLabel(){ if(BK_AF||BK_AT) return (BK_AF||"처음")+" ~ "+(BK_AT||"지금"); return BK_Y?BK_Y+"년":"전체 기간"; }
+function _bkInAcctPer(t){ var d=String(t.dt).slice(0,10); if(BK_Y && d.slice(0,4)!==BK_Y) return false; if(BK_M && +d.slice(5,7)!==BK_M) return false; if(BK_AF && d<BK_AF) return false; if(BK_AT && d>BK_AT) return false; return true; }
+function _bkAcctPerLabel(){ if(BK_AF||BK_AT) return (BK_AF||"처음")+" ~ "+(BK_AT||"지금"); return BK_Y?BK_Y+"년"+(BK_M?" "+BK_M+"월":""):(BK_M?"매년 "+BK_M+"월":"전체 기간"); }
 function _bkAcctFilter(L){
   var q=String(BK_Q||"").replace(/[\s,]/g,"").toLowerCase();
   return L.slice().reverse().filter(function(t){
@@ -14321,7 +14321,9 @@ function _bkAcctView(ak){
   var fb=function(k,lb){ var on=BK_F===k; return '<button onclick="BK_F=\''+k+'\';draw()" style="border:none;border-radius:7px;padding:6px 11px;font-size:13px;font-weight:700;cursor:pointer;background:'+(on?'#0f766e':'#e2e8f0')+';color:'+(on?'#fff':'#0f172a')+'">'+lb+'</button>'; };
   h+='<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:10px 0 8px">';
   h+='<select onchange="BK_Y=this.value;BK_AF=BK_AT=String();draw()" style="padding:7px;font-size:14px;font-weight:700;border:2px solid #cbd5e1;border-radius:8px"><option value="">전체 기간</option>'+ys.map(function(y){ return '<option value="'+y+'"'+(BK_Y===y?' selected':'')+'>'+y+'년</option>'; }).join('')+'</select>';
-  var adp=function(id,v){ return '<input type="date" id="'+id+'" value="'+esc(v)+'" onclick="try{this.showPicker()}catch(e){}" onchange="BK_AF=document.getElementById(\QbkAF\Q).value;BK_AT=document.getElementById(\QbkAT\Q).value;BK_Y=String();draw()" title="눌러서 달력" style="padding:6px 8px;width:150px;font-size:14px;font-weight:700;cursor:pointer;border:2px solid '+(v?'#0f766e':'#cbd5e1')+';border-radius:8px">'; };
+  var mo='<option value="0">전체 월</option>'; for(var mi=1;mi<=12;mi++) mo+='<option value="'+mi+'"'+(BK_M===mi?' selected':'')+'>'+mi+'월</option>';
+  h+='<select onchange="BK_M=+this.value;if(BK_M&&!BK_Y)BK_Y=\''+(ys[0]||'')+'\';BK_AF=BK_AT=String();draw()" style="padding:7px;font-size:14px;font-weight:700;border:2px solid '+(BK_M?'#0f766e':'#cbd5e1')+';border-radius:8px">'+mo+'</select>';
+  var adp=function(id,v){ return '<input type="date" id="'+id+'" value="'+esc(v)+'" onclick="try{this.showPicker()}catch(e){}" onchange="BK_AF=document.getElementById(\QbkAF\Q).value;BK_AT=document.getElementById(\QbkAT\Q).value;BK_Y=String();BK_M=0;draw()" title="눌러서 달력" style="padding:6px 8px;width:150px;font-size:14px;font-weight:700;cursor:pointer;border:2px solid '+(v?'#0f766e':'#cbd5e1')+';border-radius:8px">'; };
   h+='<span style="display:inline-flex;gap:4px;align-items:center">📅'+adp('bkAF',BK_AF)+'~'+adp('bkAT',BK_AT)+((BK_AF||BK_AT)?' <button class="btn btn-s" style="background:#475569;color:#fff" onclick="BK_AF=BK_AT=String();draw()">기간 지우기</button>':'')+'</span>';
   h+='<input type="search" id="bkQ" value="'+esc(BK_Q)+'" placeholder="🔍 적요·내용·분류·금액" oninput="_bkQIn(this)" oncompositionstart="_bkQC=true" oncompositionend="_bkQC=false;_bkQIn(this)" autocomplete="off" style="flex:1 1 200px;max-width:320px;padding:8px 10px;font-size:14px;border:2px solid '+(BK_Q?'#0f766e':'#cbd5e1')+';border-radius:8px">';
   h+=fb("all","전체")+fb("in","입금")+fb("out","출금")+fb("none","❓ 분류 안 한 것 "+nNone)+fb("noev","📎 증빙 없는 출금 "+nNoEv)+(nWarn?fb("warn","⚠ 잔액 안 맞는 줄 "+nWarn):'')+'</div>';
