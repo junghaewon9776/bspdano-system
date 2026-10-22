@@ -555,6 +555,7 @@ var DEEP_EVT = "";   // ?evtId= 딥링크 (해당 행사 자동 선택)
 var IS_MODVIEW_MODE = false; var MODVIEW_KEY=""; var MODVIEW_ID=""; var MODVIEW_EVT="";  // QR 조회 페이지
 var IS_ASSETVIEW_MODE = false; var ASSETVIEW_ID="";  // 자산 QR 조회 페이지
 var IS_ESIGN_MODE = false;  // (예전 비로그인 서명 페이지 — 사용 안 함)
+var DEEP_BKESIGN = null; // 정산서 결재 링크(?bkesign=) — 로그인 후 그 정산서 결재 창
 var DEEP_ESIGN = null;      // 결재 요청 링크(?esign=) — 로그인 후 그 결재 화면 열기
 var DEEP_MOD_KEY = "";  // 모듈 바로가기(?modlist=) — 로그인 후 이동할 모듈 키
 // 한국시간 헬퍼 — toISOString은 UTC(외국시간)이므로 날짜/시간 표시엔 이걸 쓸 것
@@ -623,6 +624,7 @@ function nowKST(full){ var d=new Date(); var s=todayKST()+" "+("0"+d.getHours())
       document.title = "💵 회비 조회";
     }
     // ===== 결재 요청 링크 (?esign=evt&inv=&role=&t=) — 로그인(폰은 자동 로그인) 후 결재 화면 =====
+    if (sp.get("bkesign")) DEEP_BKESIGN = sp.get("bkesign");
     if (sp.get("esign")) {
       DEEP_ESIGN = {evt:sp.get("esign")||"", inv:sp.get("inv")||"", role:sp.get("role")||"", t:sp.get("t")||""};
       DEEP_EVT = DEEP_ESIGN.evt;
@@ -1141,7 +1143,8 @@ async function doLogin(id,pw,keep,silent){
     }, 300);
   }
   // 결재 요청 링크로 들어왔으면 → 그 결재 화면 / 아니면 내 결재함 알림
-  if (DEEP_ESIGN) { var _de = DEEP_ESIGN; DEEP_ESIGN = null; setTimeout(function(){ _esgOpenDeep(_de); }, 500); }
+  if (DEEP_BKESIGN) { var _bd = DEEP_BKESIGN; DEEP_BKESIGN = null; setTimeout(function(){ _bkEsgOpenDeep(_bd); }, 600); }
+  else if (DEEP_ESIGN) { var _de = DEEP_ESIGN; DEEP_ESIGN = null; setTimeout(function(){ _esgOpenDeep(_de); }, 500); }
   else setTimeout(function(){ _esgInboxNotify(); }, 1500);
   return true;
 }
@@ -13730,6 +13733,7 @@ function _bkRef(p){ return fbDb.ref('/main/Bank'+(p?'/'+p:'')); }
 function _bkLoad(){
   _fbLoad();
   if(BK._lis) return; BK._lis=true;
+  fbDb.ref('/main/BankEsig').on('value',function(s){ BK.esig=s.val()||{}; if(typeof CTAB!=="undefined"&&CTAB==="bank"&&!document.getElementById("bkEsgPadBox")) draw(); });
   _bkRef().on('value',function(s){ var v=s.val()||{}; BK.accts=v.accts||{}; BK.tx=v.tx||{}; BK.cats=v.cats||null; BK.loaded=true; if(typeof CTAB!=="undefined"&&CTAB==="bank") draw(); });
 }
 function _bkTxRoot(ak){ return ak===BK_FEE ? _fbRef('tx') : _bkRef('tx/'+ak); }
@@ -14065,7 +14069,7 @@ function _bkSumView(){
   if(BK_BIG && bl.indexOf(BK_BIG)<0) bl.unshift(BK_BIG);
   h+='<div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center"><b style="width:60px">대분류</b>'+pill(!BK_BIG,'전체','BK_BIG=\'\';draw()','#7c3aed')+bl.map(function(b){ return pill(BK_BIG===b,esc(b),'BK_BIG='+_bkJs(b).replace(/"/g,'&quot;')+';draw()','#7c3aed'); }).join('')+'</div></div>';
   var sv=function(k,lb){ var on=BK_SV===k; return '<button onclick="BK_SV=\''+k+'\';draw()" style="border:none;border-radius:8px;padding:9px 16px;font-size:15px;font-weight:900;cursor:pointer;background:'+(on?'#1d4ed8':'#e2e8f0')+';color:'+(on?'#fff':'#0f172a')+'">'+lb+'</button>'; };
-  h+='<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:12px">'+sv("dash","📊 대시보드")+sv("report","📄 정산보고서 (총회용)")+(BK_SV==="report"?'<label style="display:flex;gap:5px;align-items:center;font-weight:700;margin-left:8px"><input type="checkbox" '+(BK_DET?'checked':'')+' onchange="BK_DET=this.checked;draw()" style="width:18px;height:18px"> 거래 상세 내역도 넣기</label>':'')+'</div>';
+  h+='<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:12px">'+sv("dash","📊 대시보드")+sv("report","📄 정산보고서")+(BK_SV==="report"?'<label style="display:flex;gap:5px;align-items:center;font-weight:700;margin-left:8px"><input type="checkbox" '+(BK_DET?'checked':'')+' onchange="BK_DET=this.checked;draw()" style="width:18px;height:18px"> 거래 상세 내역도 넣기</label>':'')+'</div>';
   if(!A.length) return h+'<div class="mut">통장을 하나 이상 골라 주세요</div>';
   if(BK_SV==="report") return h+_bkRsPicker()+'<div style="background:#fff;border:1px solid #cbd5e1;border-radius:10px;padding:18px;max-width:'+(BK_RS==="month"?'100%':'900px')+';margin:0 auto">'+_bkReportHtml()+'</div>';
   var card=function(lb,v,col){ return '<div style="flex:1 1 150px;background:#fff;border:1px solid #cbd5e1;border-radius:8px;padding:8px 12px"><div style="font-size:12px;color:#475569;font-weight:700">'+lb+'</div><div style="font-size:19px;font-weight:900;color:'+col+'">'+fm(v)+'원</div></div>'; };
@@ -14120,7 +14124,7 @@ function _bkDashCharts(R){
 var BK_RS="big", BK_MERGE=true;   // 같은 대분류·계정과목 칸 병합
 var BK_RS_LIST=[["gov","🏛 정산서","월례회 문서 양식 — 결재란 · 집행현황(이월금·수입금) · 집행내역(비목·항목·내역)"],["big","📂 대분류별","엑셀 「정산보고서」 — 대분류 비중 + 대분류별 상세"],["date","📅 일자순","엑셀 「정산보고」 — 날짜 순서대로 수입·지출"],["pnl","⚖ 사업별 수입·지출","대분류마다 들어온 돈·쓴 돈·남은 돈을 옆에 — 같은 대분류는 칸 병합"],["acct","🧾 계정과목별","엑셀 「항목별 정산보고」 — 계정과목 비율 + 내역"],["month","📈 월별 추이","기업식 손익 추이표 — 대분류 × 월"],["yoy","🔁 전년 대비","기업식 — 올해와 작년 같은 기간 비교, 증감·증감률"]];
 function _bkRsPicker(){
-  return '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:-4px 0 12px"><b style="font-size:13px;color:#475569">보고서 모양</b>'+BK_RS_LIST.map(function(o){ var on=BK_RS===o[0]; return '<button title="'+esc(o[2])+'" onclick="BK_RS=\''+o[0]+'\';draw()" style="border:2px solid '+(on?'#1d4ed8':'#cbd5e1')+';border-radius:8px;padding:5px 11px;font-size:13.5px;font-weight:800;cursor:pointer;background:'+(on?'#1d4ed8':'#fff')+';color:'+(on?'#fff':'#0f172a')+'">'+o[1]+'</button>'; }).join('')+(true?'<label style="display:flex;gap:5px;align-items:center;font-weight:800;margin-left:6px;background:#fff;border:2px solid #7c3aed;border-radius:8px;padding:4px 10px;cursor:pointer"><input type="checkbox" '+(BK_MERGE?'checked':'')+' onchange="BK_MERGE=this.checked;draw()" style="width:17px;height:17px"> 같은 '+(BK_RS==="date"?'날짜':(BK_RS==="acct"||BK_BIG?'계정과목':'대분류'))+' 칸 병합'+((BK_RS==="month"||BK_RS==="yoy")?' <span style="font-size:11px;font-weight:600;color:#64748b">(이 모양은 합칠 칸 없음)</span>':(BK_RS==="gov"?' <span style="font-size:11px;font-weight:600;color:#64748b">(정산서는 항상 병합)</span>':''))+'</label><label style="display:flex;gap:5px;align-items:center;font-weight:800;background:#fff;border:2px solid #0f766e;border-radius:8px;padding:4px 10px;cursor:pointer"><input type="checkbox" '+(BK_SIGNON?'checked':'')+' onchange="BK_SIGNON=this.checked;draw()" style="width:17px;height:17px"> ✍ 결재란</label>':'')+'<span style="font-size:12px;color:#64748b">'+esc((BK_RS_LIST.filter(function(o){ return o[0]===BK_RS; })[0]||[])[2]||'')+'</span></div>';
+  return '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:-4px 0 12px"><b style="font-size:13px;color:#475569">보고서 모양</b>'+BK_RS_LIST.map(function(o){ var on=BK_RS===o[0]; return '<button title="'+esc(o[2])+'" onclick="BK_RS=\''+o[0]+'\';draw()" style="border:2px solid '+(on?'#1d4ed8':'#cbd5e1')+';border-radius:8px;padding:5px 11px;font-size:13.5px;font-weight:800;cursor:pointer;background:'+(on?'#1d4ed8':'#fff')+';color:'+(on?'#fff':'#0f172a')+'">'+o[1]+'</button>'; }).join('')+(true?'<label style="display:flex;gap:5px;align-items:center;font-weight:800;margin-left:6px;background:#fff;border:2px solid #7c3aed;border-radius:8px;padding:4px 10px;cursor:pointer"><input type="checkbox" '+(BK_MERGE?'checked':'')+' onchange="BK_MERGE=this.checked;draw()" style="width:17px;height:17px"> 같은 '+(BK_RS==="date"?'날짜':(BK_RS==="acct"||BK_BIG?'계정과목':'대분류'))+' 칸 병합'+((BK_RS==="month"||BK_RS==="yoy")?' <span style="font-size:11px;font-weight:600;color:#64748b">(이 모양은 합칠 칸 없음)</span>':(BK_RS==="gov"?' <span style="font-size:11px;font-weight:600;color:#64748b">(정산서는 항상 병합)</span>':''))+'</label><label style="display:flex;gap:5px;align-items:center;font-weight:800;background:#fff;border:2px solid #0f766e;border-radius:8px;padding:4px 10px;cursor:pointer"><input type="checkbox" '+(BK_SIGNON?'checked':'')+' onchange="BK_SIGNON=this.checked;draw()" style="width:17px;height:17px"> ✍ 결재란</label>'+(BK_SIGNON?_bkEsgBtn():'')+'':'')+'<span style="font-size:12px;color:#64748b">'+esc((BK_RS_LIST.filter(function(o){ return o[0]===BK_RS; })[0]||[])[2]||'')+'</span></div>';
 }
 // 대분류(또는 대분류 하나 골랐으면 계정과목) → {이름:{t, list}}
 function _bkRsGroups(G, byMid){
@@ -14283,13 +14287,98 @@ async function _bkReportXlsx(){
 }
 // 🏛 정산서 (월례회 문서 양식) — 결재란 · □ 집행현황(이월금·수입금 / 집행액·집행잔액) · □ 집행내역(구분·비목·항목·금액·합계·내역·비고)
 var BK_SIGN=["재무국장","사무국장","감사","회장"], BK_SIGNON=true;
+// ✍ 정산서 결재(서명) — 구매 결의서 전자결재와 같은 결재선(ESIG_ROLES). 기간·통장·대분류마다 따로 저장
+//   /main/BankEsig/{기간키} = { title, roles:{역할:{img,nm,at,by,via}} }
+function _bkRepKey(){
+  var rg=_bkRange(), acc=_bkAccts().filter(function(a){ return !BK_SEL || BK_SEL[a._k]!==false; }).map(function(a){ return a._k; }).sort().join(",");
+  return [rg.from||"처음",rg.to||"지금",acc,BK_BIG||""].join("~").replace(/[.#$\[\]\/]/g,"_");
+}
+function _bkRepTitle(){ return (BK_BIG?BK_BIG+" ":"")+_bkPeriodLabel()+" 정산서"; }
+function _bkEsgRoles(){ return (typeof ESIG_ROLES!=="undefined"&&ESIG_ROLES.length)?ESIG_ROLES:BK_SIGN; }
+function _bkEsgOf(){ return (BK.esig||{})[_bkRepKey()]||{}; }
+function _bkEsgCount(){ var r=_bkEsgOf().roles||{}; return _bkEsgRoles().filter(function(k){ return r[k]&&r[k].img; }).length; }
+function _bkEsgBtn(){
+  var n=_bkEsgCount(), all=_bkEsgRoles().length;
+  return '<button onclick="_bkEsgPop()" style="border:2px solid '+(n===all?'#16a34a':'#0f766e')+';border-radius:8px;padding:5px 12px;font-size:13.5px;font-weight:800;cursor:pointer;background:'+(n===all?'#16a34a':'#fff')+';color:'+(n===all?'#fff':'#0f766e')+'">✍ 결재 받기 '+n+'/'+all+'</button>';
+}
+function _bkEsgPop(){
+  var d=_bkEsgOf(), roles=d.roles||{}, adm=(typeof isA==="function"&&isA());
+  var h='<h3>✍ 정산서 결재 <button class="close-x" onclick="closePopup2()">&times;</button></h3>';
+  h+='<div style="font-size:13.5px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;margin-bottom:10px">📄 <b>'+esc(_bkRepTitle())+'</b><div style="font-size:12px;color:#475569">통장: '+esc(_bkAccts().filter(function(a){ return !BK_SEL||BK_SEL[a._k]!==false; }).map(function(a){ return a.nm; }).join(', '))+' — 이 기간·통장 정산서에만 들어가요</div></div>';
+  _bkEsgRoles().forEach(function(role){
+    var s=roles[role], uid=(typeof _esgUidOf==="function")?_esgUidOf(role):"", mine=(typeof _esgCanSign==="function")&&_esgCanSign(role);
+    h+='<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;border:1px solid #e2e8f0;border-radius:10px;padding:9px 12px;margin-bottom:7px;background:'+(s&&s.img?'#f0fdf4':'#fff')+'">';
+    h+='<div style="min-width:86px"><div style="font-weight:800;font-size:15px">'+esc(role)+'</div><div style="font-size:11px;color:'+(uid?'#475569':'#dc2626')+'">'+(uid?esc(_esgUserNm(uid)):'결재자 미지정')+'</div></div>';
+    h+='<div style="flex:1;min-width:140px;font-size:13px">'+(s&&s.img?'<img src="'+s.img+'" style="height:38px;vertical-align:middle;border:1px solid #d1d5db;border-radius:4px;background:#fff"> <b>'+esc(s.nm||'')+'</b> <span style="color:#64748b;font-size:12px">'+esc(s.at||'')+'</span>':'<span style="color:#94a3b8">서명 전</span>')+'</div>';
+    h+='<div style="display:flex;gap:6px;flex-wrap:wrap">';
+    if(!mine&&!adm) h+='<span style="font-size:12px;color:#64748b">👁 '+esc(role)+' 계정으로 로그인해야 서명돼요</span>';
+    if(mine||adm) h+='<button class="btn btn-s" style="background:#2563eb;color:#fff;font-weight:700" onclick="_bkEsgSign(\''+esc(role)+'\')">✍ '+(mine?'서명하기':'이 기기에서 서명받기')+'</button>';
+    if(uid&&adm&&!(s&&s.img)) h+='<button class="btn btn-s" style="background:#334155;color:#fff;font-weight:700" onclick="_bkEsgReq(\''+esc(role)+'\')">📨 텔레그램 요청</button><button class="btn btn-s" style="background:#0f766e;color:#fff;font-weight:700" onclick="_bkEsgLinkCopy(\''+esc(role)+'\')">🔗 링크 복사</button>';
+    if(s&&s.img&&(adm||mine)) h+='<button class="btn btn-s" style="background:#dc2626;color:#fff" onclick="_bkEsgClear(\''+esc(role)+'\')">지우기</button>';
+    h+='</div></div>';
+  });
+  h+='<div id="bkEsgPadBox" style="display:none;border:2px solid #2563eb;border-radius:10px;padding:10px;margin-top:8px"><div style="font-weight:800;margin-bottom:6px" id="bkEsgPadTtl"></div>';
+  h+='<canvas id="bkEsgPad" style="width:100%;height:150px;border:1px dashed #94a3b8;border-radius:8px;background:#fff;display:block"></canvas>';
+  h+='<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px"><input id="bkEsgNm" placeholder="이름" style="padding:7px;width:120px;font-weight:700"><label style="font-size:12.5px"><input type="checkbox" id="bkEsgRem" checked> 내 서명 기억</label><span style="flex:1"></span><button class="btn btn-s" style="background:#475569;color:#fff" onclick="window._bkEsgPadO&&window._bkEsgPadO.clear()">다시 쓰기</button><button class="btn" style="background:#16a34a;color:#fff;font-weight:900" onclick="_bkEsgSave()">✅ 서명 저장</button></div></div>';
+  h+='<div style="font-size:12px;color:#64748b;margin-top:8px;line-height:1.6">결재자·직책은 물품/구매 결의서와 같은 <b>결재선</b>을 써요 (구매 결재 창 ⚙ 결재선 설정). 서명은 <b>지금 고른 기간·통장 정산서에만</b> 저장돼서, 달마다 따로 받아요. 정산서 결재란과 인쇄에 그대로 찍혀요.</div>';
+  openPopup2(h,560);
+}
+// 🔗 결재 링크 — 기간·통장만 담김(개인정보 없음). 열면 로그인 → 그 정산서 결재 창. 서명은 결재선에 지정된 본인 계정만
+function _bkEsgLink(){
+  var rg=_bkRange(), o={f:rg.from||"",t:rg.to||"",y:BK_PY,m:BK_PM,s:_bkAccts().filter(function(a){ return !BK_SEL||BK_SEL[a._k]!==false; }).map(function(a){ return a._k; }),b:BK_BIG||""};
+  return location.href.split("?")[0].split("#")[0]+"?bkesign="+encodeURIComponent(btoa(unescape(encodeURIComponent(JSON.stringify(o)))));
+}
+function _bkEsgLinkCopy(role){
+  var txt="["+(typeof SYS_NAME!=="undefined"?SYS_NAME:"")+"] "+_bkRepTitle()+" — "+role+" 결재(서명) 부탁드려요.\n"+_bkEsgLink()+"\n(본인 아이디로 로그인해야 서명돼요)";
+  var done=function(){ toast("🔗 링크를 복사했어요 — 문자·카톡에 붙여넣기"); };
+  try{ navigator.clipboard.writeText(txt).then(done,function(){ prompt("복사하세요",txt); }); }catch(e){ prompt("복사하세요",txt); }
+}
+function _bkEsgOpenDeep(code){
+  try{ history.replaceState(null,"",location.pathname); }catch(e){}
+  var o; try{ o=JSON.parse(decodeURIComponent(escape(atob(code)))); }catch(e){ toast("결재 링크가 잘못됐어요",true); return; }
+  CTAB="bank"; BK_ACC="_sum"; BK_SV="report"; BK_RS="gov"; BK_BIG=o.b||""; BK_PY=+o.y||BK_PY; BK_PM=(o.m==null?0:+o.m); BK_FROM=o.f||""; BK_TO=o.t||"";
+  BK_SEL={}; _bkLoad();
+  var go=function(){ if(!BK.loaded||!FB.loaded){ setTimeout(go,300); return; } _bkAccts().forEach(function(a){ BK_SEL[a._k]=(o.s||[]).indexOf(a._k)>=0; }); try{ draw(); }catch(e){} _bkEsgPop(); };
+  go();
+}
+function _bkEsgSign(role){
+  window._bkEsgRole=role;
+  var box=document.getElementById("bkEsgPadBox"); if(!box) return; box.style.display="block";
+  document.getElementById("bkEsgPadTtl").textContent="✍ "+role+" 서명 — 아래 칸에 손가락이나 마우스로";
+  var nm=document.getElementById("bkEsgNm"), mine=(typeof _esgCanSign==="function")&&_esgCanSign(role);
+  if(nm) nm.value=mine&&typeof US!=="undefined"&&US[CID]?(US[CID].nm||""):(_esgUserNm(_esgUidOf(role))||"");
+  window._bkEsgPadO=_sigPadInit(document.getElementById("bkEsgPad"));
+  if(mine){ try{ var m=localStorage.getItem("esigMine_"+CID); if(m) window._bkEsgPadO.load(m); }catch(e){} }
+  box.scrollIntoView({behavior:"smooth",block:"center"});
+}
+async function _bkEsgSave(){
+  var role=window._bkEsgRole, pad=window._bkEsgPadO; if(!role||!pad) return;
+  if(pad.isEmpty()) return toast("서명을 해 주세요",true);
+  var nm=String((document.getElementById("bkEsgNm")||{}).value||"").trim(); if(!nm) return toast("이름을 넣어 주세요",true);
+  var img=pad.toData(), mine=(typeof _esgCanSign==="function")&&_esgCanSign(role);
+  try{ if(mine&&(document.getElementById("bkEsgRem")||{}).checked) localStorage.setItem("esigMine_"+CID,img); }catch(e){}
+  var key=_bkRepKey(), u={}; u[key+'/title']=_bkRepTitle(); u[key+'/roles/'+role]={img:img,nm:nm,at:nowKST(true),by:(typeof CID!=="undefined"?CID:""),via:mine?"self":"admin"};
+  showLoading("서명 저장 중...");
+  try{ await fbDb.ref('/main/BankEsig').update(u); hideLoading(); toast("✅ "+role+" 서명 저장"); _bkEsgPop();
+    try{ _tgNotify("<b>✅ ["+esc(typeof SYS_NAME!=="undefined"?SYS_NAME:"")+"] 정산서 서명</b>\n• "+esc(_bkRepTitle())+"\n• "+esc(role)+" — "+esc(nm)+(mine?"":" (관리자 기기에서 받음: "+esc(typeof CID!=="undefined"?CID:"")+")"), _tgAdminUids()); }catch(x){} }catch(e){ hideLoading(); toast("저장 실패: "+(e.message||e),true); }
+}
+function _bkEsgClear(role){
+  if(!confirm(role+" 서명을 지울까요?")) return;
+  fbDb.ref('/main/BankEsig/'+_bkRepKey()+'/roles/'+role).remove().then(function(){ toast("지웠어요"); _bkEsgPop(); });
+}
+function _bkEsgReq(role){
+  var uid=_esgUidOf(role); if(!uid) return;
+  if(typeof _tgOf==="function" && !_tgOf(uid)) return toast(_esgUserNm(uid)+"님은 텔레그램이 연결 안 돼 있어요 — 「이 기기에서 서명받기」로 받아 주세요",true);
+  _tgNotify("<b>✍ ["+esc(typeof SYS_NAME!=="undefined"?SYS_NAME:"")+"] 정산서 결재 요청</b>\n• "+esc(_bkRepTitle())+"\n• "+esc(role)+" 서명 부탁드려요\n• 재정 → 입출금 → 📊 결산·정산보고서 → 같은 기간 고르고 「✍ 결재 받기」", [uid]);
+  toast("📨 "+_esgUserNm(uid)+"님께 텔레그램으로 요청했어요");
+}
 function _bkSignBox(){
   if(!BK_SIGNON) return '';
-  var bd='border:1.5px solid #111;text-align:center;vertical-align:middle;padding:0', W=26+BK_SIGN.length*84;
-  return '<div style="display:flex;justify-content:flex-end;margin:0 0 14px"><table style="border-collapse:collapse;table-layout:fixed;width:'+W+'px;min-width:'+W+'px;max-width:'+W+'px"><colgroup><col style="width:26px">'+BK_SIGN.map(function(){ return '<col style="width:84px">'; }).join('')+'</colgroup>'
+  var R=_bkEsgRoles(), sg=_bkEsgOf().roles||{}, bd='border:1.5px solid #111;text-align:center;vertical-align:middle;padding:0', W=26+R.length*84;
+  return '<div style="display:flex;justify-content:flex-end;margin:0 0 14px"><table style="border-collapse:collapse;table-layout:fixed;width:'+W+'px;min-width:'+W+'px;max-width:'+W+'px"><colgroup><col style="width:26px">'+R.map(function(){ return '<col style="width:84px">'; }).join('')+'</colgroup>'
     +'<tr><td rowspan="2" style="'+bd+';font-size:13px;font-weight:800;line-height:1.6">결<br><br>재</td>'
-    +BK_SIGN.map(function(x){ return '<td style="'+bd+';height:28px;font-size:13px;font-weight:700;letter-spacing:1px;white-space:nowrap">'+x+'</td>'; }).join('')+'</tr><tr>'
-    +BK_SIGN.map(function(){ return '<td style="'+bd+';height:62px"></td>'; }).join('')+'</tr></table></div>';
+    +R.map(function(x){ return '<td style="'+bd+';height:28px;font-size:13px;font-weight:700;letter-spacing:1px;white-space:nowrap">'+esc(x)+'</td>'; }).join('')+'</tr><tr>'
+    +R.map(function(x){ var g=sg[x]; return '<td style="'+bd+';height:62px">'+(g&&g.img?'<img src="'+g.img+'" style="max-width:80px;max-height:44px;display:block;margin:0 auto"><div style="font-size:9.5px;color:#334155;line-height:1.2">'+esc(g.nm||'')+' '+esc(String(g.at||'').slice(5,10).replace('-','/'))+'</div>':'')+'</td>'; }).join('')+'</tr></table></div>';
 }
 function _bkGovHtml(){
   var R=_bkSumCalc(), A=R.accts, an={}; A.forEach(function(a){ an[a._k]=a.nm; });
