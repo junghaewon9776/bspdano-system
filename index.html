@@ -14155,6 +14155,23 @@ function _bkRepBody(R,A,an,S){
     });
     if(!BL.length) h+='<tr><td style="'+td+';color:#94a3b8" colspan="5">없음</td></tr>';
     h+='<tr style="font-weight:900;background:#dbeafe"><td style="'+td+';text-align:center" colspan="2">합  계</td><td style="'+n+'">'+fm(R.incT)+'</td><td style="'+n+'">'+fm(R.expT)+'</td>'+dc(R.incT-R.expT)+'</tr></table>';
+    if(BK_DET){
+      var cols=multi?9:8;
+      h+='<div style="font-weight:900;margin:16px 0 4px">■ 사업별 거래내역</div><table style="border-collapse:collapse;width:100%;font-size:12.5px"><tr><th style="'+th+'">대분류</th><th style="'+th+'">일자</th>'+(multi?'<th style="'+th+'">통장</th>':'')+'<th style="'+th+'">계정과목</th><th style="'+th+'">거래처</th><th style="'+th+'">내용</th><th style="'+th+'">수입</th><th style="'+th+'">지출</th><th style="'+th+'">비고</th></tr>';
+      BL.forEach(function(b){
+        var L=[], I=R.inc[b]||{_t:0,mids:{}}, E=R.exp[b]||{_t:0,mids:{}}, seen={};
+        [I,E].forEach(function(G){ Object.keys(G.mids).forEach(function(m){ G.mids[m].list.forEach(function(t){ var k=t._a+'|'+t._k; if(!seen[k]){ seen[k]=1; L.push(t); } }); }); });
+        L.sort(byDate);
+        L.forEach(function(t,i){
+          h+='<tr>'+(BK_MERGE?(i===0?'<td rowspan="'+(L.length+1)+'" style="'+td+';font-weight:900;vertical-align:middle;text-align:center;background:#f8fafc">'+esc(b)+'</td>':''):'<td style="'+td+';font-weight:700">'+esc(b)+'</td>')
+            +'<td style="'+td+';white-space:nowrap">'+dk(t.dt)+'</td>'+(multi?'<td style="'+td+'">'+esc(an[t._a]||'')+'</td>':'')+'<td style="'+td+'">'+esc(t.mid||'')+'</td><td style="'+td+'">'+esc(t.vendor||t.nm||'')+'</td><td style="'+td+'">'+esc(t.desc||(t.vendor?t.nm:'')||'')+'</td>'
+            +'<td style="'+n+';color:#166534">'+(Number(t.inA)?fm(t.inA):'')+'</td><td style="'+n+';color:#b91c1c">'+(Number(t.out)?fm(t.out):'')+'</td><td style="'+td+'">'+esc(t.memo||'')+'</td></tr>';
+        });
+        var d=I._t-E._t;
+        h+='<tr style="font-weight:900;background:#f1f5f9">'+(BK_MERGE?'':'<td style="'+td+'">'+esc(b)+'</td>')+'<td style="'+td+'" colspan="'+(cols-5)+'" align="right">소계 '+L.length+'건 · 차액 <span style="color:'+(d<0?'#b91c1c':'#1d4ed8')+'">'+fm(d)+'</span></td><td style="'+n+';color:#166534">'+fm(I._t)+'</td><td style="'+n+';color:#b91c1c">'+fm(E._t)+'</td><td style="'+td+'"></td></tr>';
+      });
+      h+='<tr style="font-weight:900;background:#dbeafe"><td style="'+td+';text-align:center" colspan="'+(cols-3)+'">합  계 · 차액 '+fm(R.incT-R.expT)+'</td><td style="'+n+'">'+fm(R.incT)+'</td><td style="'+n+'">'+fm(R.expT)+'</td><td style="'+td+'"></td></tr></table>';
+    }
     return h;
   }
   if(BK_RS==="acct"){
