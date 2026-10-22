@@ -13934,7 +13934,7 @@ function _bkForm(ak,k){
   var h='<h3>'+(t?'✏️ 거래 고치기':'＋ 거래 등록')+' <button class="close-x" onclick="closePopup2()">&times;</button></h3>';
   h+='<div style="display:grid;grid-template-columns:110px 1fr;gap:9px 10px;align-items:center;font-size:14px">';
   h+=lab('통장 '+star)+(t?'<div style="font-weight:800">'+esc(_bkAcct(ak).nm)+'</div>':'<select id="bkF_ak" onchange="window._BKF.ak=this.value;_bkFormNmDL()" style="padding:9px;font-weight:800">'+A.map(function(a){ return '<option value="'+a._k+'"'+(a._k===ak?' selected':'')+'>'+(a.fee?'💰 ':'🏦 ')+esc(a.nm)+'</option>'; }).join('')+'</select>');
-  h+=lab('날짜 '+star)+'<input type="date" id="bkF_dt" value="'+esc(t?String(t.dt).slice(0,10):today())+'" style="padding:9px">';
+  h+=lab('날짜 '+star)+'<input type="date" id="bkF_dt" value="'+esc(t?String(t.dt).slice(0,10):today())+'" onclick="try{this.showPicker()}catch(e){}" style="padding:9px;cursor:pointer">';
   var iob=function(v,lb,col){ var on=io===v; return '<button type="button" id="bkF_io_'+v+'" onclick="_bkFormIo(\''+v+'\')" style="flex:1;border:2px solid '+col+';border-radius:8px;padding:9px;font-size:15px;font-weight:900;cursor:pointer;background:'+(on?col:'#fff')+';color:'+(on?'#fff':col)+'">'+lb+'</button>'; };
   h+=lab('구분 '+star)+'<div style="display:flex;gap:8px"><input type="hidden" id="bkF_io" value="'+io+'">'+iob("out","💸 출금 (나간 돈)","#b91c1c")+iob("in","💵 입금 (들어온 돈)","#166534")+'</div>';
   h+=lab('금액 '+star)+'<input id="bkF_amt" inputmode="numeric" value="'+cm(amt)+'" oninput="this.value=_cm(this.value)" placeholder="0" style="padding:9px;font-size:18px;font-weight:900;text-align:right">';
@@ -14047,10 +14047,11 @@ function _bkSumView(){
   var h='<div style="background:#f0fdfa;border:1px solid #99f6e4;border-radius:10px;padding:10px 12px;margin-bottom:12px">';
   h+='<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px"><b style="width:60px">기간</b>';
   h+='<button onclick="_bkPer('+(BK_PY-1)+')" style="border:2px solid #0f766e;border-radius:8px;padding:5px 12px;font-weight:900;cursor:pointer;background:#fff;color:#0f766e">◀</button><span style="font-size:18px;font-weight:900;min-width:76px;text-align:center">'+BK_PY+'년</span><button onclick="_bkPer('+(BK_PY+1)+')" style="border:2px solid #0f766e;border-radius:8px;padding:5px 12px;font-weight:900;cursor:pointer;background:#fff;color:#0f766e">▶</button>';
-  h+='<span style="width:8px"></span>'+pill(BK_PM===0,'1년 전체','_bkPer(null,0)');
+  var dpk=function(id,v){ return '<input type="date" id="'+id+'" value="'+esc(v)+'" onclick="try{this.showPicker()}catch(e){}" onchange="BK_FROM=document.getElementById(\'bkPFrom\').value;BK_TO=document.getElementById(\'bkPTo\').value;BK_PM=-1;draw()" title="눌러서 달력" style="padding:6px 8px;width:150px;font-size:14px;font-weight:700;cursor:pointer;border:2px solid #0f766e;border-radius:8px">'; };
+  h+='<span style="width:6px"></span>'+dpk('bkPFrom',rg.from)+' ~ '+dpk('bkPTo',rg.to)+pill(BK_PM===-2,'전체 기간','_bkPer(null,-2)','#334155')+'<span style="font-size:13px;color:#0f766e;font-weight:800">📅 '+esc(_bkPeriodLabel())+'</span>';
+  h+='</div><div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px"><b style="width:60px"></b>'+pill(BK_PM===0,'1년 전체','_bkPer(null,0)');
   for(var mm=1;mm<=12;mm++) h+=pill(BK_PM===mm,mm+'월','_bkPer(null,'+mm+')');
-  h+='</div><div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px"><b style="width:60px"></b><input type="date" value="'+esc(rg.from)+'" onchange="BK_FROM=this.value;BK_TO=BK_TO||\''+esc(rg.to)+'\';BK_PM=-1;draw()" style="padding:5px"> ~ <input type="date" value="'+esc(rg.to)+'" onchange="BK_TO=this.value;BK_FROM=BK_FROM||\''+esc(rg.from)+'\';BK_PM=-1;draw()" style="padding:5px">';
-  h+=pill(BK_PM===-2,'전체 기간','_bkPer(null,-2)','#334155')+'<span style="font-size:13px;color:#0f766e;font-weight:800">📅 '+esc(_bkPeriodLabel())+'</span></div>';
+  h+='</div>';
   h+='<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:8px"><b style="width:60px">통장</b>';
   h+='<button onclick="BK_SEL={};draw()" style="border:2px solid #0f766e;border-radius:8px;padding:4px 10px;font-weight:800;cursor:pointer;background:#fff;color:#0f766e">전체 통장</button>';
   all.forEach(function(a){ var on=BK_SEL[a._k]!==false; h+='<label style="display:flex;gap:5px;align-items:center;font-weight:700;cursor:pointer"><input type="checkbox" '+(on?'checked':'')+' onchange="BK_SEL[\''+a._k+'\']=this.checked;draw()" style="width:18px;height:18px">'+esc(a.nm)+' <a href="javascript:void 0" onclick="event.preventDefault();_bkOnly(\''+a._k+'\')" style="font-size:11.5px;font-weight:600">이것만</a></label>'; });
