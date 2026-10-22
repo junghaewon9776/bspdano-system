@@ -14120,7 +14120,7 @@ function _bkDashCharts(R){
 var BK_RS="big", BK_MERGE=true;   // 같은 대분류·계정과목 칸 병합
 var BK_RS_LIST=[["big","📂 대분류별","엑셀 「정산보고서」 — 대분류 비중 + 대분류별 상세"],["date","📅 일자순","엑셀 「정산보고」 — 날짜 순서대로 수입·지출"],["pnl","⚖ 사업별 수입·지출","대분류마다 들어온 돈·쓴 돈·남은 돈을 옆에 — 같은 대분류는 칸 병합"],["acct","🧾 계정과목별","엑셀 「항목별 정산보고」 — 계정과목 비율 + 내역"],["month","📈 월별 추이","기업식 손익 추이표 — 대분류 × 월"],["yoy","🔁 전년 대비","기업식 — 올해와 작년 같은 기간 비교, 증감·증감률"]];
 function _bkRsPicker(){
-  return '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:-4px 0 12px"><b style="font-size:13px;color:#475569">보고서 모양</b>'+BK_RS_LIST.map(function(o){ var on=BK_RS===o[0]; return '<button title="'+esc(o[2])+'" onclick="BK_RS=\''+o[0]+'\';draw()" style="border:2px solid '+(on?'#1d4ed8':'#cbd5e1')+';border-radius:8px;padding:5px 11px;font-size:13.5px;font-weight:800;cursor:pointer;background:'+(on?'#1d4ed8':'#fff')+';color:'+(on?'#fff':'#0f172a')+'">'+o[1]+'</button>'; }).join('')+((BK_RS==="pnl"||BK_RS==="acct"||(BK_RS==="big"&&BK_DET))?'<label style="display:flex;gap:5px;align-items:center;font-weight:800;margin-left:6px;background:#fff;border:2px solid #7c3aed;border-radius:8px;padding:4px 10px;cursor:pointer"><input type="checkbox" '+(BK_MERGE?'checked':'')+' onchange="BK_MERGE=this.checked;draw()" style="width:17px;height:17px"> 같은 '+(BK_RS==="acct"||BK_BIG?'계정과목':'대분류')+' 칸 병합</label>':'')+'<span style="font-size:12px;color:#64748b">'+esc((BK_RS_LIST.filter(function(o){ return o[0]===BK_RS; })[0]||[])[2]||'')+'</span></div>';
+  return '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:-4px 0 12px"><b style="font-size:13px;color:#475569">보고서 모양</b>'+BK_RS_LIST.map(function(o){ var on=BK_RS===o[0]; return '<button title="'+esc(o[2])+'" onclick="BK_RS=\''+o[0]+'\';draw()" style="border:2px solid '+(on?'#1d4ed8':'#cbd5e1')+';border-radius:8px;padding:5px 11px;font-size:13.5px;font-weight:800;cursor:pointer;background:'+(on?'#1d4ed8':'#fff')+';color:'+(on?'#fff':'#0f172a')+'">'+o[1]+'</button>'; }).join('')+(true?'<label style="display:flex;gap:5px;align-items:center;font-weight:800;margin-left:6px;background:#fff;border:2px solid #7c3aed;border-radius:8px;padding:4px 10px;cursor:pointer"><input type="checkbox" '+(BK_MERGE?'checked':'')+' onchange="BK_MERGE=this.checked;draw()" style="width:17px;height:17px"> 같은 '+(BK_RS==="date"?'날짜':(BK_RS==="acct"||BK_BIG?'계정과목':'대분류'))+' 칸 병합'+((BK_RS==="month"||BK_RS==="yoy")?' <span style="font-size:11px;font-weight:600;color:#64748b">(이 모양은 합칠 칸 없음)</span>':'')+'</label>':'')+'<span style="font-size:12px;color:#64748b">'+esc((BK_RS_LIST.filter(function(o){ return o[0]===BK_RS; })[0]||[])[2]||'')+'</span></div>';
 }
 // 대분류(또는 대분류 하나 골랐으면 계정과목) → {이름:{t, list}}
 function _bkRsGroups(G, byMid){
@@ -14137,7 +14137,8 @@ function _bkRepBody(R,A,an,S){
     [["수입",R.inc,R.incT,"inA","입금액"],["지출",R.exp,R.expT,"out","지출액"]].forEach(function(x){
       var L=allOf(x[1]);
       h+='<div style="display:flex;justify-content:space-between;font-weight:900;margin:16px 0 4px"><span>■ '+x[0]+' ('+L.length+'건)</span><span>'+x[0]+'합계 '+fm(x[2])+'원</span></div><table style="border-collapse:collapse;width:100%;font-size:12.5px"><tr><th style="'+th+'">'+x[0]+'일자</th>'+(multi?'<th style="'+th+'">통장</th>':'')+'<th style="'+th+'">대분류</th><th style="'+th+'">계정과목</th><th style="'+th+'">거래처</th><th style="'+th+'">내용</th><th style="'+th+'">'+x[4]+'</th><th style="'+th+'">비고</th></tr>';
-      L.forEach(function(t){ h+='<tr><td style="'+td+';white-space:nowrap">'+dk(t.dt)+'</td>'+(multi?'<td style="'+td+'">'+esc(an[t._a]||'')+'</td>':'')+'<td style="'+td+'">'+esc(t.big||'❓')+'</td><td style="'+td+'">'+esc(t.mid||'')+'</td><td style="'+td+'">'+esc(t.vendor||t.nm||'')+'</td><td style="'+td+'">'+esc(t.desc||(t.vendor?t.nm:'')||'')+'</td><td style="'+n+'">'+fm(t[x[3]])+'</td><td style="'+td+'">'+esc(t.memo||'')+'</td></tr>'; });
+      var runN={}; L.forEach(function(t,i){ var d=String(t.dt).slice(0,10); if(i&&String(L[i-1].dt).slice(0,10)===d) runN[i]=0; else { var c=1; while(i+c<L.length&&String(L[i+c].dt).slice(0,10)===d) c++; runN[i]=c; } });
+      L.forEach(function(t,i){ h+='<tr>'+(BK_MERGE?(runN[i]?'<td rowspan="'+runN[i]+'" style="'+td+';white-space:nowrap;vertical-align:middle;text-align:center;background:#f8fafc">'+dk(t.dt)+'</td>':''):'<td style="'+td+';white-space:nowrap">'+dk(t.dt)+'</td>')+(multi?'<td style="'+td+'">'+esc(an[t._a]||'')+'</td>':'')+'<td style="'+td+'">'+esc(t.big||'❓')+'</td><td style="'+td+'">'+esc(t.mid||'')+'</td><td style="'+td+'">'+esc(t.vendor||t.nm||'')+'</td><td style="'+td+'">'+esc(t.desc||(t.vendor?t.nm:'')||'')+'</td><td style="'+n+'">'+fm(t[x[3]])+'</td><td style="'+td+'">'+esc(t.memo||'')+'</td></tr>'; });
       if(!L.length) h+='<tr><td style="'+td+';color:#94a3b8" colspan="8">없음</td></tr>';
       h+='<tr style="font-weight:900;background:#f1f5f9"><td style="'+td+';text-align:center" colspan="'+(multi?6:5)+'">'+x[0]+' 합계</td><td style="'+n+'">'+fm(x[2])+'</td><td style="'+td+'"></td></tr></table>';
     });
@@ -14325,10 +14326,20 @@ function _bkReportHtml(){
     out.sort(function(a,b){ return b.t-a.t; }); out.forEach(function(g){ g.list.sort(function(a,b){ return String(a.dt).localeCompare(String(b.dt))||(a.seq||0)-(b.seq||0); }); }); return out; };
   var lv=BK_BIG?"계정과목":"대분류";
   var share=function(title,G,tot){
-    var gs=groups(G), s='<div style="font-weight:900;margin:14px 0 4px">▣ '+title+' '+lv+'별</div><table style="border-collapse:collapse;width:100%;font-size:13.5px"><tr><th style="'+th+'">'+lv+'</th><th style="'+th+'">'+title+'금액</th><th style="'+th+'">비중</th></tr>';
-    gs.forEach(function(g){ s+='<tr><td style="'+td+'">'+esc(g.nm)+'</td><td style="'+n+'">'+fm(g.t)+'</td><td style="'+n+'">'+(tot?(Math.round(g.t/tot*1000)/10).toFixed(1):'0.0')+'%</td></tr>'; });
-    if(!gs.length) s+='<tr><td style="'+td+';color:#94a3b8" colspan="3">없음</td></tr>';
-    return s+'<tr style="font-weight:900;background:#f1f5f9"><td style="'+td+';text-align:center">합  계</td><td style="'+n+'">'+fm(tot)+'</td><td style="'+n+'">'+(tot?'100.0%':'')+'</td></tr>'+'</table>';
+    var pc=function(v){ return tot?(Math.round(v/tot*1000)/10).toFixed(1)+'%':'0.0%'; };
+    if(BK_BIG){
+      var gs=groups(G), s='<div style="font-weight:900;margin:14px 0 4px">▣ '+title+' 계정과목별</div><table style="border-collapse:collapse;width:100%;font-size:13.5px"><tr><th style="'+th+'">계정과목</th><th style="'+th+'">'+title+'금액</th><th style="'+th+'">비중</th></tr>';
+      gs.forEach(function(g){ s+='<tr><td style="'+td+'">'+esc(g.nm)+'</td><td style="'+n+'">'+fm(g.t)+'</td><td style="'+n+'">'+pc(g.t)+'</td></tr>'; });
+      if(!gs.length) s+='<tr><td style="'+td+';color:#94a3b8" colspan="3">없음</td></tr>';
+      return s+'<tr style="font-weight:900;background:#f1f5f9"><td style="'+td+';text-align:center">합  계</td><td style="'+n+'">'+fm(tot)+'</td><td style="'+n+'">'+(tot?'100.0%':'')+'</td></tr></table>';
+    }
+    var BL=Object.keys(G).sort(function(a,b){ return G[b]._t-G[a]._t; });
+    var s='<div style="font-weight:900;margin:14px 0 4px">▣ '+title+' 대분류별</div><table style="border-collapse:collapse;width:100%;font-size:13.5px"><tr><th style="'+th+'">대분류</th><th style="'+th+'">계정과목</th><th style="'+th+'">'+title+'금액</th><th style="'+th+'">비중</th></tr>';
+    BL.forEach(function(b){ var B=G[b], ML=Object.keys(B.mids).sort(function(x,y){ return B.mids[y]._t-B.mids[x]._t; });
+      ML.forEach(function(m,j){ s+='<tr>'+(BK_MERGE?(j===0?'<td rowspan="'+(ML.length+1)+'" style="'+td+';font-weight:900;vertical-align:middle;text-align:center;background:#f8fafc">'+esc(b)+'</td>':''):'<td style="'+td+'">'+esc(b)+'</td>')+'<td style="'+td+'">'+esc(m)+'</td><td style="'+n+'">'+fm(B.mids[m]._t)+'</td><td style="'+n+';color:#475569">'+pc(B.mids[m]._t)+'</td></tr>'; });
+      s+='<tr style="font-weight:800;background:#f1f5f9">'+(BK_MERGE?'':'<td style="'+td+'">'+esc(b)+'</td>')+'<td style="'+td+';text-align:center">소계</td><td style="'+n+'">'+fm(B._t)+'</td><td style="'+n+'">'+pc(B._t)+'</td></tr>'; });
+    if(!BL.length) s+='<tr><td style="'+td+';color:#94a3b8" colspan="4">없음</td></tr>';
+    return s+'<tr style="font-weight:900;background:#e2e8f0"><td style="'+td+';text-align:center" colspan="2">합  계</td><td style="'+n+'">'+fm(tot)+'</td><td style="'+n+'">'+(tot?'100.0%':'')+'</td></tr></table>';
   };
   h+=share("수입",R.inc,R.incT)+share("지출",R.exp,R.expT);
   if(BK_DET){
