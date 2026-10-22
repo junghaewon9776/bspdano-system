@@ -14239,6 +14239,51 @@ function dBank(){
   return h+_bkCatDL()+'</div>';
 }
 
+// 통장 화면 거르기 (연도·필터·검색) — 최근이 위
+function _bkAcctFilter(L){
+  var q=String(BK_Q||"").replace(/[\s,]/g,"").toLowerCase();
+  return L.slice().reverse().filter(function(t){
+    if(BK_Y && String(t.dt).slice(0,4)!==BK_Y) return false;
+    if(BK_F==="in"&&!(Number(t.inA)>0)) return false; if(BK_F==="out"&&!(Number(t.out)>0)) return false;
+    if(BK_F==="none"&&t.big) return false; if(BK_F==="noev"&&!(Number(t.out)>0 && !(t.ev||[]).length && !_bkSkip(t.big))) return false; if(BK_F==="warn"&&!t._warn) return false;
+    if(q){ var hay=[t.dt,t.nm,t.desc,t.vendor,t.memo,t.big,t.mid,t.inA,t.out].join("|").replace(/[\s,]/g,"").toLowerCase(); if(hay.indexOf(q)<0) return false; }
+    return true; });
+}
+// 📗 엑셀 내보내기 — ID 칸을 붙여서, 고친 뒤 ⬆ 가져오기 하면 그 거래가 고쳐짐
+var BK_ID_HDR="ID (고치지 마세요)";
+async function _bkXlsxOut(ak){
+  var a=_bkAcct(ak), V=_bkAcctFilter(_bkTxList(ak)).reverse(); if(!V.length){ toast("내보낼 거래가 없어요",true); return; }
+  showLoading("엑셀 만드는 중...");
+  var EJ; try{ EJ=await _loadExcelJS(); }catch(e){ hideLoading(); toast(e.message,true); return; }
+  var wb=new EJ.Workbook(), ws=wb.addWorksheet("거래내역",{views:[{state:"frozen",ySplit:1,xSplit:2}]});
+  var H=[BK_ID_HDR,"날짜","적요","입금액","출금액","누적(참고)","거래처","내용","대분류","계정과목","메모"];
+  ws.columns=[{width:14},{width:12},{width:22},{width:12},{width:12},{width:13},{width:16},{width:26},{width:16},{width:18},{width:18}];
+  var hr=ws.addRow(H); hr.height=20;
+  hr.eachCell(function(c,ci){ c.font={bold:true,color:{argb:"FFFFFFFF"}}; c.fill={type:"pattern",pattern:"solid",fgColor:{argb:ci===1?"FF64748B":(ci>=9&&ci<=10?"FF0F766E":"FF1E293B")}}; c.alignment={horizontal:"center",vertical:"middle"}; });
+  V.forEach(function(t){
+    var r=ws.addRow([t._k, String(t.dt).slice(0,10), t.nm||"", Number(t.inA)||null, Number(t.out)||null, t._run, t.vendor||"", t.desc||"", t._auto?"":(t.big||""), t._auto?"":(t.mid||""), t.memo||""]);
+    r.getCell(1).font={color:{argb:"FF94A3B8"},size:9};
+    [4,5,6].forEach(function(ci){ r.getCell(ci).numFmt='#,##0'; });
+    r.getCell(4).font={color:{argb:"FF166534"},bold:true}; r.getCell(5).font={color:{argb:"FFB91C1C"},bold:true}; r.getCell(6).font={color:{argb:"FF94A3B8"}};
+    if(!t.big&&!t._auto){ [9,10].forEach(function(ci){ r.getCell(ci).fill={type:"pattern",pattern:"solid",fgColor:{argb:"FFFEF3C7"}}; }); }
+  });
+  // 분류 목록 시트 + 고르기 칸
+  var C=_bkCatList(), cs=wb.addWorksheet("분류목록"), mids=[];
+  cs.columns=[{header:"대분류",width:18},{header:"계정과목 (전체)",width:22},{header:"대분류 › 계정과목",width:34}];
+  C.forEach(function(c){ c.mids.forEach(function(m){ if(mids.indexOf(m)<0) mids.push(m); }); });
+  var n=Math.max(C.length,mids.length), pairs=[]; C.forEach(function(c){ if(!c.mids.length) pairs.push(c.big); c.mids.forEach(function(m){ pairs.push(c.big+" › "+m); }); });
+  for(var i=0;i<Math.max(n,pairs.length);i++) cs.addRow([C[i]?C[i].big:null, mids[i]||null, pairs[i]||null]);
+  cs.getRow(1).font={bold:true};
+  var last=V.length+1;
+  for(var r=2;r<=last;r++){
+    ws.getCell(r,9).dataValidation={type:"list",allowBlank:true,formulae:["분류목록!$A$2:$A$"+(C.length+1)],showErrorMessage:false};
+    if(mids.length) ws.getCell(r,10).dataValidation={type:"list",allowBlank:true,formulae:["분류목록!$B$2:$B$"+(mids.length+1)],showErrorMessage:false};
+  }
+  var buf=await wb.xlsx.writeBuffer(), el=document.createElement("a");
+  el.href=URL.createObjectURL(new Blob([buf],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"})); el.download=String(a.nm).replace(/[\\\/:*?"<>|]/g,"")+"_거래내역"+(BK_Y?"_"+BK_Y:"")+"_"+today().replace(/-/g,"")+".xlsx";
+  document.body.appendChild(el); el.click(); setTimeout(function(){ URL.revokeObjectURL(el.href); el.remove(); },3000);
+  hideLoading(); toast("📗 "+V.length+"건 내보냈어요 — 대분류·계정과목을 채우고 ⬆ 엑셀 가져오기로 올리면 그대로 고쳐져요");
+}
 // ── 통장 하나 ──
 function _bkAcctView(ak){
   var a=_bkAcct(ak), L=_bkTxList(ak), B=_bkBal(L), h='';
@@ -14246,9 +14291,10 @@ function _bkAcctView(ak){
   h+='<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px"><div style="flex:1;font-size:14px;color:#334155"><b style="font-size:16px">'+esc(a.nm)+'</b> '+esc(a.no||'')+'</div>';
   h+='<button class="btn btn-s" style="background:#1d4ed8;color:#fff;font-weight:900" onclick="_bkReg(\''+ak+'\')">＋ 거래 등록</button>';
   h+='<button class="btn btn-s" style="background:#b45309;color:#fff;font-weight:800" onclick="_bkEvPrintAsk(\''+ak+'\')" title="위 연도 거르기 그대로">📎 증빙 출력</button>';
+  h+='<button class="btn btn-s" style="background:#15803d;color:#fff;font-weight:800" onclick="_bkXlsxOut(\''+ak+'\')" title="지금 보이는 거래(연도·필터·검색 그대로) — 분류 채워서 다시 가져오기">📗 엑셀 내보내기</button>';
+  h+='<button class="btn btn-s" style="background:#ea580c;color:#fff;font-weight:800" onclick="_bkImportPick(\''+ak+'\')">⬆ 엑셀 가져오기</button>';
   if(a.fee) h+='<button class="btn btn-s" style="background:#0f766e;color:#fff;font-weight:800" onclick="CTAB=\'fee\';FB_TAB=\'tx\';draw()">💵 회비 탭에서 입력하기</button>';
   else {
-    h+='<button class="btn btn-s" style="background:#ea580c;color:#fff;font-weight:800" onclick="_bkImportPick(\''+ak+'\')">⬆ 엑셀 가져오기</button>';
     h+='<button class="btn btn-s" style="background:#7c3aed;color:#fff;font-weight:700" onclick="_bkTmpl()" title="이 양식에 붙여넣어 올려도 되고, 은행 엑셀을 그대로 올려 칸만 맞춰도 돼요">📋 양식 받기</button>';
     h+='<button class="btn btn-s" style="background:#475569;color:#fff;font-weight:700" onclick="_bkAcctEdit(\''+ak+'\')">⚙ 통장 이름·번호</button>';
   }
@@ -14272,13 +14318,7 @@ function _bkAcctView(ak){
   h+='<select onchange="BK_Y=this.value;draw()" style="padding:7px;font-size:14px;font-weight:700;border:2px solid #cbd5e1;border-radius:8px"><option value="">전체 기간</option>'+ys.map(function(y){ return '<option value="'+y+'"'+(BK_Y===y?' selected':'')+'>'+y+'년</option>'; }).join('')+'</select>';
   h+='<input type="search" id="bkQ" value="'+esc(BK_Q)+'" placeholder="🔍 적요·내용·분류·금액" oninput="_bkQIn(this)" oncompositionstart="_bkQC=true" oncompositionend="_bkQC=false;_bkQIn(this)" autocomplete="off" style="flex:1 1 200px;max-width:320px;padding:8px 10px;font-size:14px;border:2px solid '+(BK_Q?'#0f766e':'#cbd5e1')+';border-radius:8px">';
   h+=fb("all","전체")+fb("in","입금")+fb("out","출금")+fb("none","❓ 분류 안 한 것 "+nNone)+fb("noev","📎 증빙 없는 출금 "+nNoEv)+(nWarn?fb("warn","⚠ 잔액 안 맞는 줄 "+nWarn):'')+'</div>';
-  var q=String(BK_Q||"").replace(/[\s,]/g,"").toLowerCase();
-  var V=L.slice().reverse().filter(function(t){
-    if(BK_Y && String(t.dt).slice(0,4)!==BK_Y) return false;
-    if(BK_F==="in"&&!(Number(t.inA)>0)) return false; if(BK_F==="out"&&!(Number(t.out)>0)) return false;
-    if(BK_F==="none"&&t.big) return false; if(BK_F==="noev"&&!(Number(t.out)>0 && !(t.ev||[]).length && !_bkSkip(t.big))) return false; if(BK_F==="warn"&&!t._warn) return false;
-    if(q){ var hay=[t.dt,t.nm,t.desc,t.vendor,t.memo,t.big,t.mid,t.inA,t.out].join("|").replace(/[\s,]/g,"").toLowerCase(); if(hay.indexOf(q)<0) return false; }
-    return true; });
+  var V=_bkAcctFilter(L);
   var sameDay={}; L.forEach(function(t){ var d=String(t.dt).slice(0,10); sameDay[d]=(sameDay[d]||0)+1; });
   h+='<div style="overflow-x:auto;max-height:65vh;overflow-y:auto"><table style="width:100%;border-collapse:collapse;font-size:14px;min-width:900px"><thead style="position:sticky;top:0;z-index:1"><tr style="background:#1e293b;color:#fff"><th style="padding:7px">날짜</th><th style="padding:7px;text-align:left">적요 / 내용</th><th style="padding:7px;text-align:right">입금</th><th style="padding:7px;text-align:right">출금</th><th style="padding:7px;text-align:right">잔액</th><th style="padding:7px;text-align:left">대분류 › 계정과목</th><th></th></tr></thead><tbody>';
   V.slice(0,500).forEach(function(t){
@@ -14354,8 +14394,8 @@ function _bkImportPick(ak){
 function _bkClean(v){ var s=String(v==null?"":v).trim(); return /^#(N\/A|REF!|VALUE!|NAME\?|DIV\/0!)$/.test(s)?"":s; }
 function _bkNum(v){ if(v==null||v==="") return 0; var n=Number(String(v).replace(/,/g,"")); return isNaN(n)?0:n; }
 // 칸 맞추기 — 은행마다 다른 엑셀 머리줄을 날짜·적요·입금·출금… 에 짝짓기 (통장마다 기억: accts/k/map)
-var BK_FIELDS=[["dt","날짜",1],["nm","적요 (통장에 찍힌 글자)"],["inA","입금액"],["out","출금액"],["amt","금액 — 입출금이 한 칸일 때"],["io","입출 구분 — 금액 한 칸일 때"],["bal","잔액"],["vendor","거래처"],["desc","내용"],["big","대분류"],["mid","계정과목"],["memo","메모·비고"]];
-var BK_GUESS={dt:[/^거래일자$/,/거래일/,/일자|날짜|일시/],nm:[/^적요/,/기재내용/,/입금자|받는분|의뢰인|보낸분|거래내용/],inA:[/입금액/,/^입금/,/맡기신/],out:[/출금액/,/^출금/,/찾으신/,/지급액/],amt:[/^거래금액$/,/^금액$/],io:[/^구분$/,/입출.*구분|거래구분/],bal:[/잔액/],vendor:[/거래처|상대/],desc:[/^내용$/],big:[/대분류/],mid:[/계정과목/,/중분류/],memo:[/비고|메모/]};
+var BK_FIELDS=[["id","ID — 내보낸 엑셀이면 (그 거래를 고쳐요)"],["dt","날짜",1],["nm","적요 (통장에 찍힌 글자)"],["inA","입금액"],["out","출금액"],["amt","금액 — 입출금이 한 칸일 때"],["io","입출 구분 — 금액 한 칸일 때"],["bal","잔액"],["vendor","거래처"],["desc","내용"],["big","대분류"],["mid","계정과목"],["memo","메모·비고"]];
+var BK_GUESS={id:[/고치지 마세요/,/^ID$/],dt:[/^거래일자$/,/거래일/,/일자|날짜|일시/],nm:[/^적요/,/기재내용/,/입금자|받는분|의뢰인|보낸분|거래내용/],inA:[/입금액/,/^입금/,/맡기신/],out:[/출금액/,/^출금/,/찾으신/,/지급액/],amt:[/^거래금액$/,/^금액$/],io:[/^구분$/,/입출.*구분|거래구분/],bal:[/잔액/],vendor:[/거래처|상대/],desc:[/^내용$/],big:[/대분류/],mid:[/계정과목/,/중분류/],memo:[/비고|메모/]};
 function _bkHdrRow(R){
   var best=-1, bs=1;
   for(var i=0;i<Math.min(R.length,40);i++){ var sc=0, row=R[i]||[];
@@ -14384,10 +14424,10 @@ function _bkMapRows(){
     var bal=cell(x,"bal"); bal=(bal===null||bal===""||isNaN(Number(String(bal).replace(/,/g,""))))?null:Number(String(bal).replace(/,/g,""));
     var nm=g(x,"nm"), big=g(x,"big"), mid=g(x,"mid");
     if(/^이월/.test(nm)||/^이월/.test(big)) big=BK_CARRY;
-    tx.push({dt:dt,nm:nm,inA:inA,out:out,bal:bal,vendor:g(x,"vendor"),desc:g(x,"desc"),big:big||null,mid:mid||null,memo:g(x,"memo"),seq:r});
+    tx.push({_id:g(x,"id"),dt:dt,nm:nm,inA:inA,out:out,bal:bal,vendor:g(x,"vendor"),desc:g(x,"desc"),big:big||null,mid:mid||null,memo:g(x,"memo"),seq:r});
   }
   // 은행 엑셀이 최근 거래부터 적혀 있으면 오래된 순으로 뒤집기
-  if(tx.length>1 && tx[0].dt>tx[tx.length-1].dt){ tx.reverse(); tx.forEach(function(t,i){ t.seq=i; }); }
+  if(tx.length>1 && tx[0].dt>tx[tx.length-1].dt && !tx[0]._id){ tx.reverse(); tx.forEach(function(t,i){ t.seq=i; }); }
   return tx;
 }
 function _bkMapSheet(name){
@@ -14438,17 +14478,27 @@ function _bkMapGo(){
   var M=window._BKM, ak=M.ak, tx=_bkMapRows(); if(!tx.length) return;
   var saved={}; Object.keys(M.map).forEach(function(f){ if(M.map[f]!=null&&M.H[M.map[f]]) saved[f]=M.H[M.map[f]]; });
   closePopup2();
+  var cur={}; _bkTxList(ak).forEach(function(t){ cur[t._k]=t; });
+  // ID 있는 줄 = 그 거래 고치기 (바뀐 칸만)
+  var F=["dt","nm","inA","out","vendor","desc","big","mid","memo"].filter(function(f){ return f==="inA"||f==="out" ? (M.map.inA!=null||M.map.out!=null||M.map.amt!=null) : M.map[f]!=null; });
+  var edits={}, nEdit=0, nCat=0, rest=[];
+  tx.forEach(function(t){
+    var o=t._id&&cur[t._id]; if(!o){ rest.push(t); return; }
+    var ch=0; F.forEach(function(f){ var nv=t[f], ov=o._auto&&(f==="big"||f==="mid")?null:o[f];
+      if(f==="inA"||f==="out"){ nv=Number(nv)||0; ov=Number(ov)||0; } else { nv=(nv==null?"":String(nv).trim()); ov=(ov==null?"":String(ov).trim()); }
+      if(nv!==ov){ edits[t._id+'/'+f]=(nv===""?null:nv); ch++; if(f==="big"||f==="mid") nCat++; } });
+    if(ch) nEdit++;
+  });
   var key=function(t){ return [t.dt,_fbNm(t.nm),Number(t.inA)||0,Number(t.out)||0].join("|"); };
   var have={}; _bkTxList(ak).forEach(function(t){ have[key(t)]=(have[key(t)]||0)+1; });
-  var seen={}, newTx=tx.filter(function(t){ var kk=key(t); seen[kk]=(seen[kk]||0)+1; return seen[kk]>(have[kk]||0); });   // 같은 날 같은 금액 여러 건도 개수로 비교
-  var nCat=newTx.filter(function(t){ return t.big; }).length;
-  if(!newTx.length){ _bkRef('accts/'+ak+'/map').set(saved); alert("새 거래가 없어요 — 이미 다 들어가 있어요"); return; }
-  if(!confirm("📥 「"+_bkAcct(ak).nm+"」에 가져올까요?\n\n• 엑셀 거래 "+tx.length+"건 중 새 거래 "+newTx.length+"건 (이미 있는 건 건너뜀)\n• 대분류 붙은 거래 "+nCat+"건")) return;
+  var seen={}, newTx=rest.filter(function(t){ var kk=key(t); seen[kk]=(seen[kk]||0)+1; return seen[kk]>(have[kk]||0); });   // 같은 날 같은 금액 여러 건도 개수로 비교
+  var root=_bkTxRoot(ak), keepMap=function(){ if(ak!==BK_FEE) _bkRef('accts/'+ak+'/map').set(saved); };
+  if(!newTx.length && !nEdit){ keepMap(); alert("바뀐 것도 새 거래도 없어요 — 이미 다 들어가 있어요"); return; }
+  if(!confirm("📥 「"+_bkAcct(ak).nm+"」에 반영할까요?\n\n"+(nEdit?"• 고칠 거래 "+nEdit+"건 (분류 바뀐 칸 "+nCat+"개)\n":"")+(newTx.length?"• 새 거래 "+newTx.length+"건\n":"")+"• 엑셀 "+tx.length+"줄 중 그대로인 줄은 건너뜀")) return;
   showLoading("저장 중...");
-  var upd={}, base=Date.now();
-  newTx.forEach(function(t,i){ t.seq=base+i; upd['tx/'+ak+'/'+_bkRef('tx/'+ak).push().key]=t; });
-  upd['accts/'+ak+'/map']=saved;
-  _bkRef().update(upd).then(function(){ hideLoading(); toast("✓ 거래 "+newTx.length+"건 들어갔어요"); BK_F="all"; draw(); })
+  var upd=edits, base=Date.now();
+  newTx.forEach(function(t,i){ delete t._id; t.seq=base+i; upd[root.push().key]=t; });
+  root.update(upd).then(function(){ keepMap(); hideLoading(); toast("✓ "+(nEdit?"고침 "+nEdit+"건":"")+(nEdit&&newTx.length?" · ":"")+(newTx.length?"새 거래 "+newTx.length+"건":"")); BK_F="all"; draw(); })
     .catch(function(e){ hideLoading(); alert("저장 실패: "+(e.message||e)); });
 }
 // 📋 입출금 양식 — 이 칸 그대로 붙여넣고 ⬆ 엑셀 가져오기
