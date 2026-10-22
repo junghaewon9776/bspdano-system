@@ -13721,7 +13721,7 @@ function _fbImport(wb){
 // ===== 🏦 입출금 — 통장마다 따로 입력, 결산은 합쳐서 =====
 //   /main/Bank = { accts:{k:{nm,no,ord}}, tx:{acctK:{k:{dt,nm,inA,out,bal,vendor,desc,big,mid,memo,seq}}} }
 //   회비통장은 /main/FeeBank/tx 를 그대로 읽음(입력은 회비 탭) — 여기선 대분류·계정과목만 붙임
-//   대분류 「통장간 이체」·「이월」은 수입·지출 합계에서 뺌
+//   대분류 「이월」은 수입·지출 합계에서 뺌 (「통장간 이체」는 통장간 입금·지출로 그대로 들어감)
 var BK={loaded:false,accts:{},tx:{}}, BK_ACC="", BK_Y="", BK_F="all", BK_Q="", _bkQT=null, _bkQC=false, BK_SEL=null, BK_FROM="", BK_TO="", BK_SV="dash", BK_DET=true, BK_AF="", BK_AT="", BK_M=0;   // BK_M: 통장 화면 월 (0=전체)
 var BK_PICK={};   // 증빙 출력용으로 고른 거래 {"통장|거래키":1}
 var BK_XIN="통장간 입금", BK_XOUT="통장간 지출";
@@ -13886,7 +13886,7 @@ function _bkCatMgr(){
   L.forEach(function(c,i){
     var fixed=_bkSkip(c.big);
     h+='<div style="border:1px solid #cbd5e1;border-radius:8px;padding:8px 10px;margin-bottom:8px;background:'+(fixed?'#f1f5f9':'#fff')+'">';
-    h+='<div style="display:flex;align-items:center;gap:6px"><b style="font-size:15px;flex:1">'+esc(c.big)+' <span style="font-size:12px;color:#64748b;font-weight:600">거래 '+(bigN[c.big]||0)+'건</span>'+(fixed?' <span style="font-size:11.5px;color:#4338ca">(결산 수입·지출에서 빠지는 고정 분류)</span>':'')+'</b>';
+    h+='<div style="display:flex;align-items:center;gap:6px"><b style="font-size:15px;flex:1">'+esc(c.big)+' <span style="font-size:12px;color:#64748b;font-weight:600">거래 '+(bigN[c.big]||0)+'건</span>'+(fixed?' <span style="font-size:11.5px;color:#4338ca">(고정 분류)</span>':'')+'</b>';
     if(!fixed) h+='<button class="btn btn-s" style="background:#475569;color:#fff" onclick="_bkCMRen('+i+')">✎ 이름</button><button class="btn btn-s" style="background:#dc2626;color:#fff" onclick="_bkCMDel('+i+')">🗑</button>';
     h+='</div>';
     if(!fixed){
@@ -14027,7 +14027,7 @@ function _bkSumCalc(rgOv){
       if(to && d10>to) return;
       P.close+=d;
       if(t.big===BK_CARRY){ P.open+=d; P.close-=d; return; }
-      if(t.big===BK_XFER){ P.xin+=Number(t.inA)||0; P.xout+=Number(t.out)||0; R.xfer.push(t); return; }
+      if(t.big===BK_XFER){ P.xin+=Number(t.inA)||0; P.xout+=Number(t.out)||0; R.xfer.push(t); }   // 수입·지출에도 그대로 들어감 (통장간 입금·지출)
       var b=t.big||"❓ 분류 안 함", m=t.mid||"(계정과목 없음)";
       R.bigs[b]=(R.bigs[b]||0)+(Number(t.inA)||0)+(Number(t.out)||0);
       if(BK_BIG && b!==BK_BIG) return;
@@ -14077,7 +14077,7 @@ function _bkSumView(){
   h+=_bkMonthTable(R);
   if(!BK_BIG){
     var th='padding:7px 8px;text-align:right', td='padding:6px 8px;text-align:right';
-    h+='<div style="font-weight:900;font-size:15px;margin:16px 0 6px">🏦 통장별</div><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:14px;min-width:720px"><thead><tr style="background:#1e293b;color:#fff"><th style="padding:7px 8px;text-align:left">통장</th><th style="'+th+'">이월 잔액</th><th style="'+th+'">수입</th><th style="'+th+'">지출</th><th style="'+th+'">이체 들어옴</th><th style="'+th+'">이체 나감</th><th style="'+th+'">잔액</th></tr></thead><tbody>';
+    h+='<div style="font-weight:900;font-size:15px;margin:16px 0 6px">🏦 통장별</div><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:14px;min-width:720px"><thead><tr style="background:#1e293b;color:#fff"><th style="padding:7px 8px;text-align:left">통장</th><th style="'+th+'">이월 잔액</th><th style="'+th+'">수입</th><th style="'+th+'">지출</th><th style="'+th+'">이체 들어옴 (수입에 포함)</th><th style="'+th+'">이체 나감 (지출에 포함)</th><th style="'+th+'">잔액</th></tr></thead><tbody>';
     var T={open:0,inc:0,exp:0,xin:0,xout:0,close:0};
     A.forEach(function(a){ var P=R.per[a._k]; Object.keys(T).forEach(function(k){ T[k]+=P[k]; });
       h+='<tr style="border-bottom:1px solid #e2e8f0"><td style="padding:6px 8px;font-weight:800">'+esc(a.nm)+'</td><td style="'+td+'">'+fm(P.open)+'</td><td style="'+td+';color:#166534;font-weight:700">'+fm(P.inc)+'</td><td style="'+td+';color:#b91c1c;font-weight:700">'+fm(P.exp)+'</td><td style="'+td+';color:#4338ca">'+(P.xin?fm(P.xin):'-')+'</td><td style="'+td+';color:#4338ca">'+(P.xout?fm(P.xout):'-')+'</td><td style="'+td+';font-weight:900">'+fm(P.close)+'</td></tr>'; });
@@ -14086,7 +14086,7 @@ function _bkSumView(){
   }
   h+=_bkCatTable("💵 수입", R.inc, R.incT, A, "#166534", "inc");
   h+=_bkCatTable("💸 지출", R.exp, R.expT, A, "#b91c1c", "exp");
-  h+='<div style="font-size:12.5px;color:#64748b;margin-top:10px">「'+BK_XFER+'」은 수입·지출에서 빼고 통장별 표에만 보여요. 「'+BK_CARRY+'」(처음 잔액)은 이월 잔액에 들어가요. 금액을 누르면 거래 목록이 떠요.</div>';
+  h+='<div style="font-size:12.5px;color:#64748b;margin-top:10px">「'+BK_XFER+'」도 수입·지출에 들어가요 (통장간 입금·통장간 지출로 같은 금액이 보여요). 「'+BK_CARRY+'」(처음 잔액)은 이월 잔액에 들어가요. 금액을 누르면 거래 목록이 떠요.</div>';
   return h;
 }
 // 엑셀 대시보드처럼: 대분류별 지출·수입 막대, 상위 10개 지출, 최근 거래
@@ -14158,10 +14158,6 @@ function _bkRepBody(R,A,an,S){
     });
     if(!BL.length) h+='<tr><td style="'+td+';color:#94a3b8" colspan="5">없음</td></tr>';
     h+='<tr style="font-weight:900;background:#dbeafe"><td style="'+td+';text-align:center" colspan="2">합  계</td><td style="'+n+'">'+fm(R.incT)+'</td><td style="'+n+'">'+fm(R.expT)+'</td>'+dc(R.incT-R.expT)+'</tr>';
-    var XS=_bkXferSum(R), XM=Object.keys(XS.mids);
-    if(!BK_BIG && XM.length){
-      XM.forEach(function(m,i){ var v=XS.mids[m]; h+='<tr style="color:#4338ca;background:#eef2ff">'+(BK_MERGE?(i===0?'<td rowspan="'+XM.length+'" style="'+td+';font-weight:900;vertical-align:middle;text-align:center">'+BK_XFER+'<div style="font-size:11px;font-weight:600">(합계 제외)</div></td>':''):'<td style="'+td+';font-weight:700">'+BK_XFER+' (합계 제외)</td>')+'<td style="'+td+'">'+esc(m)+'</td><td style="'+n+'">'+(v.inA?fm(v.inA):'-')+'</td><td style="'+n+'">'+(v.out?fm(v.out):'-')+'</td><td style="'+n+';font-weight:800">'+fm(v.inA-v.out)+'</td></tr>'; });
-    }
     h+='</table>';
     if(BK_DET){
       var cols=multi?9:8;
@@ -14284,7 +14280,6 @@ async function _bkReportXlsx(){
   document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); },3000);
   hideLoading(); toast("📗 정산보고서 엑셀 받았어요");
 }
-function _bkXferSum(R){ var o={inA:0,out:0,mids:{}}; (R.xfer||[]).forEach(function(t){ var m=t.mid||(Number(t.inA)>0?BK_XIN:BK_XOUT), M=o.mids[m]=o.mids[m]||{inA:0,out:0}; M.inA+=Number(t.inA)||0; M.out+=Number(t.out)||0; o.inA+=Number(t.inA)||0; o.out+=Number(t.out)||0; }); return o; }
 function _bkReportHtml(){
   var R=_bkSumCalc(), A=R.accts, an={}; A.forEach(function(a){ an[a._k]=a.nm; });
   var open=0,close=0; A.forEach(function(a){ open+=R.per[a._k].open; close+=R.per[a._k].close; });
@@ -14293,12 +14288,11 @@ function _bkReportHtml(){
   var dk=function(d){ d=String(d).slice(0,10); return (+d.slice(5,7))+"월"+(+d.slice(8,10))+"일"; };
   var h='<div class="bkRep"><div style="text-align:center;font-size:22px;font-weight:900;margin-bottom:4px">'+esc(ttl)+'</div>';
   h+='<div style="text-align:center;font-size:12.5px;color:#334155;margin-bottom:12px">'+A.map(function(a){ return esc(a.no||a.nm); }).join(' · ')+'</div>';
-  var XI=0,XO=0; R.xfer.forEach(function(t){ XI+=Number(t.inA)||0; XO+=Number(t.out)||0; });
-  var sumRows=BK_BIG?[["총 입금액",R.incT],["총 지출액",R.expT],["차  액",R.incT-R.expT]]:[["이월액",open],["수입 합계",R.incT],["지출 합계",R.expT]].concat((XI||XO)?[["통장간 이체",XI-XO,(XI&&XO?"들어옴 "+fm(XI)+" · 나감 "+fm(XO):(XI?"다른 통장에서 들어옴":"다른 통장으로 나감"))]]:[]).concat([["잔  액",close]]);
+  var sumRows=BK_BIG?[["총 입금액",R.incT],["총 지출액",R.expT],["차  액",R.incT-R.expT]]:[["이월액",open],["수입 합계",R.incT],["지출 합계",R.expT]].concat([["잔  액",close]]);
   h+='<table style="border-collapse:collapse;width:100%;max-width:520px;margin:0 auto 14px;font-size:15px"><tr><th style="'+th+'">구  분</th><th style="'+th+'">금  액</th></tr>';
   sumRows.forEach(function(r,i){ var last=i===sumRows.length-1, xf=r[0]==="통장간 이체"; h+='<tr'+(last?' style="font-weight:900;background:#f1f5f9"':(xf?' style="background:#eef2ff"':''))+'><td style="'+td+';text-align:center;font-weight:700'+(xf?';color:#4338ca':'')+'">'+r[0]+(r[2]?'<div style="font-size:11px;font-weight:600;color:#4338ca">'+esc(r[2])+'</div>':'')+'</td><td style="'+n+';font-weight:800'+(xf?';color:#4338ca':'')+'">'+(xf&&r[1]>0?'+':'')+fm(r[1])+'원</td></tr>'; });
   h+='</table>';
-  if(!BK_BIG && Math.abs(open+R.incT-R.expT+XI-XO-close)>=1) h+='<div style="text-align:center;font-size:12px;color:#b45309;margin-bottom:10px">※ 이월액+수입−지출±이체와 잔액이 '+fm(close-(open+R.incT-R.expT+XI-XO))+'원 달라요 — 빠진 거래가 있는지 확인해 주세요</div>';
+  if(!BK_BIG && Math.abs(open+R.incT-R.expT-close)>=1) h+='<div style="text-align:center;font-size:12px;color:#b45309;margin-bottom:10px">※ 이월액+수입−지출과 잔액이 '+fm(close-(open+R.incT-R.expT))+'원 달라요 — 빠진 거래가 있는지 확인해 주세요</div>';
   if(!BK_BIG && A.length>1){
     h+='<div style="font-weight:900;margin:10px 0 4px">▣ 통장별</div><table style="border-collapse:collapse;width:100%;font-size:13px"><tr><th style="'+th+'">통장</th><th style="'+th+'">이월액</th><th style="'+th+'">수입</th><th style="'+th+'">지출</th><th style="'+th+'">통장간 이체</th><th style="'+th+'">잔액</th></tr>';
     A.forEach(function(a){ var P=R.per[a._k]; h+='<tr><td style="'+td+';font-weight:700">'+esc(a.nm)+'</td><td style="'+n+'">'+fm(P.open)+'</td><td style="'+n+'">'+fm(P.inc)+'</td><td style="'+n+'">'+fm(P.exp)+'</td><td style="'+n+'">'+(P.xin||P.xout?fm(P.xin-P.xout):'-')+'</td><td style="'+n+';font-weight:800">'+fm(P.close)+'</td></tr>'; });
@@ -14334,8 +14328,7 @@ function _bkReportHtml(){
     var gs=groups(G), s='<div style="font-weight:900;margin:14px 0 4px">▣ '+title+' '+lv+'별</div><table style="border-collapse:collapse;width:100%;font-size:13.5px"><tr><th style="'+th+'">'+lv+'</th><th style="'+th+'">'+title+'금액</th><th style="'+th+'">비중</th></tr>';
     gs.forEach(function(g){ s+='<tr><td style="'+td+'">'+esc(g.nm)+'</td><td style="'+n+'">'+fm(g.t)+'</td><td style="'+n+'">'+(tot?(Math.round(g.t/tot*1000)/10).toFixed(1):'0.0')+'%</td></tr>'; });
     if(!gs.length) s+='<tr><td style="'+td+';color:#94a3b8" colspan="3">없음</td></tr>';
-    var XS=_bkXferSum(R), xv=(title==="수입"?XS.inA:XS.out);
-    return s+'<tr style="font-weight:900;background:#f1f5f9"><td style="'+td+';text-align:center">합  계</td><td style="'+n+'">'+fm(tot)+'</td><td style="'+n+'">'+(tot?'100.0%':'')+'</td></tr>'+(!BK_BIG&&xv?'<tr style="color:#4338ca;background:#eef2ff"><td style="'+td+'">'+BK_XFER+' › '+(title==="수입"?BK_XIN:BK_XOUT)+' <span style="font-size:11px">(합계 제외)</span></td><td style="'+n+'">'+fm(xv)+'</td><td style="'+n+'"></td></tr>':'')+'</table>';
+    return s+'<tr style="font-weight:900;background:#f1f5f9"><td style="'+td+';text-align:center">합  계</td><td style="'+n+'">'+fm(tot)+'</td><td style="'+n+'">'+(tot?'100.0%':'')+'</td></tr>'+'</table>';
   };
   h+=share("수입",R.inc,R.incT)+share("지출",R.exp,R.expT);
   if(BK_DET){
@@ -14775,7 +14768,7 @@ function _bkSumRows(){
   A.forEach(function(a){ var P=R.per[a._k], v=[P.open,P.inc,P.exp,P.xin,P.xout,P.close]; v.forEach(function(x,i){ T[i]+=x; }); rows.push({k:"mid",v:[a.nm].concat(v)}); });
   rows.push({k:"tot",v:["합계"].concat(T)}); rows.push({k:"gap",v:[]});
   sec("수입",R.inc,R.incT); sec("지출",R.exp,R.expT);
-  return {rows:rows, title:"입출금 결산 ("+_bkPeriodLabel()+")", sub:"통장: "+A.map(function(a){return a.nm;}).join(", ")+" · 「"+BK_XFER+"」은 수입·지출에서 뺌 · 출력 "+today(), none:R.none.length};
+  return {rows:rows, title:"입출금 결산 ("+_bkPeriodLabel()+")", sub:"통장: "+A.map(function(a){return a.nm;}).join(", ")+" · 「"+BK_XFER+"」도 수입·지출에 포함 · 출력 "+today(), none:R.none.length};
 }
 function _bkSumPrint(){
   var D=_bkSumRows(), f=function(v){ return typeof v==="number"?fm(v):esc(v); };
