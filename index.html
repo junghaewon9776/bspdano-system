@@ -14285,8 +14285,11 @@ async function _bkReportXlsx(){
 var BK_SIGN=["재무국장","사무국장","감사","회장"], BK_SIGNON=true;
 function _bkSignBox(){
   if(!BK_SIGNON) return '';
-  var B='border:1px solid #000;padding:4px 6px;text-align:center';
-  return '<table style="border-collapse:collapse;margin-left:auto;margin-bottom:12px;font-size:13px"><tr>'+BK_SIGN.map(function(x){ return '<td style="'+B+';background:#f1f5f9;font-weight:700;width:70px">'+x+'</td>'; }).join('')+'</tr><tr>'+BK_SIGN.map(function(){ return '<td style="'+B+';height:46px"></td>'; }).join('')+'</tr></table>';
+  var bd='border:1.5px solid #111;text-align:center;vertical-align:middle;padding:0', W=26+BK_SIGN.length*84;
+  return '<div style="display:flex;justify-content:flex-end;margin:0 0 14px"><table style="border-collapse:collapse;table-layout:fixed;width:'+W+'px;min-width:'+W+'px;max-width:'+W+'px"><colgroup><col style="width:26px">'+BK_SIGN.map(function(){ return '<col style="width:84px">'; }).join('')+'</colgroup>'
+    +'<tr><td rowspan="2" style="'+bd+';font-size:13px;font-weight:800;line-height:1.6">결<br><br>재</td>'
+    +BK_SIGN.map(function(x){ return '<td style="'+bd+';height:28px;font-size:13px;font-weight:700;letter-spacing:1px;white-space:nowrap">'+x+'</td>'; }).join('')+'</tr><tr>'
+    +BK_SIGN.map(function(){ return '<td style="'+bd+';height:62px"></td>'; }).join('')+'</tr></table></div>';
 }
 function _bkGovHtml(){
   var R=_bkSumCalc(), A=R.accts, an={}; A.forEach(function(a){ an[a._k]=a.nm; });
