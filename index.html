@@ -14490,7 +14490,7 @@ function _bkReportHtml(){
   var td='border:1px solid #64748b;padding:4px 8px', n=td+';text-align:right', th='border:1px solid #64748b;padding:5px 8px;background:#e2e8f0';
   var dk=function(d){ d=String(d).slice(0,10); return (+d.slice(5,7))+"월"+(+d.slice(8,10))+"일"; };
   var h='<div class="bkRep">'+_bkSignBox()+'<div style="text-align:center;font-size:22px;font-weight:900;margin-bottom:4px">'+esc(ttl)+'</div>';
-  h+='<div style="text-align:center;font-size:12.5px;color:#334155;margin-bottom:12px">'+(A.length===_bkAccts().length&&A.length>1?'전체 통장 합계 — ':'')+A.map(function(a){ return esc(a.nm)+(a.no?' ('+esc(a.no)+')':''); }).join(' · ')+'</div>';
+  h+='<div style="text-align:center;font-size:12.5px;color:#334155;margin-bottom:12px">'+(A.length===1?esc(A[0].no||A[0].nm):(A.length===_bkAccts().length?'전체 통장 합계 — ':'')+A.map(function(a){ return esc(a.nm)+(a.no?' ('+esc(a.no)+')':''); }).join(' · '))+'</div>';
   var sumRows=BK_BIG?[["총 입금액",R.incT],["총 지출액",R.expT],["차  액",R.incT-R.expT]]:[["이월액",open],["수입 합계",R.incT],["지출 합계",R.expT]].concat([["잔  액",close]]);
   h+='<table style="border-collapse:collapse;width:100%;max-width:520px;margin:0 auto 14px;font-size:15px"><tr><th style="'+th+'">구  분</th><th style="'+th+'">금  액</th></tr>';
   sumRows.forEach(function(r,i){ var last=i===sumRows.length-1, xf=r[0]==="통장간 이체"; h+='<tr'+(last?' style="font-weight:900;background:#f1f5f9"':(xf?' style="background:#eef2ff"':''))+'><td style="'+td+';text-align:center;font-weight:700'+(xf?';color:#4338ca':'')+'">'+r[0]+(r[2]?'<div style="font-size:11px;font-weight:600;color:#4338ca">'+esc(r[2])+'</div>':'')+'</td><td style="'+n+';font-weight:800'+(xf?';color:#4338ca':'')+'">'+(xf&&r[1]>0?'+':'')+fm(r[1])+'원</td></tr>'; });
@@ -14721,20 +14721,20 @@ function _bkAcctView(ak){
   window._BK_VIS=V.slice(0,500).map(function(t){ return t._a+"|"+t._k; });
   var allOn=window._BK_VIS.length&&window._BK_VIS.every(function(pk){ return BK_PICK[pk]; });
   h+='<div id="bkPickBar" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;min-height:30px;margin-bottom:4px">'+_bkPickBarHtml()+'</div>';
-  h+='<div style="overflow-x:auto;max-height:65vh;overflow-y:auto"><table style="width:100%;border-collapse:collapse;font-size:14px;min-width:900px"><thead style="position:sticky;top:0;z-index:1"><tr style="background:#1e293b;color:#fff"><th style="padding:7px;width:30px"><input type="checkbox" title="보이는 거래 모두 고르기" '+(allOn?'checked':'')+' onchange="_bkPickAll(this.checked)" style="width:18px;height:18px"></th><th style="padding:7px">날짜</th><th style="padding:7px;text-align:left">적요 / 내용</th><th style="padding:7px;text-align:right">입금</th><th style="padding:7px;text-align:right">출금</th><th style="padding:7px;text-align:right">잔액</th><th style="padding:7px;text-align:left">대분류 › 계정과목</th><th></th></tr></thead><tbody>';
+  h+='<div style="overflow-x:auto;max-height:65vh;overflow-y:auto"><table style="width:100%;border-collapse:collapse;font-size:14px;min-width:1040px"><thead style="position:sticky;top:0;z-index:1"><tr style="background:#1e293b;color:#fff"><th style="padding:7px;width:30px"><input type="checkbox" title="보이는 거래 모두 고르기" '+(allOn?'checked':'')+' onchange="_bkPickAll(this.checked)" style="width:18px;height:18px"></th><th style="padding:7px">날짜</th><th style="padding:7px;text-align:left">적요</th><th style="padding:7px;text-align:left">거래처</th><th style="padding:7px;text-align:left">내용</th><th style="padding:7px;text-align:right">입금</th><th style="padding:7px;text-align:right">출금</th><th style="padding:7px;text-align:right">잔액</th><th style="padding:7px;text-align:left">대분류 › 계정과목</th><th></th></tr></thead><tbody>';
   V.slice(0,500).forEach(function(t){
     var sk=_bkSkip(t.big);
     var cat=t.big ? '<span style="background:'+(sk?'#e0e7ff;color:#3730a3':'#dcfce7;color:#166534')+';font-weight:800;padding:3px 8px;border-radius:6px">'+esc(t.big)+(t.mid?' › '+esc(t.mid):'')+'</span>'+(t._auto?' <span style="font-size:11px;color:#64748b">자동</span>':'')
       : '<span style="background:#fef3c7;color:#92400e;font-weight:800;padding:3px 8px;border-radius:6px;border:1px solid #f59e0b">❓ 분류 넣기</span>';
     var pk=t._a+"|"+t._k;
     h+='<tr style="border-bottom:1px solid #e2e8f0'+(sk?';background:#f8fafc':'')+'"><td style="padding:6px;text-align:center"><input type="checkbox" '+(BK_PICK[pk]?'checked':'')+' onchange="_bkPick(\''+pk+'\',this.checked)" style="width:18px;height:18px"></td><td style="padding:6px;white-space:nowrap">'+esc(String(t.dt).slice(0,10))+_bkMoveBtns(t,sameDay[String(t.dt).slice(0,10)])+'</td>';
-    h+='<td style="padding:6px"><b>'+esc(t.nm||'')+'</b>'+(t.desc||t.vendor||t.memo?'<div style="font-size:12.5px;color:#475569">'+esc([t.vendor,t.desc,t.memo].filter(Boolean).join(' · '))+'</div>':'')+'</td>';
+    h+='<td style="padding:6px;font-weight:700">'+esc(t.nm||'')+'</td><td style="padding:6px;color:#334155">'+esc(t.vendor||'')+'</td><td style="padding:6px;color:#334155">'+esc(t.desc||'')+(t.memo?'<div style="font-size:12px;color:#64748b">📝 '+esc(t.memo)+'</div>':'')+'</td>';
     h+='<td style="padding:6px;text-align:right;color:#166534;font-weight:700">'+(Number(t.inA)?fm(t.inA):'')+'</td><td style="padding:6px;text-align:right;color:'+(Number(t.out)<0?'#7c3aed':'#b91c1c')+';font-weight:700">'+(Number(t.out)<0?'<span style="font-size:11px">↩ 환불·취소</span> −'+fm(-t.out):(Number(t.out)?fm(t.out):''))+'</td>';
     h+='<td style="padding:6px;text-align:right;white-space:nowrap'+(t._warn?';color:#dc2626;font-weight:800" title="통장 기록 잔액 '+fm(t.bal)+'원과 다름':'')+'">'+fm(t._run)+(t._warn?' ⚠':'')+'</td>';
     h+='<td style="padding:6px;cursor:pointer" onclick="_bkEdit(\''+t._a+'\',\''+t._k+'\')">'+cat+'</td>';
     h+='<td style="padding:6px;white-space:nowrap">'+_bkEvBtn(t)+'<button class="btn btn-s" style="background:#1d4ed8;color:#fff" onclick="_bkEdit(\''+t._a+'\',\''+t._k+'\')">✏️</button>'+(' <button class="btn btn-s" style="background:#dc2626;color:#fff" onclick="_bkTxDel(\''+t._a+'\',\''+t._k+'\')">✕</button>')+'</td></tr>';
   });
-  if(!V.length) h+='<tr><td colspan="8" style="padding:16px;text-align:center;color:#64748b">해당하는 거래가 없어요</td></tr>';
+  if(!V.length) h+='<tr><td colspan="10" style="padding:16px;text-align:center;color:#64748b">해당하는 거래가 없어요</td></tr>';
   h+='</tbody></table></div>'+(V.length>500?'<div class="mut" style="font-size:12px;margin-top:6px">최근 500건만 보여요 — 연도나 검색으로 좁혀 보세요</div>':'');
   return h;
 }
