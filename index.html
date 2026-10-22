@@ -14245,6 +14245,7 @@ async function _bkReportXlsx(){
   var num=function(t){ var x=String(t).replace(/[원,\s▲]/g,""); if(/^▼/.test(String(t).trim())) x="-"+x.replace(/▼/g,""); return /^-?\d+(\.\d+)?$/.test(x)?Number(x):null; };
   var rep=box.querySelector(".bkRep")||box;
   Array.prototype.forEach.call(rep.children,function(el){
+    if(el.classList&&el.classList.contains("noprint")) return;
     if(el.tagName==="TABLE"||el.querySelector("table")){
       var tb=el.tagName==="TABLE"?el:el.querySelector("table"), occ={};
       Array.prototype.forEach.call(tb.rows,function(tr){
@@ -14295,8 +14296,8 @@ function _bkReportHtml(){
   }
   if(BK_RS!=="big"){
     h+=_bkRepBody(R,A,an,{td:td,n:n,th:th,dk:dk});
-    if(R.none.length) h+='<div style="margin-top:10px;font-size:12px;color:#b45309">※ 분류 안 한 거래 '+R.none.length+'건은 「❓ 분류 안 함」으로 들어가 있어요</div>';
-    return h+'<div style="margin-top:12px;font-size:12px;color:#334155">출력 '+esc(today())+'</div></div>';
+    if(R.none.length) h+='<div class="noprint" style="margin-top:10px;font-size:12px;color:#b45309">※ 분류 안 한 거래 '+R.none.length+'건은 「❓ 분류 안 함」으로 들어가 있어요</div>';
+    return h+'<div class="noprint" style="margin-top:12px;font-size:12px;color:#334155">출력 '+esc(today())+'</div></div>';
   }
   // 대분류별(대분류 하나 골랐으면 계정과목별) 비중 + 상세
   var groups=function(G){ var out=[];
@@ -14325,8 +14326,8 @@ function _bkReportHtml(){
     };
     h+=det("수입",R.inc,R.incT,"inA")+det("지출",R.exp,R.expT,"out");
   }
-  if(R.none.length) h+='<div style="margin-top:10px;font-size:12px;color:#b45309">※ 분류 안 한 거래 '+R.none.length+'건은 「❓ 분류 안 함」으로 들어가 있어요</div>';
-  return h+'<div style="margin-top:12px;font-size:12px;color:#334155">출력 '+esc(today())+'</div></div>';
+  if(R.none.length) h+='<div class="noprint" style="margin-top:10px;font-size:12px;color:#b45309">※ 분류 안 한 거래 '+R.none.length+'건은 「❓ 분류 안 함」으로 들어가 있어요</div>';
+  return h+'<div class="noprint" style="margin-top:12px;font-size:12px;color:#334155">출력 '+esc(today())+'</div></div>';
 }
 // ── 📎 입출금 증빙 출력 — 엑셀 증빙자료처럼 한 장에 1·2·4칸, 사진 밑에 제목 ──
 function _bkEvCap(i){
@@ -14783,7 +14784,7 @@ async function _bkSumXlsx(){
   hideLoading(); toast("📗 결산 엑셀 받았어요");
 }
 function _bkReportPrint(){
-  var css='@page{size:A4 '+(BK_RS==="month"?'landscape':'portrait')+';margin:12mm}body{font-family:"맑은 고딕","Malgun Gothic",sans-serif;margin:0;color:#000}tr{page-break-inside:avoid}.bar{padding:8px}.bar button{font-size:15px;padding:8px 16px;background:#1d4ed8;color:#fff;border:none;border-radius:6px;cursor:pointer}@media print{.bar{display:none}}';
+  var css='@page{size:A4 '+(BK_RS==="month"?'landscape':'portrait')+';margin:12mm}body{font-family:"맑은 고딕","Malgun Gothic",sans-serif;margin:0;color:#000}tr{page-break-inside:avoid}.bar{padding:8px}.bar button{font-size:15px;padding:8px 16px;background:#1d4ed8;color:#fff;border:none;border-radius:6px;cursor:pointer}@media print{.bar,.noprint{display:none}}';
   var h='<!doctype html><html><head><meta charset="utf-8"><title>&#8203;</title><style>'+css+'</style></head><body><div class="bar"><button onclick="window.print()">🖨️ 인쇄 / PDF 저장</button></div>'+_bkReportHtml()+'</body></html>';
   var w=window.open("","_blank","width=900,height=900"); if(!w){ toast("팝업이 막혔어요 — 허용 후 다시",true); return; }
   w.document.open(); w.document.write(h); w.document.close();
