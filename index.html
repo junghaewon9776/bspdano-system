@@ -14305,7 +14305,7 @@ function _bkEsgDone(g){ return !!(g&&(g.img||g.ok)); }
 function _bkEsgCount(){ var r=_bkEsgOf().roles||{}; return _bkEsgRoles().filter(function(k){ return _bkEsgDone(r[k]); }).length; }
 function _bkEsgBtn(){
   var n=_bkEsgCount(), all=_bkEsgRoles().length;
-  return '<button onclick="_bkEsgPop()" style="border:2px solid '+(n===all?'#16a34a':'#0f766e')+';border-radius:8px;padding:5px 12px;font-size:13.5px;font-weight:800;cursor:pointer;background:'+(n===all?'#16a34a':'#fff')+';color:'+(n===all?'#fff':'#0f766e')+'">✍ 결재 받기 '+n+'/'+all+'</button><button onclick="_bkEsgList()" style="border:2px solid #475569;border-radius:8px;padding:5px 12px;font-size:13.5px;font-weight:800;cursor:pointer;background:#fff;color:#334155">📋 서명 받은 정산서</button>';
+  return '<button onclick="_bkEsgPop()" style="border:2px solid '+(n===all?'#16a34a':'#0f766e')+';border-radius:8px;padding:5px 12px;font-size:13.5px;font-weight:800;cursor:pointer;background:'+(n===all?'#16a34a':'#fff')+';color:'+(n===all?'#fff':'#0f766e')+'">✍ 결재 받기 '+n+'/'+all+'</button><button onclick="_bkEsgList()" style="border:2px solid #475569;border-radius:8px;padding:5px 12px;font-size:13.5px;font-weight:800;cursor:pointer;background:#fff;color:#334155">📋 서명 받은 정산서</button>'+((typeof isA==="function"&&isA())?'<button onclick="_esgLineEdit()" style="border:2px solid #7c3aed;border-radius:8px;padding:5px 12px;font-size:13.5px;font-weight:800;cursor:pointer;background:#7c3aed;color:#fff">⚙ 결재선 (담당자 지정)</button>':'');
 }
 function _bkEsgPop(){
   var d=_bkEsgOf(), roles=d.roles||{}, adm=(typeof isA==="function"&&isA());
