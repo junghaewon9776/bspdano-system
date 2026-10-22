@@ -13724,6 +13724,7 @@ function _fbImport(wb){
 //   대분류 「통장간 이체」·「이월」은 수입·지출 합계에서 뺌
 var BK={loaded:false,accts:{},tx:{}}, BK_ACC="", BK_Y="", BK_F="all", BK_Q="", _bkQT=null, _bkQC=false, BK_SEL=null, BK_FROM="", BK_TO="", BK_SV="dash", BK_DET=true, BK_AF="", BK_AT="", BK_M=0;   // BK_M: 통장 화면 월 (0=전체)
 var BK_PICK={};   // 증빙 출력용으로 고른 거래 {"통장|거래키":1}
+var BK_XIN="통장간 입금", BK_XOUT="통장간 지출";
 var BK_XFER="통장간 이체", BK_CARRY="이월", BK_FEE="_fee";
 function _bkRef(p){ return fbDb.ref('/main/Bank'+(p?'/'+p:'')); }
 function _bkLoad(){
@@ -13839,7 +13840,7 @@ function _bkCatList(){
   var L;
   if(Array.isArray(BK.cats)) L=BK.cats.filter(Boolean).map(function(c){ return {big:c.big, mids:(c.mids||[]).filter(Boolean).slice()}; });
   else { var C=_bkCats(); L=Object.keys(C).filter(function(b){ return !_bkSkip(b); }).sort().map(function(b){ return {big:b, mids:Object.keys(C[b]).sort()}; }); }
-  [BK_XFER,BK_CARRY].forEach(function(b){ if(!L.some(function(c){ return c.big===b; })) L.push({big:b,mids:[]}); });
+  [BK_XFER,BK_CARRY].forEach(function(b){ if(!L.some(function(c){ return c.big===b; })) L.push({big:b,mids:b===BK_XFER?[BK_XIN,BK_XOUT]:[]}); });
   return L;
 }
 function _bkCatSave(L){
@@ -13868,7 +13869,7 @@ function _bkMidOpts(big, val){
 function _bkBigChg(px){
   var b=document.getElementById(px+"big"), m=document.getElementById(px+"mid");
   if(b.value==="__new"){ var nm=(prompt("새 대분류 이름 (예: 워크숍)")||"").trim(); if(!nm){ b.value=""; return; } _bkCatAdd(nm); b.innerHTML=_bkBigOpts(nm); }
-  if(m) m.innerHTML=_bkMidOpts(b.value,"");
+  if(m) m.innerHTML=_bkMidOpts(b.value,b.value===BK_XFER?((document.getElementById("bkF_io")||{}).value==="in"?BK_XIN:BK_XOUT):"");
 }
 function _bkMidChg(px){
   var b=document.getElementById(px+"big"), m=document.getElementById(px+"mid");
@@ -13978,6 +13979,7 @@ async function _bkFormSave(){
   var F=window._BKF, ak=F.ak, k=F.k, g=function(i){ var e=document.getElementById(i); return e?String(e.value).trim():""; };
   var dt=g("bkF_dt"), io=g("bkF_io"), amt=Number(g("bkF_amt").replace(/,/g,""))||0, bs=g("bkF_bal").replace(/,/g,"");
   var big=g("bkF_big"), mid=g("bkF_mid"); if(big==="__new") big=""; if(mid==="__new") mid="";
+  if(big===BK_XFER) mid=(io==="in")?BK_XIN:BK_XOUT;   // 통장간 이체는 들어오면 통장간 입금, 나가면 통장간 지출
   if(!dt||!amt){ alert("날짜와 금액을 넣어 주세요"); return; }
   var row={dt:dt, nm:g("bkF_nm"), inA:io==="in"?amt:0, out:io==="out"?amt:(io==="ref"?-amt:0), vendor:g("bkF_vendor"), desc:g("bkF_desc"), memo:g("bkF_memo"), big:big||null, mid:mid||null, bal:(bs!==""&&!isNaN(Number(bs)))?Number(bs):null};
   try{ localStorage.setItem("bk_last",JSON.stringify({ak:ak,io:io,big:big,mid:mid})); }catch(e){}
@@ -14155,7 +14157,12 @@ function _bkRepBody(R,A,an,S){
       h+='<tr style="font-weight:900;background:#f1f5f9">'+(BK_MERGE?'':'<td style="'+td+'">'+esc(b)+'</td>')+'<td style="'+td+';text-align:center">소계</td><td style="'+n+';color:#166534">'+fm(I._t)+'</td><td style="'+n+';color:#b91c1c">'+fm(E._t)+'</td>'+dc(I._t-E._t)+'</tr>';
     });
     if(!BL.length) h+='<tr><td style="'+td+';color:#94a3b8" colspan="5">없음</td></tr>';
-    h+='<tr style="font-weight:900;background:#dbeafe"><td style="'+td+';text-align:center" colspan="2">합  계</td><td style="'+n+'">'+fm(R.incT)+'</td><td style="'+n+'">'+fm(R.expT)+'</td>'+dc(R.incT-R.expT)+'</tr></table>';
+    h+='<tr style="font-weight:900;background:#dbeafe"><td style="'+td+';text-align:center" colspan="2">합  계</td><td style="'+n+'">'+fm(R.incT)+'</td><td style="'+n+'">'+fm(R.expT)+'</td>'+dc(R.incT-R.expT)+'</tr>';
+    var XS=_bkXferSum(R), XM=Object.keys(XS.mids);
+    if(!BK_BIG && XM.length){
+      XM.forEach(function(m,i){ var v=XS.mids[m]; h+='<tr style="color:#4338ca;background:#eef2ff">'+(BK_MERGE?(i===0?'<td rowspan="'+XM.length+'" style="'+td+';font-weight:900;vertical-align:middle;text-align:center">'+BK_XFER+'<div style="font-size:11px;font-weight:600">(합계 제외)</div></td>':''):'<td style="'+td+';font-weight:700">'+BK_XFER+' (합계 제외)</td>')+'<td style="'+td+'">'+esc(m)+'</td><td style="'+n+'">'+(v.inA?fm(v.inA):'-')+'</td><td style="'+n+'">'+(v.out?fm(v.out):'-')+'</td><td style="'+n+';font-weight:800">'+fm(v.inA-v.out)+'</td></tr>'; });
+    }
+    h+='</table>';
     if(BK_DET){
       var cols=multi?9:8;
       h+='<div style="font-weight:900;margin:16px 0 4px">■ 사업별 거래내역</div><table style="border-collapse:collapse;width:100%;font-size:12.5px"><tr><th style="'+th+'">대분류</th><th style="'+th+'">일자</th>'+(multi?'<th style="'+th+'">통장</th>':'')+'<th style="'+th+'">계정과목</th><th style="'+th+'">거래처</th><th style="'+th+'">내용</th><th style="'+th+'">수입</th><th style="'+th+'">지출</th><th style="'+th+'">비고</th></tr>';
@@ -14277,6 +14284,7 @@ async function _bkReportXlsx(){
   document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); },3000);
   hideLoading(); toast("📗 정산보고서 엑셀 받았어요");
 }
+function _bkXferSum(R){ var o={inA:0,out:0,mids:{}}; (R.xfer||[]).forEach(function(t){ var m=t.mid||(Number(t.inA)>0?BK_XIN:BK_XOUT), M=o.mids[m]=o.mids[m]||{inA:0,out:0}; M.inA+=Number(t.inA)||0; M.out+=Number(t.out)||0; o.inA+=Number(t.inA)||0; o.out+=Number(t.out)||0; }); return o; }
 function _bkReportHtml(){
   var R=_bkSumCalc(), A=R.accts, an={}; A.forEach(function(a){ an[a._k]=a.nm; });
   var open=0,close=0; A.forEach(function(a){ open+=R.per[a._k].open; close+=R.per[a._k].close; });
@@ -14326,7 +14334,8 @@ function _bkReportHtml(){
     var gs=groups(G), s='<div style="font-weight:900;margin:14px 0 4px">▣ '+title+' '+lv+'별</div><table style="border-collapse:collapse;width:100%;font-size:13.5px"><tr><th style="'+th+'">'+lv+'</th><th style="'+th+'">'+title+'금액</th><th style="'+th+'">비중</th></tr>';
     gs.forEach(function(g){ s+='<tr><td style="'+td+'">'+esc(g.nm)+'</td><td style="'+n+'">'+fm(g.t)+'</td><td style="'+n+'">'+(tot?(Math.round(g.t/tot*1000)/10).toFixed(1):'0.0')+'%</td></tr>'; });
     if(!gs.length) s+='<tr><td style="'+td+';color:#94a3b8" colspan="3">없음</td></tr>';
-    return s+'<tr style="font-weight:900;background:#f1f5f9"><td style="'+td+';text-align:center">합  계</td><td style="'+n+'">'+fm(tot)+'</td><td style="'+n+'">'+(tot?'100.0%':'')+'</td></tr></table>';
+    var XS=_bkXferSum(R), xv=(title==="수입"?XS.inA:XS.out);
+    return s+'<tr style="font-weight:900;background:#f1f5f9"><td style="'+td+';text-align:center">합  계</td><td style="'+n+'">'+fm(tot)+'</td><td style="'+n+'">'+(tot?'100.0%':'')+'</td></tr>'+(!BK_BIG&&xv?'<tr style="color:#4338ca;background:#eef2ff"><td style="'+td+'">'+BK_XFER+' › '+(title==="수입"?BK_XIN:BK_XOUT)+' <span style="font-size:11px">(합계 제외)</span></td><td style="'+n+'">'+fm(xv)+'</td><td style="'+n+'"></td></tr>':'')+'</table>';
   };
   h+=share("수입",R.inc,R.incT)+share("지출",R.exp,R.expT);
   if(BK_DET){
