@@ -13928,7 +13928,7 @@ function _bkForm(ak,k){
   var LS=_bkLast(), A=_bkAccts();
   if(!t){ if(!ak||ak==="_sum"||!_bkAcct(ak)) ak=(LS.ak&&_bkAcct(LS.ak))?LS.ak:A[0]._k; }
   window._BKF={ak:ak,k:k}; _BKEV_NEW=[];
-  var io=t?(Number(t.out)>0?"out":"in"):(LS.io||"out"), amt=t?(Number(t.out)||Number(t.inA)||""):"";
+  var io=t?(Number(t.out)>0?"out":(Number(t.out)<0?"ref":"in")):(LS.io==="ref"?"out":(LS.io||"out")), amt=t?(Math.abs(Number(t.out))||Number(t.inA)||""):"";
   var big=t?(t._auto?"":(t.big||"")):(LS.big||""), mid=t?(t._auto?"":(t.mid||"")):(LS.mid||"");
   var cm=function(v){ return (v===null||v===undefined||v==="")?"":_cm(String(v)); }, star='<span style="color:#dc2626">*</span>';
   var lab=function(s){ return '<label style="font-weight:800;font-size:14px">'+s+'</label>'; };
@@ -13937,7 +13937,7 @@ function _bkForm(ak,k){
   h+=lab('통장 '+star)+(t?'<div style="font-weight:800">'+esc(_bkAcct(ak).nm)+'</div>':'<select id="bkF_ak" onchange="window._BKF.ak=this.value;_bkFormNmDL()" style="padding:9px;font-weight:800">'+A.map(function(a){ return '<option value="'+a._k+'"'+(a._k===ak?' selected':'')+'>'+(a.fee?'💰 ':'🏦 ')+esc(a.nm)+'</option>'; }).join('')+'</select>');
   h+=lab('날짜 '+star)+'<input type="date" id="bkF_dt" value="'+esc(t?String(t.dt).slice(0,10):today())+'" onclick="try{this.showPicker()}catch(e){}" style="padding:9px;cursor:pointer">';
   var iob=function(v,lb,col){ var on=io===v; return '<button type="button" id="bkF_io_'+v+'" onclick="_bkFormIo(\''+v+'\')" style="flex:1;border:2px solid '+col+';border-radius:8px;padding:9px;font-size:15px;font-weight:900;cursor:pointer;background:'+(on?col:'#fff')+';color:'+(on?'#fff':col)+'">'+lb+'</button>'; };
-  h+=lab('구분 '+star)+'<div style="display:flex;gap:8px"><input type="hidden" id="bkF_io" value="'+io+'">'+iob("out","💸 출금 (나간 돈)","#b91c1c")+iob("in","💵 입금 (들어온 돈)","#166534")+'</div>';
+  h+=lab('구분 '+star)+'<div style="display:flex;gap:8px"><input type="hidden" id="bkF_io" value="'+io+'">'+iob("out","💸 출금 (나간 돈)","#b91c1c")+iob("in","💵 입금 (들어온 돈)","#166534")+iob("ref","↩ 환불·취소","#7c3aed")+'</div><div id="bkF_refHint" style="grid-column:2;font-size:12.5px;color:#6d28d9;margin-top:-4px;display:'+(io==="ref"?"block":"none")+'">결제했다가 돌려받은 돈 — <b>원래 결제와 같은 대분류·계정과목</b>으로 넣으면 그 지출에서 빠져요 (예: 264,000 결제 → 264,000 환불·취소 → 240,000 결제 = 지출 240,000)'+'</div>';
   h+=lab('금액 '+star)+'<input id="bkF_amt" inputmode="numeric" value="'+cm(amt)+'" oninput="this.value=_cm(this.value)" placeholder="0" style="padding:9px;font-size:18px;font-weight:900;text-align:right">';
   h+=lab('대분류 '+star)+'<select id="bkF_big" onchange="_bkBigChg(\'bkF_\')" style="padding:9px;font-weight:800;border:2px solid #0f766e">'+_bkBigOpts(big)+'</select>';
   h+=lab('계정과목 '+star)+'<select id="bkF_mid" onchange="_bkMidChg(\'bkF_\')" style="padding:9px;font-weight:800;border:2px solid #0f766e">'+_bkMidOpts(big,mid)+'</select>';
@@ -13964,7 +13964,8 @@ function _bkForm(ak,k){
 }
 function _bkFormIo(v){
   document.getElementById("bkF_io").value=v;
-  [["out","#b91c1c"],["in","#166534"]].forEach(function(x){ var b=document.getElementById("bkF_io_"+x[0]); if(!b) return; var on=x[0]===v; b.style.background=on?x[1]:"#fff"; b.style.color=on?"#fff":x[1]; });
+  var rh=document.getElementById("bkF_refHint"); if(rh) rh.style.display=(v==="ref"?"block":"none");
+  [["out","#b91c1c"],["in","#166534"],["ref","#7c3aed"]].forEach(function(x){ var b=document.getElementById("bkF_io_"+x[0]); if(!b) return; var on=x[0]===v; b.style.background=on?x[1]:"#fff"; b.style.color=on?"#fff":x[1]; });
 }
 function _bkFormNmDL(){
   var w=document.getElementById("bkF_nmDLw"); if(!w) return;
@@ -13978,7 +13979,7 @@ async function _bkFormSave(){
   var dt=g("bkF_dt"), io=g("bkF_io"), amt=Number(g("bkF_amt").replace(/,/g,""))||0, bs=g("bkF_bal").replace(/,/g,"");
   var big=g("bkF_big"), mid=g("bkF_mid"); if(big==="__new") big=""; if(mid==="__new") mid="";
   if(!dt||!amt){ alert("날짜와 금액을 넣어 주세요"); return; }
-  var row={dt:dt, nm:g("bkF_nm"), inA:io==="in"?amt:0, out:io==="out"?amt:0, vendor:g("bkF_vendor"), desc:g("bkF_desc"), memo:g("bkF_memo"), big:big||null, mid:mid||null, bal:(bs!==""&&!isNaN(Number(bs)))?Number(bs):null};
+  var row={dt:dt, nm:g("bkF_nm"), inA:io==="in"?amt:0, out:io==="out"?amt:(io==="ref"?-amt:0), vendor:g("bkF_vendor"), desc:g("bkF_desc"), memo:g("bkF_memo"), big:big||null, mid:mid||null, bal:(bs!==""&&!isNaN(Number(bs)))?Number(bs):null};
   try{ localStorage.setItem("bk_last",JSON.stringify({ak:ak,io:io,big:big,mid:mid})); }catch(e){}
   var root=_bkTxRoot(ak), mk=(ak===BK_FEE&&row.inA)?_fbMatch(row.nm):null;
   showLoading("저장 중...");
@@ -14440,17 +14441,21 @@ async function _bkXlsxOut(ak){
     r.getCell(4).font={color:{argb:"FF166534"},bold:true}; r.getCell(5).font={color:{argb:"FFB91C1C"},bold:true}; r.getCell(6).font={color:{argb:"FF94A3B8"}};
     if(!t.big&&!t._auto){ [9,10].forEach(function(ci){ r.getCell(ci).fill={type:"pattern",pattern:"solid",fgColor:{argb:"FFFEF3C7"}}; }); }
   });
-  // 분류 목록 시트 + 고르기 칸
-  var C=_bkCatList(), cs=wb.addWorksheet("분류목록"), mids=[];
-  cs.columns=[{header:"대분류",width:18},{header:"계정과목 (전체)",width:22},{header:"대분류 › 계정과목",width:34}];
-  C.forEach(function(c){ c.mids.forEach(function(m){ if(mids.indexOf(m)<0) mids.push(m); }); });
-  var n=Math.max(C.length,mids.length), pairs=[]; C.forEach(function(c){ if(!c.mids.length) pairs.push(c.big); c.mids.forEach(function(m){ pairs.push(c.big+" › "+m); }); });
-  for(var i=0;i<Math.max(n,pairs.length);i++) cs.addRow([C[i]?C[i].big:null, mids[i]||null, pairs[i]||null]);
-  cs.getRow(1).font={bold:true};
-  var last=V.length+1;
-  for(var r=2;r<=last;r++){
-    ws.getCell(r,9).dataValidation={type:"list",allowBlank:true,formulae:["분류목록!$A$2:$A$"+(C.length+1)],showErrorMessage:false};
-    if(mids.length) ws.getCell(r,10).dataValidation={type:"list",allowBlank:true,formulae:["분류목록!$B$2:$B$"+(mids.length+1)],showErrorMessage:false};
+  // 분류 목록 시트: A열 대분류, C열부터 대분류마다 한 칸씩 그 계정과목 → 대분류 고르면 그 계정과목만 뜨게(INDIRECT)
+  var C=_bkCatList(), cs=wb.addWorksheet("분류목록"), mx=1;
+  cs.getCell(1,1).value="대분류"; cs.getColumn(1).width=18; cs.getColumn(2).width=3;
+  C.forEach(function(c,i){
+    cs.getCell(i+2,1).value=c.big;
+    var col=i+3, L=cs.getColumn(col).letter; cs.getColumn(col).width=16;
+    cs.getCell(1,col).value=c.big; c.mids.forEach(function(m,j){ cs.getCell(j+2,col).value=m; });
+    var h=Math.max(c.mids.length,1); if(h>mx) mx=h;
+    wb.definedNames.add("분류목록!$"+L+"$2:$"+L+"$"+(h+1), "BKC_"+(i+1));
+  });
+  cs.getRow(1).font={bold:true}; cs.getRow(1).fill={type:"pattern",pattern:"solid",fgColor:{argb:"FFE2E8F0"}};
+  var last=V.length+1, bigRng="분류목록!$A$2:$A$"+(C.length+1);
+  for(var r=2;r<=last+30;r++){
+    ws.getCell(r,9).dataValidation={type:"list",allowBlank:true,formulae:[bigRng],showErrorMessage:false};
+    ws.getCell(r,10).dataValidation={type:"list",allowBlank:true,formulae:['INDIRECT("BKC_"&MATCH($I'+r+','+bigRng+',0))'],showErrorMessage:false};
   }
   var buf=await wb.xlsx.writeBuffer(), el=document.createElement("a");
   el.href=URL.createObjectURL(new Blob([buf],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"})); el.download=String(a.nm).replace(/[\\\/:*?"<>|]/g,"")+"_거래내역_"+_bkAcctPerLabel().replace(/[^0-9가-힣~-]/g,"")+"_"+today().replace(/-/g,"")+".xlsx";
@@ -14508,7 +14513,7 @@ function _bkAcctView(ak){
     var pk=t._a+"|"+t._k;
     h+='<tr style="border-bottom:1px solid #e2e8f0'+(sk?';background:#f8fafc':'')+'"><td style="padding:6px;text-align:center"><input type="checkbox" '+(BK_PICK[pk]?'checked':'')+' onchange="_bkPick(\''+pk+'\',this.checked)" style="width:18px;height:18px"></td><td style="padding:6px;white-space:nowrap">'+esc(String(t.dt).slice(0,10))+_bkMoveBtns(t,sameDay[String(t.dt).slice(0,10)])+'</td>';
     h+='<td style="padding:6px"><b>'+esc(t.nm||'')+'</b>'+(t.desc||t.vendor||t.memo?'<div style="font-size:12.5px;color:#475569">'+esc([t.vendor,t.desc,t.memo].filter(Boolean).join(' · '))+'</div>':'')+'</td>';
-    h+='<td style="padding:6px;text-align:right;color:#166534;font-weight:700">'+(Number(t.inA)?fm(t.inA):'')+'</td><td style="padding:6px;text-align:right;color:#b91c1c;font-weight:700">'+(Number(t.out)?fm(t.out):'')+'</td>';
+    h+='<td style="padding:6px;text-align:right;color:#166534;font-weight:700">'+(Number(t.inA)?fm(t.inA):'')+'</td><td style="padding:6px;text-align:right;color:'+(Number(t.out)<0?'#7c3aed':'#b91c1c')+';font-weight:700">'+(Number(t.out)<0?'<span style="font-size:11px">↩ 환불·취소</span> −'+fm(-t.out):(Number(t.out)?fm(t.out):''))+'</td>';
     h+='<td style="padding:6px;text-align:right;white-space:nowrap'+(t._warn?';color:#dc2626;font-weight:800" title="통장 기록 잔액 '+fm(t.bal)+'원과 다름':'')+'">'+fm(t._run)+(t._warn?' ⚠':'')+'</td>';
     h+='<td style="padding:6px;cursor:pointer" onclick="_bkEdit(\''+t._a+'\',\''+t._k+'\')">'+cat+'</td>';
     h+='<td style="padding:6px;white-space:nowrap">'+_bkEvBtn(t)+'<button class="btn btn-s" style="background:#1d4ed8;color:#fff" onclick="_bkEdit(\''+t._a+'\',\''+t._k+'\')">✏️</button>'+(' <button class="btn btn-s" style="background:#dc2626;color:#fff" onclick="_bkTxDel(\''+t._a+'\',\''+t._k+'\')">✕</button>')+'</td></tr>';
