@@ -13733,6 +13733,7 @@ function _bkRef(p){ return fbDb.ref('/main/Bank'+(p?'/'+p:'')); }
 function _bkLoad(){
   _fbLoad();
   if(BK._lis) return; BK._lis=true;
+  fbDb.ref('/main/BankEsigCfg').on('value',function(s){ BK.esigCfg=s.val()||{}; if(typeof CTAB!=="undefined"&&CTAB==="bank"&&!document.getElementById("bkEsgPadBox")) draw(); });
   fbDb.ref('/main/BankEsig').on('value',function(s){ BK.esig=s.val()||{}; if(typeof CTAB!=="undefined"&&CTAB==="bank"&&!document.getElementById("bkEsgPadBox")) draw(); });
   _bkRef().on('value',function(s){ var v=s.val()||{}; BK.accts=v.accts||{}; BK.tx=v.tx||{}; BK.cats=v.cats||null; BK.loaded=true; if(typeof CTAB!=="undefined"&&CTAB==="bank") draw(); });
 }
@@ -14296,7 +14297,9 @@ function _bkRepKey(){
 function _bkRepTitle(){ return (BK_BIG?BK_BIG+" ":"")+_bkPeriodLabel()+" 정산서"; }
 function _bkEsgRoles(){ return (typeof ESIG_ROLES!=="undefined"&&ESIG_ROLES.length)?ESIG_ROLES:BK_SIGN; }
 function _bkEsgOf(){ return (BK.esig||{})[_bkRepKey()]||{}; }
-function _bkEsgCount(){ var r=_bkEsgOf().roles||{}; return _bkEsgRoles().filter(function(k){ return r[k]&&r[k].img; }).length; }
+function _bkEsgHand(role){ return ((BK.esigCfg||{}).hand||[]).indexOf(role)>=0; }   // ✋ 수기 서명 직책 (결재란 빈칸으로 인쇄)
+function _bkEsgDone(g){ return !!(g&&(g.img||g.ok)); }
+function _bkEsgCount(){ var r=_bkEsgOf().roles||{}; return _bkEsgRoles().filter(function(k){ return _bkEsgDone(r[k]); }).length; }
 function _bkEsgBtn(){
   var n=_bkEsgCount(), all=_bkEsgRoles().length;
   return '<button onclick="_bkEsgPop()" style="border:2px solid '+(n===all?'#16a34a':'#0f766e')+';border-radius:8px;padding:5px 12px;font-size:13.5px;font-weight:800;cursor:pointer;background:'+(n===all?'#16a34a':'#fff')+';color:'+(n===all?'#fff':'#0f766e')+'">✍ 결재 받기 '+n+'/'+all+'</button><button onclick="_bkEsgList()" style="border:2px solid #475569;border-radius:8px;padding:5px 12px;font-size:13.5px;font-weight:800;cursor:pointer;background:#fff;color:#334155">📋 서명 받은 정산서</button>';
@@ -14309,6 +14312,13 @@ function _bkEsgPop(){
     var s=roles[role], uid=(typeof _esgUidOf==="function")?_esgUidOf(role):"", mine=(typeof _esgCanSign==="function")&&_esgCanSign(role);
     h+='<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;border:1px solid #e2e8f0;border-radius:10px;padding:9px 12px;margin-bottom:7px;background:'+(s&&s.img?'#f0fdf4':'#fff')+'">';
     h+='<div style="min-width:86px"><div style="font-weight:800;font-size:15px">'+esc(role)+'</div><div style="font-size:11px;color:'+(uid?'#475569':'#dc2626')+'">'+(uid?esc(_esgUserNm(uid)):'결재자 미지정')+'</div></div>';
+    if(_bkEsgHand(role)){
+      h+='<div style="flex:1;min-width:140px;font-size:13px">'+(s&&s.ok?'<b style="color:#15803d">✋ 수기 서명 받음</b> '+esc(s.nm||'')+' <span style="color:#64748b;font-size:12px">'+esc(s.at||'')+'</span>'+(s.scan?' <a href="'+esc(s.scan)+'" target="_blank">📷 서명본 보기</a>':''):'<span style="color:#b45309;font-weight:700">✋ 수기 서명</span> <span style="color:#64748b;font-size:12px">정산서를 인쇄해서 펜으로 받아요 (결재란 이 칸은 빈칸으로 인쇄)</span>')+'</div><div style="display:flex;gap:6px;flex-wrap:wrap">';
+      if(adm){ if(!(s&&s.ok)) h+='<button class="btn btn-s" style="background:#16a34a;color:#fff;font-weight:800" onclick="_bkEsgHandOk(\''+esc(role)+'\')">✅ 수기 서명 받음</button>';
+        h+='<label class="btn btn-s" style="background:#0f766e;color:#fff;font-weight:700;cursor:pointer">📷 서명본 올리기<input type="file" accept="image/*,application/pdf" style="display:none" onchange="_bkEsgHandScan(\''+esc(role)+'\',this)"></label>';
+        if(s&&s.ok) h+='<button class="btn btn-s" style="background:#dc2626;color:#fff" onclick="_bkEsgClear(\''+esc(role)+'\')">지우기</button>'; }
+      h+='</div></div>'; return;
+    }
     h+='<div style="flex:1;min-width:140px;font-size:13px">'+(s&&s.img?'<img src="'+s.img+'" style="height:38px;vertical-align:middle;border:1px solid #d1d5db;border-radius:4px;background:#fff"> <b>'+esc(s.nm||'')+'</b> <span style="color:#64748b;font-size:12px">'+esc(s.at||'')+'</span>':'<span style="color:#94a3b8">서명 전</span>')+'</div>';
     h+='<div style="display:flex;gap:6px;flex-wrap:wrap">';
     if(!mine&&!adm) h+='<span style="font-size:12px;color:#64748b">👁 '+esc(role)+' 계정으로 로그인해야 서명돼요</span>';
@@ -14320,6 +14330,7 @@ function _bkEsgPop(){
   h+='<div id="bkEsgPadBox" style="display:none;border:2px solid #2563eb;border-radius:10px;padding:10px;margin-top:8px"><div style="font-weight:800;margin-bottom:6px" id="bkEsgPadTtl"></div>';
   h+='<canvas id="bkEsgPad" style="width:100%;height:150px;border:1px dashed #94a3b8;border-radius:8px;background:#fff;display:block"></canvas>';
   h+='<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px"><input id="bkEsgNm" placeholder="이름" style="padding:7px;width:120px;font-weight:700"><label style="font-size:12.5px"><input type="checkbox" id="bkEsgRem" checked> 내 서명 기억</label><span style="flex:1"></span><button class="btn btn-s" style="background:#475569;color:#fff" onclick="window._bkEsgPadO&&window._bkEsgPadO.clear()">다시 쓰기</button><button class="btn" style="background:#16a34a;color:#fff;font-weight:900" onclick="_bkEsgSave()">✅ 서명 저장</button></div></div>';
+  if(adm) h+='<div style="margin-top:8px;font-size:13px;background:#fff7ed;border:1px solid #fdba74;border-radius:8px;padding:7px 10px"><b>✋ 수기로 받는 직책</b> '+_bkEsgRoles().map(function(r){ return '<label style="margin-left:8px;cursor:pointer"><input type="checkbox" '+(_bkEsgHand(r)?'checked':'')+' onchange="_bkEsgHandSet(\''+esc(r)+'\',this.checked)"> '+esc(r)+'</label>'; }).join('')+'</div>';
   h+='<div style="font-size:12px;color:#64748b;margin-top:8px;line-height:1.6">결재자·직책은 물품/구매 결의서와 같은 <b>결재선</b>을 써요 (구매 결재 창 ⚙ 결재선 설정). 서명은 <b>지금 고른 기간·통장 정산서에만</b> 저장돼서, 달마다 따로 받아요. 정산서 결재란과 인쇄에 그대로 찍혀요.</div>';
   openPopup2(h,560);
 }
@@ -14348,7 +14359,7 @@ function _bkEsgApply(o,pop){
 // 📋 서명 받은 정산서 목록 — 열면 그 기간·통장 정산서(서명 찍힌 채)
 function _bkEsgList(){
   var E=BK.esig||{}, an={}; _bkAccts().forEach(function(a){ an[a._k]=a.nm; });
-  var L=Object.keys(E).map(function(k){ var d=E[k]||{}, r=d.roles||{}, at=""; Object.keys(r).forEach(function(x){ if(r[x]&&r[x].at>at) at=r[x].at; }); return {k:k,d:d,at:at,n:Object.keys(r).filter(function(x){ return r[x]&&r[x].img; }).length}; })
+  var L=Object.keys(E).map(function(k){ var d=E[k]||{}, r=d.roles||{}, at=""; Object.keys(r).forEach(function(x){ if(r[x]&&r[x].at>at) at=r[x].at; }); return {k:k,d:d,at:at,n:Object.keys(r).filter(function(x){ return _bkEsgDone(r[x]); }).length}; })
     .filter(function(x){ return x.n; }).sort(function(a,b){ return String(b.at).localeCompare(String(a.at)); });
   var h='<h3>📋 서명 받은 정산서 <button class="close-x" onclick="closePopup2()">&times;</button></h3>';
   if(!L.length) h+='<div style="color:#64748b;padding:14px">아직 서명 받은 정산서가 없어요</div>';
@@ -14357,11 +14368,29 @@ function _bkEsgList(){
     h+='<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><b style="font-size:15px;flex:1">'+esc(d.title||x.k)+'</b><span style="font-size:12.5px;font-weight:800;color:'+(x.n>=R.length?'#15803d':'#b45309')+'">서명 '+x.n+'/'+R.length+'</span>'
       +(q.f||q.t||q.m===-2?'<button class="btn btn-s" style="background:#1d4ed8;color:#fff;font-weight:800" onclick="_bkEsgOpenIdx(\''+esc(x.k)+'\')">📄 열기</button>':'')+'</div>';
     h+='<div style="font-size:12px;color:#475569;margin:2px 0 6px">통장: '+esc((q.s||[]).map(function(k){ return an[k]||'(지운 통장)'; }).join(', ')||'-')+'</div>';
-    h+='<div style="display:flex;gap:8px;flex-wrap:wrap">'+R.map(function(role){ var g=r[role]; return '<div style="border:1px solid #e2e8f0;border-radius:6px;padding:4px 6px;text-align:center;min-width:80px;background:#fff"><div style="font-size:11.5px;font-weight:800">'+esc(role)+'</div>'+(g&&g.img?'<img src="'+g.img+'" style="height:30px;display:block;margin:2px auto"><div style="font-size:10.5px;color:#475569">'+esc(g.nm||'')+' '+esc(String(g.at||'').slice(5,16))+'</div>':'<div style="font-size:11px;color:#94a3b8;padding:8px 0">서명 전</div>')+'</div>'; }).join('')+'</div></div>';
+    h+='<div style="display:flex;gap:8px;flex-wrap:wrap">'+R.map(function(role){ var g=r[role]; return '<div style="border:1px solid #e2e8f0;border-radius:6px;padding:4px 6px;text-align:center;min-width:80px;background:#fff"><div style="font-size:11.5px;font-weight:800">'+esc(role)+'</div>'+(g&&g.img?'<img src="'+g.img+'" style="height:30px;display:block;margin:2px auto"><div style="font-size:10.5px;color:#475569">'+esc(g.nm||'')+' '+esc(String(g.at||'').slice(5,16))+'</div>':(g&&g.ok?'<div style="font-size:12px;color:#15803d;font-weight:800;padding:4px 0">✋ 수기</div><div style="font-size:10.5px;color:#475569">'+esc(g.nm||'')+' '+esc(String(g.at||'').slice(5,16))+'</div>'+(g.scan?'<a href="'+esc(g.scan)+'" target="_blank" style="font-size:11px">📷 서명본</a>':''):'<div style="font-size:11px;color:#94a3b8;padding:8px 0">서명 전</div>'))+'</div>'; }).join('')+'</div></div>';
   });
   openPopup2(h,620);
 }
 function _bkEsgOpenIdx(k){ var d=(BK.esig||{})[k]; if(!d||!d.q) return; closePopup2(); _bkEsgApply(d.q,false); toast("📄 "+(d.title||"")+" 열었어요"); }
+function _bkEsgHandSet(role,on){ var L=((BK.esigCfg||{}).hand||[]).filter(function(r){ return r!==role; }); if(on) L.push(role); fbDb.ref('/main/BankEsigCfg/hand').set(L).then(function(){ BK.esigCfg=Object.assign({},BK.esigCfg,{hand:L}); _bkEsgPop(); }); }
+function _bkEsgHandOk(role,scan){
+  var nm=prompt(role+" 수기 서명 받은 분 이름", _esgUserNm(_esgUidOf(role))||""); if(nm===null) return Promise.resolve();
+  var key=_bkRepKey(), u={}, cur=(_bkEsgOf().roles||{})[role]||{}; u[key+'/title']=_bkRepTitle(); u[key+'/q']=_bkEsgQ();
+  u[key+'/roles/'+role]={ok:true,hand:true,nm:nm.trim(),at:nowKST(true),by:(typeof CID!=="undefined"?CID:""),scan:scan||cur.scan||null};
+  return fbDb.ref('/main/BankEsig').update(u).then(function(){ toast("✋ "+role+" 수기 서명 받음으로 표시"); _bkEsgPop(); });
+}
+async function _bkEsgHandScan(role,inp){
+  var f=inp.files&&inp.files[0]; if(!f) return;
+  showLoading("서명본 올리는 중...");
+  try{ var r=await compressOne(f), nm=_bkRepTitle().replace(/[\\\/:*?"<>|\s]/g,"_")+"_"+role+"_서명본"+((/\.[a-z0-9]+$/i.exec(r.name||f.name)||[".jpg"])[0]);
+    var res=await api("uploadPhoto",{dataUrl:r.dataUrl,name:nm,type:"purchase",evtId:"정산서서명"}); hideLoading();
+    if(!(res&&res.ok&&res.url)) return toast("올리기 실패: "+((res&&res.err)||""),true);
+    var cur=(_bkEsgOf().roles||{})[role]||{};
+    if(cur.ok){ await fbDb.ref('/main/BankEsig/'+_bkRepKey()+'/roles/'+role+'/scan').set(res.url); toast("📷 서명본 올렸어요"); _bkEsgPop(); }
+    else await _bkEsgHandOk(role,res.url);
+  }catch(e){ hideLoading(); toast("올리기 실패: "+(e.message||e),true); }
+}
 function _bkEsgSign(role){
   window._bkEsgRole=role;
   var box=document.getElementById("bkEsgPadBox"); if(!box) return; box.style.display="block";
@@ -14399,7 +14428,7 @@ function _bkSignBox(){
   return '<div style="display:flex;justify-content:flex-end;margin:0 0 14px"><table style="border-collapse:collapse;table-layout:fixed;width:'+W+'px;min-width:'+W+'px;max-width:'+W+'px"><colgroup><col style="width:26px">'+R.map(function(){ return '<col style="width:84px">'; }).join('')+'</colgroup>'
     +'<tr><td rowspan="2" style="'+bd+';font-size:13px;font-weight:800;line-height:1.6">결<br><br>재</td>'
     +R.map(function(x){ return '<td style="'+bd+';height:28px;font-size:13px;font-weight:700;letter-spacing:1px;white-space:nowrap">'+esc(x)+'</td>'; }).join('')+'</tr><tr>'
-    +R.map(function(x){ var g=sg[x]; return '<td style="'+bd+';height:62px">'+(g&&g.img?'<img src="'+g.img+'" style="max-width:80px;max-height:44px;display:block;margin:0 auto"><div style="font-size:9.5px;color:#334155;line-height:1.2">'+esc(g.nm||'')+' '+esc(String(g.at||'').slice(5,10).replace('-','/'))+'</div>':'')+'</td>'; }).join('')+'</tr></table></div>';
+    +R.map(function(x){ var g=_bkEsgHand(x)?null:sg[x]; return '<td style="'+bd+';height:62px">'+(g&&g.img?'<img src="'+g.img+'" style="max-width:80px;max-height:44px;display:block;margin:0 auto"><div style="font-size:9.5px;color:#334155;line-height:1.2">'+esc(g.nm||'')+' '+esc(String(g.at||'').slice(5,10).replace('-','/'))+'</div>':'')+'</td>'; }).join('')+'</tr></table></div>';
 }
 function _bkGovHtml(){
   var R=_bkSumCalc(), A=R.accts, an={}; A.forEach(function(a){ an[a._k]=a.nm; });
