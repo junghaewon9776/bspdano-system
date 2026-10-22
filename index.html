@@ -14694,6 +14694,40 @@ function _bkDocPrint(html,orient){
 }
 function _bkDocXlsx(html,name){ window._bkXlsxHtml=html; window._bkXlsxName=name; return _bkReportXlsx(); }
 
+// 🎪 사업별(행사) 결산 — 행사별 세입(Inc·Dpst)·세출(ExpBG 예산 / Purs 집행). 결제일 있는 구매만 집행
+function _bkEvtList(Y){ return (typeof EVENTS!=="undefined"&&EVENTS||[]).filter(function(e){ return e && e.evtId && !/청년회/.test(e.nm||"") && (!e.yr||String(e.yr)===String(Y)); }); }   // 청년회 자체(회원·통장) 행사는 빼고
+function _bkEvtSettle(ev, D){
+  var arr=function(x){ return Array.isArray(x)?x.filter(Boolean):Object.keys(x||{}).map(function(k){ return x[k]; }).filter(Boolean); };
+  var Inc=arr(D.Inc), Dp=arr(D.Dpst), BG=arr(D.ExpBG), P=arr(D.Purs);
+  var td='border:1px solid #000;padding:4px 6px', n=td+';text-align:right', H=td+';background:#f1f5f9;text-align:center;font-weight:700';
+  var pc=function(a,b){ return b?Math.round(a/b*1000)/10+'%':'-'; };
+  // 세입: 재원(종류·출처)별 예산 / 입금
+  var inc={}, it=0, dt=0; Inc.forEach(function(r){ var k=(r.tp||'')+(r.sub?' · '+r.sub:''); (inc[k]=inc[k]||{b:0,d:0,card:r.card||''}).b+=_bkNum(r.am); it+=_bkNum(r.am); });
+  Dp.forEach(function(r){ var k=Object.keys(inc).filter(function(x){ return x.indexOf(r.incTp||'@@')===0; })[0]||((r.incTp||'입금')+(r.payM?' · '+r.payM:'')); (inc[k]=inc[k]||{b:0,d:0,card:r.payM||''}).d+=_bkNum(r.am); dt+=_bkNum(r.am); });
+  // 세출: 대분류(tp)·중분류(mid) 예산 / 집행(결제일 있는 구매)
+  var ex={}, bt=0, xt=0, pend=0;
+  BG.forEach(function(r){ var t=r.tp||'(대분류 없음)', m=r.mid||''; var E=ex[t]=ex[t]||{b:0,x:0,mids:{}}; if(m){ (E.mids[m]=E.mids[m]||{b:0,x:0}).b+=_bkNum(r.planAm); } else { E.b+=_bkNum(r.planAm); } });
+  Object.keys(ex).forEach(function(t){ var E=ex[t], mb=0; Object.keys(E.mids).forEach(function(m){ mb+=E.mids[m].b; }); if(!E.b) E.b=mb; bt+=E.b; });
+  // 자부담: 청년회 통장에서 바로 낸 돈 — 입금 기록 대신 자부담으로 집행한 금액을 입금으로 봄
+  var selfX=0; P.forEach(function(p){ if(p.dt && /자부담/.test((p.incTp||'')+' '+(p.card||'')+' '+(p.expTp||''))) selfX+=_bkNum(p.tot); });
+  var selfK=Object.keys(inc).filter(function(k){ return /자부담/.test(k); })[0];
+  if(selfX){ if(!selfK){ selfK='자부담 · 청년회'; inc[selfK]={b:0,d:0,card:'청년회 통장'}; } if(!inc[selfK].d){ inc[selfK].d=selfX; inc[selfK].self=1; dt+=selfX; } }
+  P.forEach(function(p){ var v=_bkNum(p.tot); if(!p.dt){ pend+=v; return; } var t=p.expTp||'(대분류 없음)', m=p.expMid||''; var E=ex[t]=ex[t]||{b:0,x:0,mids:{}}; E.x+=v; if(m) (E.mids[m]=E.mids[m]||{b:0,x:0}).x+=v; xt+=v; });
+  var h='<div style="font-weight:900;font-size:16px;margin:4px 0 8px">🎪 '+esc(ev.nm||ev.evtId)+'</div>';
+  h+='<table style="border-collapse:collapse;width:100%;font-size:13px;margin-bottom:10px"><tr><td style="'+H+'">세입 예산</td><td style="'+H+'">세입(입금)</td><td style="'+H+'">세출 예산</td><td style="'+H+'">집행액</td><td style="'+H+'">잔액 (입금 − 집행)</td><td style="'+H+'">집행률</td></tr><tr><td style="'+n+'">'+fm(it)+'</td><td style="'+n+'">'+fm(dt)+'</td><td style="'+n+'">'+fm(bt)+'</td><td style="'+n+';font-weight:800">'+fm(xt)+'</td><td style="'+n+';font-weight:900">'+fm(dt-xt)+'</td><td style="'+n+'">'+pc(xt,bt||dt)+'</td></tr></table>';
+  if(pend) h+='<div style="font-size:12px;color:#b45309;margin:-4px 0 8px">※ 결제 전(결제일 없는) 구매 '+fm(pend)+'원은 집행액에 안 넣었어요</div>';
+  h+='<div style="font-weight:800;margin:6px 0 2px">□ 세입</div><table style="border-collapse:collapse;width:100%;font-size:12.5px"><tr><td style="'+H+'">재원</td><td style="'+H+'">결제수단</td><td style="'+H+'">예산</td><td style="'+H+'">입금</td></tr>';
+  Object.keys(inc).forEach(function(k){ var r=inc[k]; h+='<tr><td style="'+td+'">'+esc(k)+'</td><td style="'+td+'">'+esc(r.card)+'</td><td style="'+n+'">'+fm(r.b)+'</td><td style="'+n+'">'+fm(r.d)+(r.self?'<div style="font-size:10.5px;color:#475569">청년회 통장에서 집행</div>':'')+'</td></tr>'; });
+  h+='<tr style="font-weight:900;background:#f1f5f9"><td style="'+td+';text-align:center" colspan="2">합 계</td><td style="'+n+'">'+fm(it)+'</td><td style="'+n+'">'+fm(dt)+'</td></tr></table>';
+  h+='<div style="font-weight:800;margin:10px 0 2px">□ 세출</div><table style="border-collapse:collapse;width:100%;font-size:12.5px"><tr><td style="'+H+'">대분류</td><td style="'+H+'">중분류</td><td style="'+H+'">예산</td><td style="'+H+'">집행</td><td style="'+H+'">잔액</td><td style="'+H+'">집행률</td></tr>';
+  Object.keys(ex).sort(function(a,b){ return (ex[b].b+ex[b].x)-(ex[a].b+ex[a].x); }).forEach(function(t){ var E=ex[t], ML=Object.keys(E.mids);
+    if(!ML.length){ h+='<tr><td style="'+td+';font-weight:700">'+esc(t)+'</td><td style="'+td+'"></td><td style="'+n+'">'+fm(E.b)+'</td><td style="'+n+'">'+fm(E.x)+'</td><td style="'+n+'">'+fm(E.b-E.x)+'</td><td style="'+n+'">'+pc(E.x,E.b)+'</td></tr>'; return; }
+    ML.forEach(function(m,i){ var M=E.mids[m]; h+='<tr>'+(i===0?'<td rowspan="'+(ML.length+1)+'" style="'+td+';font-weight:700;vertical-align:middle;text-align:center">'+esc(t)+'</td>':'')+'<td style="'+td+'">'+esc(m)+'</td><td style="'+n+'">'+fm(M.b)+'</td><td style="'+n+'">'+fm(M.x)+'</td><td style="'+n+'">'+fm(M.b-M.x)+'</td><td style="'+n+'">'+pc(M.x,M.b)+'</td></tr>'; });
+    h+='<tr style="background:#f8fafc;font-weight:800"><td style="'+td+';text-align:center">소계</td><td style="'+n+'">'+fm(E.b)+'</td><td style="'+n+'">'+fm(E.x)+'</td><td style="'+n+'">'+fm(E.b-E.x)+'</td><td style="'+n+'">'+pc(E.x,E.b)+'</td></tr>'; });
+  h+='<tr style="font-weight:900;background:#f1f5f9"><td style="'+td+';text-align:center" colspan="2">합 계</td><td style="'+n+'">'+fm(bt)+'</td><td style="'+n+'">'+fm(xt)+'</td><td style="'+n+'">'+fm(bt-xt)+'</td><td style="'+n+'">'+pc(xt,bt)+'</td></tr></table>';
+  return {html:h, it:it, dt:dt, bt:bt, xt:xt, pend:pend};
+}
+async function _bkEvtLoadAll(ids){ var out={}; for(var i=0;i<ids.length;i++){ try{ out[ids[i]]=(await fbDb.ref('/evtData/'+ids[i]).once('value')).val()||{}; }catch(e){ out[ids[i]]={}; } } return out; }
 // 🏛 총회 자료
 function _bkAgmDef(Y){ return {date:"", place:"", agenda:"제1호 의안: "+Y+"년도 사업실적 및 결산 승인의 건\n제2호 의안: "+(Y+1)+"년도 사업계획 및 예산(안) 승인의 건\n제3호 의안: 임원 선임(임기 연장)의 건\n제4호 의안: 기타 단체 운영에 관한 안건", plan:(Y+1)+"년도 사업은 "+Y+"년도 사업을 그대로 이어서 진행합니다.", officers:"", etc:""}; }
 function _bkAgmView(){
@@ -14707,6 +14741,8 @@ function _bkAgmView(){
   h+='<button class="btn" style="background:#1d4ed8;color:#fff;font-weight:900" onclick="_bkAgmSave('+Y+')">💾 저장</button><button class="btn" style="background:#b45309;color:#fff;font-weight:900" onclick="_bkAgmSave('+Y+',1)">🖨 총회 자료 뽑기</button></div>';
   h+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;margin-bottom:10px">'+inp("agDate","총회 일시",A.date,"예: "+(Y+1)+". 1. 10.(토) 18:00")+inp("agPlace","장소",A.place,"예: 법성포청년회 사무실")+'</div>';
   h+='<div style="display:grid;gap:10px">'+ta("agAgenda","안건 (한 줄에 하나)",A.agenda,4)+ta("agPlan","제2호 — "+(Y+1)+"년도 사업계획",A.plan,4,"주요 사업: 방역, 효사랑잔치, 정화활동 …")+ta("agOff","제3호 — 임원 명단 (직책 : 이름)",A.officers,5)+ta("agEtc","제4호 — 기타 안건",A.etc,3,"회비 인상, 회칙 개정 등")+'</div>';
+  var EV=_bkEvtList(Y), sel=A.evts||EV.map(function(e){ return e.evtId; });
+  h+='<div style="margin-top:10px;font-size:13.5px;background:#f8fafc;border:1px solid #cbd5e1;border-radius:8px;padding:8px 10px"><b>🎪 사업별(행사) 결산에 넣을 행사</b> <span style="font-size:12px;color:#64748b">행사별 세입·세출(카드 구매)로 관리한 사업 — 청년회 통장 밖에서 쓴 돈</span><div style="margin-top:4px">'+(EV.length?EV.map(function(e){ return '<label style="margin-right:12px;cursor:pointer"><input type="checkbox" class="agEvt" value="'+esc(e.evtId)+'" '+(sel.indexOf(e.evtId)>=0?'checked':'')+'> '+esc(e.nm||e.evtId)+'</label>'; }).join(''):'<span style="color:#94a3b8">'+Y+'년 행사가 없어요 — 방역처럼 따로 쓰는 사업은 행사로 만들어 세입·세출로 넣어 주세요</span>')+'</div></div>';
   var bud=(BK.bud||{})[Y+1];
   h+='<div style="margin-top:10px;font-size:13px;background:'+(bud&&(Object.keys(bud.inc||{}).length||Object.keys(bud.exp||{}).length)?'#f0fdf4;border:1px solid #86efac':'#fff7ed;border:1px solid #fdba74')+';border-radius:8px;padding:8px 10px">'+(bud&&(Object.keys(bud.inc||{}).length||Object.keys(bud.exp||{}).length)?'✓ '+(Y+1)+'년도 예산안이 저장돼 있어요 — 제2호 의안에 들어가요':'⚠ '+(Y+1)+'년도 예산안을 아직 저장 안 했어요 — <a href="javascript:void 0" onclick="BK_SV=\'budget\';draw()">📋 예산안</a>에서 저장하면 제2호 의안에 들어가요')+'</div>';
   h+='<div style="font-size:12.5px;color:#475569;margin-top:8px;line-height:1.7">뽑히는 순서: 표지 → 회의 순서·안건 → 제1호 '+Y+'년 결산(🏛 정산서 1년 + 사업별 수입·지출) → 제2호 사업계획·예산안 → 제3호 임원 → 제4호 기타 → 회의록 양식 → 참석자 서명부(회비 회원 '+_fbMemList().filter(function(m){ return !(m.endYm&&m.endYm<_ymNow()); }).length+'명). 결산은 위에서 고른 통장 기준이에요.</div>';
@@ -14714,10 +14750,11 @@ function _bkAgmView(){
 }
 function _bkAgmSave(Y,print){
   var g=function(i){ var e=document.getElementById(i); return e?e.value:""; };
-  var o={date:g("agDate").trim(), place:g("agPlace").trim(), agenda:g("agAgenda"), plan:g("agPlan"), officers:g("agOff"), etc:g("agEtc")};
-  fbDb.ref('/main/BankAGM/'+Y).set(o).then(function(){ toast("💾 총회 자료 저장"); if(print) _bkDocPrint(_bkAgmDoc(Y,o),'portrait'); });
+  var o={date:g("agDate").trim(), place:g("agPlace").trim(), agenda:g("agAgenda"), plan:g("agPlan"), officers:g("agOff"), etc:g("agEtc"), evts:[].slice.call(document.querySelectorAll(".agEvt")).filter(function(c){ return c.checked; }).map(function(c){ return c.value; })};
+  fbDb.ref('/main/BankAGM/'+Y).set(o).then(async function(){ toast("💾 총회 자료 저장"); if(!print) return;
+    showLoading("행사 자료 불러오는 중..."); var ED=await _bkEvtLoadAll(o.evts||[]); hideLoading(); _bkDocPrint(_bkAgmDoc(Y,o,ED),'portrait'); });
 }
-function _bkAgmDoc(Y,A){
+function _bkAgmDoc(Y,A,ED){
   var org=(typeof SYS_PARENT!=="undefined"&&SYS_PARENT)||(typeof SYS_NAME!=="undefined"?SYS_NAME:""), N=Y+1;
   var nl=function(t){ return esc(t||"").split("\n").filter(function(x){ return x.trim(); }); };
   var td='border:1px solid #000;padding:6px 8px', H=td+';background:#f1f5f9;text-align:center;font-weight:700';
@@ -14735,6 +14772,16 @@ function _bkAgmDoc(Y,A){
   pnl=pnl.replace(/<div style="text-align:center;font-size:22px[^>]*>[^<]*<\/div>/,'').replace(/<div style="display:flex;justify-content:flex-end;margin:0 0 14px">[\s\S]*?<\/table><\/div>/,'');
   h+='<div class="pg">'+sec('제1호 의안 : '+Y+'년도 사업실적 및 결산 승인의 건')+gov+'</div>';
   h+='<div class="pg">'+sec('제1호 의안 (붙임) : '+Y+'년도 사업별 수입·지출')+pnl+'</div>';
+  // 사업별(행사) 결산 — 청년회 통장 밖(카드 등)에서 쓴 사업
+  var EV=_bkEvtList(Y).filter(function(e){ return (A.evts||[]).indexOf(e.evtId)>=0 && ED && ED[e.evtId]; });
+  if(EV.length){
+    var S=EV.map(function(e){ return {e:e, r:_bkEvtSettle(e, ED[e.evtId])}; }), tdd='border:1px solid #000;padding:5px 7px', nn=tdd+';text-align:right', HH=tdd+';background:#f1f5f9;text-align:center;font-weight:700';
+    var t={it:0,dt:0,bt:0,xt:0}; S.forEach(function(x){ Object.keys(t).forEach(function(k){ t[k]+=x.r[k]; }); });
+    h+='<div class="pg">'+sec('제1호 의안 (붙임2) : '+Y+'년도 사업별(행사) 결산')+'<div style="font-size:13px;color:#334155;margin-bottom:8px">행사별 지원금·카드로 집행한 사업이에요. 남은 돈 중 청년회로 귀속한 금액은 청년회 결산(수입)에 들어가 있어요.</div><table style="border-collapse:collapse;width:100%;font-size:13.5px"><tr><td style="'+HH+'">사 업</td><td style="'+HH+'">세입(입금)</td><td style="'+HH+'">세출 예산</td><td style="'+HH+'">집행액</td><td style="'+HH+'">잔 액</td></tr>'
+      +S.map(function(x){ return '<tr><td style="'+tdd+';font-weight:700">'+esc(x.e.nm||x.e.evtId)+'</td><td style="'+nn+'">'+fm(x.r.dt)+'</td><td style="'+nn+'">'+fm(x.r.bt)+'</td><td style="'+nn+'">'+fm(x.r.xt)+'</td><td style="'+nn+';font-weight:800">'+fm(x.r.dt-x.r.xt)+'</td></tr>'; }).join('')
+      +'<tr style="font-weight:900;background:#f1f5f9"><td style="'+tdd+';text-align:center">합 계</td><td style="'+nn+'">'+fm(t.dt)+'</td><td style="'+nn+'">'+fm(t.bt)+'</td><td style="'+nn+'">'+fm(t.xt)+'</td><td style="'+nn+'">'+fm(t.dt-t.xt)+'</td></tr></table></div>';
+    S.forEach(function(x){ h+='<div class="pg">'+sec('사업별 결산 — '+esc(x.e.nm||x.e.evtId))+x.r.html+'</div>'; });
+  }
   // 제2호 사업계획·예산안
   h+='<div class="pg">'+sec('제2호 의안 : '+N+'년도 사업계획 및 예산(안) 승인의 건')+'<div style="font-size:14px;line-height:1.9;margin-bottom:14px;white-space:pre-line">'+esc(A.plan||"")+'</div>'+_bkBudgetDoc(Y)+'</div>';
   // 제3호 임원
