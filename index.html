@@ -13623,7 +13623,7 @@ async function _fbSyncApply(){
     var a=pick[i]; showLoading("맞추는 중 ("+(i+1)+"/"+pick.length+")");
     try{
       var r={ok:true};
-      if(a.t==="add") r=await api("addMem",{nm:a.f.nm, tel:a.f.tel||"", bd:a.f.tel||"", ar:a.f.role||"회원", joinDt:(a.f.startYm||_fbStartYm())+"-01", leftDt:""});
+      if(a.t==="add") r=await api("addMem",{nm:a.f.nm, tel:a.f.tel||"", ar:a.f.role||"회원", joinDt:(a.f.startYm||_fbStartYm())+"-01", leftDt:""});
       else if(a.t==="left"||a.t==="unleft") r=await api("updateMem",{id:a.mm.id, leftDt:a.f.endYm?_ymLastDay(a.f.endYm):""});
       else if(a.t==="roleAll"){ for(var q=0;q<a.items.length;q++){ var y=a.items[q], old=String(y.mm.ar||""), nar=old.trim()?old.replace(old.trim(),y.f.role):y.f.role; showLoading("직책 맞추는 중 — "+y.f.nm); var r3=await api("updateMem",{id:y.mm.id, ar:nar}); if(!(r3&&r3.ok)) fail++; } }
       else if(a.t==="joinAll"||a.t==="telAll"){ for(var j=0;j<a.items.length;j++){ var x=a.items[j]; showLoading("맞추는 중 — "+x.f.nm); var rr=await api("updateMem",a.t==="joinAll"?{id:x.mm.id, joinDt:x.f.startYm+"-01"}:{id:x.mm.id, tel:x.f.tel}); if(!(rr&&rr.ok)) fail++; } }
