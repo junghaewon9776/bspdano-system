@@ -14701,9 +14701,20 @@ function _bkAcctView(ak){
   h+='</div>';
   if(a.fee) h+='<div style="background:#f0fdfa;border:1px solid #99f6e4;border-radius:8px;padding:8px 12px;font-size:13.5px;margin-bottom:10px">회비통장은 <b>회비 탭과 같은 자료</b>예요 — 여기서 넣든 회비 탭에서 넣든 양쪽에 똑같이 떠요. 회원 이름 입금은 자동으로 그 달 회비 · 「회비 › 월회비」예요.</div>';
   h+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">';
-  h+='<div style="flex:1 1 150px;background:#fff;border:1px solid #cbd5e1;border-radius:8px;padding:8px 12px"><div style="font-size:12px;color:#475569;font-weight:700">입금 합계</div><div style="font-size:18px;font-weight:900;color:#166534">'+fm(B.inS)+'원</div></div>';
-  h+='<div style="flex:1 1 150px;background:#fff;border:1px solid #cbd5e1;border-radius:8px;padding:8px 12px"><div style="font-size:12px;color:#475569;font-weight:700">출금 합계</div><div style="font-size:18px;font-weight:900;color:#b91c1c">'+fm(B.outS)+'원</div></div>';
-  h+='<div style="flex:1 1 200px;background:#fff;border:2px solid '+(B.last&&!ok?'#dc2626':'#334155')+';border-radius:8px;padding:8px 12px"><div style="font-size:12px;color:#0f172a;font-weight:700">🏦 통장 잔액 (계산)</div><div style="font-size:18px;font-weight:900">'+fm(B.calc)+'원</div>'+(B.last&&!ok?'<div style="font-size:12px;color:#b91c1c;font-weight:700">⚠ '+esc(String(B.last.dt).slice(0,10))+' 통장 잔액 '+fm(B.last.bal)+'원과 '+fm(B.last.calc-B.last.bal)+'원 차이</div>':'')+'</div>';
+  var perOn=!!(BK_Y||BK_M||BK_AF||BK_AT), cont=!(BK_M&&!BK_Y), cd=function(lb,v,col,bd){ return '<div style="flex:1 1 150px;background:#fff;border:'+(bd||'1px solid #cbd5e1')+';border-radius:8px;padding:8px 12px"><div style="font-size:12px;color:#475569;font-weight:700">'+lb+'</div><div style="font-size:18px;font-weight:900;color:'+(col||'#0f172a')+'">'+fm(v)+'원</div></div>'; };
+  if(perOn){
+    var pIn=0,pOut=0,pEnd=null,pOpen=0,seen=false;
+    L.forEach(function(t){ if(_bkInAcctPer(t)){ pIn+=Number(t.inA)||0; pOut+=Number(t.out)||0; pEnd=t._run; seen=true; } else if(!seen) pOpen=t._run; });
+    if(pEnd==null) pEnd=pOpen;
+    h+='<div style="flex:1 1 100%;font-size:13px;font-weight:800;color:#0f766e">📅 '+esc(_bkAcctPerLabel())+' 기준</div>';
+    if(cont) h+=cd('기간 시작 잔액',pOpen);
+    h+=cd('입금 합계',pIn,'#166534')+cd('출금 합계',pOut,'#b91c1c');
+    if(cont) h+=cd('기간 끝 잔액',pEnd,'#1d4ed8','2px solid #334155');
+    h+='<div style="flex:1 1 150px;background:#f8fafc;border:1px dashed #94a3b8;border-radius:8px;padding:8px 12px"><div style="font-size:12px;color:#475569;font-weight:700">🏦 지금 통장 잔액</div><div style="font-size:16px;font-weight:800;color:#334155">'+fm(B.calc)+'원</div></div>';
+  } else {
+    h+=cd('입금 합계 (전체)',B.inS,'#166534')+cd('출금 합계 (전체)',B.outS,'#b91c1c');
+    h+='<div style="flex:1 1 200px;background:#fff;border:2px solid '+(B.last&&!ok?'#dc2626':'#334155')+';border-radius:8px;padding:8px 12px"><div style="font-size:12px;color:#0f172a;font-weight:700">🏦 통장 잔액 (계산)</div><div style="font-size:18px;font-weight:900">'+fm(B.calc)+'원</div>'+(B.last&&!ok?'<div style="font-size:12px;color:#b91c1c;font-weight:700">⚠ '+esc(String(B.last.dt).slice(0,10))+' 통장 잔액 '+fm(B.last.bal)+'원과 '+fm(B.last.calc-B.last.bal)+'원 차이</div>':'')+'</div>';
+  }
   h+='</div>';
   if(!L.length && !a.fee){
     h+='<div style="background:#fff7ed;border:2px solid #fdba74;border-radius:10px;padding:16px;font-size:15px;line-height:1.7">아직 거래가 없어요.<br><b>⬆ 엑셀 가져오기</b>로 이 통장 거래내역 엑셀(예: 「법성포청년회 입출금 ….xlsm」, 은행에서 받은 거래내역)을 고르면 대분류·계정과목까지 한 번에 들어가요. 오른쪽 아래 <b>＋ 거래 등록</b>으로 한 건씩 넣어도 돼요.</div>';
