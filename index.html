@@ -14114,10 +14114,10 @@ function _bkDashCharts(R){
 }
 // ── 📄 정산보고서 — 엑셀 정산보고서 양식: 월 고르면 월별, 1년 전체면 총회용, 대분류 고르면 항목별 ──
 // ── 정산보고서 모양 고르기 ──
-var BK_RS="big";
+var BK_RS="big", BK_MERGE=true;   // 같은 대분류·계정과목 칸 병합
 var BK_RS_LIST=[["big","📂 대분류별","엑셀 「정산보고서」 — 대분류 비중 + 대분류별 상세"],["date","📅 일자순","엑셀 「정산보고」 — 날짜 순서대로 수입·지출"],["pnl","⚖ 사업별 수입·지출","대분류마다 들어온 돈·쓴 돈·남은 돈을 옆에 — 같은 대분류는 칸 병합"],["acct","🧾 계정과목별","엑셀 「항목별 정산보고」 — 계정과목 비율 + 내역"],["month","📈 월별 추이","기업식 손익 추이표 — 대분류 × 월"],["yoy","🔁 전년 대비","기업식 — 올해와 작년 같은 기간 비교, 증감·증감률"]];
 function _bkRsPicker(){
-  return '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:-4px 0 12px"><b style="font-size:13px;color:#475569">보고서 모양</b>'+BK_RS_LIST.map(function(o){ var on=BK_RS===o[0]; return '<button title="'+esc(o[2])+'" onclick="BK_RS=\''+o[0]+'\';draw()" style="border:2px solid '+(on?'#1d4ed8':'#cbd5e1')+';border-radius:8px;padding:5px 11px;font-size:13.5px;font-weight:800;cursor:pointer;background:'+(on?'#1d4ed8':'#fff')+';color:'+(on?'#fff':'#0f172a')+'">'+o[1]+'</button>'; }).join('')+'<span style="font-size:12px;color:#64748b">'+esc((BK_RS_LIST.filter(function(o){ return o[0]===BK_RS; })[0]||[])[2]||'')+'</span></div>';
+  return '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:-4px 0 12px"><b style="font-size:13px;color:#475569">보고서 모양</b>'+BK_RS_LIST.map(function(o){ var on=BK_RS===o[0]; return '<button title="'+esc(o[2])+'" onclick="BK_RS=\''+o[0]+'\';draw()" style="border:2px solid '+(on?'#1d4ed8':'#cbd5e1')+';border-radius:8px;padding:5px 11px;font-size:13.5px;font-weight:800;cursor:pointer;background:'+(on?'#1d4ed8':'#fff')+';color:'+(on?'#fff':'#0f172a')+'">'+o[1]+'</button>'; }).join('')+((BK_RS==="pnl"||BK_RS==="acct")?'<label style="display:flex;gap:5px;align-items:center;font-weight:800;margin-left:6px;background:#fff;border:2px solid #7c3aed;border-radius:8px;padding:4px 10px;cursor:pointer"><input type="checkbox" '+(BK_MERGE?'checked':'')+' onchange="BK_MERGE=this.checked;draw()" style="width:17px;height:17px"> 같은 '+(BK_RS==="pnl"?'대분류':'계정과목')+' 칸 병합</label>':'')+'<span style="font-size:12px;color:#64748b">'+esc((BK_RS_LIST.filter(function(o){ return o[0]===BK_RS; })[0]||[])[2]||'')+'</span></div>';
 }
 // 대분류(또는 대분류 하나 골랐으면 계정과목) → {이름:{t, list}}
 function _bkRsGroups(G, byMid){
@@ -14150,8 +14150,8 @@ function _bkRepBody(R,A,an,S){
       Object.keys(I.mids).forEach(function(m){ ms[m]=1; }); Object.keys(E.mids).forEach(function(m){ ms[m]=1; });
       var ML=Object.keys(ms).sort(function(x,y){ return (((I.mids[y]||{})._t||0)+((E.mids[y]||{})._t||0))-(((I.mids[x]||{})._t||0)+((E.mids[x]||{})._t||0)); });
       ML.forEach(function(m,i){ var vi=(I.mids[m]||{})._t||0, ve=(E.mids[m]||{})._t||0;
-        h+='<tr>'+(i===0?'<td rowspan="'+(ML.length+1)+'" style="'+td+';font-weight:900;vertical-align:middle;text-align:center;background:#f8fafc">'+esc(b)+'</td>':'')+'<td style="'+td+'">'+esc(m)+'</td><td style="'+n+';color:#166534">'+(vi?fm(vi):'-')+'</td><td style="'+n+';color:#b91c1c">'+(ve?fm(ve):'-')+'</td>'+dc(vi-ve)+'</tr>'; });
-      h+='<tr style="font-weight:900;background:#f1f5f9"><td style="'+td+';text-align:center">소계</td><td style="'+n+';color:#166534">'+fm(I._t)+'</td><td style="'+n+';color:#b91c1c">'+fm(E._t)+'</td>'+dc(I._t-E._t)+'</tr>';
+        h+='<tr>'+(BK_MERGE?(i===0?'<td rowspan="'+(ML.length+1)+'" style="'+td+';font-weight:900;vertical-align:middle;text-align:center;background:#f8fafc">'+esc(b)+'</td>':''):'<td style="'+td+';font-weight:700">'+esc(b)+'</td>')+'<td style="'+td+'">'+esc(m)+'</td><td style="'+n+';color:#166534">'+(vi?fm(vi):'-')+'</td><td style="'+n+';color:#b91c1c">'+(ve?fm(ve):'-')+'</td>'+dc(vi-ve)+'</tr>'; });
+      h+='<tr style="font-weight:900;background:#f1f5f9">'+(BK_MERGE?'':'<td style="'+td+'">'+esc(b)+'</td>')+'<td style="'+td+';text-align:center">소계</td><td style="'+n+';color:#166534">'+fm(I._t)+'</td><td style="'+n+';color:#b91c1c">'+fm(E._t)+'</td>'+dc(I._t-E._t)+'</tr>';
     });
     if(!BL.length) h+='<tr><td style="'+td+';color:#94a3b8" colspan="5">없음</td></tr>';
     h+='<tr style="font-weight:900;background:#dbeafe"><td style="'+td+';text-align:center" colspan="2">합  계</td><td style="'+n+'">'+fm(R.incT)+'</td><td style="'+n+'">'+fm(R.expT)+'</td>'+dc(R.incT-R.expT)+'</tr></table>';
@@ -14166,7 +14166,7 @@ function _bkRepBody(R,A,an,S){
       h+='<tr style="font-weight:900;background:#f1f5f9"><td style="'+td+';text-align:center" colspan="3">합  계</td><td style="'+n+'">'+fm(x[2])+'</td><td style="'+n+'">'+(x[2]?'100.0%':'')+'</td></tr></table>';
       if(BK_DET){
         h+='<div style="font-weight:900;margin:12px 0 4px">■ '+x[0]+'내역</div><table style="border-collapse:collapse;width:100%;font-size:12.5px"><tr><th style="'+th+'">계정과목</th><th style="'+th+'">일자</th>'+(multi?'<th style="'+th+'">통장</th>':'')+'<th style="'+th+'">거래처</th><th style="'+th+'">내용</th><th style="'+th+'">'+x[0]+'금액</th></tr>';
-        ks.forEach(function(k){ var o=G[k]; o.list.sort(byDate).forEach(function(t,i){ h+='<tr><td style="'+td+';font-weight:700">'+(i?'':esc(k))+'</td><td style="'+td+';white-space:nowrap">'+dk(t.dt)+'</td>'+(multi?'<td style="'+td+'">'+esc(an[t._a]||'')+'</td>':'')+'<td style="'+td+'">'+esc(t.vendor||t.nm||'')+'</td><td style="'+td+'">'+esc(t.desc||(t.vendor?t.nm:'')||'')+'</td><td style="'+n+'">'+fm(t[x[3]])+'</td></tr>'; });
+        ks.forEach(function(k){ var o=G[k]; o.list.sort(byDate).forEach(function(t,i){ h+='<tr>'+(BK_MERGE?(i?'':'<td rowspan="'+o.list.length+'" style="'+td+';font-weight:700;vertical-align:middle;background:#f8fafc">'+esc(k)+'</td>'):'<td style="'+td+';font-weight:700">'+esc(k)+'</td>')+'<td style="'+td+';white-space:nowrap">'+dk(t.dt)+'</td>'+(multi?'<td style="'+td+'">'+esc(an[t._a]||'')+'</td>':'')+'<td style="'+td+'">'+esc(t.vendor||t.nm||'')+'</td><td style="'+td+'">'+esc(t.desc||(t.vendor?t.nm:'')||'')+'</td><td style="'+n+'">'+fm(t[x[3]])+'</td></tr>'; });
           h+='<tr style="background:#f8fafc;font-weight:800"><td style="'+td+'" colspan="'+(multi?5:4)+'" align="right">'+esc(k)+' 소계 '+o.list.length+'건</td><td style="'+n+'">'+fm(o.t)+'</td></tr>'; });
         h+='</table>';
       }
