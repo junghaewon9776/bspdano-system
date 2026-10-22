@@ -14795,12 +14795,13 @@ function _bkAgmDef(Y){ return {date:"", place:"", agenda:"제1호 의안: "+Y+"�
 function _bkAgmView(){
   var Y=BK_PY; _bkAgmLoad(Y); _bkBudLoad(Y+1);
   var A=Object.assign(_bkAgmDef(Y), (BK.agm||{})[Y]||{});
+  if(!String(A.agenda||"").trim()) A.agenda=_bkAgmDef(Y).agenda;
   if(!A.officers){ A.officers=_fbMemList().filter(function(m){ return !(m.endYm&&m.endYm<_ymNow()) && m.role && !/^회원$/.test(String(m.role).trim()); }).map(function(m){ return String(m.role).trim()+" : "+m.nm; }).join("\n"); }
   var inp=function(id,lb,v,ph){ return '<label style="display:flex;flex-direction:column;gap:3px;font-weight:800;font-size:13.5px">'+lb+'<input id="'+id+'" value="'+esc(v||"")+'" placeholder="'+esc(ph||"")+'" style="padding:8px;font-weight:600"></label>'; };
   var ta=function(id,lb,v,rows,ph){ return '<label style="display:flex;flex-direction:column;gap:3px;font-weight:800;font-size:13.5px">'+lb+'<textarea id="'+id+'" rows="'+rows+'" placeholder="'+esc(ph||"")+'" style="padding:8px;font-weight:500;font-family:inherit;font-size:13.5px">'+esc(v||"")+'</textarea></label>'; };
   var h='<div id="bkAgmEditing" style="background:#fff;border:1px solid #cbd5e1;border-radius:10px;padding:14px">';
   h+='<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px"><b style="font-size:18px;flex:1">🏛 '+(Y+1)+'년 정기총회 자료 <span style="font-size:13px;color:#475569;font-weight:600">'+Y+'년 결산 + '+(Y+1)+'년 예산안 — 연도는 위 ◀ ▶</span></b>';
-  h+='<button class="btn" style="background:#1d4ed8;color:#fff;font-weight:900" onclick="_bkAgmSave('+Y+')">💾 저장</button><button class="btn" style="background:#b45309;color:#fff;font-weight:900" onclick="_bkAgmSave('+Y+',1)">🖨 총회 자료 뽑기</button></div>';
+  h+='<button class="btn" style="background:#1d4ed8;color:#fff;font-weight:900" onclick="_bkAgmSave('+Y+')">💾 저장</button><button class="btn" style="background:#b45309;color:#fff;font-weight:900" onclick="_bkAgmSave('+Y+',1)">🖨 총회 자료 뽑기</button><button class="btn" style="background:#7c3aed;color:#fff;font-weight:900" onclick="_bkAgmSave('+Y+',2)" title="청년회 결산 + '+Y+'년 행사 전부의 결산(전년 대비 포함) + 사업계획·예산안 + 회의록·서명부">📚 전부 한 번에 뽑기</button></div>';
   h+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;margin-bottom:10px">'+inp("agDate","총회 일시",A.date,"예: "+(Y+1)+". 1. 10.(토) 18:00")+inp("agPlace","장소",A.place,"예: 법성포청년회 사무실")+'</div>';
   h+='<div style="display:grid;gap:10px">'+ta("agAgenda","안건 (한 줄에 하나)",A.agenda,4)+ta("agPlan","제2호 — "+(Y+1)+"년도 사업계획",A.plan,4,"주요 사업: 방역, 효사랑잔치, 정화활동 …")+ta("agOff","제3호 — 임원 명단 (직책 : 이름)",A.officers,5)+ta("agEtc","제4호 — 기타 안건",A.etc,3,"회비 인상, 회칙 개정 등")+'</div>';
   var EV=_bkEvtList(Y), sel=A.evts||[];   // 사업별 결산은 각 행사 결산서에서 — 총회 자료엔 필요할 때만 체크
@@ -14817,8 +14818,8 @@ function _bkAgmSave(Y,print){
   var o={date:g("agDate").trim(), place:g("agPlace").trim(), agenda:g("agAgenda"), plan:g("agPlan"), officers:g("agOff"), etc:g("agEtc"), evts:[].slice.call(document.querySelectorAll(".agEvt")).filter(function(c){ return c.checked; }).map(function(c){ return c.value; }), link:{}};
   document.querySelectorAll(".agLink").forEach(function(e){ o.link[e.getAttribute("data-e")]=e.value; });
   fbDb.ref('/main/BankAGM/'+Y).set(o).then(async function(){ toast("💾 총회 자료 저장"); if(!print) return;
-    var ids=(o.evts||[]).slice(); _bkEvtAll().forEach(function(e){ if((+e.yr===Y+1||+e.yr===Y)&&ids.indexOf(e.evtId)<0) ids.push(e.evtId); });
-    showLoading("행사 자료 불러오는 중..."); var ED=await _bkEvtLoadAll(ids); hideLoading(); _bkDocPrint(_bkAgmDoc(Y,o,ED),'portrait'); });
+    var all=(print===2), ids=(o.evts||[]).slice(); _bkEvtAll().forEach(function(e){ if((+e.yr===Y+1||+e.yr===Y||(all&&+e.yr===Y-1))&&ids.indexOf(e.evtId)<0) ids.push(e.evtId); });
+    showLoading("행사 자료 불러오는 중..."); var ED=await _bkEvtLoadAll(ids); hideLoading(); var o2=all?Object.assign({},o,{evts:_bkEvtList(Y).map(function(e){ return e.evtId; }),all:1}):o; _bkDocPrint(_bkAgmDoc(Y,o2,ED),'portrait'); });
 }
 // 내년 사업계획 총괄표 — 내년 행사들의 세입(지원금·자부담) 계획 + 올해 같은 사업과 비교
 function _bkPlanTable(Y,ED){
@@ -14834,6 +14835,7 @@ function _bkPlanTable(Y,ED){
   return h+'<div style="font-size:11.5px;color:#475569;margin:4px 0 12px">지원금은 신청 금액이라 승인 결과에 따라 바뀔 수 있어요. 자부담은 청년회 통장에서 나가요(아래 예산안 지출에 포함). 단오제 등 청년회 통장 사업은 아래 예산안에 있어요.</div>';
 }
 function _bkAgmDoc(Y,A,ED){
+  A=Object.assign({},A); if(!String(A.agenda||"").trim()) A.agenda=_bkAgmDef(Y).agenda;   // 안건 비면 기본 안건
   var org=(typeof SYS_PARENT!=="undefined"&&SYS_PARENT)||(typeof SYS_NAME!=="undefined"?SYS_NAME:""), N=Y+1;
   var nl=function(t){ return esc(t||"").split("\n").filter(function(x){ return x.trim(); }); };
   var td='border:1px solid #000;padding:6px 8px', H=td+';background:#f1f5f9;text-align:center;font-weight:700';
@@ -14863,6 +14865,9 @@ function _bkAgmDoc(Y,A,ED){
         return '<tr><td style="'+tdd+';font-weight:700">'+esc(x.e.nm||x.e.evtId)+'</td><td style="'+nn+'">'+fm(ext)+'</td><td style="'+nn+'">'+fm(x.r.selfX)+'</td><td style="'+nn+';font-weight:800">'+fm(x.r.xt)+'</td><td style="'+tdd+';font-size:12px">'+esc(bg||'-')+'</td><td style="'+nn+'">'+(bg?fm(bi)+_bkMidLines((RY.inc[bg]||{}).mids):'-')+'</td><td style="'+nn+'">'+(bg?fm(bo)+_bkMidLines((RY.exp[bg]||{}).mids):'-')+'</td></tr>'; }).join('')
       +'<tr style="font-weight:900;background:#f1f5f9"><td style="'+tdd+';text-align:center">합 계</td><td style="'+nn+'">'+fm(t.ext)+'</td><td style="'+nn+'">'+fm(t.self)+'</td><td style="'+nn+'">'+fm(t.xt)+'</td><td style="'+tdd+'" colspan="3"></td></tr></table>'
       +'<div style="font-size:12px;color:#475569;margin-top:6px;line-height:1.6">· 지원금으로 = 행사 집행 중 한수원·면 지원금(카드)으로 쓴 돈 · 자부담으로 = 청년회 통장에서 낸 돈<br>· 청년회 결산에 들어간 금액 = 그 사업과 짝인 청년회 통장 대분류의 '+Y+'년 수입(귀속·후원 등)·지출(자부담 등)</div></div>';
+    if(A.all){ var _se=BK.evtD, _sv=BK_EVT; BK.evtD=Object.assign({},BK.evtD||{},ED);
+      S.forEach(function(x){ BK_EVT=x.e.evtId; h+='<div class="pg">'+sec('사업별 결산 — '+esc(x.e.nm||x.e.evtId))+_bkEvtDoc()+'</div>'; });
+      BK.evtD=_se; BK_EVT=_sv; S=[]; }
     S.forEach(function(x){ h+='<div class="pg">'+sec('참고 : 사업별 결산 — '+esc(x.e.nm||x.e.evtId))+x.r.html+'</div>'; });
   }
   // 제2호 사업계획·예산안
