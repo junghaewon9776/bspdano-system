@@ -14070,8 +14070,9 @@ function _bkSumView(){
   if(BK_BIG && bl.indexOf(BK_BIG)<0) bl.unshift(BK_BIG);
   h+='<div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center"><b style="width:60px">대분류</b>'+pill(!BK_BIG,'전체','BK_BIG=\'\';draw()','#7c3aed')+bl.map(function(b){ return pill(BK_BIG===b,esc(b),'BK_BIG='+_bkJs(b).replace(/"/g,'&quot;')+';draw()','#7c3aed'); }).join('')+'</div></div>';
   var sv=function(k,lb){ var on=BK_SV===k; return '<button onclick="BK_SV=\''+k+'\';draw()" style="border:none;border-radius:8px;padding:9px 16px;font-size:15px;font-weight:900;cursor:pointer;background:'+(on?'#1d4ed8':'#e2e8f0')+';color:'+(on?'#fff':'#0f172a')+'">'+lb+'</button>'; };
-  h+='<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:12px">'+(isA()?sv("dash","📊 대시보드")+sv("report","📄 정산보고서")+sv("budget","📋 예산안")+sv("agm","🏛 총회 자료"):'')+(BK_SV==="report"?'<label style="display:flex;gap:5px;align-items:center;font-weight:700;margin-left:8px"><input type="checkbox" '+(BK_DET?'checked':'')+' onchange="BK_DET=this.checked;draw()" style="width:18px;height:18px"> 거래 상세 내역도 넣기</label>':'')+'</div>';
+  h+='<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:12px">'+(isA()?sv("dash","📊 대시보드")+sv("report","📄 정산보고서")+sv("evt","🎪 사업별 결산")+sv("budget","📋 예산안")+sv("agm","🏛 총회 자료"):'')+(BK_SV==="report"?'<label style="display:flex;gap:5px;align-items:center;font-weight:700;margin-left:8px"><input type="checkbox" '+(BK_DET?'checked':'')+' onchange="BK_DET=this.checked;draw()" style="width:18px;height:18px"> 거래 상세 내역도 넣기</label>':'')+'</div>';
   if(!A.length) return h+'<div class="mut">통장을 하나 이상 골라 주세요</div>';
+  if(BK_SV==="evt"&&isA()) return h+_bkEvtView();
   if(BK_SV==="budget"&&isA()) return h+_bkBudgetView();
   if(BK_SV==="agm"&&isA()) return h+_bkAgmView();
   if(BK_SV==="report") return h+_bkRsPicker()+'<div style="background:#fff;border:1px solid #cbd5e1;border-radius:10px;padding:18px;max-width:'+(BK_RS==="month"?'100%':'900px')+';margin:0 auto">'+_bkReportHtml()+'</div>';
@@ -14736,6 +14737,52 @@ function _bkEvtGuessBig(ev, bigs){
   return "";
 }
 async function _bkEvtLoadAll(ids){ var out={}; for(var i=0;i<ids.length;i++){ try{ out[ids[i]]=(await fbDb.ref('/evtData/'+ids[i]).once('value')).val()||{}; }catch(e){ out[ids[i]]={}; } } return out; }
+// ── 🎪 사업별(행사) 결산 화면 — 행사 하나 골라 세입·세출 + 같은 이름 전년도 행사와 항목별 비교 ──
+var BK_EVT="";
+function _bkEvtAll(){ return (typeof EVENTS!=="undefined"&&EVENTS||[]).filter(function(e){ return e&&e.evtId&&!/청년회/.test(e.nm||""); }).sort(function(a,b){ return String(b.yr||"").localeCompare(String(a.yr||"")) || String(a.nm).localeCompare(String(b.nm)); }); }
+function _bkEvtNm(e){ return String((e&&e.nm)||"").replace(/\s|20\d\d|법성면|법성포/g,""); }
+function _bkEvtPrev(e){ var y=+e.yr-1; return _bkEvtAll().filter(function(x){ return +x.yr===y && _bkEvtNm(x)===_bkEvtNm(e); })[0]; }
+function _bkEvtGet(id){ if(!BK.evtD) BK.evtD={}; if(BK.evtD[id]!==undefined) return BK.evtD[id]; BK.evtD[id]=null;
+  fbDb.ref('/evtData/'+id).once('value').then(function(s){ BK.evtD[id]=s.val()||{}; if(typeof CTAB!=="undefined"&&CTAB==="bank"&&BK_SV==="evt") draw(); }); return null; }
+// 대분류·중분류별 예산 / 집행 (결제일 있는 구매만)
+function _bkEvtAgg(D){
+  var arr=function(x){ return Array.isArray(x)?x.filter(Boolean):Object.keys(x||{}).map(function(k){ return x[k]; }).filter(Boolean); };
+  var ex={};
+  arr(D.ExpBG).forEach(function(r){ var t=r.tp||'(대분류 없음)', m=r.mid||'', E=ex[t]=ex[t]||{b:0,x:0,mids:{}}; if(m) (E.mids[m]=E.mids[m]||{b:0,x:0}).b+=_bkNum(r.planAm); else E.b0=(E.b0||0)+_bkNum(r.planAm); });
+  arr(D.Purs).forEach(function(p){ if(!p.dt) return; var v=_bkNum(p.tot), t=p.expTp||'(대분류 없음)', m=p.expMid||'', E=ex[t]=ex[t]||{b:0,x:0,mids:{}}; E.x+=v; if(m) (E.mids[m]=E.mids[m]||{b:0,x:0}).x+=v; });
+  Object.keys(ex).forEach(function(t){ var E=ex[t], mb=0; Object.keys(E.mids).forEach(function(m){ mb+=E.mids[m].b; }); E.b=E.b0||mb; });
+  return ex;
+}
+function _bkEvtView(){
+  var EV=_bkEvtAll(); if(!EV.length) return '<div class="card mut">행사가 없어요 — 사업(행사)을 만들고 세입·세출을 넣으면 여기서 결산이 나와요</div>';
+  if(!BK_EVT||!EV.some(function(e){ return e.evtId===BK_EVT; })) BK_EVT=EV[0].evtId;
+  var ev=EV.filter(function(e){ return e.evtId===BK_EVT; })[0], pv=_bkEvtPrev(ev), D=_bkEvtGet(ev.evtId), PD=pv?_bkEvtGet(pv.evtId):undefined;
+  var h='<div style="background:#fff;border:1px solid #cbd5e1;border-radius:10px;padding:14px">';
+  h+='<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px"><b style="font-size:18px">🎪 사업별 결산</b><select onchange="BK_EVT=this.value;draw()" style="padding:7px;font-size:15px;font-weight:800;border:2px solid #0f766e;border-radius:8px">'+EV.map(function(e){ return '<option value="'+esc(e.evtId)+'"'+(e.evtId===BK_EVT?' selected':'')+'>'+esc((e.yr?e.yr+' ':'')+(e.nm||e.evtId))+'</option>'; }).join('')+'</select>';
+  h+='<span style="flex:1;font-size:12.5px;color:#475569">'+(pv?'전년도 「'+esc(pv.yr+' '+pv.nm)+'」와 항목별 비교':'같은 이름의 전년도 행사가 없어서 비교는 안 나와요')+'</span>';
+  h+='<button class="btn btn-s" style="background:#15803d;color:#fff;font-weight:800" onclick="_bkDocXlsx(_bkEvtDoc(),\''+esc((ev.yr||'')+'_'+(ev.nm||''))+'_사업결산\')">📗 엑셀</button><button class="btn btn-s" style="background:#334155;color:#fff;font-weight:800" onclick="_bkDocPrint(_bkEvtDoc(),\'portrait\')">🖨 인쇄</button></div>';
+  if(!D||(pv&&!PD)) return h+'<div class="mut" style="padding:20px;text-align:center">📡 행사 자료 불러오는 중...</div></div>';
+  return h+_bkEvtDoc()+'</div>';
+}
+function _bkEvtDoc(){
+  var ev=_bkEvtAll().filter(function(e){ return e.evtId===BK_EVT; })[0]; if(!ev) return '';
+  var D=(BK.evtD||{})[ev.evtId]||{}, pv=_bkEvtPrev(ev), PD=pv?((BK.evtD||{})[pv.evtId]||{}):null;
+  var r=_bkEvtSettle(ev,D), h='<div class="bkRep"><div style="text-align:center;font-size:22px;font-weight:900;margin-bottom:10px">'+esc((ev.yr?ev.yr+'년 ':'')+(ev.nm||''))+' 결산</div>'+r.html;
+  if(pv){
+    var A=_bkEvtAgg(D), P=_bkEvtAgg(PD), td='border:1px solid #000;padding:4px 6px', n=td+';text-align:right', H=td+';background:#f1f5f9;text-align:center;font-weight:700';
+    var dd=function(v){ return '<span style="color:'+(v>0?'#1d4ed8':v<0?'#b91c1c':'#475569')+';font-weight:700">'+(v>0?'▲':v<0?'▼':'')+fm(Math.abs(v))+'</span>'; };
+    var keys={}; [A,P].forEach(function(G){ Object.keys(G).forEach(function(t){ keys[t]=keys[t]||{}; Object.keys(G[t].mids).forEach(function(m){ keys[t][m]=1; }); }); });
+    h+='<div style="font-weight:900;margin:16px 0 4px">□ 전년도 대비 ('+esc(pv.yr)+' → '+esc(ev.yr)+')</div><div style="text-align:right;font-size:11.5px">(단위:원)</div><table style="border-collapse:collapse;width:100%;font-size:12.5px"><tr><td style="'+H+'" rowspan="2">대분류</td><td style="'+H+'" rowspan="2">항목</td><td style="'+H+'" colspan="2">'+esc(pv.yr)+'년</td><td style="'+H+'" colspan="2">'+esc(ev.yr)+'년</td><td style="'+H+'" colspan="2">증 감</td></tr><tr><td style="'+H+'">예산</td><td style="'+H+'">집행</td><td style="'+H+'">예산</td><td style="'+H+'">집행</td><td style="'+H+'">예산</td><td style="'+H+'">집행</td></tr>';
+    var T={pb:0,px:0,cb:0,cx:0};
+    Object.keys(keys).forEach(function(t){ var ML=Object.keys(keys[t]); if(!ML.length) ML=[''];
+      ML.forEach(function(m,i){ var c=m?((A[t]||{mids:{}}).mids[m]||{b:0,x:0}):(A[t]||{b:0,x:0}), p=m?((P[t]||{mids:{}}).mids[m]||{b:0,x:0}):(P[t]||{b:0,x:0});
+        T.pb+=p.b; T.px+=p.x; T.cb+=c.b; T.cx+=c.x;
+        h+='<tr>'+(i===0?'<td rowspan="'+ML.length+'" style="'+td+';font-weight:700;vertical-align:middle;text-align:center">'+esc(t)+'</td>':'')+'<td style="'+td+'">'+esc(m||'-')+'</td><td style="'+n+';color:#475569">'+fm(p.b)+'</td><td style="'+n+';color:#475569">'+fm(p.x)+'</td><td style="'+n+'">'+fm(c.b)+'</td><td style="'+n+';font-weight:800">'+fm(c.x)+'</td><td style="'+n+'">'+dd(c.b-p.b)+'</td><td style="'+n+'">'+dd(c.x-p.x)+'</td></tr>'; }); });
+    h+='<tr style="font-weight:900;background:#f1f5f9"><td style="'+td+';text-align:center" colspan="2">합 계</td><td style="'+n+'">'+fm(T.pb)+'</td><td style="'+n+'">'+fm(T.px)+'</td><td style="'+n+'">'+fm(T.cb)+'</td><td style="'+n+'">'+fm(T.cx)+'</td><td style="'+n+'">'+dd(T.cb-T.pb)+'</td><td style="'+n+'">'+dd(T.cx-T.px)+'</td></tr></table>';
+    h+='<div style="font-size:11.5px;color:#475569;margin-top:4px">집행은 결제일이 있는 구매만 셈해요. 올해 사업이 진행 중이면 집행이 적게 나와요.</div>';
+  }
+  return h+'</div>';
+}
 // 🏛 총회 자료
 function _bkAgmDef(Y){ return {date:"", place:"", agenda:"제1호 의안: "+Y+"년도 사업실적 및 결산 승인의 건\n제2호 의안: "+(Y+1)+"년도 사업계획 및 예산(안) 승인의 건\n제3호 의안: 임원 선임(임기 연장)의 건\n제4호 의안: 기타 단체 운영에 관한 안건", plan:(Y+1)+"년도 사업은 "+Y+"년도 사업을 그대로 이어서 진행합니다.", officers:"", etc:""}; }
 function _bkAgmView(){
