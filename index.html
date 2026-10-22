@@ -14299,7 +14299,7 @@ function _bkEsgOf(){ return (BK.esig||{})[_bkRepKey()]||{}; }
 function _bkEsgCount(){ var r=_bkEsgOf().roles||{}; return _bkEsgRoles().filter(function(k){ return r[k]&&r[k].img; }).length; }
 function _bkEsgBtn(){
   var n=_bkEsgCount(), all=_bkEsgRoles().length;
-  return '<button onclick="_bkEsgPop()" style="border:2px solid '+(n===all?'#16a34a':'#0f766e')+';border-radius:8px;padding:5px 12px;font-size:13.5px;font-weight:800;cursor:pointer;background:'+(n===all?'#16a34a':'#fff')+';color:'+(n===all?'#fff':'#0f766e')+'">✍ 결재 받기 '+n+'/'+all+'</button>';
+  return '<button onclick="_bkEsgPop()" style="border:2px solid '+(n===all?'#16a34a':'#0f766e')+';border-radius:8px;padding:5px 12px;font-size:13.5px;font-weight:800;cursor:pointer;background:'+(n===all?'#16a34a':'#fff')+';color:'+(n===all?'#fff':'#0f766e')+'">✍ 결재 받기 '+n+'/'+all+'</button><button onclick="_bkEsgList()" style="border:2px solid #475569;border-radius:8px;padding:5px 12px;font-size:13.5px;font-weight:800;cursor:pointer;background:#fff;color:#334155">📋 서명 받은 정산서</button>';
 }
 function _bkEsgPop(){
   var d=_bkEsgOf(), roles=d.roles||{}, adm=(typeof isA==="function"&&isA());
@@ -14324,8 +14324,9 @@ function _bkEsgPop(){
   openPopup2(h,560);
 }
 // 🔗 결재 링크 — 기간·통장만 담김(개인정보 없음). 열면 로그인 → 그 정산서 결재 창. 서명은 결재선에 지정된 본인 계정만
+function _bkEsgQ(){ var rg=_bkRange(); return {f:rg.from||"",t:rg.to||"",y:BK_PY,m:BK_PM,s:_bkAccts().filter(function(a){ return !BK_SEL||BK_SEL[a._k]!==false; }).map(function(a){ return a._k; }),b:BK_BIG||""}; }
 function _bkEsgLink(){
-  var rg=_bkRange(), o={f:rg.from||"",t:rg.to||"",y:BK_PY,m:BK_PM,s:_bkAccts().filter(function(a){ return !BK_SEL||BK_SEL[a._k]!==false; }).map(function(a){ return a._k; }),b:BK_BIG||""};
+  var o=_bkEsgQ();
   return location.href.split("?")[0].split("#")[0]+"?bkesign="+encodeURIComponent(btoa(unescape(encodeURIComponent(JSON.stringify(o)))));
 }
 function _bkEsgLinkCopy(role){
@@ -14336,11 +14337,31 @@ function _bkEsgLinkCopy(role){
 function _bkEsgOpenDeep(code){
   try{ history.replaceState(null,"",location.pathname); }catch(e){}
   var o; try{ o=JSON.parse(decodeURIComponent(escape(atob(code)))); }catch(e){ toast("결재 링크가 잘못됐어요",true); return; }
+  _bkEsgApply(o,true);
+}
+function _bkEsgApply(o,pop){
   CTAB="bank"; BK_ACC="_sum"; BK_SV="report"; BK_RS="gov"; BK_BIG=o.b||""; BK_PY=+o.y||BK_PY; BK_PM=(o.m==null?0:+o.m); BK_FROM=o.f||""; BK_TO=o.t||"";
   BK_SEL={}; _bkLoad();
-  var go=function(){ if(!BK.loaded||!FB.loaded){ setTimeout(go,300); return; } _bkAccts().forEach(function(a){ BK_SEL[a._k]=(o.s||[]).indexOf(a._k)>=0; }); try{ draw(); }catch(e){} _bkEsgPop(); };
+  var go=function(){ if(!BK.loaded||!FB.loaded){ setTimeout(go,300); return; } _bkAccts().forEach(function(a){ BK_SEL[a._k]=(o.s||[]).indexOf(a._k)>=0; }); try{ draw(); }catch(e){} if(pop) _bkEsgPop(); };
   go();
 }
+// 📋 서명 받은 정산서 목록 — 열면 그 기간·통장 정산서(서명 찍힌 채)
+function _bkEsgList(){
+  var E=BK.esig||{}, an={}; _bkAccts().forEach(function(a){ an[a._k]=a.nm; });
+  var L=Object.keys(E).map(function(k){ var d=E[k]||{}, r=d.roles||{}, at=""; Object.keys(r).forEach(function(x){ if(r[x]&&r[x].at>at) at=r[x].at; }); return {k:k,d:d,at:at,n:Object.keys(r).filter(function(x){ return r[x]&&r[x].img; }).length}; })
+    .filter(function(x){ return x.n; }).sort(function(a,b){ return String(b.at).localeCompare(String(a.at)); });
+  var h='<h3>📋 서명 받은 정산서 <button class="close-x" onclick="closePopup2()">&times;</button></h3>';
+  if(!L.length) h+='<div style="color:#64748b;padding:14px">아직 서명 받은 정산서가 없어요</div>';
+  L.forEach(function(x){ var d=x.d, q=d.q||{}, R=_bkEsgRoles(), r=d.roles||{};
+    h+='<div style="border:1px solid #cbd5e1;border-radius:10px;padding:10px 12px;margin-bottom:8px;background:'+(x.n>=R.length?'#f0fdf4':'#fff')+'">';
+    h+='<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><b style="font-size:15px;flex:1">'+esc(d.title||x.k)+'</b><span style="font-size:12.5px;font-weight:800;color:'+(x.n>=R.length?'#15803d':'#b45309')+'">서명 '+x.n+'/'+R.length+'</span>'
+      +(q.f||q.t||q.m===-2?'<button class="btn btn-s" style="background:#1d4ed8;color:#fff;font-weight:800" onclick="_bkEsgOpenIdx(\''+esc(x.k)+'\')">📄 열기</button>':'')+'</div>';
+    h+='<div style="font-size:12px;color:#475569;margin:2px 0 6px">통장: '+esc((q.s||[]).map(function(k){ return an[k]||'(지운 통장)'; }).join(', ')||'-')+'</div>';
+    h+='<div style="display:flex;gap:8px;flex-wrap:wrap">'+R.map(function(role){ var g=r[role]; return '<div style="border:1px solid #e2e8f0;border-radius:6px;padding:4px 6px;text-align:center;min-width:80px;background:#fff"><div style="font-size:11.5px;font-weight:800">'+esc(role)+'</div>'+(g&&g.img?'<img src="'+g.img+'" style="height:30px;display:block;margin:2px auto"><div style="font-size:10.5px;color:#475569">'+esc(g.nm||'')+' '+esc(String(g.at||'').slice(5,16))+'</div>':'<div style="font-size:11px;color:#94a3b8;padding:8px 0">서명 전</div>')+'</div>'; }).join('')+'</div></div>';
+  });
+  openPopup2(h,620);
+}
+function _bkEsgOpenIdx(k){ var d=(BK.esig||{})[k]; if(!d||!d.q) return; closePopup2(); _bkEsgApply(d.q,false); toast("📄 "+(d.title||"")+" 열었어요"); }
 function _bkEsgSign(role){
   window._bkEsgRole=role;
   var box=document.getElementById("bkEsgPadBox"); if(!box) return; box.style.display="block";
@@ -14357,7 +14378,7 @@ async function _bkEsgSave(){
   var nm=String((document.getElementById("bkEsgNm")||{}).value||"").trim(); if(!nm) return toast("이름을 넣어 주세요",true);
   var img=pad.toData(), mine=(typeof _esgCanSign==="function")&&_esgCanSign(role);
   try{ if(mine&&(document.getElementById("bkEsgRem")||{}).checked) localStorage.setItem("esigMine_"+CID,img); }catch(e){}
-  var key=_bkRepKey(), u={}; u[key+'/title']=_bkRepTitle(); u[key+'/roles/'+role]={img:img,nm:nm,at:nowKST(true),by:(typeof CID!=="undefined"?CID:""),via:mine?"self":"admin"};
+  var key=_bkRepKey(), u={}; u[key+'/title']=_bkRepTitle(); u[key+'/q']=_bkEsgQ(); u[key+'/roles/'+role]={img:img,nm:nm,at:nowKST(true),by:(typeof CID!=="undefined"?CID:""),via:mine?"self":"admin"};
   showLoading("서명 저장 중...");
   try{ await fbDb.ref('/main/BankEsig').update(u); hideLoading(); toast("✅ "+role+" 서명 저장"); _bkEsgPop();
     try{ _tgNotify("<b>✅ ["+esc(typeof SYS_NAME!=="undefined"?SYS_NAME:"")+"] 정산서 서명</b>\n• "+esc(_bkRepTitle())+"\n• "+esc(role)+" — "+esc(nm)+(mine?"":" (관리자 기기에서 받음: "+esc(typeof CID!=="undefined"?CID:"")+")"), _tgAdminUids()); }catch(x){} }catch(e){ hideLoading(); toast("저장 실패: "+(e.message||e),true); }
