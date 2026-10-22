@@ -13722,7 +13722,7 @@ function _fbImport(wb){
 //   /main/Bank = { accts:{k:{nm,no,ord}}, tx:{acctK:{k:{dt,nm,inA,out,bal,vendor,desc,big,mid,memo,seq}}} }
 //   회비통장은 /main/FeeBank/tx 를 그대로 읽음(입력은 회비 탭) — 여기선 대분류·계정과목만 붙임
 //   대분류 「통장간 이체」·「이월」은 수입·지출 합계에서 뺌
-var BK={loaded:false,accts:{},tx:{}}, BK_ACC="", BK_Y="", BK_F="all", BK_Q="", _bkQT=null, _bkQC=false, BK_SEL=null, BK_FROM="", BK_TO="", BK_SV="dash", BK_DET=true;
+var BK={loaded:false,accts:{},tx:{}}, BK_ACC="", BK_Y="", BK_F="all", BK_Q="", _bkQT=null, _bkQC=false, BK_SEL=null, BK_FROM="", BK_TO="", BK_SV="dash", BK_DET=true, BK_AF="", BK_AT="";
 var BK_PICK={};   // 증빙 출력용으로 고른 거래 {"통장|거래키":1}
 var BK_XFER="통장간 이체", BK_CARRY="이월", BK_FEE="_fee";
 function _bkRef(p){ return fbDb.ref('/main/Bank'+(p?'/'+p:'')); }
@@ -14178,12 +14178,12 @@ function _bkEvPrintAsk(scope){
   h+='</div><div style="font-size:12px;color:#64748b;margin-top:10px">사진 밑 제목은 각 거래 📎 창의 「✎ 제목」에서 넣어요 (안 넣으면 거래 내용·적요가 들어가요)</div>';
   openPopup2(h,420);
 }
-function _bkEvPrintLabel(scope){ if(scope==="pick") return "고른 거래 "+Object.keys(BK_PICK).length+"건"; if(scope==="sum") return _bkPeriodLabel()+(BK_BIG?" · "+BK_BIG:""); var a=_bkAcct(scope)||{}; return (a.nm||"")+(BK_Y?" · "+BK_Y+"년":" · 전체 기간"); }
+function _bkEvPrintLabel(scope){ if(scope==="pick") return "고른 거래 "+Object.keys(BK_PICK).length+"건"; if(scope==="sum") return _bkPeriodLabel()+(BK_BIG?" · "+BK_BIG:""); var a=_bkAcct(scope)||{}; return (a.nm||"")+" · "+_bkAcctPerLabel(); }
 function _bkEvPrintTx(scope){
   var L;
   if(scope==="pick"){ L=[]; Object.keys(BK_PICK).forEach(function(pk){ var i=pk.indexOf("|"), ak=pk.slice(0,i), k=pk.slice(i+1), t=_bkTxList(ak).filter(function(x){ return x._k===k; })[0]; if(t) L.push(t); }); }
   else if(scope==="sum") L=_bkSumCalc().list;
-  else L=_bkTxList(scope).filter(function(t){ return (!BK_Y||String(t.dt).slice(0,4)===BK_Y) && !_bkSkip(t.big); });
+  else L=_bkTxList(scope).filter(function(t){ return _bkInAcctPer(t) && !_bkSkip(t.big); });
   return L.slice().sort(function(a,b){ return String(a.dt).localeCompare(String(b.dt)) || (a.seq||0)-(b.seq||0); });
 }
 function _bkEvPrint(per){
@@ -14243,10 +14243,12 @@ function dBank(){
 }
 
 // 통장 화면 거르기 (연도·필터·검색) — 최근이 위
+function _bkInAcctPer(t){ var d=String(t.dt).slice(0,10); if(BK_Y && d.slice(0,4)!==BK_Y) return false; if(BK_AF && d<BK_AF) return false; if(BK_AT && d>BK_AT) return false; return true; }
+function _bkAcctPerLabel(){ if(BK_AF||BK_AT) return (BK_AF||"처음")+" ~ "+(BK_AT||"지금"); return BK_Y?BK_Y+"년":"전체 기간"; }
 function _bkAcctFilter(L){
   var q=String(BK_Q||"").replace(/[\s,]/g,"").toLowerCase();
   return L.slice().reverse().filter(function(t){
-    if(BK_Y && String(t.dt).slice(0,4)!==BK_Y) return false;
+    if(!_bkInAcctPer(t)) return false;
     if(BK_F==="in"&&!(Number(t.inA)>0)) return false; if(BK_F==="out"&&!(Number(t.out)>0)) return false;
     if(BK_F==="none"&&t.big) return false; if(BK_F==="noev"&&!(Number(t.out)>0 && !(t.ev||[]).length && !_bkSkip(t.big))) return false; if(BK_F==="warn"&&!t._warn) return false;
     if(q){ var hay=[t.dt,t.nm,t.desc,t.vendor,t.memo,t.big,t.mid,t.inA,t.out].join("|").replace(/[\s,]/g,"").toLowerCase(); if(hay.indexOf(q)<0) return false; }
@@ -14283,7 +14285,7 @@ async function _bkXlsxOut(ak){
     if(mids.length) ws.getCell(r,10).dataValidation={type:"list",allowBlank:true,formulae:["분류목록!$B$2:$B$"+(mids.length+1)],showErrorMessage:false};
   }
   var buf=await wb.xlsx.writeBuffer(), el=document.createElement("a");
-  el.href=URL.createObjectURL(new Blob([buf],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"})); el.download=String(a.nm).replace(/[\\\/:*?"<>|]/g,"")+"_거래내역"+(BK_Y?"_"+BK_Y:"")+"_"+today().replace(/-/g,"")+".xlsx";
+  el.href=URL.createObjectURL(new Blob([buf],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"})); el.download=String(a.nm).replace(/[\\\/:*?"<>|]/g,"")+"_거래내역_"+_bkAcctPerLabel().replace(/[^0-9가-힣~-]/g,"")+"_"+today().replace(/-/g,"")+".xlsx";
   document.body.appendChild(el); el.click(); setTimeout(function(){ URL.revokeObjectURL(el.href); el.remove(); },3000);
   hideLoading(); toast("📗 "+V.length+"건 내보냈어요 — 대분류·계정과목을 채우고 ⬆ 엑셀 가져오기로 올리면 그대로 고쳐져요");
 }
@@ -14293,7 +14295,7 @@ function _bkAcctView(ak){
   var ok=B.last && Math.abs(B.last.bal-B.last.calc)<1;
   h+='<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px"><div style="flex:1;font-size:14px;color:#334155"><b style="font-size:16px">'+esc(a.nm)+'</b> '+esc(a.no||'')+'</div>';
   h+='<button class="btn btn-s" style="background:#1d4ed8;color:#fff;font-weight:900" onclick="_bkReg(\''+ak+'\')">＋ 거래 등록</button>';
-  h+='<button class="btn btn-s" style="background:#b45309;color:#fff;font-weight:800" onclick="_bkEvPrintAsk(\''+ak+'\')" title="위 연도 거르기 그대로">📎 증빙 출력</button>';
+  h+='<button class="btn btn-s" style="background:#b45309;color:#fff;font-weight:800" onclick="_bkEvPrintAsk(\''+ak+'\')" title="아래 기간·연도 그대로 (체크한 거래만 뽑으려면 표 위 「고른 거래 증빙 출력」)">📎 증빙 출력</button>';
   h+='<button class="btn btn-s" style="background:#15803d;color:#fff;font-weight:800" onclick="_bkXlsxOut(\''+ak+'\')" title="지금 보이는 거래(연도·필터·검색 그대로) — 분류 채워서 다시 가져오기">📗 엑셀 내보내기</button>';
   h+='<button class="btn btn-s" style="background:#ea580c;color:#fff;font-weight:800" onclick="_bkImportPick(\''+ak+'\')">⬆ 엑셀 가져오기</button>';
   if(a.fee) h+='<button class="btn btn-s" style="background:#0f766e;color:#fff;font-weight:800" onclick="CTAB=\'fee\';FB_TAB=\'tx\';draw()">💵 회비 탭에서 입력하기</button>';
@@ -14318,7 +14320,9 @@ function _bkAcctView(ak){
   var nNone=L.filter(function(t){ return !t.big; }).length, nWarn=L.filter(function(t){ return t._warn; }).length;
   var fb=function(k,lb){ var on=BK_F===k; return '<button onclick="BK_F=\''+k+'\';draw()" style="border:none;border-radius:7px;padding:6px 11px;font-size:13px;font-weight:700;cursor:pointer;background:'+(on?'#0f766e':'#e2e8f0')+';color:'+(on?'#fff':'#0f172a')+'">'+lb+'</button>'; };
   h+='<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:10px 0 8px">';
-  h+='<select onchange="BK_Y=this.value;draw()" style="padding:7px;font-size:14px;font-weight:700;border:2px solid #cbd5e1;border-radius:8px"><option value="">전체 기간</option>'+ys.map(function(y){ return '<option value="'+y+'"'+(BK_Y===y?' selected':'')+'>'+y+'년</option>'; }).join('')+'</select>';
+  h+='<select onchange="BK_Y=this.value;BK_AF=BK_AT=String();draw()" style="padding:7px;font-size:14px;font-weight:700;border:2px solid #cbd5e1;border-radius:8px"><option value="">전체 기간</option>'+ys.map(function(y){ return '<option value="'+y+'"'+(BK_Y===y?' selected':'')+'>'+y+'년</option>'; }).join('')+'</select>';
+  var adp=function(id,v){ return '<input type="date" id="'+id+'" value="'+esc(v)+'" onclick="try{this.showPicker()}catch(e){}" onchange="BK_AF=document.getElementById(\QbkAF\Q).value;BK_AT=document.getElementById(\QbkAT\Q).value;BK_Y=String();draw()" title="눌러서 달력" style="padding:6px 8px;width:150px;font-size:14px;font-weight:700;cursor:pointer;border:2px solid '+(v?'#0f766e':'#cbd5e1')+';border-radius:8px">'; };
+  h+='<span style="display:inline-flex;gap:4px;align-items:center">📅'+adp('bkAF',BK_AF)+'~'+adp('bkAT',BK_AT)+((BK_AF||BK_AT)?' <button class="btn btn-s" style="background:#475569;color:#fff" onclick="BK_AF=BK_AT=String();draw()">기간 지우기</button>':'')+'</span>';
   h+='<input type="search" id="bkQ" value="'+esc(BK_Q)+'" placeholder="🔍 적요·내용·분류·금액" oninput="_bkQIn(this)" oncompositionstart="_bkQC=true" oncompositionend="_bkQC=false;_bkQIn(this)" autocomplete="off" style="flex:1 1 200px;max-width:320px;padding:8px 10px;font-size:14px;border:2px solid '+(BK_Q?'#0f766e':'#cbd5e1')+';border-radius:8px">';
   h+=fb("all","전체")+fb("in","입금")+fb("out","출금")+fb("none","❓ 분류 안 한 것 "+nNone)+fb("noev","📎 증빙 없는 출금 "+nNoEv)+(nWarn?fb("warn","⚠ 잔액 안 맞는 줄 "+nWarn):'')+'</div>';
   var V=_bkAcctFilter(L);
