@@ -14285,15 +14285,31 @@ function _bkReportHtml(){
   var dk=function(d){ d=String(d).slice(0,10); return (+d.slice(5,7))+"월"+(+d.slice(8,10))+"일"; };
   var h='<div class="bkRep"><div style="text-align:center;font-size:22px;font-weight:900;margin-bottom:4px">'+esc(ttl)+'</div>';
   h+='<div style="text-align:center;font-size:12.5px;color:#334155;margin-bottom:12px">'+A.map(function(a){ return esc(a.no||a.nm); }).join(' · ')+'</div>';
-  var sumRows=BK_BIG?[["총 입금액",R.incT],["총 지출액",R.expT],["차  액",R.incT-R.expT]]:[["이월액",open],["수입 합계",R.incT],["지출 합계",R.expT],["잔  액",close]];
+  var XI=0,XO=0; R.xfer.forEach(function(t){ XI+=Number(t.inA)||0; XO+=Number(t.out)||0; });
+  var sumRows=BK_BIG?[["총 입금액",R.incT],["총 지출액",R.expT],["차  액",R.incT-R.expT]]:[["이월액",open],["수입 합계",R.incT],["지출 합계",R.expT]].concat((XI||XO)?[["통장간 이체",XI-XO,(XI&&XO?"들어옴 "+fm(XI)+" · 나감 "+fm(XO):(XI?"다른 통장에서 들어옴":"다른 통장으로 나감"))]]:[]).concat([["잔  액",close]]);
   h+='<table style="border-collapse:collapse;width:100%;max-width:520px;margin:0 auto 14px;font-size:15px"><tr><th style="'+th+'">구  분</th><th style="'+th+'">금  액</th></tr>';
-  sumRows.forEach(function(r,i){ var last=i===sumRows.length-1; h+='<tr'+(last?' style="font-weight:900;background:#f1f5f9"':'')+'><td style="'+td+';text-align:center;font-weight:700">'+r[0]+'</td><td style="'+n+';font-weight:800">'+fm(r[1])+'원</td></tr>'; });
+  sumRows.forEach(function(r,i){ var last=i===sumRows.length-1, xf=r[0]==="통장간 이체"; h+='<tr'+(last?' style="font-weight:900;background:#f1f5f9"':(xf?' style="background:#eef2ff"':''))+'><td style="'+td+';text-align:center;font-weight:700'+(xf?';color:#4338ca':'')+'">'+r[0]+(r[2]?'<div style="font-size:11px;font-weight:600;color:#4338ca">'+esc(r[2])+'</div>':'')+'</td><td style="'+n+';font-weight:800'+(xf?';color:#4338ca':'')+'">'+(xf&&r[1]>0?'+':'')+fm(r[1])+'원</td></tr>'; });
   h+='</table>';
-  if(!BK_BIG && Math.abs(open+R.incT-R.expT-close)>=1) h+='<div style="text-align:center;font-size:12px;color:#4338ca;margin-bottom:10px">※ 이월액+수입−지출과 잔액 차이 '+fm(close-(open+R.incT-R.expT))+'원은 통장간 이체(골라 놓은 통장 밖과 오간 돈)예요</div>';
+  if(!BK_BIG && Math.abs(open+R.incT-R.expT+XI-XO-close)>=1) h+='<div style="text-align:center;font-size:12px;color:#b45309;margin-bottom:10px">※ 이월액+수입−지출±이체와 잔액이 '+fm(close-(open+R.incT-R.expT+XI-XO))+'원 달라요 — 빠진 거래가 있는지 확인해 주세요</div>';
   if(!BK_BIG && A.length>1){
     h+='<div style="font-weight:900;margin:10px 0 4px">▣ 통장별</div><table style="border-collapse:collapse;width:100%;font-size:13px"><tr><th style="'+th+'">통장</th><th style="'+th+'">이월액</th><th style="'+th+'">수입</th><th style="'+th+'">지출</th><th style="'+th+'">통장간 이체</th><th style="'+th+'">잔액</th></tr>';
     A.forEach(function(a){ var P=R.per[a._k]; h+='<tr><td style="'+td+';font-weight:700">'+esc(a.nm)+'</td><td style="'+n+'">'+fm(P.open)+'</td><td style="'+n+'">'+fm(P.inc)+'</td><td style="'+n+'">'+fm(P.exp)+'</td><td style="'+n+'">'+(P.xin||P.xout?fm(P.xin-P.xout):'-')+'</td><td style="'+n+';font-weight:800">'+fm(P.close)+'</td></tr>'; });
     h+='</table>';
+  }
+  // ▣ 통장간 이체 내역 — 보낸 통장 → 받은 통장으로 짝지어서 (금액·날짜 3일 안)
+  if(!BK_BIG && R.xfer.length){
+    var anAll={}; _bkAccts().forEach(function(a){ anAll[a._k]=a.nm; });
+    var outs=R.xfer.filter(function(t){ return Number(t.out)>0; }), ins=R.xfer.filter(function(t){ return Number(t.inA)>0; }), used={}, XR=[];
+    var dd=function(x){ return new Date(String(x).slice(0,10)).getTime(); };
+    outs.forEach(function(o){ var m=ins.filter(function(x){ return !used[x._a+'|'+x._k] && x._a!==o._a && Number(x.inA)===Number(o.out) && Math.abs(dd(x.dt)-dd(o.dt))<=3*864e5; })[0];
+      if(m) used[m._a+'|'+m._k]=1; XR.push({dt:o.dt, from:anAll[o._a], to:m?anAll[m._a]:'(고르지 않은 통장)', amt:Number(o.out), L:[o].concat(m?[m]:[])}); });
+    ins.forEach(function(x){ if(!used[x._a+'|'+x._k]) XR.push({dt:x.dt, from:'(고르지 않은 통장)', to:anAll[x._a], amt:Number(x.inA), L:[x]}); });
+    XR.sort(function(a,b){ return String(a.dt).localeCompare(String(b.dt)); });
+    var xt=0; XR.forEach(function(r){ xt+=r.amt; });
+    h+='<div style="font-weight:900;margin:12px 0 4px;color:#4338ca">▣ 통장간 이체 내역 <span style="font-size:12px;color:#475569;font-weight:600">수입·지출에는 안 들어가는 돈 옮김</span></div><table style="border-collapse:collapse;width:100%;font-size:13px"><tr><th style="'+th+'">일자</th><th style="'+th+'">보낸 통장 → 받은 통장</th><th style="'+th+'">적요</th><th style="'+th+'">내용</th><th style="'+th+'">금액</th></tr>';
+    XR.forEach(function(r){ var nm={}, ds={}; r.L.forEach(function(t){ if(t.nm) nm[t.nm]=1; [t.desc,t.memo].forEach(function(v){ if(v) ds[v]=1; }); });
+      h+='<tr><td style="'+td+';white-space:nowrap">'+dk(r.dt)+'</td><td style="'+td+';font-weight:700">'+esc(r.from)+' → '+esc(r.to)+'</td><td style="'+td+'">'+esc(Object.keys(nm).join(' / '))+'</td><td style="'+td+'">'+esc(Object.keys(ds).join(' · '))+'</td><td style="'+n+';font-weight:800">'+fm(r.amt)+'</td></tr>'; });
+    h+='<tr style="font-weight:900;background:#eef2ff"><td style="'+td+';text-align:center" colspan="4">이체 '+XR.length+'건</td><td style="'+n+'">'+fm(xt)+'</td></tr></table>';
   }
   if(BK_RS!=="big"){
     h+=_bkRepBody(R,A,an,{td:td,n:n,th:th,dk:dk});
