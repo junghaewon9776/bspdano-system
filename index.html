@@ -14311,8 +14311,9 @@ function _bkGovHtml(){
   // □ 집행내역 - 수입 / - 지출
   var sec=function(title,G,total,f){
     var s='<div style="font-weight:700;margin:12px 0 2px">- '+title+'</div><div style="text-align:right;font-size:11.5px">(단위:원)</div><table style="border-collapse:collapse;width:100%;font-size:12.5px">';
-    s+='<tr><td style="'+H+';width:44px">구분</td><td style="'+H+'">비 목</td><td style="'+H+'">항 목</td><td style="'+H+'">'+title+' 금액</td><td style="'+H+'">합계</td><td style="'+H+'">'+title+' 내역</td><td style="'+H+';width:60px">비고</td></tr>';
-    s+='<tr style="font-weight:800"><td style="'+C+'" colspan="3">총  계</td><td style="'+N+'">'+fm(total)+'</td><td style="'+B+'"></td><td style="'+B+'"></td><td style="'+B+'"></td></tr>';
+    var mA=A.length>1;   // 통장 하나만이면 구분(통장) 칸 없음
+    s+='<tr>'+(mA?'<td style="'+H+';width:44px">구분</td>':'')+'<td style="'+H+'">비 목</td><td style="'+H+'">항 목</td><td style="'+H+'">'+title+' 금액</td><td style="'+H+'">합계</td><td style="'+H+'">'+title+' 내역</td><td style="'+H+';width:60px">비고</td></tr>';
+    s+='<tr style="font-weight:800"><td style="'+C+'" colspan="'+(mA?3:2)+'">총  계</td><td style="'+N+'">'+fm(total)+'</td><td style="'+B+'"></td><td style="'+B+'"></td><td style="'+B+'"></td></tr>';
     // 통장(구분) → 대분류(비목) → 계정과목(항목)
     var byA={}; Object.keys(G).forEach(function(b){ if(BK_BIG&&b!==BK_BIG) return; Object.keys(G[b].mids).forEach(function(m){ G[b].mids[m].list.forEach(function(t){ var a=byA[t._a]=byA[t._a]||{}, bb=a[b]=a[b]||{}, mm=bb[m]=bb[m]||{t:0,list:[]}; mm.t+=Number(t[f])||0; mm.list.push(t); }); }); });
     Object.keys(byA).forEach(function(ak){
@@ -14326,7 +14327,7 @@ function _bkGovHtml(){
           else lines.push(esc(k)+(g.who.length?' ('+esc(g.who.join(', '))+')':'')+' : '+fm(g.v)+'원'); });
         ML.forEach(function(m,j){
           s+='<tr>';
-          if(first){ s+='<td rowspan="'+nRows+'" style="'+C+';font-weight:700;vertical-align:middle;writing-mode:vertical-rl;letter-spacing:4px">'+esc(an[ak]||'')+'</td>'; first=false; }
+          if(first&&mA){ s+='<td rowspan="'+nRows+'" style="'+C+';font-weight:700;vertical-align:middle;writing-mode:vertical-rl;letter-spacing:4px">'+esc(an[ak]||'')+'</td>'; first=false; }
           if(j===0) s+='<td rowspan="'+ML.length+'" style="'+C+';vertical-align:middle">'+esc(b)+'</td>';
           s+='<td style="'+C+'">'+esc(m)+'</td><td style="'+N+'">'+fm(bigs[b][m].t)+'</td>';
           if(j===0) s+='<td rowspan="'+ML.length+'" style="'+N+';vertical-align:middle">'+fm(bt)+'</td><td rowspan="'+ML.length+'" style="'+B+';vertical-align:middle;font-size:11.5px;line-height:1.5">'+lines.join('<br>')+'</td><td rowspan="'+ML.length+'" style="'+C+';vertical-align:middle;font-size:11.5px">'+esc(Object.keys(memo).join(', '))+'</td>';
