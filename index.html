@@ -14362,21 +14362,6 @@ function _bkReportHtml(){
     A.forEach(function(a){ var P=R.per[a._k]; h+='<tr><td style="'+td+';font-weight:700">'+esc(a.nm)+'</td><td style="'+n+'">'+fm(P.open)+'</td><td style="'+n+'">'+fm(P.inc)+'</td><td style="'+n+'">'+fm(P.exp)+'</td><td style="'+n+'">'+(P.xin||P.xout?fm(P.xin-P.xout):'-')+'</td><td style="'+n+';font-weight:800">'+fm(P.close)+'</td></tr>'; });
     h+='</table>';
   }
-  // ▣ 통장간 이체 내역 — 보낸 통장 → 받은 통장으로 짝지어서 (금액·날짜 3일 안)
-  if(!BK_BIG && R.xfer.length){
-    var anAll={}; _bkAccts().forEach(function(a){ anAll[a._k]=a.nm; });
-    var outs=R.xfer.filter(function(t){ return Number(t.out)>0; }), ins=R.xfer.filter(function(t){ return Number(t.inA)>0; }), used={}, XR=[];
-    var dd=function(x){ return new Date(String(x).slice(0,10)).getTime(); };
-    outs.forEach(function(o){ var m=ins.filter(function(x){ return !used[x._a+'|'+x._k] && x._a!==o._a && Number(x.inA)===Number(o.out) && Math.abs(dd(x.dt)-dd(o.dt))<=3*864e5; })[0];
-      if(m) used[m._a+'|'+m._k]=1; XR.push({dt:o.dt, from:anAll[o._a], to:m?anAll[m._a]:'(고르지 않은 통장)', amt:Number(o.out), L:[o].concat(m?[m]:[])}); });
-    ins.forEach(function(x){ if(!used[x._a+'|'+x._k]) XR.push({dt:x.dt, from:'(고르지 않은 통장)', to:anAll[x._a], amt:Number(x.inA), L:[x]}); });
-    XR.sort(function(a,b){ return String(a.dt).localeCompare(String(b.dt)); });
-    var xt=0; XR.forEach(function(r){ xt+=r.amt; });
-    h+='<div style="font-weight:900;margin:12px 0 4px;color:#4338ca">▣ 통장간 이체 내역 <span style="font-size:12px;color:#475569;font-weight:600">수입·지출에는 안 들어가는 돈 옮김</span></div><table style="border-collapse:collapse;width:100%;font-size:13px"><tr><th style="'+th+'">일자</th><th style="'+th+'">보낸 통장 → 받은 통장</th><th style="'+th+'">적요</th><th style="'+th+'">내용</th><th style="'+th+'">금액</th></tr>';
-    XR.forEach(function(r){ var nm={}, ds={}; r.L.forEach(function(t){ if(t.nm) nm[t.nm]=1; [t.desc,t.memo].forEach(function(v){ if(v) ds[v]=1; }); });
-      h+='<tr><td style="'+td+';white-space:nowrap">'+dk(r.dt)+'</td><td style="'+td+';font-weight:700">'+esc(r.from)+' → '+esc(r.to)+'</td><td style="'+td+'">'+esc(Object.keys(nm).join(' / '))+'</td><td style="'+td+'">'+esc(Object.keys(ds).join(' · '))+'</td><td style="'+n+';font-weight:800">'+fm(r.amt)+'</td></tr>'; });
-    h+='<tr style="font-weight:900;background:#eef2ff"><td style="'+td+';text-align:center" colspan="4">이체 '+XR.length+'건</td><td style="'+n+'">'+fm(xt)+'</td></tr></table>';
-  }
   if(BK_RS!=="big"){
     h+=_bkRepBody(R,A,an,{td:td,n:n,th:th,dk:dk});
     if(R.none.length) h+='<div class="noprint" style="margin-top:10px;font-size:12px;color:#b45309">※ 분류 안 한 거래 '+R.none.length+'건은 「❓ 분류 안 함」으로 들어가 있어요</div>';
