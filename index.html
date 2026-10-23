@@ -10696,6 +10696,7 @@ function dExp(){
   h += '<button class="btn" style="background:#2563eb;color:#fff;font-weight:700" onclick="expManageTypes()">📂 대분류 설정</button>';
   h += ' <button class="btn" style="background:#ea580c;color:#fff;font-weight:700" onclick="expFixOrphans()" title="예산에 없는 옛 이름을 쓰는 구매·지출·활동일지를 예산 항목에 다시 연결">🔗 끊긴 이름 바로잡기</button>';
   h += '<button class="btn" style="background:#16a34a;color:#fff;font-weight:700" onclick="expAdd()">+ 세출 추가</button>';
+  h += '<button class="btn" style="background:'+(window._EC_ON?'#0f766e':'#334155')+';color:#fff;font-weight:700" onclick="_ecToggle()" title="항목별 금액을 바꿔 보면서 합계·차이를 계산 (저장 안 됨)">🧮 예산 변경 계산'+(window._EC_ON?' 끄기':'')+'</button>';
   h += '<button class="btn" style="background:#8b5cf6;color:#fff;font-weight:700" onclick="tmplExpBG()" title="엑셀 양식 다운로드">📋 양식</button>';
   h += '<button class="btn" style="background:#ea580c;color:#fff;font-weight:700" onclick="impClick(\'expbg\')">⬆ 엑셀 가져오기</button>';
   h += '<button class="btn" style="background:#059669;color:#fff;font-weight:700" onclick="expExpBG()">⬇ 엑셀 내보내기</button>';
@@ -10716,6 +10717,8 @@ function dExp(){
   h += '<div style="background:#fff;border:2px solid '+(totAvail<0?"#dc2626":"#334155")+';border-radius:6px;padding:10px;text-align:center"><div style="color:'+(totAvail<0?"#b91c1c":"#0f172a")+';font-weight:700;font-size:12px">남은 가용 합</div><div style="font-size:18px;font-weight:900;color:'+(totAvail<0?"#991b1b":"#0f172a")+'">'+(totAvail<0?"⚠ ":"")+fmtKRW(totAvail)+'</div></div>';
   h += '</div>';
 
+  if(window._EC_ON) h += '<div id="ecSum" style="position:sticky;top:0;z-index:5;margin:8px 0;padding:10px 12px;background:#f0fdfa;border:2px solid #0f766e;border-radius:8px;font-size:13px"></div>';
+  if(window._EC_ON) setTimeout(_ecUpd,0);
   // 필터 바 (관 → 대분류 순)
   var gwans = (gwanTypes||[]).slice();
   (expBG||[]).forEach(function(r){ if(r.gwan && gwans.indexOf(r.gwan)<0) gwans.push(r.gwan); });
@@ -10837,7 +10840,7 @@ function dExp(){
           var r=rs[0];
           h += '<tr style="border-top:1px solid #edf2f7">';
           h += '<td style="padding:8px"><b>'+_gpc(t,mid,!mid,esc(mid||'(미분류)'))+'</b></td>';
-          h += '<td style="padding:8px;text-align:right">'+fmtKRW(r.planAm)+'</td>';
+          h += '<td style="padding:8px;text-align:right">'+fmtKRW(r.planAm)+_ecIn(r)+'</td>';
           h += _nums(Number(r.planAm)||0, used, pre);
           h += '<td style="padding:8px;color:#718096;font-size:12px">'+esc(r.note||'')+'</td>';
           h += '<td style="padding:8px;text-align:right;white-space:nowrap">'+_btns(r)+'</td></tr>';
@@ -10854,7 +10857,7 @@ function dExp(){
         rs.forEach(function(r){
           h += '<tr style="border-top:1px dashed #e2e8f0">';
           h += '<td style="padding:6px 8px 6px 22px;color:#334155">└ '+esc(r.sub||'(중분류 공통)')+'</td>';
-          h += '<td style="padding:6px 8px;text-align:right;color:#334155">'+fmtKRW(r.planAm)+'</td>';
+          h += '<td style="padding:6px 8px;text-align:right;color:#334155">'+fmtKRW(r.planAm)+_ecIn(r)+'</td>';
           h += '<td colspan="4"></td>';
           h += '<td style="padding:6px 8px;color:#718096;font-size:12px">'+esc(r.note||'')+'</td>';
           h += '<td style="padding:6px 8px;text-align:right;white-space:nowrap">'+_btns(r)+'</td></tr>';
@@ -10897,6 +10900,31 @@ function dExp(){
   return h;
 }
 
+// 🧮 예산 변경 계산 — 항목 옆 칸에 바꿀 금액을 넣어 보면 합계·차이를 바로 계산. 비워두면 지금 금액 그대로. 저장 안 됨(화면에서만)
+window._EC_V = window._EC_V || {};
+function _ecToggle(){ window._EC_ON=!window._EC_ON; draw(); if(window._EC_ON) setTimeout(_ecUpd,0); }
+function _ecIn(r){
+  if(!window._EC_ON) return '';
+  var v=window._EC_V[r._idx]; v=(v==null?'':v);
+  return '<div style="margin-top:4px"><input class="ecIn" data-i="'+r._idx+'" data-p="'+(Number(r.planAm)||0)+'" value="'+(v===''?'':Number(v).toLocaleString())+'" placeholder="그대로" inputmode="numeric" oninput="this.value=this.value.replace(/[^0-9]/g,\'\').replace(/\\B(?=(\\d{3})+(?!\\d))/g,\',\');_ecUpd()" onclick="event.stopPropagation()" style="width:110px;padding:4px 6px;border:2px solid #5eead4;border-radius:6px;text-align:right;font-size:12px;background:#f0fdfa"></div>';
+}
+function _ecUpd(){
+  var base=0, calc=0, n=0;
+  document.querySelectorAll('.ecIn').forEach(function(el){
+    var p=Number(el.getAttribute('data-p'))||0, raw=String(el.value||'').replace(/,/g,''), i=el.getAttribute('data-i');
+    if(raw===''){ delete window._EC_V[i]; calc+=p; el.style.borderColor='#5eead4'; }
+    else { window._EC_V[i]=Number(raw); calc+=Number(raw); n++; el.style.borderColor=Number(raw)===p?'#5eead4':'#0f766e'; }
+    base+=p;
+  });
+  var d=base-calc, box=document.getElementById('ecSum'); if(!box) return;
+  box.innerHTML='🧮 <b>예산 변경 계산</b> <span style="color:#64748b">(저장 안 됨 · 칸을 비우면 지금 금액 그대로)</span>'
+    +'<div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:6px;font-size:14px">'
+    +'<span>지금 예산 합 <b>'+fmtKRW(base)+'</b></span><span>바꿔 본 합 <b>'+fmtKRW(calc)+'</b></span>'
+    +'<span style="color:'+(d<0?'#b91c1c':'#0f766e')+';font-weight:800">'+(d>0?'남는 금액 (다른 항목에 넣을 수 있음) ':d<0?'⚠ 모자라는 금액 ':'차이 ')+fmtKRW(Math.abs(d))+'원</span>'
+    +'<span style="color:#64748b">바꾼 항목 '+n+'개</span>'
+    +(n?'<button class="btn btn-s" style="background:#475569;color:#fff;margin-left:auto" onclick="window._EC_V={};draw();setTimeout(_ecUpd,0)">계산 지우기</button>':'')+'</div>'
+    +'<div style="font-size:11.5px;color:#475569;margin-top:4px">실제로 바꿀 땐 면 담당자 변경 승인 후 각 항목 ✏️ 수정으로 예산을 고치세요</div>';
+}
 function expAdd(preTp){
   var types = (expTypes||[]).slice();
   expBG.forEach(function(r){ if(r.tp && types.indexOf(r.tp)<0) types.push(r.tp); });
