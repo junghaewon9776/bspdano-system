@@ -842,7 +842,7 @@ function _modFmtCell(col,val){
       var s=String(val); return '<span title="'+esc(s)+'">'+esc(s.length>40?s.slice(0,40)+'…':s)+'</span>';
     case 'photo':   // 🖼 사진 칼럼 — 첫 장을 세로 썸네일로
       var _pp=String(val).split(/\n/).filter(function(u){return u.trim()})[0]||'', _pb=_pp.indexOf('|'), _pu=_pb>=0?_pp.slice(_pb+1).trim():_pp.trim(), _pth=_modDriveThumb(_pu,200);
-      return _pth?'<a href="'+esc(_modDriveViewUrl(_pu))+'" target="_blank" onclick="event.stopPropagation()"><img src="'+esc(_pth)+'" loading="lazy" style="width:48px;height:60px;object-fit:cover;border-radius:6px;border:1px solid #cbd5e1;background:#f1f5f9;display:block" onerror="this.replaceWith(document.createTextNode(\'🖼\'))"></a>':'';
+      return _pth?'<a href="'+esc(_modDriveViewUrl(_pu))+'" target="_blank" onclick="event.stopPropagation()"><img src="'+esc(_pth)+'" loading="lazy" style="width:56px;height:70px;object-fit:cover;border-radius:6px;border:1px solid #cbd5e1;background:#f1f5f9;display:block;margin:0 auto" onerror="this.replaceWith(document.createTextNode(\'🖼\'))"></a>':'';
     case 'file':
       var _fparts=String(val).split(/\n/).filter(function(u){return u.trim()});
       return _fparts.map(function(p){
