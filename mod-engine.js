@@ -411,6 +411,7 @@ function _modListHtml(key){
       });
     });
     h+='<button class="btn btn-s" style="background:#15803d;color:#fff" onclick="_modCopyExcelSel(\''+key+'\')" title="선택한 주문을 엑셀에 붙여넣게 복사">📋 엑셀로 복사</button>';
+    h+='<button class="btn btn-s" style="background:#4338ca;color:#fff" onclick="modDupSel(\''+key+'\')" title="체크한 줄을 한 번에 복사해서 새 줄로 추가">📑 선택 복제</button>';
     h+='<button class="btn btn-s" style="background:#0891b2;color:#fff" onclick="popModMarkSel(\''+key+'\')">🎨 색칠</button>';
     h+='<button class="btn btn-s" style="background:#dc2626;color:#fff" onclick="modDelSel(\''+key+'\')">🗑 선택 삭제</button>';
     h+='<button class="btn btn-s" style="margin-left:auto;background:#64748b;color:#fff" onclick="_modSelClear(\''+key+'\')">선택 해제</button>';
@@ -765,6 +766,43 @@ function _modSaveMarkSelMemo(key){
   data.forEach(function(r){ if(ids.indexOf(r._id)>=0){ r._markMemo=memo; r._updatedAt=now; n++; } });
   fbDb.ref(path).set(data).then(function(){ toast(memo?('📝 '+n+'개 메모: '+memo):(n+'개 메모 지움')); closePopup(); })
     .catch(function(e){ toast('실패: '+(e.message||e),true); });
+}
+// 📑 선택 복제 — 체크한 줄들을 한 번에 새 줄로 복사. 연도 칸이 있으면 새 연도로 바꿔 넣기 (작년 명단 → 올해)
+function _modYearCol(def){ return (def.columns||[]).find(function(c){ return /연도|년도/.test(c.label||'')||/_yr$/.test(c.key||''); }); }
+function modDupSel(key){
+  var ids=_modSelIds(key); if(!ids.length) return toast('선택된 항목이 없습니다',true);
+  var def=_modDefs[key]; if(!def) return;
+  var yc=_modYearCol(def);
+  var h='<div class="pop-head"><h3>📑 '+ids.length+'개 복제</h3></div><div style="padding:16px;font-size:14px;line-height:1.7">';
+  h+='체크한 <b>'+ids.length+'개</b> 줄을 그대로 복사해서 새 줄로 추가해요. 원래 줄은 그대로 남아요.';
+  if(yc){
+    var ys=(_modData[key]||[]).filter(function(r){ return ids.indexOf(r._id)>=0; }).map(function(r){ return pn(r[yc.key]); }).filter(Boolean);
+    var ny=ys.length?Math.max.apply(null,ys)+1:new Date().getFullYear();
+    h+='<div style="margin-top:12px;padding:10px 12px;background:#eef2ff;border:1px solid #c7d2fe;border-radius:8px"><label><input type="checkbox" id="_mdsYrOn" checked> 복사한 줄의 <b>'+esc(yc.label)+'</b>를 </label><input id="_mdsYr" value="'+ny+'" style="width:80px;padding:6px;border:1px solid #cbd5e1;border-radius:6px;font-weight:700"> 로 바꾸기';
+    h+='<div style="font-size:12px;color:#4338ca;margin-top:4px">작년 명단을 올해로 옮길 때 — 복제한 뒤 바뀐 분만 ✏️ 로 고치면 돼요</div></div>';
+  }
+  h+='</div><div style="padding:10px 14px;border-top:1px solid #e2e8f0;text-align:right;background:#f8fafc;border-radius:0 0 12px 12px">';
+  h+='<button class="btn" style="background:#64748b;color:#fff" onclick="closePopup()">취소</button> ';
+  h+='<button class="btn" style="background:#4338ca;color:#fff" onclick="modDupSelGo(\''+key+'\')">'+ids.length+'개 복제하기</button></div>';
+  openPopup(h,420);
+}
+function modDupSelGo(key){
+  var ids=_modSelIds(key); var def=_modDefs[key]; var path=_modFbPath(key); if(!ids.length||!def||!path) return;
+  var yc=_modYearCol(def), on=document.getElementById('_mdsYrOn'), yv=(document.getElementById('_mdsYr')||{}).value;
+  var setYr=yc&&on&&on.checked&&String(yv||'').trim();
+  var data=(_modData[key]||[]).slice(), now=new Date().toISOString(), base=_modId(), n=0;
+  (_modData[key]||[]).forEach(function(row){
+    if(ids.indexOf(row._id)<0) return;
+    var r=JSON.parse(JSON.stringify(row));
+    delete r._updatedAt; delete r._printCount; delete r._mark; delete r._markMemo; delete r.labelPrinted;
+    (def.columns||[]).forEach(function(c){ if(c.type==='badge'||/송장/.test(c.label||'')||c.key==='status') r[c.key]=''; });
+    if(setYr) r[yc.key]=String(yv).trim();
+    r._id=base+'d'+(n++); r._createdAt=now;
+    data.push(r);
+  });
+  showLoading('복제 중...');
+  fbDb.ref(path).set(data).then(function(){ hideLoading(); closePopup(); toast('📑 '+n+'개 복제됨'+(setYr?' ('+yc.label+' '+yv+')':'')); _modLogAdd(key,'복제','','('+n+'개 일괄)','행 복제'); _modSel[key]={}; _modSelRefresh(key); })
+    .catch(function(e){ hideLoading(); toast('실패: '+(e.message||e),true); });
 }
 // 선택 항목 → 일괄 삭제
 function modDelSel(key){
