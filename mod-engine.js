@@ -420,6 +420,7 @@ function _modListHtml(key){
 
   // 표 영역: 최대 높이 제한 → 가로 스크롤바가 항상 보이는 위치(박스 하단)에 고정 + 제목줄(thead) 고정
   var _hSticky='position:sticky;top:0;z-index:3;background:#f8fafc;';
+  h+='<style>.modActMini{display:none}@media(max-width:700px){.modActFull{display:none!important}.modActMini{display:inline-block!important}th.modActTh{min-width:38px!important;padding:2px!important}td.modActTd{padding:2px!important;text-align:center}}</style>';
   h+='<div id="_modScroll_'+key+'" style="overflow:auto;max-height:72vh;border:1px solid #e5e7eb;border-radius:10px">';
   h+='<table class="tbl"><thead><tr>';
   if(isA()){
@@ -433,7 +434,7 @@ function _modListHtml(key){
     h+='<th style="cursor:pointer;white-space:nowrap;'+_hSticky+'" onclick="_modToggleSort(\''+key+'\',\''+c.key+'\')">'+esc(c.label)+arrow+'</th>';
   });
   if(hasSelect && isA()) h+='<th style="white-space:nowrap;font-size:11px;color:#64748b;'+_hSticky+'">상태일시</th>';
-  if(isA()) h+='<th style="min-width:'+(hasSelect?'120':'100')+'px;position:sticky;right:0;top:0;background:#f8fafc;z-index:4;text-align:center;font-size:10px;color:#94a3b8">관리</th>';
+  if(isA()) h+='<th class="modActTh" style="min-width:'+(hasSelect?'120':'100')+'px;position:sticky;right:0;top:0;background:#f8fafc;z-index:4;text-align:center;font-size:10px;color:#94a3b8">관리</th>';
   h+='</tr></thead><tbody>';
 
   data.forEach(function(row,idx){
@@ -453,7 +454,9 @@ function _modListHtml(key){
     // 접수일
     if(isA()){
       var _ca=row._createdAt?_modFmtDateTime(row._createdAt):'';
-      h+='<td style="white-space:nowrap;font-size:11px;color:#94a3b8" title="ID: '+esc(row._id||'')+'">'+esc(_ca)+'</td>';
+      // 날짜(26.10.23) 위 · 시간 아래 두 줄 — 칸이 좁아져서 폰에서도 옆 칸이 보임
+      var _caH=_ca?esc(_ca.slice(2,10).replace(/-/g,'.'))+'<br><span style="font-size:10px;color:#cbd5e1">'+esc(_ca.slice(11))+'</span>':'';
+      h+='<td style="white-space:nowrap;font-size:11px;color:#94a3b8;line-height:1.25" title="'+esc(_ca)+' · ID: '+esc(row._id||'')+'">'+_caH+'</td>';
     }
     cols.forEach(function(c){
       var raw=esc(String(row[c.key]==null?'':row[c.key]));
@@ -469,7 +472,8 @@ function _modListHtml(key){
       h+='<td style="white-space:nowrap;font-size:11px;color:#94a3b8" title="처리자: '+esc(_sb)+'">'+esc(_sa)+(_sb?' <span style="color:#64748b">'+esc(_sb)+'</span>':'')+'</td>';
     }
     if(isA()){
-      h+='<td style="position:sticky;right:0;background:#fff;z-index:1;box-shadow:-4px 0 8px rgba(0,0,0,.04);padding:2px 4px;vertical-align:middle">';
+      h+='<td class="modActTd" style="position:sticky;right:0;background:#fff;z-index:1;box-shadow:-4px 0 8px rgba(0,0,0,.04);padding:2px 4px;vertical-align:middle">';
+      h+='<button class="modActMini" onclick="event.stopPropagation();_modActMenu(\''+key+'\',\''+esc(row._id||'')+'\')" title="수정·복제·삭제" style="width:32px;height:30px;border-radius:8px;border:none;cursor:pointer;font-size:16px;font-weight:900;background:#1e40af;color:#fff;padding:0;line-height:1">⋯</button><div class="modActFull">';
       if(hasSelect){
         h+='<div style="display:flex;gap:2px;margin-bottom:2px">';
         Object.keys(statusCol.badgeMap||{}).forEach(function(sk){
@@ -488,6 +492,7 @@ function _modListHtml(key){
       h+='<button onclick="popModEdit(\''+key+'\',\''+esc(row._id||'')+'\')" title="수정" style="width:24px;height:22px;border-radius:4px;border:1px solid #e2e8f0;cursor:pointer;font-size:11px;background:#f8fafc;color:#334155;padding:0;line-height:1">✏️</button>';
       h+='<button onclick="modDupRow(\''+key+'\',\''+esc(row._id||'')+'\')" title="복제 — 같은 주문자로 새 박스(받는분만 수정)" style="width:24px;height:22px;border-radius:4px;border:1px solid #c7d2fe;cursor:pointer;font-size:11px;background:#eef2ff;color:#4338ca;padding:0;line-height:1">📑</button>';
       h+='<button onclick="modDel(\''+key+'\',\''+esc(row._id||'')+'\')" title="삭제" style="width:24px;height:22px;border-radius:4px;border:1px solid #fecaca;cursor:pointer;font-size:11px;background:#fef2f2;color:#dc2626;padding:0;line-height:1">🗑</button>';
+      h+='</div>';
       h+='</div>';
       h+='</td>';
     }
@@ -955,6 +960,28 @@ function popModEdit(key,id){
   openPopup(h,460);
 }
 
+// 📱 폰 화면 관리 메뉴 — 표 오른쪽 관리칸이 가리지 않게 ⋯ 하나로 접고, 누르면 큰 버튼으로
+function _modActMenu(key,id){
+  var def=_modDefs[key]; if(!def) return;
+  var row=(_modData[key]||[]).find(function(r){return r._id===id;}); if(!row) return;
+  var B=function(bg,fn,label){ return '<button class="btn" style="display:block;width:100%;margin:0 0 8px;padding:12px;font-size:15px;font-weight:700;background:'+bg+';color:#fff" onclick="closePopup();'+fn+'">'+label+'</button>'; };
+  var a="'"+key+"','"+esc(id)+"'";
+  var h='<div class="pop-head"><h3>'+esc(_modRowTitle(def,row)||'관리')+'</h3></div><div style="padding:14px">';
+  var sc=(def.columns||[]).find(function(c){return c.key==='status'&&c.badgeMap;});
+  if(sc){
+    h+='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">';
+    Object.keys(sc.badgeMap).forEach(function(sk){ if(sk==='대기') return; var bm=sc.badgeMap[sk]||{};
+      h+='<button class="btn" style="flex:1;padding:10px;font-weight:700;background:'+(bm.bg||'#16a34a')+';color:'+(bm.color||'#fff')+';opacity:'+(row.status===sk?'1':'.55')+'" onclick="closePopup();modSetStatus('+a+',\''+esc(sk)+'\')">'+esc(bm.label||sk)+'</button>'; });
+    h+='</div>';
+  }
+  h+=B('#2563eb','popModEdit('+a+')','✏️ 수정');
+  h+=B('#4338ca','modDupRow('+a+')','📑 복제');
+  h+=B('#475569','modPrintOne('+a+')','🖨 라벨 출력');
+  if(typeof isSuper==='function'&&isSuper()) h+=B('#334155','popModLog('+a+')','📋 기록 보기');
+  h+=B('#dc2626','modDel('+a+')','🗑 삭제');
+  h+='<button class="btn" style="display:block;width:100%;padding:10px;background:#64748b;color:#fff" onclick="closePopup()">닫기</button></div>';
+  openPopup(h,360);
+}
 // 📑 행 복제 — 같은 주문자로 새 박스(받는분만 수정). 배송 진행정보(송장·상태·출력)는 비움
 function modDupRow(key,id){
   var def=_modDefs[key]; if(!def) return;
