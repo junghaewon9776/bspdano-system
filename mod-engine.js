@@ -88,6 +88,28 @@ function _modDriveThumb(url, sz){
   return (m&&m[1]) ? 'https://drive.google.com/thumbnail?id='+m[1]+'&sz=w'+(sz||120) : '';
 }
 // 🖼 사진 칼럼 도우미 — 고르면 미리보기, 빼기, 올릴 때 줄여서 사진 업로드
+// 📋 캡처 붙여넣기 — 사진 칸을 누르고 Ctrl+V, 또는 사진 칸이 열린 창에서 아무 데나 Ctrl+V (글자 칸 입력 중일 땐 글자 붙여넣기 그대로)
+function _modPhotoSet(id,f){
+  var el=document.getElementById(id); if(!el||!f) return false;
+  try{ var dt=new DataTransfer(); dt.items.add(f); el.files=dt.files; }catch(e){ return false; }
+  _modPhotoPick(el); var z=document.querySelector('.modPhotoZone[data-pid="'+id+'"]'); if(z){ z.style.borderColor='#16a34a'; setTimeout(function(){ z.style.borderColor='#cbd5e1'; },1200); }
+  if(typeof toast==='function') toast('📋 캡처 사진을 넣었어요 — 저장을 눌러야 올라가요'); return true;
+}
+function _modPhotoFromClip(ev){
+  var items=(ev.clipboardData||{}).items||[];
+  for(var i=0;i<items.length;i++){ var it=items[i]; if(it.type&&it.type.indexOf('image/')===0){ var f=it.getAsFile(); if(f){ try{ f=new File([f],'캡처_'+Date.now()+'.png',{type:f.type||'image/png'}); }catch(e){} return f; } } }
+  return null;
+}
+function _modPhotoPaste(ev,id){ var f=_modPhotoFromClip(ev); if(!f) return; ev.preventDefault(); ev.stopPropagation(); window._modPhotoLast=id; _modPhotoSet(id,f); }
+if(!window._modPhotoPasteHook){ window._modPhotoPasteHook=1;
+  document.addEventListener('paste',function(ev){
+    var zs=document.querySelectorAll('.modPhotoZone'); if(!zs.length) return;
+    var ae=document.activeElement, tag=ae&&ae.tagName; if(ae&&(tag==='TEXTAREA'||(tag==='INPUT'&&/^(text|search|tel|number|email|url|date)$/i.test(ae.type||'text'))||ae.isContentEditable)) return;
+    var f=_modPhotoFromClip(ev); if(!f) return;
+    var id=window._modPhotoLast; if(!id||!document.getElementById(id)) id=zs[0].getAttribute('data-pid');
+    ev.preventDefault(); _modPhotoSet(id,f);
+  });
+}
 function _modPhotoPick(inp){ var f=inp.files&&inp.files[0]; if(!f) return; var pv=document.getElementById(inp.id+'_pv'); if(pv){ try{ pv.src=URL.createObjectURL(f); }catch(e){} pv.style.display=''; } }
 function _modPhotoClear(id){ var h=document.getElementById(id+'_prev'), pv=document.getElementById(id+'_pv'), el=document.getElementById(id); if(h) h.value=''; if(pv){ pv.style.display='none'; pv.removeAttribute('src'); } if(el) el.value=''; }
 function _modUpFile(f,folder,col){
@@ -1031,9 +1053,9 @@ function _modFormField(col,val,idOverride){
       return '<input id="'+id+'" type="tel" value="'+ev+'" placeholder="'+esc(col.placeholder||'010-0000-0000')+'" maxlength="13" style="'+_w+'" oninput="var v=this.value.replace(/[^0-9]/g,\'\');if(v.length<=3)this.value=v;else if(v.length<=7)this.value=v.slice(0,3)+\'-\'+v.slice(3);else this.value=v.slice(0,3)+\'-\'+v.slice(3,7)+\'-\'+v.slice(7,11)">';
     case 'photo':
       var _ph0=String(val||'').split(/\n/).filter(function(u){return u.trim()})[0]||'', _pb0=_ph0.indexOf('|'), _pu0=_pb0>=0?_ph0.slice(_pb0+1).trim():_ph0.trim(), _pt0=_pu0?_modDriveThumb(_pu0,300):'';
-      var phh='<div style="display:flex;gap:12px;align-items:center"><img id="'+id+'_pv" src="'+esc(_pt0)+'" style="width:90px;height:112px;object-fit:cover;border-radius:8px;border:1px solid #cbd5e1;background:#f1f5f9'+(_pt0?'':';display:none')+'">';
+      var phh='<div class="modPhotoZone" data-pid="'+id+'" tabindex="0" onpaste="_modPhotoPaste(event,\''+id+'\')" onclick="window._modPhotoLast=\''+id+'\'" style="display:flex;gap:12px;align-items:center;outline:none;border:2px dashed #cbd5e1;border-radius:10px;padding:8px"><img id="'+id+'_pv" src="'+esc(_pt0)+'" style="width:90px;height:112px;object-fit:cover;border-radius:8px;border:1px solid #cbd5e1;background:#f1f5f9'+(_pt0?'':';display:none')+'">';
       phh+='<div><label style="display:inline-block;background:#0f766e;color:#fff;font-weight:700;padding:9px 14px;border-radius:8px;cursor:pointer">📷 사진 고르기<input id="'+id+'" type="file" accept="image/*" style="display:none" onchange="_modPhotoPick(this)"></label>';
-      phh+='<div style="font-size:11px;color:#94a3b8;margin-top:5px">'+(_pt0?'새로 고르면 바뀌어요 · <a href="javascript:void 0" onclick="_modPhotoClear(\''+id+'\')" style="color:#dc2626">사진 빼기</a>':'얼굴이 잘 보이는 사진 한 장 (자동으로 줄여서 올려요)')+'</div></div></div>';
+      phh+='<div style="font-size:11px;color:#94a3b8;margin-top:5px">'+(_pt0?'새로 고르면 바뀌어요 · <a href="javascript:void 0" onclick="_modPhotoClear(\''+id+'\')" style="color:#dc2626">사진 빼기</a>':'얼굴이 잘 보이는 사진 한 장 (자동으로 줄여서 올려요)')+'<br><b style="color:#0f766e">📋 캡처(Win+Shift+S) 후 Ctrl+V 로 붙여넣어도 돼요</b></div></div></div>';
       phh+='<input type="hidden" id="'+id+'_prev" value="'+ev+'">';
       return phh;
     case 'file':
