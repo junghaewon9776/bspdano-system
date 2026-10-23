@@ -487,8 +487,8 @@ label{display:block;font-size:10px;color:#999;margin-bottom:3px}
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <!-- firebase-storage 제거: 구글 드라이브 프록시로 대체 -->
 <script src="firebase-config.js"></script>
-<script src="common.js?v=20261014rn"></script>
-<script src="mod-engine.js?v=20261023v6"></script>
+<script src="common.js?v=20261023sec1"></script>
+<script src="mod-engine.js?v=20261023sec1"></script>
 
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" onerror="console.warn('XLSX CDN load failed')"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js" onerror="console.warn('xlsx-js-style CDN load failed')"></script>
@@ -20080,8 +20080,7 @@ function dAcct(){
     h+='<div style="font-size:11px;color:#047857;margin-bottom:10px"><a href="https://www.ncloud.com" target="_blank" style="color:#065f46;font-weight:700">ncloud.com</a> → SENS 서비스 → 프로젝트 생성 → 발신번호 등록 → 인증키 발급 → 여기 입력</div>';
     h+='<div class="frow fr2" style="margin-bottom:10px"><div><label>Service ID</label><input type="text" id="cfgSensSvc" placeholder="ncp:sms:kr:xxxxx:프로젝트명"></div>';
     h+='<div><label>발신번호 (사전등록)</label><input type="text" id="cfgSensSender" placeholder="01012345678 (숫자만)"></div></div>';
-    h+='<div class="frow fr2"><div><label>Access Key</label><input type="password" id="cfgSensAccess" placeholder="네이버 클라우드 인증키" autocomplete="off"></div>';
-    h+='<div><label>Secret Key</label><input type="password" id="cfgSensSecret" placeholder="Secret Key" autocomplete="off"></div></div>';
+    h+='<div style="background:#ecfdf5;border:1px solid #6ee7b7;border-radius:8px;padding:9px 11px;font-size:12px;color:#065f46;line-height:1.5">🔒 <b>Access Key / Secret Key 는 여기 넣지 않아요.</b><br>남이 볼 수 없게 문자 프록시(구글 Apps Script)의 <b>스크립트 속성</b>에만 넣어 둡니다. 키를 바꿀 땐 그곳에서 바꿔 주세요.</div>';
     h+='<div style="margin-top:8px"><label>SMS 서명 (본문 앞에 자동 추가)</label><input type="text" id="cfgSmsSig" placeholder="[법성포단오제보존회]"></div>';
     // 카카오 알림톡 (선택) — 기존 필드 유지
     h+='<details style="margin-top:10px;padding:8px;background:#fef3c7;border:1px solid #fbbf24;border-radius:6px"><summary style="cursor:pointer;font-weight:700;color:#78350f;font-size:13px">💬 카카오 알림톡 연동 (선택)</summary>';

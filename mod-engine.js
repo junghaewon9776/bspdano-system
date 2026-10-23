@@ -1167,7 +1167,7 @@ function _modSmsGlobal(tels, msg){
   return fbDb.ref('/main/Config').once('value').then(function(s){
     var cfg=s.val()||{};
     var proxy=cfg.SMS_PROXY_URL, sender=cfg.NAVER_SENS_SENDER;
-    if(!proxy||!sender||!cfg.NAVER_SENS_SECRET_KEY) return {ok:false,err:'문자 설정 미완료(main Config)'};
+    if(!proxy||!sender) return {ok:false,err:'문자 설정 미완료(main Config)'};
     var body={ action:'send', serviceId:cfg.NAVER_SENS_SERVICE_ID, accessKey:cfg.NAVER_SENS_ACCESS_KEY, secretKey:cfg.NAVER_SENS_SECRET_KEY, sender:sender, tels:tels, msg:String(msg||'') };
     return fetch(proxy,{method:'POST',redirect:'follow',body:JSON.stringify(body)}).then(function(r){return r.json();}).catch(function(e){return {ok:false,err:'프록시 통신오류: '+(e.message||e)};});
   });

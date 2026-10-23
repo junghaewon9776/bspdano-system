@@ -1269,8 +1269,7 @@ function _apiCheckSmsConfig(p) {
       return _getSensCfg(evtId).then(function(c) {
         return _getAligoCfg(evtId).then(function(ac) {
           if (!ac.proxyUrl) return {ok:false, err:"SMS 프록시 URL 미설정 — GAS 웹앱 URL을 등록하세요"};
-          if (!c.serviceId) return {ok:false, err:"네이버 SENS 서비스 ID 미설정"};
-          if (!c.accessKey || !c.secretKey) return {ok:false, err:"네이버 SENS Access/Secret Key 미설정"};
+          // 🔒 서비스ID·Access/Secret Key 는 문자 프록시(Apps Script) 스크립트 속성에 보관 — DB엔 없어도 됨
           if (!c.sender) return {ok:false, err:"네이버 SENS 발신번호 미설정"};
           return {ok:true};
         });
@@ -1294,8 +1293,8 @@ function _apiSendSmsAligo(p) {
 // 네이버 SENS 발송 (GAS 프록시 경유)
 function _apiSendSmsNaver(p, evtId) {
   return _getSensCfg(evtId).then(function(c) {
-    if (!c.serviceId || !c.accessKey || !c.secretKey || !c.sender)
-      return {ok:false, err:"네이버 SENS 설정 미완료"};
+    if (!c.sender)
+      return {ok:false, err:"네이버 SENS 발신번호 미설정"};
     // 프록시 URL 확인 (알리고와 동일 키 SMS_PROXY_URL 사용)
     return _getAligoCfg(evtId).then(function(ac) {
       var proxyUrl = ac.proxyUrl;
@@ -1304,6 +1303,7 @@ function _apiSendSmsNaver(p, evtId) {
       if (!tels.length) return {ok:false, err:"수신번호 없음"};
       var body = {
         action:    "send",
+        // 비밀키는 프록시가 스크립트 속성에서 꺼냄. DB에 옛 키가 남아 있을 때만 같이 보냄(옮기는 동안 호환)
         serviceId: c.serviceId,
         accessKey: c.accessKey,
         secretKey: c.secretKey,
