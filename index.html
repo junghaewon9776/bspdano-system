@@ -10876,6 +10876,7 @@ function dExp(){
       h += '<td></td><td></td></tr>';
       h += '</tbody></table>';
     }
+    h += '<div style="padding:8px 10px;border-top:1px dashed #e2e8f0"><button class="btn btn-s" style="background:#7c3aed;color:#fff;font-weight:700" onclick="expAdd(\''+esc(t)+'\')">＋ 중분류 추가</button></div>';
     h += '</div>';
   });
   h += '</div></div>';
@@ -10894,14 +10895,16 @@ function expAdd(preTp){
   h += '</div>';
   h += '<label style="display:block;margin-top:10px;font-weight:600;font-size:13px">대분류 (카테고리) *</label>';
   h += '<div style="display:flex;gap:6px">';
-  h += '<select id="expN_tp" style="flex:1;padding:8px;border:1px solid #cbd5e0;border-radius:5px">';
+  h += '<select id="expN_tp" onchange="_expMidRefresh()" style="flex:1;padding:8px;border:1px solid #cbd5e0;border-radius:5px">';
   if(!types.length) h += '<option value="">— 대분류 없음 (우측 버튼으로 먼저 추가) —</option>';
   types.forEach(function(t){ h += '<option value="'+esc(t)+'"'+(preTp===t?' selected':'')+'>'+esc(t)+'</option>'; });
   h += '</select>';
   h += '<button type="button" class="btn" style="background:#2563eb;color:#fff;font-weight:700;white-space:nowrap" onclick="expAddTypeQuick()">+ 대분류 추가</button>';
   h += '</div>';
   h += '<label style="display:block;margin-top:10px;font-weight:600;font-size:13px">중분류 (예산 단위) * <span style="color:#64748b;font-weight:400">— 실제 예산이 잡히는 항목</span></label>';
-  h += '<input id="expN_mid" type="text" placeholder="예: 개막식/기념식, 난장트기" style="width:100%;padding:8px;border:1px solid #cbd5e0;border-radius:5px">';
+  h += '<select id="expN_midSel" onchange="_expMidSelChg()" style="width:100%;padding:8px;border:1px solid #cbd5e0;border-radius:5px"></select>';
+  h += '<input id="expN_mid" type="text" placeholder="새 중분류 이름 — 예: 개막식/기념식, 난장트기" style="width:100%;padding:8px;border:1px solid #cbd5e0;border-radius:5px;margin-top:6px;display:none">';
+  h += '<div id="expN_midHint" style="font-size:12px;color:#475569;margin-top:4px"></div>';
   h += '<label style="display:block;margin-top:10px;font-weight:600;font-size:13px">소분류 (선택)</label>';
   h += '<input id="expN_sub" type="text" placeholder="세부 항목 (비워둬도 됨)" style="width:100%;padding:8px;border:1px solid #cbd5e0;border-radius:5px">';
   h += '<label style="display:block;margin-top:10px;font-weight:600;font-size:13px">사업계획비 (원) * <span style="color:#64748b;font-weight:400">— 중분류의 예산 한도</span></label>';
@@ -10913,6 +10916,25 @@ function expAdd(preTp){
   h += '<button class="btn btn-b" onclick="expAddSave()">저장</button>';
   h += '</div></div>';
   openPopup(h, 460);
+  _expMidRefresh();
+}
+// 세출 추가: 고른 대분류에 이미 있는 중분류를 목록으로 + 맨 아래 「새 중분류 직접 입력」
+function _expMidOpts(tp){
+  var seen={}, list=[];
+  (expBG||[]).forEach(function(r){ if(r.tp!==tp||!r.mid) return; if(!seen[r.mid]){ seen[r.mid]={n:0,am:0}; list.push(r.mid); } seen[r.mid].n++; seen[r.mid].am+=Number(r.planAm)||0; });
+  var h=list.length?'<option value="">(중분류 고르기 — 이미 있는 것 '+list.length+'개)</option>':'';
+  list.forEach(function(m){ h+='<option value="'+esc(m)+'">'+esc(m)+' · 예산 '+fmtKRW(seen[m].am)+'원'+(seen[m].n>1?' (소분류 '+seen[m].n+'줄)':'')+'</option>'; });
+  h+='<option value="__new__"'+(list.length?'':' selected')+'>＋ 새 중분류 직접 입력</option>';
+  return h;
+}
+function _expMidRefresh(){
+  var sel=document.getElementById('expN_midSel'), tp=(document.getElementById('expN_tp')||{}).value||'';
+  if(!sel) return; sel.innerHTML=_expMidOpts(tp); _expMidSelChg();
+}
+function _expMidSelChg(){
+  var v=(document.getElementById('expN_midSel')||{}).value||'', inp=document.getElementById('expN_mid'), hint=document.getElementById('expN_midHint');
+  if(inp){ inp.style.display=v==='__new__'?'':'none'; if(v==='__new__') setTimeout(function(){ inp.focus(); },0); }
+  if(hint) hint.innerHTML = v==='__new__' ? '' : (v ? '이 중분류 아래에 <b>소분류</b>로 예산이 추가돼요 — 소분류 이름을 꼭 적어 주세요' : '');
 }
 // 세출 추가 팝업에서 대분류 빠른 추가 (팝업 안 닫고 바로 추가)
 async function expAddTypeQuick(){
@@ -10935,12 +10957,17 @@ async function expAddTypeQuick(){
     sel.appendChild(opt);
     sel.value = nm;
   }
+  _expMidRefresh();
   toast("대분류 '"+nm+"' 추가됨");
 }
 function expAddSave(){
   var tp = document.getElementById("expN_tp").value;
-  var mid = document.getElementById("expN_mid").value.trim();
+  var _ms = (document.getElementById("expN_midSel")||{}).value||"__new__";
+  var mid = _ms==="__new__" ? document.getElementById("expN_mid").value.trim() : _ms;
   var sub = document.getElementById("expN_sub").value.trim();
+  if (mid && (expBG||[]).some(function(r){ return r.tp===tp && r.mid===mid && (r.sub||"")===sub; })){
+    toast(sub ? "「"+mid+" › "+sub+"」는 이미 있어요" : "「"+mid+"」는 이미 있어요 — 소분류 이름을 적거나 ✏️ 수정으로 금액을 바꾸세요", true); return;
+  }
   var am = Number(document.getElementById("expN_am").value.replace(/,/g,""))||0;
   var note = document.getElementById("expN_note").value;
   if (!tp){ toast("대분류를 선택하세요", true); return; }
