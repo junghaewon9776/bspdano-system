@@ -45,7 +45,7 @@ function _modRowTitle(def,row){
 }
 // 행 상세 설명(표시 컬럼 전체 조합) — 로그/구분용 (열이 늘어도 다 표시)
 function _modRowDesc(def,row){
-  var cs=(def.columns||[]).filter(function(x){return !x.adminOnly&&x.key!=='status'&&!x.hideTable&&x.type!=='file'&&x.type!=='consent';});
+  var cs=(def.columns||[]).filter(function(x){return !x.adminOnly&&x.key!=='status'&&!x.hideTable&&x.type!=='file'&&x.type!=='photo'&&x.type!=='consent';});
   var s=cs.map(function(c){ var v=row[c.key]; return (v==null||v==='')?'':_modPlain(c,v); }).filter(Boolean).join(' / ');
   return s||_modRowTitle(def,row);
 }
@@ -86,6 +86,16 @@ function _modDriveThumb(url, sz){
   if(!url) return '';
   var m = url.match(/\/d\/([-\w]{20,})/) || url.match(/[?&]id=([-\w]{20,})/) || url.match(/([-\w]{25,})/);
   return (m&&m[1]) ? 'https://drive.google.com/thumbnail?id='+m[1]+'&sz=w'+(sz||120) : '';
+}
+// 🖼 사진 칼럼 도우미 — 고르면 미리보기, 빼기, 올릴 때 줄여서 사진 업로드
+function _modPhotoPick(inp){ var f=inp.files&&inp.files[0]; if(!f) return; var pv=document.getElementById(inp.id+'_pv'); if(pv){ try{ pv.src=URL.createObjectURL(f); }catch(e){} pv.style.display=''; } }
+function _modPhotoClear(id){ var h=document.getElementById(id+'_prev'), pv=document.getElementById(id+'_pv'), el=document.getElementById(id); if(h) h.value=''; if(pv){ pv.style.display='none'; pv.removeAttribute('src'); } if(el) el.value=''; }
+function _modUpFile(f,folder,col){
+  if(col&&col.type==='photo'&&typeof api==='function'&&typeof compressOne==='function'){
+    return compressOne(f).then(function(r){ return api('uploadPhoto',{dataUrl:r.dataUrl,name:(r.name||f.name),type:'purchase',evtId:folder}); })
+      .then(function(res){ if(res&&res.ok&&res.url) return res.url; throw new Error('사진 올리기 실패: '+((res&&res.err)||'')); });
+  }
+  return _uploadToDrive(f,folder,col?col.label:'');
 }
 function _modIsImg(s){ return /\.(jpe?g|png|gif|webp|bmp|heic|heif)(\?|$)/i.test(String(s||'')); }
 
@@ -485,7 +495,7 @@ function _modSearchTyped(key,val){
 function _modFilterOpts(key,fc){
   if(fc.type==='select') return (fc.options||[]).map(function(o){ return {v:typeof o==='object'?o.value:o, l:typeof o==='object'?o.label:o}; });
   if(fc.type==='badge') return Object.keys(fc.badgeMap||{}).map(function(k){ return {v:k, l:(fc.badgeMap[k].label||k)}; });
-  if(fc.type==='file'||fc.type==='consent') return [{v:'__has__',l:'✅ 등록됨'},{v:'__none__',l:'⬜ 미등록'}];
+  if(fc.type==='file'||fc.type==='photo'||fc.type==='consent') return [{v:'__has__',l:'✅ 등록됨'},{v:'__none__',l:'⬜ 미등록'}];
   // 그 외(텍스트 등) → 실제 데이터의 고유값 자동 수집
   var seen={}, out=[];
   (_modData[key]||[]).forEach(function(r){ var v=String(r[fc.key]||''); if(v&&!seen[v]){seen[v]=1;out.push({v:v,l:v});} });
@@ -770,6 +780,9 @@ function _modFmtCell(col,val){
       return esc(String(val));
     case 'textarea':
       var s=String(val); return '<span title="'+esc(s)+'">'+esc(s.length>40?s.slice(0,40)+'…':s)+'</span>';
+    case 'photo':   // 🖼 사진 칼럼 — 첫 장을 세로 썸네일로
+      var _pp=String(val).split(/\n/).filter(function(u){return u.trim()})[0]||'', _pb=_pp.indexOf('|'), _pu=_pb>=0?_pp.slice(_pb+1).trim():_pp.trim(), _pth=_modDriveThumb(_pu,200);
+      return _pth?'<a href="'+esc(_modDriveViewUrl(_pu))+'" target="_blank" onclick="event.stopPropagation()"><img src="'+esc(_pth)+'" loading="lazy" style="width:48px;height:60px;object-fit:cover;border-radius:6px;border:1px solid #cbd5e1;background:#f1f5f9;display:block" onerror="this.replaceWith(document.createTextNode(\'🖼\'))"></a>':'';
     case 'file':
       var _fparts=String(val).split(/\n/).filter(function(u){return u.trim()});
       return _fparts.map(function(p){
@@ -1016,6 +1029,13 @@ function _modFormField(col,val,idOverride){
       return '<input id="'+id+'" type="date" value="'+ev+'" style="'+_w+'">';
     case 'tel':
       return '<input id="'+id+'" type="tel" value="'+ev+'" placeholder="'+esc(col.placeholder||'010-0000-0000')+'" maxlength="13" style="'+_w+'" oninput="var v=this.value.replace(/[^0-9]/g,\'\');if(v.length<=3)this.value=v;else if(v.length<=7)this.value=v.slice(0,3)+\'-\'+v.slice(3);else this.value=v.slice(0,3)+\'-\'+v.slice(3,7)+\'-\'+v.slice(7,11)">';
+    case 'photo':
+      var _ph0=String(val||'').split(/\n/).filter(function(u){return u.trim()})[0]||'', _pb0=_ph0.indexOf('|'), _pu0=_pb0>=0?_ph0.slice(_pb0+1).trim():_ph0.trim(), _pt0=_pu0?_modDriveThumb(_pu0,300):'';
+      var phh='<div style="display:flex;gap:12px;align-items:center"><img id="'+id+'_pv" src="'+esc(_pt0)+'" style="width:90px;height:112px;object-fit:cover;border-radius:8px;border:1px solid #cbd5e1;background:#f1f5f9'+(_pt0?'':';display:none')+'">';
+      phh+='<div><label style="display:inline-block;background:#0f766e;color:#fff;font-weight:700;padding:9px 14px;border-radius:8px;cursor:pointer">📷 사진 고르기<input id="'+id+'" type="file" accept="image/*" style="display:none" onchange="_modPhotoPick(this)"></label>';
+      phh+='<div style="font-size:11px;color:#94a3b8;margin-top:5px">'+(_pt0?'새로 고르면 바뀌어요 · <a href="javascript:void 0" onclick="_modPhotoClear(\''+id+'\')" style="color:#dc2626">사진 빼기</a>':'얼굴이 잘 보이는 사진 한 장 (자동으로 줄여서 올려요)')+'</div></div></div>';
+      phh+='<input type="hidden" id="'+id+'_prev" value="'+ev+'">';
+      return phh;
     case 'file':
       var fh='';
       if(val){
@@ -1216,7 +1236,7 @@ function modSave(key,editId){
       if(c.required&&!ok){ toast(c.label+'에 동의가 필요합니다',true); valid=false; }
       obj[c.key]=ok?'동의':''; return;
     }
-    if(c.type==='file'){
+    if(c.type==='file'||c.type==='photo'){
       var prev=(document.getElementById('mod_f_'+c.key+'_prev')||{}).value||'';
       if(el.files&&el.files.length){ fileTasks.push({col:c,files:Array.prototype.slice.call(el.files)}); }
       else { obj[c.key]=prev; if(c.required&&!prev){ toast(c.label+' 파일을 첨부하세요',true); valid=false; } }
@@ -1288,7 +1308,7 @@ function modSave(key,editId){
       var urls=[];
       var sub=Promise.resolve();
       t.files.forEach(function(f){
-        sub=sub.then(function(){ return _uploadToDrive(f,'mod_'+key,t.col.label).then(function(url){ urls.push(f.name.replace(/[|\n]/g,' ')+'|'+url); }); });
+        sub=sub.then(function(){ return _modUpFile(f,'mod_'+key,t.col).then(function(url){ urls.push(f.name.replace(/[|\n]/g,' ')+'|'+url); }); });
       });
       return sub.then(function(){ obj[t.col.key]=urls.join('\n'); });
     });
@@ -1299,7 +1319,7 @@ function modSave(key,editId){
       upChain=upChain.then(function(){
         var urls=[]; var sub=Promise.resolve();
         t.files.forEach(function(f){
-          sub=sub.then(function(){ return _uploadToDrive(f,'mod_'+key,t.col.label).then(function(url){ urls.push(f.name.replace(/[|\n]/g,' ')+'|'+url); }); });
+          sub=sub.then(function(){ return _modUpFile(f,'mod_'+key,t.col).then(function(url){ urls.push(f.name.replace(/[|\n]/g,' ')+'|'+url); }); });
         });
         return sub.then(function(){ t.target[t.col.key]=urls.join('\n'); });
       });
@@ -1411,8 +1431,43 @@ function _modSendCancelSms(def, rows){
 // 엑셀 내보내기
 // ═══════════════════════════════════════════
 
+// 사진 칼럼이 있으면 ExcelJS로 — 사진을 칸 안에 넣은 엑셀 (드라이브 사진은 lh3 주소로 받아옴)
+async function _modExportExcelPhoto(key){
+  var def=_modDefs[key], data=_modFilteredData(key), cols=(def.columns||[]).filter(function(c){return !c.hideTable});
+  showLoading('사진 넣은 엑셀 만드는 중...');
+  var EJ; try{ EJ=await _loadExcelJS(); }catch(e){ hideLoading(); toast(e.message,true); return; }
+  var wb=new EJ.Workbook(), ws=wb.addWorksheet(String(def.label||'목록').replace(/[\\\/?*\[\]:]/g,'').slice(0,30)||'목록');
+  var thin={style:'thin',color:{argb:'FF94A3B8'}}, border={top:thin,left:thin,bottom:thin,right:thin};
+  ws.columns=[{width:12}].concat(cols.map(function(c){ return {width:c.type==='photo'?12:(c.type==='textarea'||c.type==='address'?30:16)}; }));
+  var hr=ws.addRow(['고유번호'].concat(cols.map(function(c){return c.label;})));
+  hr.eachCell(function(c){ c.font={bold:true,color:{argb:'FFFFFFFF'}}; c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF1E293B'}}; c.alignment={horizontal:'center',vertical:'middle'}; c.border=border; });
+  ws.views=[{state:'frozen',ySplit:1}];
+  var idOf=function(v){ var p=String(v||'').split(/\n/).filter(function(u){return u.trim()})[0]||'', b=p.indexOf('|'), u=b>=0?p.slice(b+1).trim():p.trim(), m=u.match(/\/d\/([-\w]{20,})/)||u.match(/[?&]id=([-\w]{20,})/)||u.match(/([-\w]{25,})/); return m?m[1]:''; };
+  var b64=function(buf){ var s='', a=new Uint8Array(buf); for(var i=0;i<a.length;i+=8192) s+=String.fromCharCode.apply(null,a.subarray(i,i+8192)); return btoa(s); };
+  var jobs=[], photoCols=[];
+  cols.forEach(function(c,j){ if(c.type==='photo') photoCols.push(j); });
+  data.forEach(function(row,i){
+    var r=ws.addRow([row._id||''].concat(cols.map(function(c){ var v=row[c.key]; if(v==null) return ''; if(c.type==='photo') return '';
+      if(c.multiQty) return _modMultiStr(v,c.multiSep,c.multiNoQty,c.multiQtyKae); if(c.type==='badge'&&c.badgeMap&&c.badgeMap[v]) return c.badgeMap[v].label||v;
+      if(c.type==='file') return String(v).split(/\n/).map(function(p){ var b=p.indexOf('|'); return b>=0?p.slice(b+1).trim():p.trim(); }).join('\n');
+      return v; })));
+    r.eachCell({includeEmpty:true},function(c){ c.border=border; c.alignment={vertical:'middle',wrapText:true}; });
+    if(photoCols.length){ r.height=78; photoCols.forEach(function(j){ var id=idOf(row[cols[j].key]); if(id) jobs.push({id:id,row:i+1,col:j+1}); }); }
+  });
+  for(var k=0;k<jobs.length;k++){
+    var jb=jobs[k]; showLoading('사진 넣는 중 '+(k+1)+'/'+jobs.length);
+    try{ var res=await fetch('https://lh3.googleusercontent.com/d/'+jb.id+'=w240'); if(!res.ok) continue; var ct=res.headers.get('content-type')||'image/jpeg', ext=/png/.test(ct)?'png':(/gif/.test(ct)?'gif':'jpeg');
+      var buf=await res.arrayBuffer(), imgId=wb.addImage({base64:'data:'+ct+';base64,'+b64(buf), extension:ext});
+      ws.addImage(imgId,{tl:{col:jb.col+0.08,row:jb.row+0.06}, ext:{width:76,height:96}, editAs:'oneCell'}); }catch(e){}
+  }
+  var out=await wb.xlsx.writeBuffer(), a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([out],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'})); a.download=String(def.label||'목록')+'_'+(_todayStr())+'.xlsx';
+  document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); },3000);
+  hideLoading(); toast('📗 엑셀 받았어요'+(jobs.length?' (사진 '+jobs.length+'장)':''));
+}
 function modExportExcel(key){
   var def=_modDefs[key]; if(!def) return;
+  if((def.columns||[]).some(function(c){ return c.type==='photo'&&!c.hideTable; }) && typeof _loadExcelJS==='function') return _modExportExcelPhoto(key);
   var data=_modFilteredData(key);  // 현재 검색·필터·정렬 적용된 것만 내보내기
   var cols=(def.columns||[]).filter(function(c){return !c.hideTable});
   // 첫 열은 고유번호(QR id) — 다시 가져올 때 기존 행을 식별/업데이트하기 위함
@@ -1444,7 +1499,7 @@ function modExportExcel(key){
 
 // 시트에서 편집 가능한 컬럼 (파일 제외)
 function _mshCols(def){
-  return (def.columns||[]).filter(function(c){return !c.hideTable&&c.type!=='file';});
+  return (def.columns||[]).filter(function(c){return !c.hideTable&&c.type!=='file'&&c.type!=='photo';});
 }
 // badge 라벨↔키 역매핑 (저장 시 입력값이 라벨이면 키로)
 function _mshBadgeToKey(col,val){
@@ -2114,7 +2169,7 @@ function _modTrackImportRun(key){
 var MOD_COL_TYPES=[
   {v:"text",l:"텍스트"},{v:"number",l:"숫자/금액"},{v:"date",l:"날짜"},{v:"tel",l:"연락처(하이픈)"},
   {v:"select",l:"선택(드롭다운)"},{v:"textarea",l:"긴 텍스트"},{v:"badge",l:"상태배지"},
-  {v:"file",l:"파일첨부"},{v:"consent",l:"개인정보 동의"},{v:"account",l:"계좌(복사버튼)"},{v:"address",l:"주소(검색)"}
+  {v:"file",l:"파일첨부"},{v:"photo",l:"사진(이미지)"},{v:"consent",l:"개인정보 동의"},{v:"account",l:"계좌(복사버튼)"},{v:"address",l:"주소(검색)"}
 ];
 function _modColKey(){ return 'c'+Date.now().toString(36)+Math.random().toString(36).slice(2,5); }
 
@@ -2276,7 +2331,7 @@ function _renderModDefCols(){
     // 콤마 (숫자/금액만)
     if(c.type==='number') h+='<label style="font-size:11px;display:flex;align-items:center;gap:3px"><input type="checkbox"'+(c.comma?' checked':'')+' onchange="_modDefEditCols['+i+'].comma=this.checked">금액(콤마)</label>';
     // 필터 (긴글·파일·동의 제외한 모든 타입) — 체크하면 그 컬럼 값으로 거르는 버튼 자동 생성
-    if(['select','badge','text','tel','number','date','file','consent'].indexOf(c.type)>=0) h+='<label style="font-size:11px;display:flex;align-items:center;gap:3px" title="체크하면 이 컬럼으로 거르는 필터 버튼이 생깁니다 (파일/동의는 첨부됨·미첨부)"><input type="checkbox"'+(c.filter?' checked':'')+' onchange="_modDefEditCols['+i+'].filter=this.checked">필터</label>';
+    if(['select','badge','text','tel','number','date','file','photo','consent'].indexOf(c.type)>=0) h+='<label style="font-size:11px;display:flex;align-items:center;gap:3px" title="체크하면 이 컬럼으로 거르는 필터 버튼이 생깁니다 (파일/동의는 첨부됨·미첨부)"><input type="checkbox"'+(c.filter?' checked':'')+' onchange="_modDefEditCols['+i+'].filter=this.checked">필터</label>';
     // 검색 (텍스트류만)
     if(['text','tel','textarea','number','select'].indexOf(c.type)>=0) h+='<label style="font-size:11px;display:flex;align-items:center;gap:3px"><input type="checkbox"'+(c.search?' checked':'')+' onchange="_modDefEditCols['+i+'].search=this.checked">검색</label>';
     // 👥 중복 표시 (텍스트/연락처/선택) — 같은 값 여러 건이면 표에 "총 N건" 배지 (칼럼별 독립)
@@ -2356,6 +2411,9 @@ function _renderModDefCols(){
     if(c.type==='consent'){
       h+='<div style="margin-top:6px"><input placeholder="동의 문구 (예: 개인정보 수집·이용에 동의합니다)" value="'+esc(c.consentText||'')+'" style="width:100%;font-size:12px;padding:5px 8px;border:1px solid #cbd5e1;border-radius:6px" onchange="_modDefEditCols['+i+'].consentText=this.value"></div>';
     }
+    if(c.type==='photo'){
+      h+='<div style="margin-top:6px;font-size:11px;color:#94a3b8">🖼 표에는 얼굴 썸네일로, 엑셀 내보내기에는 사진이 칸 안에 들어가요.</div>';
+    }
     if(c.type==='file'){
       h+='<div style="margin-top:6px;font-size:11px;color:#94a3b8">📎 파일첨부는 자료실의 Drive 업로드 설정이 필요합니다. 신청자가 파일을 올리면 링크로 저장됩니다.</div>';
     }
@@ -2414,6 +2472,7 @@ function _renderModDefCols(){
     }
     h+='</div>';
   });
+  h+='<button class="btn" onclick="_modDefAddCol()" style="width:100%;margin-top:8px;padding:10px;border:2px dashed #2563eb;background:#eff6ff;color:#1d4ed8;font-weight:800;border-radius:8px">➕ 컬럼 추가 (맨 아래에)</button>';
   return h;
 }
 // 컬럼 값 검증 — 통과 시 null, 실패 시 에러 메시지
@@ -2457,6 +2516,9 @@ function _strToBadgeMap(s){
 function _modDefAddCol(){
   _modDefEditCols.push({key:_modColKey(),label:'',type:'text',required:false,search:true,filter:false,comma:false});
   _modDefRefreshCols();
+  setTimeout(function(){   // 새로 생긴 칸(맨 아래 추가 버튼 바로 위)으로 내려가서 이름 칸에 커서
+    var a=document.getElementById('mdf_cols_area'), kids=a?a.children:[], el=kids.length>1?kids[kids.length-2]:null;
+    if(el&&el.scrollIntoView) el.scrollIntoView({behavior:'smooth',block:'center'}); var inp=el&&el.querySelector('input'); if(inp) try{ inp.focus({preventScroll:true}); }catch(e){} },60);
 }
 function _modDefRemoveCol(i){
   var c=_modDefEditCols[i];
@@ -3283,7 +3345,7 @@ function _modReadField(c, fid, ctx, target){
     if(c.required&&(!el||!el.checked)){ ctx.valid=false; if(!ctx.firstBad)ctx.firstBad=c.label+'에 동의해 주세요'; }
     return el&&el.checked?'동의':'';
   }
-  if(c.type==='file'){
+  if(c.type==='file'||c.type==='photo'){
     if(el&&el.files&&el.files.length){ ctx.fileTasks.push({col:c,files:Array.prototype.slice.call(el.files),target:target}); }
     else if(c.required){ ctx.valid=false; if(!ctx.firstBad)ctx.firstBad=c.label+' 파일을 첨부해 주세요'; }
     return undefined;
@@ -3366,7 +3428,7 @@ function submitModApply(){
     upChain=upChain.then(function(){
       var urls=[]; var sub=Promise.resolve();
       t.files.forEach(function(f){
-        sub=sub.then(function(){ return _uploadToDrive(f,'mod_'+def.key,t.col.label).then(function(url){ urls.push(f.name.replace(/[|\n]/g,' ')+'|'+url); }); });
+        sub=sub.then(function(){ return _modUpFile(f,'mod_'+def.key,t.col).then(function(url){ urls.push(f.name.replace(/[|\n]/g,' ')+'|'+url); }); });
       });
       return sub.then(function(){ t.target[t.col.key]=urls.join('\n'); });
     });
@@ -3480,7 +3542,7 @@ function popModSms(key, preSelIds){
 
   // 변수 목록 (컬럼 기반)
   var sample=(_modData[key]||[])[0]||{};
-  var vars=(def.columns||[]).filter(function(c){return c.key!=='status'&&c.type!=='consent'&&c.type!=='file'})
+  var vars=(def.columns||[]).filter(function(c){return c.key!=='status'&&c.type!=='consent'&&c.type!=='file'&&c.type!=='photo'})
     .map(function(c){return {key:c.label, srcKey:c.key, sample:sample[c.key]||''};});
   if(typeof _smsDateVars==='function') vars=vars.concat(_smsDateVars());
   // 📱 디지털 패스 링크 변수 (열면 QR 표시 → 입구 스캔)
@@ -3542,7 +3604,7 @@ function popModSms(key, preSelIds){
   },50);
 }
 function _modTitleCol(def){
-  var c=(def.columns||[]).filter(function(x){return !x.adminOnly&&x.key!=='status'&&!x.hideTable&&x.type!=='file'&&x.type!=='consent'})[0];
+  var c=(def.columns||[]).filter(function(x){return !x.adminOnly&&x.key!=='status'&&!x.hideTable&&x.type!=='file'&&x.type!=='photo'&&x.type!=='consent'})[0];
   return c?c.key:'';
 }
 // 전체 데이터 (연락처 있는 것만)
@@ -3563,7 +3625,7 @@ function _modSmsRenderList(){
   var key=window.__modSmsKey; var def=_modDefs[key]; if(!def) return;
   var telKey=window.__modSmsTelKey;
   var showCols=(def.columns||[]).filter(function(c){
-    return c.key!=='status'&&c.type!=='tel'&&c.type!=='file'&&c.type!=='consent'&&!c.hideTable&&!c.adminOnly;
+    return c.key!=='status'&&c.type!=='tel'&&c.type!=='file'&&c.type!=='photo'&&c.type!=='consent'&&!c.hideTable&&!c.adminOnly;
   }).slice(0,3);
   var q=((document.getElementById('modSmsSearch')||{}).value||'').trim().toLowerCase();
   var rows=_modSmsAllRows();
@@ -3870,7 +3932,7 @@ function _mlSuffixKey(def,opt){
 // 칸 이름(제목) 붙이기 — 저장값 없으면 등기우편은 끔, 나머지는 켬(기존 그대로)
 function _mlShowLbl(def,opt){ return (opt.showLbl==null) ? !(def.features&&def.features.epost) : !!opt.showLbl; }
 function _modLabelHtml(def,row,opt){
-  var allc=(def.columns||[]).filter(function(c){return c.key!=='status'&&!c.hideTable&&c.type!=='file'&&c.type!=='consent'});
+  var allc=(def.columns||[]).filter(function(c){return c.key!=='status'&&!c.hideTable&&c.type!=='file'&&c.type!=='photo'&&c.type!=='consent'});
   var hasFields=!!(opt.fields&&opt.fields.length);
   var cols=hasFields ? allc.filter(function(c){return opt.fields.indexOf(c.key)>=0;}) : allc;
   // 표시 여부: 항목 체크가 있으면 그에 따름. 제목/ QR도 동일하게 제어
@@ -3945,7 +4007,7 @@ function popModLabel(key,singleId,idsList){
   window.__mlPickLast = -1;
   window.__mlMode = opt.mode||'label';    // 현재 출력 모드
   window.__mlSizes = JSON.parse(JSON.stringify(opt.sizes||{})); // 모드별 크기 작업 사본
-  var allCols=(def.columns||[]).filter(function(c){return c.key!=='status'&&!c.hideTable&&c.type!=='file'&&c.type!=='consent'});
+  var allCols=(def.columns||[]).filter(function(c){return c.key!=='status'&&!c.hideTable&&c.type!=='file'&&c.type!=='photo'&&c.type!=='consent'});
   var fieldOpts=allCols.map(function(c){return '<option value="'+esc(c.key)+'"'+(opt.titleKey===c.key?' selected':'')+'>'+esc(c.label)+'</option>';}).join('');
   var checkedFields=(opt.fields&&opt.fields.length)?opt.fields:allCols.map(function(c){return c.key;}).concat(['_qr']);
   var isA4=(opt.mode==='a4');
@@ -4273,7 +4335,7 @@ function _mlExportMailMerge(key){
     if(!rows.length){ toast('승인된 항목이 없습니다',true); return; }
   }
   // 라벨에 표시되는 컬럼 (파일/동의/상태 제외)
-  var cols=(def.columns||[]).filter(function(c){return c.key!=='status'&&!c.hideTable&&c.type!=='file'&&c.type!=='consent';});
+  var cols=(def.columns||[]).filter(function(c){return c.key!=='status'&&!c.hideTable&&c.type!=='file'&&c.type!=='photo'&&c.type!=='consent';});
   var headers=cols.map(function(c){return c.label;});
   headers.push('QR링크');
   var aoa=[headers];
@@ -4855,7 +4917,7 @@ function popModLabelLayout(key){
   // 라벨 팝업이 열려있으면 그 모드/입력값을 우선 사용 (모드별 분리)
   var mode=window.__mlMode||opt.mode||'label';
   if(window.__mlMode && window.__mlSizes){ _mlSyncSizeFromInputs(); opt=Object.assign({},opt,window.__mlSizes[mode]||{}); }
-  var allCols=(def.columns||[]).filter(function(c){return c.key!=='status'&&!c.hideTable&&c.type!=='file'&&c.type!=='consent'});
+  var allCols=(def.columns||[]).filter(function(c){return c.key!=='status'&&!c.hideTable&&c.type!=='file'&&c.type!=='photo'&&c.type!=='consent'});
   var checkedFields=(opt.fields&&opt.fields.length)?opt.fields:allCols.map(function(c){return c.key;});
   var cols=allCols.filter(function(c){return checkedFields.indexOf(c.key)>=0;});
   var existing=_modLabelLayout(key,mode);
@@ -5330,7 +5392,7 @@ function _mlistLoad(key,evtId){
 function _renderModListUI(def,rows,q){
   var w=document.getElementById('modListWrap'); if(!w) return;
   var telCols=(def.columns||[]).filter(function(c){return c.type==='tel';});
-  var infoCols=(def.columns||[]).filter(function(c){return c.key!=='status'&&c.type!=='consent'&&c.type!=='file'&&c.type!=='tel'&&!c.hideTable&&!c.sysOnly;});
+  var infoCols=(def.columns||[]).filter(function(c){return c.key!=='status'&&c.type!=='consent'&&c.type!=='file'&&c.type!=='photo'&&c.type!=='tel'&&!c.hideTable&&!c.sysOnly;});
   q=(q||'').trim();
   var filtered=rows;
   if(q){ var ql=q.toLowerCase(); filtered=rows.filter(function(r){ return (def.columns||[]).some(function(c){ return String(r[c.key]||'').toLowerCase().indexOf(ql)>=0; }); }); }
@@ -5461,7 +5523,7 @@ function _modStatCol(c, data, key){
 }
 function _modStatNameCol(key){
   var def=_modDefs[key]; if(!def) return null;
-  var cols=(def.columns||[]).filter(function(c){return c.type!=='badge'&&c.type!=='consent'&&c.type!=='file'&&!c.auto&&!c.sysOnly;});
+  var cols=(def.columns||[]).filter(function(c){return c.type!=='badge'&&c.type!=='consent'&&c.type!=='file'&&c.type!=='photo'&&!c.auto&&!c.sysOnly;});
   // 이름/업체/성명/대표자 같은 컬럼 우선
   var nameHints=/이름|성명|업체|대표|name/i;
   var hit=cols.find(function(c){return nameHints.test(c.label);});
