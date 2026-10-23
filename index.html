@@ -10869,11 +10869,25 @@ function dExp(){
         h += '<td style="padding:8px;text-align:right;color:'+(_nmP?'#92400e':'#a0aec0')+'">'+(_nmP?fmtKRW(_nmP):'-')+'</td>';
         h += '<td style="padding:8px;text-align:right;color:#a0aec0">-</td><td></td><td></td></tr>';
       }
+      var _hasBig = bigBudget>0 && bigBudget!==_tP;
       h += '<tr style="border-top:2px solid #334155;background:#f1f5f9;font-weight:800">';
-      h += '<td style="padding:9px 8px">합계</td>';
+      h += '<td style="padding:9px 8px">'+(_hasBig?'중분류 합계':'합계')+'</td>';
       h += '<td style="padding:9px 8px;text-align:right">'+fmtKRW(_tP)+'</td>';
       h += _nums(_tP, _tU, _tPre);
       h += '<td></td><td></td></tr>';
+      // 대분류 예산이 중분류 합과 다르면: 아직 안 나눈 예산 + 대분류 전체 기준 남은 가용을 맨 아래에
+      if(_hasBig){
+        var _un=bigBudget-_tP;
+        h += '<tr style="border-top:1px dashed #cbd5e1;background:#f0fdf4">';
+        h += '<td style="padding:8px;color:#166534"><b>'+(_un<0?'⚠ 중분류가 대분류 예산보다 많음':'아직 중분류로 안 나눈 예산')+'</b></td>';
+        h += '<td style="padding:8px;text-align:right;color:'+(_un<0?'#b91c1c':'#166534')+';font-weight:700">'+fmtKRW(_un)+'</td>';
+        h += '<td colspan="6"></td></tr>';
+        h += '<tr style="border-top:3px double #0f172a;background:#e2e8f0;font-weight:900">';
+        h += '<td style="padding:10px 8px">📌 '+esc(t)+' 전체 <span style="font-size:11px;font-weight:600;color:#475569">(대분류 예산 기준)</span></td>';
+        h += '<td style="padding:10px 8px;text-align:right">'+fmtKRW(bigBudget)+'</td>';
+        h += _nums(bigBudget, _tU, _tPre);
+        h += '<td></td><td></td></tr>';
+      }
       h += '</tbody></table>';
     }
     h += '<div style="padding:8px 10px;border-top:1px dashed #e2e8f0"><button class="btn btn-s" style="background:#7c3aed;color:#fff;font-weight:700" onclick="expAdd(\''+esc(t)+'\')">＋ 중분류 추가</button></div>';
