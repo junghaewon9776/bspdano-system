@@ -473,7 +473,7 @@ function _modListHtml(key){
     }
     if(isA()){
       h+='<td class="modActTd" style="position:sticky;right:0;background:#fff;z-index:1;box-shadow:-4px 0 8px rgba(0,0,0,.04);padding:2px 4px;vertical-align:middle">';
-      h+='<button class="modActMini" onclick="event.stopPropagation();_modActMenu(\''+key+'\',\''+esc(row._id||'')+'\')" title="수정·복제·삭제" style="width:32px;height:30px;border-radius:8px;border:none;cursor:pointer;font-size:16px;font-weight:900;background:#1e40af;color:#fff;padding:0;line-height:1">⋯</button><div class="modActFull">';
+      h+='<button class="modActMini" onclick="event.stopPropagation();_modActMenu(\''+key+'\',\''+esc(row._id||'')+'\')" title="수정·복제·삭제" style="width:30px;height:30px;border-radius:50%;border:none;cursor:pointer;font-size:17px;font-weight:900;background:#334155;color:#fff;padding:0;line-height:1;box-shadow:0 1px 3px rgba(15,23,42,.25)">⋮</button><div class="modActFull">';
       if(hasSelect){
         h+='<div style="display:flex;gap:2px;margin-bottom:2px">';
         Object.keys(statusCol.badgeMap||{}).forEach(function(sk){
