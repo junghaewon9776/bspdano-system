@@ -158,6 +158,7 @@ function modLoadData(key){
     if(!val) _modData[key]=[];
     else if(Array.isArray(val)) _modData[key]=val;
     else _modData[key]=Object.values(val);
+    _modStockSync(key);
     // 현재 이 모듈 탭을 보고 있을 때만 다시 그림 (modLoadData 재호출 없이 dMod만)
     if(typeof CTAB!=='undefined' && CTAB==='mod_'+key){
       var el=document.getElementById('mc');
@@ -180,6 +181,18 @@ function modLoadData(key){
 // 모든 커스텀 모듈 데이터 로드
 function modLoadAll(){
   Object.keys(_modDefs).forEach(function(k){ modLoadData(k); });
+  _modPubCfgSync();
+}
+// 🔒 공개 신청폼 접수 문자용 설정만 /main/PubCfg 에 복사 (main/Config 는 로그인 회원만 읽게 잠그므로) — 2026-10 보안작업 4단계
+function _modPubCfgSync(){
+  try{
+    if(typeof ME==='undefined'||!ME||typeof _cache==='undefined'||!_cache||typeof fbDb==='undefined') return;
+    var c=_cache.Config; if(!c||Array.isArray(c)||typeof c!=='object') return;
+    var pub={SMS_PROXY_URL:c.SMS_PROXY_URL||'', NAVER_SENS_SENDER:c.NAVER_SENS_SENDER||''};
+    var old=_cache.PubCfg||{};
+    if(old.SMS_PROXY_URL===pub.SMS_PROXY_URL&&old.NAVER_SENS_SENDER===pub.NAVER_SENS_SENDER) return;
+    fbDb.ref('/main/PubCfg').set(pub).catch(function(){});
+  }catch(e){}
 }
 
 // ─── Firebase에서 모듈 정의 로드 ───
@@ -1164,7 +1177,7 @@ function _modSmsGlobal(tels, msg){
   if(typeof fbDb==='undefined') return Promise.resolve({ok:false,err:'no db'});
   tels=(tels||[]).map(function(t){return String(t||'').replace(/[^0-9]/g,'');}).filter(function(t){return t.length>=10;});
   if(!tels.length) return Promise.resolve({ok:false,err:'수신번호 없음'});
-  return fbDb.ref('/main/Config').once('value').then(function(s){
+  return fbDb.ref('/main/Config').once('value').catch(function(){ return fbDb.ref('/main/PubCfg').once('value'); }).then(function(s){
     var cfg=s.val()||{};
     var proxy=cfg.SMS_PROXY_URL, sender=cfg.NAVER_SENS_SENDER;
     if(!proxy||!sender) return {ok:false,err:'문자 설정 미완료(main Config)'};
@@ -3286,17 +3299,57 @@ function _modStockUsed(def,col,arr){
   return used;
 }
 
-// 재고 관리 select들: 현재 데이터 읽어 옵션별 남은수량 계산 → 드롭다운에 반영
+// 📦 공개 재고판 /main/ModStock/{모듈키[@행사]}/{컬럼}/{옵션} = 사용 수량 (2026-10 보안작업 4단계)
+// 로그인 없는 신청폼은 전체 신청 명단 대신 이 숫자만 읽음. 로그인한 회원 화면이 실제 데이터로 다시 계산해 덮어씀
+function _modStockKey(def,evtId){ return def.key+(def.global?'':'@'+(evtId||'')); }
+function _modStockOpt(o){ return encodeURIComponent(String(o)).replace(/\./g,'%2E'); }
+function _modStockCols(def){ return (def.columns||[]).filter(function(c){return c.type==='select'&&c.stockOn&&c.stock;}); }
+function _modStockSync(key){
+  try{
+    if(typeof ME==='undefined'||!ME||typeof fbDb==='undefined') return;
+    var def=_modDefs[key]; if(!def) return;
+    var cols=_modStockCols(def); if(!cols.length) return;
+    var evtId=(!def.global&&typeof CUR_EVT!=='undefined'&&CUR_EVT)?CUR_EVT.evtId:'';
+    if(!def.global&&!evtId) return;
+    var out={};
+    cols.forEach(function(c){
+      var used=_modStockUsed(def,c,_modData[key]||[]), o={};
+      Object.keys(used).forEach(function(k){ o[_modStockOpt(k)]=used[k]; });
+      out[c.key]=o;
+    });
+    var sk=_modStockKey(def,evtId), js=JSON.stringify(out);
+    window.__modStockLast=window.__modStockLast||{};
+    if(window.__modStockLast[sk]===js) return;
+    window.__modStockLast[sk]=js;
+    fbDb.ref('/main/ModStock/'+sk).set(out).catch(function(){ delete window.__modStockLast[sk]; });
+  }catch(e){}
+}
+// 신청폼용: 컬럼별 사용 수량 {colKey:{옵션:수량}} — 재고판 우선, 없으면(옮기기 전) 예전처럼 명단에서 계산
+function _modPubStockUsed(def,evtId){
+  var cols=_modStockCols(def);
+  return fbDb.ref('/main/ModStock/'+_modStockKey(def,evtId)).once('value').then(function(s){
+    var v=s.val();
+    if(v){
+      var res={};
+      cols.forEach(function(c){ var o=v[c.key]||{}, u={}; Object.keys(o).forEach(function(k){ try{ u[decodeURIComponent(k)]=Number(o[k])||0; }catch(e){} }); res[c.key]=u; });
+      return res;
+    }
+    var path=def.global?'/main/'+def.fbPath:'/evtData/'+evtId+'/'+def.fbPath;
+    return fbDb.ref(path).once('value').then(function(snap){
+      var arr=snap.val()||[]; if(!Array.isArray(arr))arr=Object.values(arr);
+      var res={}; cols.forEach(function(c){ res[c.key]=_modStockUsed(def,c,arr); }); return res;
+    }).catch(function(){ var res={}; cols.forEach(function(c){ res[c.key]={}; }); return res; });
+  });
+}
+
+// 재고 관리 select들: 옵션별 남은수량 계산 → 드롭다운에 반영
 function _modApplyLoadStock(def,evtId){
   if(typeof fbDb==='undefined') return;
-  var stockCols=(def.columns||[]).filter(function(c){return c.type==='select'&&c.stockOn&&c.stock;});
+  var stockCols=_modStockCols(def);
   if(!stockCols.length) return;
-  var path=def.global?'/main/'+def.fbPath:'/evtData/'+evtId+'/'+def.fbPath;
-  fbDb.ref(path).once('value').then(function(snap){
-    var arr=snap.val()||[]; if(!Array.isArray(arr))arr=Object.values(arr);
-    window.__modStockData={path:path, arr:arr};
+  _modPubStockUsed(def,evtId).then(function(usedAll){
     stockCols.forEach(function(c){
-      var used=_modStockUsed(def,c,arr);
+      var used=usedAll[c.key]||{};
       var sel=document.getElementById('mod_f_'+c.key); if(!sel) return;
       // 🛒 다중선택+수량: 각 항목 행에 남은수량 표시 + 입력 상한
       if(c.multiQty){
@@ -3534,14 +3587,15 @@ function submitModApply(){
       if(_multi) r._grpId=grp;
       rows.push(r);
     });
-    return fbDb.ref(path).once('value');
-  }).then(function(snap){
-    var arr=snap.val()||[]; if(!Array.isArray(arr))arr=Object.values(arr);
+    return _modPubStockUsed(def,evtId);
+  }).then(function(usedAll){
     // 📦 재고 재확인 — 이번 배치(여러 행) 누적까지 반영
-    var stockCols=(def.columns||[]).filter(function(c){return c.type==='select'&&c.stockOn&&c.stock;});
+    // (2026-10 보안작업 4단계) 전체 명단을 읽지 않고 재고판(/main/ModStock) 숫자로 확인 → 재고판에 먼저 예약 → 새 줄만 추가(push)
+    var stockCols=_modStockCols(def);
+    var reserve=[];  // [{col, opt, q, cap}]
     for(var si=0;si<stockCols.length;si++){
       var sc=stockCols[si];
-      var usedMap=_modStockUsed(def,sc,arr);
+      var usedMap=usedAll[sc.key]||{};
       var batch={};  // 이번 제출 누적
       for(var ri=0;ri<rows.length;ri++){
         var obj=rows[ri];
@@ -3564,9 +3618,23 @@ function submitModApply(){
         if(u+newQty>cap) throw new Error('"'+chosen+'" 재고가 부족합니다 (남은 '+Math.max(0,cap-u)+'개)');
         batch[chosen]=(batch[chosen]||0)+newQty;
       }
+      Object.keys(batch).forEach(function(o){ reserve.push({col:sc.key, opt:o, q:batch[o], cap:sc.stock[o]}); });
     }
-    rows.forEach(function(r){ arr.push(r); });
-    return fbDb.ref(path).set(arr);
+    var sk=_modStockKey(def,evtId);
+    // 재고 예약: 동시에 여러 명이 내도 남은 수량을 넘지 않게 (트랜잭션)
+    return reserve.reduce(function(chain,rv){
+      return chain.then(function(){
+        return fbDb.ref('/main/ModStock/'+sk+'/'+rv.col+'/'+_modStockOpt(rv.opt)).transaction(function(cur){
+          cur=Number(cur)||0;
+          if(cur+rv.q>rv.cap) return;  // 중단 → 재고 부족
+          return cur+rv.q;
+        }).then(function(res){
+          if(!res.committed) throw new Error('"'+rv.opt+'" 재고가 부족합니다 (방금 다른 분이 신청했어요)');
+        });
+      });
+    },Promise.resolve()).then(function(){
+      return rows.reduce(function(chain,r){ return chain.then(function(){ return fbDb.ref(path).push(r); }); },Promise.resolve());
+    });
   }).then(function(){
     // 📱 신청 접수 문자 — 모든 행의 대상 연락처 모아 번호당 1번만
     if(def.smsApply){
@@ -5332,7 +5400,8 @@ function renderModView(key,id,evtId){
     var def=null; for(var i=0;i<defs.length;i++){if(defs[i]&&defs[i].key===key){def=defs[i];break}}
     if(!def){ document.getElementById('modViewCard').innerHTML='<div style="text-align:center;color:#64748b;padding:20px">정보를 찾을 수 없습니다</div>'; return; }
     var path=def.global?'/main/'+def.fbPath:'/evtData/'+evtId+'/'+def.fbPath;
-    fbDb.ref(path).once('value').then(function(s2){
+    // 🔒 전체 명단 대신 그 한 건만 (_id 검색) — 2026-10 보안작업 4단계
+    fbDb.ref(path).orderByChild('_id').equalTo(String(id||'')).limitToFirst(1).once('value').then(function(s2){
       var arr=s2.val()||[]; if(!Array.isArray(arr))arr=Object.values(arr);
       var row=null; for(var j=0;j<arr.length;j++){if(arr[j]&&arr[j]._id===id){row=arr[j];break}}
       if(!row){ document.getElementById('modViewCard').innerHTML='<div style="text-align:center;color:#64748b;padding:20px">해당 정보가 없습니다</div>'; return; }
@@ -5520,6 +5589,15 @@ function _mvDoLogin(){
   if(typeof fbDb==='undefined'){ if(errEl){errEl.textContent='시스템 연결 오류';errEl.style.display='block';} return; }
   if(btn){btn.disabled=true;btn.textContent='로그인 중...';}
   if(errEl) errEl.style.display='none';
+  if(window.SEC_AUTH_ON && window.secQuickLogin){
+    window.secQuickLogin(id,pw).then(function(r){
+      if(!r.ok){ if(btn){btn.disabled=false;btn.textContent='로그인';} if(errEl){errEl.textContent=r.err||'로그인 실패';errEl.style.display='block';} return; }
+      if(typeof saveAuth==='function') saveAuth(id,pw);
+      var p=new URLSearchParams(location.search);
+      renderModView(p.get('modview'),p.get('id'),p.get('evtId'));
+    });
+    return;
+  }
   fbDb.ref('/main/Users').once('value').then(function(s){
     var users=s.val()||[];
     if(!Array.isArray(users)) users=Object.values(users);

@@ -95,6 +95,7 @@ function loadEvtData(evtId) {
         data.Config = Object.values(data.Config);
       }
       _evtCaches[evtId] = data;
+      _pubEvtSync(evtId, data);
       resolve(data);
     });
   });
@@ -1664,9 +1665,60 @@ function _apiListApply(p) {
   });
 }
 
+// 🔒 공개 참가신청용 설정·접수번호 — /evtData/{행사}/PubCfg, /evtData/{행사}/PubSeq/Apply{연도} (2026-10 보안작업 4단계)
+// 로그인 없는 신청 화면은 행사 Config(비밀 설정 포함)·신청 명단 대신 이것만 읽음. 로그인한 회원이 행사를 열면 갱신됨
+function _pubEvtSync(evtId, data) {
+  try {
+    if (typeof ME === 'undefined' || !ME || !evtId) return;
+    var cfg = {};
+    (data.Config || []).forEach(function(c) { if(c && c.k) cfg[c.k] = c.v; });
+    var evtNm = "";
+    ((_cache && _cache.Events) || []).forEach(function(e){ if (e && e.evtId === evtId) evtNm = e.nm || ""; });
+    var pub = {APPLY_CONFIG: cfg.APPLY_CONFIG || "", DRIVE_UPLOAD_URL: cfg.DRIVE_UPLOAD_URL || "", evtNm: evtNm,
+               APPLY_START: cfg.APPLY_START || "", APPLY_DEADLINE: cfg.APPLY_DEADLINE || "", APPLY_STATUS: cfg.APPLY_STATUS || ""};  // 뒤 3개 = 옛 Apply.html 용
+    var old = (data.PubCfg && typeof data.PubCfg === 'object' && !Array.isArray(data.PubCfg)) ? data.PubCfg : {};
+    if (Object.keys(pub).some(function(k){ return old[k] !== pub[k]; }))
+      fbDb.ref('/evtData/' + evtId + '/PubCfg').set(pub).catch(function(){});
+    var year = new Date().getFullYear().toString(), re = new RegExp("^" + year + "-(\\d+)$"), maxNum = 0;
+    (data.Apply || []).forEach(function(r) {
+      var m = String((r && (r["접수순번"] || r[_fbSafeKey("접수순번")])) || "").match(re);
+      if (m) maxNum = Math.max(maxNum, parseInt(m[1], 10));
+    });
+    var cur = Number(((data.PubSeq || {})["Apply" + year])) || 0;
+    if (maxNum > cur) fbDb.ref('/evtData/' + evtId + '/PubSeq/Apply' + year).set(maxNum).catch(function(){});
+  } catch(e) {}
+}
+function _applyCfgResult(cfg, evtNm, count) {
+  var ac = {};
+  try { ac = JSON.parse(cfg.APPLY_CONFIG || "{}"); } catch(e){}
+  var today = new Date().toISOString().slice(0,10);
+  var status = ac.status || "auto";
+  var effective = status;
+  if (status === "auto") {
+    if (ac.startDt && today < ac.startDt) effective = "notyet";
+    else if (ac.endDt && today > ac.endDt) effective = "closed";
+    else effective = "open";
+  }
+  return {ok:true, status:status, effective:effective, today:today, count:count, webappUrl:ac.webappUrl||"", startDt:ac.startDt||"", endDt:ac.endDt||"", notice:ac.notice||"", cats:ac.cats||null, formUrl:ac.formUrl||"", formUrlPdf:ac.formUrlPdf||"", driveUploadUrl:ac.driveUploadUrl||cfg.DRIVE_UPLOAD_URL||"", evtNm:evtNm};
+}
 function _apiGetApplyConfig(p) {
   var evtId = _getEvtId(p);
   if (!evtId) return Promise.resolve({ok:true, status:"auto", effective:"closed", today:new Date().toISOString().slice(0,10), count:0, webappUrl:""});
+  // 로그인 안 한 신청 화면: 공개판 먼저
+  if (typeof ME === 'undefined' || !ME) {
+    var year = new Date().getFullYear().toString();
+    return Promise.all([
+      fbDb.ref('/evtData/' + evtId + '/PubCfg').once('value'),
+      fbDb.ref('/evtData/' + evtId + '/PubSeq/Apply' + year).once('value')
+    ]).then(function(r) {
+      var pc = r[0].val();
+      if (!pc) return _apiGetApplyConfigFull(evtId);
+      return _applyCfgResult(pc, pc.evtNm || "", Number(r[1].val()) || 0);
+    }, function() { return _apiGetApplyConfigFull(evtId); });
+  }
+  return _apiGetApplyConfigFull(evtId);
+}
+function _apiGetApplyConfigFull(evtId) {
   return loadEvtData(evtId).then(function(data) {
     var cfg = {};
     (data.Config || []).forEach(function(c) { if(c && c.k) cfg[c.k] = c.v; });
@@ -1835,36 +1887,44 @@ function _fbSafeRow(row) {
 function _apiAddApply(p) {
   var evtId = _getEvtId(p);
   if (!evtId) return Promise.resolve({ok:false, err:"행사 미선택"});
-  return new Promise(function(resolve) {
-    fbDb.ref('/evtData/' + evtId + '/Apply').once('value', function(snap) {
-      var raw = snap.val();
-      var arr = [];
-      if (Array.isArray(raw)) arr = raw.filter(function(r){return r!=null;});
-      else if (raw && typeof raw === 'object') Object.keys(raw).forEach(function(k){if(raw[k])arr.push(raw[k]);});
-      // 접수순번: 2026-0001 형식 (YYYY-NNNN만 카운트)
-      var year = new Date().getFullYear().toString();
-      var maxNum = 0;
-      var re = new RegExp("^" + year + "-(\\d+)$");
-      arr.forEach(function(r) {
-        var s = String(r["접수순번"] || r[_fbSafeKey("접수순번")] || "");
-        var m = s.match(re);
-        if (m) { var n = parseInt(m[1], 10); if (n > maxNum) maxNum = n; }
+  // 🔒 (2026-10 보안작업 4단계) 신청 명단을 읽지 않음 — 접수순번은 공개 카운터(PubSeq)에서 +1, 신청서는 새 줄만 추가(push)
+  // 접수순번: 2026-0001 형식 (YYYY-NNNN)
+  var year = new Date().getFullYear().toString();
+  var seqRef = fbDb.ref('/evtData/' + evtId + '/PubSeq/Apply' + year);
+  return seqRef.once('value').then(function(s0) {
+    if (s0.val() != null) return 0;
+    // 카운터가 아직 없을 때(옮기기 전): 명단에서 마지막 번호 찾기 — 잠긴 규칙에선 못 읽으므로 0부터
+    return fbDb.ref('/evtData/' + evtId + '/Apply').once('value').then(function(snap) {
+      var raw = snap.val() || [], maxNum = 0, re = new RegExp("^" + year + "-(\\d+)$");
+      Object.keys(raw).forEach(function(k) {
+        var r = raw[k]; if (!r) return;
+        var m = String(r["접수순번"] || r[_fbSafeKey("접수순번")] || "").match(re);
+        if (m) maxNum = Math.max(maxNum, parseInt(m[1], 10));
       });
-      var seq = year + "-" + ("0000" + (maxNum + 1)).slice(-4);
-      var row = {};
-      Object.keys(p).forEach(function(k) {
-        if (k === 'action' || k === 'evtId' || k === 'by' || k === 'id') return;
-        row[k] = p[k];
-      });
-      row["접수순번"] = seq;
-      row["접수일시"] = now_();
-      arr.push(_fbSafeRow(row));
-      fbDb.ref('/evtData/' + evtId + '/Apply').set(arr).then(function() {
-        // 텔레그램 알림
-        _notifyApply(evtId, row, seq);
-        resolve({ok:true, seq: seq});
-      });
+      return maxNum;
+    }, function() { return 0; });
+  }).then(function(base) {
+    return seqRef.transaction(function(cur) {
+      var c = Number(cur) || 0;
+      return (cur == null && base > c ? base : c) + 1;
     });
+  }).then(function(res) {
+    if (!res.committed) return {ok:false, err:"접수번호를 받지 못했어요. 다시 시도해 주세요"};
+    var seq = year + "-" + ("0000" + res.snapshot.val()).slice(-4);
+    var row = {};
+    Object.keys(p).forEach(function(k) {
+      if (k === 'action' || k === 'evtId' || k === 'by' || k === 'id') return;
+      row[k] = p[k];
+    });
+    row["접수순번"] = seq;
+    row["접수일시"] = now_();
+    return fbDb.ref('/evtData/' + evtId + '/Apply').push(_fbSafeRow(row)).then(function() {
+      // 텔레그램 알림
+      _notifyApply(evtId, row, seq);
+      return {ok:true, seq: seq};
+    });
+  }).catch(function(e) {
+    return {ok:false, err:"신청 저장 실패: " + ((e && e.message) || e)};
   });
 }
 

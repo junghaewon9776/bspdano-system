@@ -20,8 +20,9 @@
  *   SENS_SENDER       기본 발신번호 (화면에서 발신번호를 고르면 그 번호 사용)
  *   DAILY_LIMIT       (선택) 하루 전체 발송 한도, 기본 1000통
  *   PER_TEL_LIMIT     (선택) 같은 번호 하루 한도, 기본 30통
- * 스크립트 속성에 키가 있으면 화면이 보낸 키는 무시함.
- * 스크립트 속성이 비어 있을 때만 예전처럼 화면이 보낸 키를 씀 (옮기는 동안 문자가 끊기지 않게).
+ * 요청에 키(서비스ID·Access·Secret)를 다 넣어 보내면 그 키로 보냄 = 그 사람 계정 요금 (엑셀 사용자는 각자 자기 키)
+ * 키 없이 보내면 스크립트 속성의 우리 키로 보냄 (웹 화면) — 하루 한도는 이때만 적용
+ * ⚠ 순서: DB에 남은 옛 키를 지운 뒤에 네이버에서 키를 새로 발급할 것 (옛 키를 보내는 화면이 없어야 함)
  *
  * [네이버 SENS API 문서] https://api.ncloud-docs.com/docs/ai-application-service-sens-smsv2
  */
@@ -45,11 +46,14 @@ function doGet(e) {
   return _json({ok:true, msg:"SMS SENS Proxy is running"});
 }
 
-// ─── 키 읽기: 스크립트 속성 우선, 없으면 요청값(옛 방식) ───
+// ─── 키 읽기 ───
+// 요청에 키 3개(서비스ID·Access·Secret)가 다 있으면 그 키 사용 = 그 사람 계정 요금 (엑셀 사용자는 각자 자기 키로 보냄)
+// 없으면 스크립트 속성의 우리 키 사용 (웹 화면은 이제 키를 안 보냄)
 function _keys(data) {
   var p = PropertiesService.getScriptProperties();
   var sk = p.getProperty("SENS_SECRET_KEY");
-  if (sk) {
+  var own = data.serviceId && data.accessKey && data.secretKey;
+  if (sk && !own) {
     return {
       inScript:  true,
       serviceId: p.getProperty("SENS_SERVICE_ID") || "",
@@ -132,7 +136,8 @@ function _send(data) {
   if (!msg)
     return _json({ok:false, err:"메시지 내용 없음"});
 
-  var over = _reserve(tels);
+  // 하루 한도는 우리 키(스크립트 속성)로 보낼 때만 — 남의 키는 그 사람 요금
+  var over = k.inScript ? _reserve(tels) : "";
   if (over) return _json({ok:false, sent:0, failed:tels.length, err:over});
 
   var byteLen = Utilities.newBlob(msg).getBytes().length;

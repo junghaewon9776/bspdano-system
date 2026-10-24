@@ -487,8 +487,9 @@ label{display:block;font-size:10px;color:#999;margin-bottom:3px}
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <!-- firebase-storage 제거: 구글 드라이브 프록시로 대체 -->
 <script src="firebase-config.js"></script>
-<script src="common.js?v=20261023sec1"></script>
-<script src="mod-engine.js?v=20261023sec1"></script>
+<script src="common.js?v=20261024sec2"></script>
+<script src="mod-engine.js?v=20261024sec2"></script>
+<script src="sec-auth.js?v=20261024sec2"></script>
 
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" onerror="console.warn('XLSX CDN load failed')"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js" onerror="console.warn('xlsx-js-style CDN load failed')"></script>
@@ -1014,7 +1015,7 @@ var AUTO_LOGIN_TTL_MS=1*60*60*1000; // 1시간
 var idleTimer=null, warnTimer=null, warnCountdown=null;
 
 function saveAuth(id,pw){
-  try{localStorage.setItem(AUTH_KEY, JSON.stringify({id:id,pw:pw,ts:Date.now()}));}catch(e){}
+  try{localStorage.setItem(AUTH_KEY, JSON.stringify({id:id,pw:(window.SEC_AUTH_ON?"__fb__":pw),ts:Date.now()}));}catch(e){}
 }
 // 기존 저장된 id/pw 는 유지하고 타임스탬프만 갱신 (활동 중이란 신호)
 function touchAuth(){
@@ -1296,6 +1297,7 @@ function showEvtSwitchModal(){
 
 // 페이지 로드 시 자동 로그인 시도
 async function tryAutoLogin(){
+  if(typeof ME!=="undefined"&&ME) return;  // 이미 로그인됨 (보안 로그인: 데이터가 로그인 뒤에 오므로 중복 방지)
   var a=loadAuth();
   if(!a||!a.id||!a.pw)return;
   // 앱(모바일)은 시간 만료 없이 계속 자동 로그인 (로그아웃 전까지) / PC는 1시간 TTL 유지
@@ -13246,7 +13248,30 @@ function _fbTxQIn(el){ if(_fbQC) return; clearTimeout(_fbQT); _fbQT=setTimeout(f
 function _fbRef(p){ return fbDb.ref('/main/FeeBank'+(p?'/'+p:'')); }
 function _fbLoad(){
   if(FB._lis) return; FB._lis=true;
-  _fbRef().on('value',function(s){ var v=s.val()||{}; FB.cfg=v.cfg||{}; FB.mems=v.mems||{}; FB.tx=v.tx||{}; FB.loaded=true; if(typeof CTAB!=="undefined"&&(CTAB==="fee"||CTAB==="bank")) draw(); });
+  _fbRef().on('value',function(s){ var v=s.val()||{}; FB.cfg=v.cfg||{}; FB.mems=v.mems||{}; FB.tx=v.tx||{}; FB.loaded=true; _fbPubSync(); if(typeof CTAB!=="undefined"&&(CTAB==="fee"||CTAB==="bank")) draw(); });
+}
+// 🔒 회원용 회비 조회(?fee=1)용 요약판 — 이름+휴대폰 뒷4자리 암호값 → 그 회원 것만 (2026-10 보안작업 4단계)
+//   /main/PubFee/{해시} = {k, cfg:{amt,startYm,acct}, mem:(전화 뺀 회원정보), tx:{그 회원 입금만 dt·inA·nm·memK·kind}}
+async function _fbPubHash(nm,t4){
+  var b=await crypto.subtle.digest("SHA-256", new TextEncoder().encode("fee|"+_fbNm(nm)+"|"+t4));
+  return Array.from(new Uint8Array(b)).map(function(x){ return ("0"+x.toString(16)).slice(-2); }).join("");
+}
+var _fbPubLast="";
+async function _fbPubSync(){
+  try{
+    if(typeof ME==="undefined"||!ME||!window.crypto||!crypto.subtle) return;
+    var out={}, cfg={amt:FB.cfg.amt||null, startYm:FB.cfg.startYm||null, acct:FB.cfg.acct||null};
+    var ks=Object.keys(FB.mems);
+    for(var i=0;i<ks.length;i++){
+      var k=ks[i], m=FB.mems[k], t4=String(m.tel||"").replace(/\D/g,"").slice(-4);
+      if(!m.nm||t4.length!==4) continue;
+      var mem={}; Object.keys(m).forEach(function(f){ if(f!=="tel") mem[f]=m[f]; });
+      var tx={}; Object.keys(FB.tx).forEach(function(tk){ var t=FB.tx[tk]; if(_fbTxMem(t)===k) tx[tk]={dt:t.dt||"", inA:t.inA||0, nm:t.nm||"", memK:t.memK||"", kind:t.kind||"", seq:t.seq||0}; });
+      out[await _fbPubHash(m.nm,t4)]={k:k, cfg:cfg, mem:mem, tx:tx};
+    }
+    var js=JSON.stringify(out); if(js===_fbPubLast) return; _fbPubLast=js;
+    fbDb.ref('/main/PubFee').set(out).catch(function(){ _fbPubLast=""; });
+  }catch(e){}
 }
 function _fbAmt(){ return Number(FB.cfg.amt)||20000; }
 function _fbStartYm(){ return FB.cfg.startYm||"2024-06"; }
@@ -13299,8 +13324,7 @@ function _fbPubInit(){
   if(!d){ d=document.createElement("div"); d.id="feePage"; document.body.appendChild(d); }
   d.style.cssText="max-width:640px;margin:0 auto;padding:16px;font-family:inherit";
   d.innerHTML='<div style="text-align:center;padding:30px;color:#64748b">📡 불러오는 중...</div>';
-  _fbRef().once('value').then(function(sn){ var v=sn.val()||{}; FB.cfg=v.cfg||{}; FB.mems=v.mems||{}; FB.tx=v.tx||{}; FB.loaded=true; _fbPubForm(""); })
-    .catch(function(e){ d.innerHTML='<div style="padding:20px;color:#b91c1c">불러오지 못했어요: '+esc(e.message||e)+'</div>'; });
+  _fbPubForm("");  // 🔒 전체 장부는 받지 않음 — 조회할 때 그 회원 요약만 (2026-10 보안작업 4단계)
 }
 function _fbPubForm(err){
   var d=document.getElementById("feePage");
@@ -13315,9 +13339,18 @@ function _fbPubForm(err){
 function _fbPubGo(){
   var nm=_fbNm((document.getElementById("fbP_nm")||{}).value), t4=String((document.getElementById("fbP_tel")||{}).value||"").replace(/\D/g,"");
   if(!nm||t4.length!==4){ _fbPubForm("이름과 휴대폰 뒷자리 4개를 넣어 주세요"); return; }
-  var k=Object.keys(FB.mems).filter(function(k){ var m=FB.mems[k]; return _fbNm(m.nm)===nm && String(m.tel||"").replace(/\D/g,"").slice(-4)===t4; })[0];
-  if(!k){ _fbPubForm("일치하는 회원이 없어요. 이름·번호를 확인하거나 재무국에 문의해 주세요"); return; }
-  _fbPubShow(k);
+  var NO="일치하는 회원이 없어요. 이름·번호를 확인하거나 재무국에 문의해 주세요";
+  _fbPubHash(nm,t4).then(function(h){ return fbDb.ref('/main/PubFee/'+h).once('value'); }).then(function(sn){
+    var v=sn.val();
+    if(v&&v.k){ FB.cfg=v.cfg||{}; FB.mems={}; FB.mems[v.k]=v.mem||{}; FB.tx=v.tx||{}; FB.loaded=true; _fbPubShow(v.k); return; }
+    // 요약판이 아직 없을 때(옮기기 전): 예전처럼 장부에서 찾기 — 규칙을 잠그면 이 길은 막힘
+    return _fbRef().once('value').then(function(s2){
+      var w=s2.val()||{}; FB.cfg=w.cfg||{}; FB.mems=w.mems||{}; FB.tx=w.tx||{}; FB.loaded=true;
+      var k=Object.keys(FB.mems).filter(function(k){ var m=FB.mems[k]; return _fbNm(m.nm)===nm && String(m.tel||"").replace(/\D/g,"").slice(-4)===t4; })[0];
+      if(!k){ _fbPubForm(NO); return; }
+      _fbPubShow(k);
+    });
+  }).catch(function(){ _fbPubForm(NO); });
 }
 function _fbPubShow(k){
   var m=Object.assign({_k:k},FB.mems[k]), now=_ymNow(), P=(_fbPaid()[k])||{};
@@ -16575,11 +16608,8 @@ function _assetRentSubmit(){
   var rec={ id:'r'+Date.now().toString(36)+Math.random().toString(36).slice(2,5), assetId:a.id||'', barcode:a.barcode||'',
     qty:qty, rentDt:from, dueDt:to, renterType:'external', renterNm:nm, renterTel:tel, renterOrg:org, eventNm:evt,
     note:note, status:'pending', createdAt:new Date().toISOString() };
-  fbDb.ref('/main/Rentals').once('value').then(function(s){
-    var arr=s.val()||[]; if(!Array.isArray(arr))arr=Object.values(arr);
-    arr.push(rec);
-    return fbDb.ref('/main/Rentals').set(arr);
-  }).then(function(){
+  // 🔒 비로그인 신청: 목록 전체 대신 새 줄만 추가 (2026-10 보안작업 4단계)
+  fbDb.ref('/main/Rentals').push(rec).then(function(){
     document.getElementById('avCard').innerHTML='<div style="text-align:center;padding:34px"><div style="font-size:48px">✅</div><h2 style="color:#16a34a;margin:12px 0;font-size:20px">대여 신청 완료</h2><p style="color:#64748b;font-size:14px;line-height:1.6">'+esc(a.name||'자산')+' '+qty+'개 신청이 접수되었습니다.<br>담당자 확인 후 안내드립니다.</p></div>';
   }).catch(function(e){
     if(btn){btn.disabled=false;btn.textContent='대여 신청하기';}
@@ -20787,7 +20817,7 @@ function popEditAcct(areaName,curId){
   }
   openPopup('<h3>'+esc(areaName)+' 담당자 수정 <button class="close-x" onclick="closePopup()">&times;</button></h3>'+
     '<div class="frow fr2"><div><label>아이디 *</label><input type="text" id="eaId" value="'+esc(curId)+'"></div>'+
-    '<div><label>비밀번호 *</label><input type="text" id="eaPw" value="'+esc(u.pw)+'"></div></div>'+
+    '<div><label>비밀번호 *</label><input type="text" id="eaPw" value="'+esc(u.pw||'')+'\" placeholder=\"'+(window.SEC_AUTH_ON?'비워두면 지금 비번 그대로':'')+'\"></div></div>'+
     '<div style="margin-bottom:12px"><label>이름</label><input type="text" id="eaNm" value="'+esc(u.nm||(areaName+" 담당자"))+'"></div>'+
     '<div style="margin-bottom:12px"><label>연락처</label><input type="text" id="eaTel" value="'+esc(u.tel||"")+'" oninput="this.value=fmTel(this.value)"></div>'+
     '<div style="margin-bottom:12px"><label>📱 텔레그램 (알림 받을 ID)</label>'+_tgConnectHtml("eaTg", u.tg||"")+'</div>'+
@@ -20799,8 +20829,8 @@ async function saveAcctX(oldId,areaName){
   var tg=String((document.getElementById("eaTg")||{}).value||"").trim();
   var roleSel=document.getElementById("eaRole");
   var role=roleSel?roleSel.value:"area";
-  if(!nwId||!pw){alert("아이디/비번 필수");return}
-  if(pw.length<4){alert("비번 4자 이상");return}
+  if(!nwId||(!pw&&!window.SEC_AUTH_ON)){alert("아이디/비번 필수");return}
+  if(pw&&pw.length<4){alert("비번 4자 이상");return}
   showLoading("저장 중...");
   var r;
   if(oldId&&oldId!="-"){r=await api("updateAcct",{oldId:oldId,id:nwId,pw:pw,nm:nm,tel:tel,tg:tg,ar:areaName,r:role});}
@@ -20897,7 +20927,7 @@ function popEditSub(curId){
   var u=US[curId]||{pw:"",nm:"",tel:""};
   openPopup('<h3>🛡️ 단오제보존회 계정 수정 <button class="close-x" onclick="closePopup()">&times;</button></h3>'+
     '<div class="frow fr2"><div><label>아이디 *</label><input type="text" id="esId" value="'+esc(curId)+'"></div>'+
-    '<div><label>비밀번호 *</label><input type="text" id="esPw" value="'+esc(u.pw)+'"></div></div>'+
+    '<div><label>비밀번호 *</label><input type="text" id="esPw" value="'+esc(u.pw||'')+'\" placeholder=\"'+(window.SEC_AUTH_ON?'비워두면 지금 비번 그대로':'')+'\"></div></div>'+
     '<div class="frow fr2"><div><label>이름</label><input type="text" id="esNm" value="'+esc(u.nm||"")+'"></div>'+
     '<div><label>연락처</label><input type="text" id="esTel" value="'+esc(u.tel||"")+'" oninput="this.value=fmTel(this.value)"></div></div>'+
     '<div style="text-align:right;margin-top:14px"><button class="btn" style="background:#7c3aed;color:#fff" onclick="saveSubX(\''+esc(curId)+'\')">저장</button></div>');
@@ -20905,8 +20935,8 @@ function popEditSub(curId){
 async function saveSubX(oldId){
   if(!isGlobalAdmin()){toast("관리자만 가능합니다",true);return}
   var nwId=document.getElementById("esId").value.trim(),pw=document.getElementById("esPw").value,nm=document.getElementById("esNm").value.trim(),tel=document.getElementById("esTel").value;
-  if(!nwId||!pw){alert("아이디/비번 필수");return}
-  if(pw.length<4){alert("비번 4자 이상");return}
+  if(!nwId||(!pw&&!window.SEC_AUTH_ON)){alert("아이디/비번 필수");return}
+  if(pw&&pw.length<4){alert("비번 4자 이상");return}
   showLoading("저장 중...");
   var r=await api("updateAcct",{oldId:oldId,id:nwId,pw:pw,nm:nm,tel:tel,ar:"",r:"subAdm",_who:CID});
   hideLoading();
@@ -20955,7 +20985,7 @@ function popEditAdm(curId){
   var u=US[curId]||{pw:"",nm:"",tel:""};
   openPopup('<h3>👑 ADMIN 계정 수정 <button class="close-x" onclick="closePopup()">&times;</button></h3>'+
     '<div class="frow fr2"><div><label>아이디 *</label><input type="text" id="eadId" value="'+esc(curId)+'"></div>'+
-    '<div><label>비밀번호 *</label><input type="text" id="eadPw" value="'+esc(u.pw)+'"></div></div>'+
+    '<div><label>비밀번호 *</label><input type="text" id="eadPw" value="'+esc(u.pw||'')+'\" placeholder=\"'+(window.SEC_AUTH_ON?'비워두면 지금 비번 그대로':'')+'\"></div></div>'+
     '<div class="frow fr2"><div><label>이름</label><input type="text" id="eadNm" value="'+esc(u.nm||"")+'"></div>'+
     '<div><label>연락처</label><input type="text" id="eadTel" value="'+esc(u.tel||"")+'" oninput="this.value=fmTel(this.value)"></div></div>'+
     '<div style="text-align:right;margin-top:14px"><button class="btn" style="background:#dc2626;color:#fff" onclick="saveAdmX(\''+esc(curId)+'\')">저장</button></div>');
@@ -20963,8 +20993,8 @@ function popEditAdm(curId){
 async function saveAdmX(oldId){
   if(!isSuper()){toast("super 관리자만 가능합니다",true);return}
   var nwId=document.getElementById("eadId").value.trim(),pw=document.getElementById("eadPw").value,nm=document.getElementById("eadNm").value.trim(),tel=document.getElementById("eadTel").value;
-  if(!nwId||!pw){alert("아이디/비번 필수");return}
-  if(pw.length<4){alert("비번 4자 이상");return}
+  if(!nwId||(!pw&&!window.SEC_AUTH_ON)){alert("아이디/비번 필수");return}
+  if(pw&&pw.length<4){alert("비번 4자 이상");return}
   showLoading("저장 중...");
   var r=await api("updateAcct",{oldId:oldId,id:nwId,pw:pw,nm:nm,tel:tel,ar:"",r:"admin",_who:CID});
   hideLoading();
@@ -21202,7 +21232,7 @@ async function expAcct(){
       No:i+1,
       부서:u.ar||"",
       아이디:u.id||"",
-      비밀번호:u.pw||"1234",
+      비밀번호:u.pw||(window.SEC_AUTH_ON?"(안전 보관 — 표시 안 함)":"1234"),
       이름:u.nm||"",
       연락처:u.tel||""
     };

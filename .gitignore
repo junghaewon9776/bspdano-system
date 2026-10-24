@@ -1,3 +1,5 @@
 node_modules/
 package-lock.json
 백업/
+# 취약점 설명 — 공개 저장소에 올리지 않음
+보안작업계획.md

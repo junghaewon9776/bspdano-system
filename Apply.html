@@ -348,19 +348,10 @@ async function uploadFile(fileObj, label, subFolder) {
 // ===== 접수순번 생성 (Firebase에서 기존 최대값 조회) =====
 async function getNextSeq() {
   var year = new Date().getFullYear().toString();
-  var snap = await db.ref("/evtData/" + EVT_ID + "/Apply").once("value");
-  var raw = snap.val();
-  var maxSeq = 0;
-  if (raw) {
-    var arr = Array.isArray(raw) ? raw : Object.values(raw);
-    var re = new RegExp("^" + year + "-(\\d+)$");
-    arr.forEach(function(r) {
-      if (!r) return;
-      var m = String(r["접수순번"] || "").match(re);
-      if (m) { var n = parseInt(m[1], 10); if (!isNaN(n) && n > maxSeq) maxSeq = n; }
-    });
-  }
-  return year + "-" + ("0000" + (maxSeq + 1)).slice(-4);
+  // 🔒 신청 명단을 읽지 않고 공개 카운터에서 +1 (2026-10 보안작업 4단계) — 카운터는 회원이 행사를 열 때 맞춰짐
+  var res = await db.ref("/evtData/" + EVT_ID + "/PubSeq/Apply" + year).transaction(function(cur) { return (Number(cur) || 0) + 1; });
+  if (!res.committed) throw new Error("접수번호를 받지 못했어요. 다시 시도해 주세요");
+  return year + "-" + ("0000" + res.snapshot.val()).slice(-4);
 }
 
 // ===== 제출 =====
@@ -461,9 +452,10 @@ function resetForNew() {
 // ===== 마감 상태 확인 (Firebase Config 에서) =====
 (async function initStatus() {
   try {
-    var snap = await db.ref("/evtData/" + EVT_ID + "/Config").once("value");
-    var raw = snap.val();
-    var cfg = {};
+    // 🔒 공개판(PubCfg) 먼저 — 행사 Config 는 로그인 회원만 읽게 잠금 (2026-10 보안작업 4단계)
+    var pub = (await db.ref("/evtData/" + EVT_ID + "/PubCfg").once("value")).val();
+    var raw = pub ? null : (await db.ref("/evtData/" + EVT_ID + "/Config").once("value")).val();
+    var cfg = pub || {};
     if (Array.isArray(raw)) {
       raw.forEach(function(c) { if (c && c.k) cfg[c.k] = c.v; });
     } else if (raw && typeof raw === "object") {

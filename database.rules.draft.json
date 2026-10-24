@@ -1,0 +1,97 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "main": {
+      ".read": "auth != null && auth.token.sys === 'dano'",
+      "Users": {
+        ".write": "auth != null && auth.token.sys === 'dano' && (auth.token.r === 'super' || auth.token.r === 'admin' || auth.token.r === 'subAdm')",
+        "$i": {
+          ".write": "auth != null && auth.token.sys === 'dano' && data.child('id').val() === auth.uid && newData.child('id').val() === data.child('id').val() && newData.child('r').val() === data.child('r').val() && newData.child('ar').val() === data.child('ar').val()"
+        }
+      },
+      "ModDefs": {
+        ".read": true,
+        ".write": "auth != null && auth.token.sys === 'dano'"
+      },
+      "Assets": {
+        ".read": true,
+        ".write": "auth != null && auth.token.sys === 'dano'"
+      },
+      "DriveProxyUrl": {
+        ".read": true,
+        ".write": "auth != null && auth.token.sys === 'dano'"
+      },
+      "PubCfg": {
+        ".read": true,
+        ".write": "auth != null && auth.token.sys === 'dano'"
+      },
+      "PubFee": {
+        "$h": {
+          ".read": true
+        },
+        ".write": "auth != null && auth.token.sys === 'dano'"
+      },
+      "ModStock": {
+        ".read": true,
+        ".write": "auth != null && auth.token.sys === 'dano'",
+        "$sk": {
+          "$col": {
+            "$opt": {
+              ".write": "newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 1000"
+            }
+          }
+        }
+      },
+      "Rentals": {
+        ".write": "auth != null && auth.token.sys === 'dano'",
+        "$row": {
+          ".write": "!data.exists() && newData.hasChildren()"
+        }
+      },
+      "$node": {
+        ".read": "$node.beginsWith('Mod_') && query.orderByChild === '_id' && query.equalTo != null && query.limitToFirst <= 1",
+        ".write": "auth != null && auth.token.sys === 'dano'",
+        ".indexOn": [
+          "_id"
+        ],
+        "$row": {
+          ".write": "$node.beginsWith('Mod_') && !data.exists() && newData.hasChildren()"
+        }
+      }
+    },
+    "evtData": {
+      ".read": "auth != null && auth.token.sys === 'dano'",
+      "$evt": {
+        ".write": "auth != null && auth.token.sys === 'dano'",
+        "PubCfg": {
+          ".read": true
+        },
+        "PubSeq": {
+          ".read": true,
+          "$k": {
+            ".write": "newData.isNumber() && newData.val() === (data.exists() ? data.val() : 0) + 1"
+          }
+        },
+        "Apply": {
+          "$row": {
+            ".write": "!data.exists() && newData.hasChildren()"
+          }
+        },
+        "$node": {
+          ".read": "$node.beginsWith('Mod_') && query.orderByChild === '_id' && query.equalTo != null && query.limitToFirst <= 1",
+          ".indexOn": [
+            "_id"
+          ],
+          "$row": {
+            ".write": "$node.beginsWith('Mod_') && !data.exists() && newData.hasChildren()"
+          }
+        }
+      }
+    },
+    "secure": {
+      ".read": false,
+      ".write": false
+    }
+  }
+}
