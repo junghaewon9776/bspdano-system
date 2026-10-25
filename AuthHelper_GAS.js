@@ -65,7 +65,14 @@ function _cfg(sys) {
 
 function _status(sys) {
   var p = PropertiesService.getScriptProperties();
-  return { ok:true, configured: !!(p.getProperty("SA_" + sys) && p.getProperty("DB_" + sys) && p.getProperty("API_" + sys) && p.getProperty("PEPPER")) };
+  var need = ["SA_" + sys, "DB_" + sys, "API_" + sys, "PEPPER"];
+  var missing = need.filter(function(k){ return !p.getProperty(k); });
+  // 값은 절대 돌려주지 않음 — 이름만 (어느 칸이 빠졌는지 / 비슷한 이름이 있는지)
+  var names = p.getKeys().filter(function(k){ return /^(SA|DB|API)_|PEPPER/i.test(k); });
+  var bad = names.filter(function(k){ return need.indexOf(k) < 0 && need.some(function(n){ return n.toLowerCase() === k.trim().toLowerCase(); }); });
+  var saOk = null;
+  if (p.getProperty("SA_" + sys)) { try { var j = JSON.parse(p.getProperty("SA_" + sys)); saOk = !!(j.private_key && j.client_email); } catch (e) { saOk = false; } }
+  return { ok:true, configured: missing.length === 0, missing: missing, similarNames: bad, saJsonOk: saOk, propCount: p.getKeys().length };
 }
 
 // ─────────── base64url / JWT ───────────

@@ -14,5 +14,5 @@ const fbDb = firebase.database();
 const fbAuth = firebase.auth();
 
 // 🔑 로그인 도우미(Apps Script) 주소 — 비어 있으면 예전 로그인 방식 (2026-10 보안작업 2단계, AuthHelper_GAS.js)
-var SEC_AUTH_URL = "";
+var SEC_AUTH_URL = "https://script.google.com/macros/s/AKfycbylFvbMgcGfy6E9fRXq-V2LPogguDKNVtfq1YI_baBES1q58SVxmJdfm54uI_MORxFa/exec";
 var SEC_SYS = "dano";
