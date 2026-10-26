@@ -13386,6 +13386,7 @@ function _fbPubSummary(m,P,now,st){
   if(pre.length) h+='<div style="margin-top:8px;font-size:13px;color:#166534;font-weight:700">💚 미리 낸 달: '+yL(pre[0])+(pre.length>1?' ~ '+yL(pre[pre.length-1]):'')+' ('+pre.length+'개월)</div>';
   h+='</div>';
   // 연도별 표
+  h+='<details class="fbPubDet" style="margin-bottom:14px"><summary style="cursor:pointer;list-style:none;background:#334155;color:#fff;border-radius:10px;padding:13px;text-align:center;font-size:16px;font-weight:800">📋 상세 내역 펼쳐보기 <span style="font-size:12px;font-weight:600;opacity:.85">(연도별 · 달별 · 입금 내역)</span></summary><div style="padding-top:12px">';
   h+='<div style="font-weight:800;margin:4px 0 6px">📅 연도별</div><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px;text-align:right">';
   h+='<tr style="background:#f1f5f9;color:#334155"><th style="padding:7px;text-align:left">연도</th><th style="padding:7px">이월</th><th style="padding:7px">낼 돈</th><th style="padding:7px">낸 돈</th><th style="padding:7px">그해 말 남은 금액</th></tr>';
   var sg=function(n){ return n<0?'<b style="color:#dc2626">미납 '+fm2(n)+'</b>':n>0?'<b style="color:#15803d">선납 '+fm2(n)+'</b>':'<span style="color:#64748b">0</span>'; };
@@ -13428,7 +13429,7 @@ function _fbPubShow(k){
   h+=_fbPubSummary(m,P,now,st);
   var L=_fbTxList().filter(function(t){ return _fbTxMem(t)===k; }).reverse();
   h+='<div style="font-weight:800;margin:16px 0 6px">입금 내역 ('+L.length+'건)</div><div style="max-height:40vh;overflow:auto;border:1px solid #e2e8f0;border-radius:8px">'
-    +(L.length?L.map(function(t){ return '<div style="display:flex;justify-content:space-between;padding:8px 10px;border-bottom:1px solid #f1f5f9;font-size:15px"><span>'+esc(String(t.dt).slice(0,10))+'</span><b>'+fm(t.inA)+'원</b></div>'; }).join(''):'<div style="padding:12px;color:#94a3b8">입금 내역이 없어요</div>')+'</div>';
+    +(L.length?L.map(function(t){ return '<div style="display:flex;justify-content:space-between;padding:8px 10px;border-bottom:1px solid #f1f5f9;font-size:15px"><span>'+esc(String(t.dt).slice(0,10))+'</span><b>'+fm(t.inA)+'원</b></div>'; }).join(''):'<div style="padding:12px;color:#94a3b8">입금 내역이 없어요</div>')+'</div></div></details>';
   if(FB.cfg.acct) h+='<div style="margin-top:16px;background:#f8fafc;border:2px solid #cbd5e1;border-radius:10px;padding:12px 14px"><div style="font-size:13px;color:#475569;font-weight:700;margin-bottom:4px">🏦 회비 넣는 계좌</div><div style="font-size:17px;font-weight:800;color:#0f172a;word-break:break-all;margin-bottom:10px">'+esc(FB.cfg.acct)+'</div><button onclick="_fbCopyAcct(this)" style="width:100%;background:#1d4ed8;color:#fff;border:none;border-radius:10px;padding:13px;font-size:17px;font-weight:800;cursor:pointer">📋 계좌번호 복사</button></div>';
   h+='<div style="font-size:12px;color:#94a3b8;margin-top:12px">내역이 다르면 재무국에 알려 주세요</div></div>';
   document.getElementById("feePage").innerHTML=h;
