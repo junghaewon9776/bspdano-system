@@ -6076,3 +6076,31 @@ function _epostMemAdd(){
     toast('✅ '+nNew+'명 추가'+(nDup?' · 중복 '+nDup+'명 건너뜀':'')+(nNoAddr?' · 주소 없는 '+nNoAddr+'명은 채워주세요':''));
   }).catch(function(e){ hideLoading(); toast('실패: '+(e.message||e),true); });
 }
+
+// ☑ 어디서나 Shift+클릭 범위 체크 — 같은 표(또는 같은 목록) 안의 같은 종류 체크칸끼리.
+// 자기 방식이 따로 있는 칸(_modChk, bkPk)이나 data-noshift 칸은 건드리지 않음.
+// 사이 칸은 진짜로 한 번씩 눌러서(click) 각 칸에 붙은 처리(선택 목록·합계 등)가 그대로 돌게 함.
+if(!window.__shiftCheckHook){ window.__shiftCheckHook=1;
+  var _scLast=null, _scBusy=false;
+  var _scOwn=function(el){ return el.classList.contains('_modChk')||el.classList.contains('bkPk')||el.hasAttribute('data-noshift')||el.closest('[data-noshift]'); };
+  var _scGroup=function(el){
+    var box=el.closest('table')||el.closest('.card')||el.parentNode&&el.parentNode.parentNode||document.body;
+    var key=el.className||el.name||'';
+    return Array.prototype.filter.call(box.querySelectorAll('input[type=checkbox]'),function(c){ return (c.className||c.name||'')===key && !c.disabled && !_scOwn(c) && c.offsetParent!==null; });
+  };
+  document.addEventListener('click',function(ev){
+    var el=ev.target; if(_scBusy||!el||el.tagName!=='INPUT'||el.type!=='checkbox'||_scOwn(el)) return;
+    // 머리줄 "전체 선택" 칸은 범위 대상 아님
+    if(el.closest('thead')) { _scLast=null; return; }
+    if(ev.shiftKey&&_scLast&&_scLast!==el&&document.contains(_scLast)){
+      var G=_scGroup(el), a=G.indexOf(_scLast), b=G.indexOf(el);
+      if(a>=0&&b>=0){
+        var on=el.checked, lo=Math.min(a,b), hi=Math.max(a,b);
+        _scBusy=true;
+        try{ for(var i=lo;i<=hi;i++){ var c=G[i]; if(c!==el && c.checked!==on) c.click(); } } finally { _scBusy=false; }
+        try{ var s=window.getSelection&&window.getSelection(); if(s) s.removeAllRanges(); }catch(e){}
+      }
+    }
+    _scLast=el;
+  },false);
+}

@@ -488,7 +488,7 @@ label{display:block;font-size:10px;color:#999;margin-bottom:3px}
 <!-- firebase-storage 제거: 구글 드라이브 프록시로 대체 -->
 <script src="firebase-config.js"></script>
 <script src="common.js?v=20261024sec2"></script>
-<script src="mod-engine.js?v=20261024sec2"></script>
+<script src="mod-engine.js?v=20261026shift"></script>
 <script src="sec-auth.js?v=20261024sec2"></script>
 
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" onerror="console.warn('XLSX CDN load failed')"></script>
@@ -15243,12 +15243,12 @@ function _bkAcctView(ak){
   var allOn=window._BK_VIS.length&&window._BK_VIS.every(function(pk){ return BK_PICK[pk]; });
   h+='<div id="bkPickBar" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;min-height:30px;margin-bottom:4px">'+_bkPickBarHtml()+'</div>';
   h+='<div style="overflow-x:auto;max-height:65vh;overflow-y:auto"><table style="width:100%;border-collapse:collapse;font-size:14px;min-width:1160px"><thead style="position:sticky;top:0;z-index:1"><tr style="background:#1e293b;color:#fff"><th style="padding:7px;width:30px"><input type="checkbox" title="보이는 거래 모두 고르기" '+(allOn?'checked':'')+' onchange="_bkPickAll(this.checked)" style="width:18px;height:18px"></th><th style="padding:7px">날짜</th><th style="padding:7px;text-align:left">적요</th><th style="padding:7px;text-align:left">거래처</th><th style="padding:7px;text-align:left">내용</th><th style="padding:7px;text-align:right">입금</th><th style="padding:7px;text-align:right">출금</th><th style="padding:7px;text-align:right">잔액</th><th style="padding:7px;text-align:left">대분류</th><th style="padding:7px;text-align:left">계정과목</th><th style="padding:7px;text-align:left">증빙</th><th></th></tr></thead><tbody>';
-  V.slice(0,500).forEach(function(t){
+  V.slice(0,500).forEach(function(t,vi){
     var sk=_bkSkip(t.big);
     var cat=t.big ? '<span style="background:'+(sk?'#e0e7ff;color:#3730a3':'#dcfce7;color:#166534')+';font-weight:800;padding:3px 8px;border-radius:6px;white-space:nowrap">'+esc(t.big)+'</span>'+(t._auto?' <span style="font-size:11px;color:#64748b">자동</span>':'')
       : '<span style="background:#fef3c7;color:#92400e;font-weight:800;padding:3px 8px;border-radius:6px;border:1px solid #f59e0b">❓ 분류 넣기</span>';
     var pk=t._a+"|"+t._k;
-    h+='<tr style="border-bottom:1px solid #e2e8f0'+(sk?';background:#f8fafc':'')+'" title="두 번 누르면 수정" ondblclick="if(!/^(INPUT|BUTTON|A|SELECT|LABEL)$/.test(event.target.tagName))_bkEdit(\''+t._a+'\',\''+t._k+'\')"><td style="padding:6px;text-align:center"><input type="checkbox" '+(BK_PICK[pk]?'checked':'')+' onchange="_bkPick(\''+pk+'\',this.checked)" style="width:18px;height:18px"></td><td style="padding:6px;white-space:nowrap">'+esc(String(t.dt).slice(0,10))+_bkMoveBtns(t,sameDay[String(t.dt).slice(0,10)])+'</td>';
+    h+='<tr style="border-bottom:1px solid #e2e8f0'+(sk?';background:#f8fafc':'')+'" title="두 번 누르면 수정" ondblclick="if(!/^(INPUT|BUTTON|A|SELECT|LABEL)$/.test(event.target.tagName))_bkEdit(\''+t._a+'\',\''+t._k+'\')"><td style="padding:6px;text-align:center"><input type="checkbox" class="bkPk" data-pk="'+esc(pk)+'" '+(BK_PICK[pk]?'checked':'')+' onclick="_bkPickClick(event,this,'+vi+')" title="Shift 누른 채 누르면 사이 거래 한꺼번에" style="width:18px;height:18px"></td><td style="padding:6px;white-space:nowrap">'+esc(String(t.dt).slice(0,10))+_bkMoveBtns(t,sameDay[String(t.dt).slice(0,10)])+'</td>';
     h+='<td style="padding:6px;font-weight:700">'+esc(t.nm||'')+'</td><td style="padding:6px;color:#334155">'+esc(t.vendor||'')+'</td><td style="padding:6px;color:#334155">'+esc(t.desc||'')+(t.memo?'<div style="font-size:12px;color:#64748b">📝 '+esc(t.memo)+'</div>':'')+'</td>';
     h+='<td style="padding:6px;text-align:right;color:#166534;font-weight:700">'+(Number(t.inA)?fm(t.inA):'')+'</td><td style="padding:6px;text-align:right;color:'+(Number(t.out)<0?'#7c3aed':'#b91c1c')+';font-weight:700">'+(Number(t.out)<0?'<span style="font-size:11px">↩ 환불·취소</span> −'+fm(-t.out):(Number(t.out)?fm(t.out):''))+'</td>';
     h+='<td style="padding:6px;text-align:right;white-space:nowrap'+(t._warn?';color:#dc2626;font-weight:800" title="통장 기록 잔액 '+fm(t.bal)+'원과 다름':'')+'">'+fm(t._run)+(t._warn?' ⚠':'')+'</td>';
@@ -15265,6 +15265,19 @@ function _bkQIn(el){ if(_bkQC) return; clearTimeout(_bkQT); _bkQT=setTimeout(fun
 function _bkPickBarHtml(){
   var n=Object.keys(BK_PICK).length; if(!n) return '<span style="font-size:12.5px;color:#64748b">☑ 왼쪽 칸을 체크하면 고른 거래만 증빙 출력할 수 있어요</span>';
   return '<b style="color:#b45309">☑ '+n+'건 고름</b> <button class="btn btn-s" style="background:#b45309;color:#fff;font-weight:800" onclick="_bkEvPrintAsk(\'pick\')">📎 고른 거래 증빙 출력</button> <button class="btn btn-s" style="background:#475569;color:#fff" onclick="BK_PICK={};draw()">선택 풀기</button>';
+}
+// 거래 체크 — Shift+클릭이면 마지막으로 누른 줄부터 지금 줄까지 같은 상태로 한꺼번에
+var _BK_PICK_LAST=null;
+function _bkPickClick(ev,el,vi){
+  var on=el.checked, vis=window._BK_VIS||[];
+  if(ev&&ev.shiftKey&&_BK_PICK_LAST!=null&&_BK_PICK_LAST!==vi){
+    var a=Math.min(_BK_PICK_LAST,vi), b=Math.max(_BK_PICK_LAST,vi);
+    for(var i=a;i<=b;i++){ var pk=vis[i]; if(!pk) continue; if(on) BK_PICK[pk]=1; else delete BK_PICK[pk]; }
+    document.querySelectorAll('input.bkPk').forEach(function(c){ c.checked=!!BK_PICK[c.getAttribute('data-pk')]; });
+    try{ var s=window.getSelection&&window.getSelection(); if(s) s.removeAllRanges(); }catch(e){}
+  } else { if(on) BK_PICK[vis[vi]]=1; else delete BK_PICK[vis[vi]]; }
+  _BK_PICK_LAST=vi;
+  var bar=document.getElementById("bkPickBar"); if(bar) bar.innerHTML=_bkPickBarHtml();
 }
 function _bkPick(pk,on){ if(on) BK_PICK[pk]=1; else delete BK_PICK[pk]; var el=document.getElementById("bkPickBar"); if(el) el.innerHTML=_bkPickBarHtml(); }
 function _bkPickAll(on){ (window._BK_VIS||[]).forEach(function(pk){ if(on) BK_PICK[pk]=1; else delete BK_PICK[pk]; }); draw(); }
