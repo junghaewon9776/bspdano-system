@@ -13960,6 +13960,19 @@ function _bkBal(L){ var inS=0,outS=0,last=null; L.forEach(function(t){ inS+=Numb
 // 📎 거래 증빙 — tx.ev=[{u,k,n,r}] (u=드라이브 주소, k=종류, n=파일 이름, r=돌린 각도)
 var BK_EV_KINDS=["영수증·카드전표","세금계산서","견적·명세표","사진","기타"], _BKEV_NEW=[];
 function _bkTxGet(ak,k){ return (ak===BK_FEE?FB.tx:(BK.tx[ak]||{}))[k]; }
+// 거래표 증빙 미리보기 — 작은 사진 3장까지 (+N), 누르면 증빙 창
+function _bkEvThumbs(t){
+  var L=t.ev||[]; if(!L.length) return '';
+  var op='_bkEv(\''+t._a+'\',\''+t._k+'\')';
+  var h='<div style="display:flex;gap:3px;align-items:center" onclick="event.stopPropagation()" ondblclick="event.stopPropagation()">';
+  L.slice(0,3).forEach(function(e){
+    var pdf=/\.pdf$/i.test(e.n||""), src=String(imgSrc(e.u)||"").replace(/sz=w\d+/,"sz=w160");
+    h+=pdf?'<span onclick="'+op+'" title="'+esc(e.c||e.k||'PDF')+'" style="width:40px;height:40px;display:flex;align-items:center;justify-content:center;border:1px solid #cbd5e1;border-radius:5px;background:#fff;font-size:20px;cursor:pointer">📄</span>'
+      :'<img src="'+esc(src)+'" loading="lazy" onclick="'+op+'" title="'+esc(e.c||e.k||'증빙')+' — 눌러서 크게" onerror="this.replaceWith(document.createTextNode(\'🖼\'))" style="width:40px;height:40px;object-fit:cover;border:1px solid #cbd5e1;border-radius:5px;cursor:zoom-in;background:#f1f5f9;'+(typeof _rotCss==='function'?_rotCss(e.r||0):'')+'">';
+  });
+  if(L.length>3) h+='<span onclick="'+op+'" style="font-size:12px;font-weight:800;color:#334155;cursor:pointer;padding:0 3px">+'+(L.length-3)+'</span>';
+  return h+'</div>';
+}
 function _bkEvBtn(t){
   var n=(t.ev||[]).length, need=!n&&Number(t.out)>0&&!_bkSkip(t.big);
   return '<button class="btn btn-s" title="'+(n?'증빙 '+n+'개 — 눌러서 보기·추가':'증빙 올리기')+'" style="'+(n?'background:#e2e8f0;color:#334155;border:1px solid #cbd5e1':(need?'background:#c2410c;color:#fff':'background:#334155;color:#fff'))+';font-weight:700" onclick="_bkEv(\''+t._a+'\',\''+t._k+'\')">📎'+(n?' '+n:' +')+'</button> ';
@@ -15229,7 +15242,7 @@ function _bkAcctView(ak){
   window._BK_VIS=V.slice(0,500).map(function(t){ return t._a+"|"+t._k; });
   var allOn=window._BK_VIS.length&&window._BK_VIS.every(function(pk){ return BK_PICK[pk]; });
   h+='<div id="bkPickBar" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;min-height:30px;margin-bottom:4px">'+_bkPickBarHtml()+'</div>';
-  h+='<div style="overflow-x:auto;max-height:65vh;overflow-y:auto"><table style="width:100%;border-collapse:collapse;font-size:14px;min-width:1040px"><thead style="position:sticky;top:0;z-index:1"><tr style="background:#1e293b;color:#fff"><th style="padding:7px;width:30px"><input type="checkbox" title="보이는 거래 모두 고르기" '+(allOn?'checked':'')+' onchange="_bkPickAll(this.checked)" style="width:18px;height:18px"></th><th style="padding:7px">날짜</th><th style="padding:7px;text-align:left">적요</th><th style="padding:7px;text-align:left">거래처</th><th style="padding:7px;text-align:left">내용</th><th style="padding:7px;text-align:right">입금</th><th style="padding:7px;text-align:right">출금</th><th style="padding:7px;text-align:right">잔액</th><th style="padding:7px;text-align:left">대분류</th><th style="padding:7px;text-align:left">계정과목</th><th></th></tr></thead><tbody>';
+  h+='<div style="overflow-x:auto;max-height:65vh;overflow-y:auto"><table style="width:100%;border-collapse:collapse;font-size:14px;min-width:1160px"><thead style="position:sticky;top:0;z-index:1"><tr style="background:#1e293b;color:#fff"><th style="padding:7px;width:30px"><input type="checkbox" title="보이는 거래 모두 고르기" '+(allOn?'checked':'')+' onchange="_bkPickAll(this.checked)" style="width:18px;height:18px"></th><th style="padding:7px">날짜</th><th style="padding:7px;text-align:left">적요</th><th style="padding:7px;text-align:left">거래처</th><th style="padding:7px;text-align:left">내용</th><th style="padding:7px;text-align:right">입금</th><th style="padding:7px;text-align:right">출금</th><th style="padding:7px;text-align:right">잔액</th><th style="padding:7px;text-align:left">대분류</th><th style="padding:7px;text-align:left">계정과목</th><th style="padding:7px;text-align:left">증빙</th><th></th></tr></thead><tbody>';
   V.slice(0,500).forEach(function(t){
     var sk=_bkSkip(t.big);
     var cat=t.big ? '<span style="background:'+(sk?'#e0e7ff;color:#3730a3':'#dcfce7;color:#166534')+';font-weight:800;padding:3px 8px;border-radius:6px;white-space:nowrap">'+esc(t.big)+'</span>'+(t._auto?' <span style="font-size:11px;color:#64748b">자동</span>':'')
@@ -15241,9 +15254,10 @@ function _bkAcctView(ak){
     h+='<td style="padding:6px;text-align:right;white-space:nowrap'+(t._warn?';color:#dc2626;font-weight:800" title="통장 기록 잔액 '+fm(t.bal)+'원과 다름':'')+'">'+fm(t._run)+(t._warn?' ⚠':'')+'</td>';
     h+='<td style="padding:6px'+(t.big?';cursor:zoom-in':'')+'"'+(t.big?' data-b="'+esc(t.big)+'" title="두 번 누르면 이 대분류만 보기" ondblclick="_bkCatPick(event,this,0)"':'')+'>'+cat+'</td>';
     h+='<td style="padding:6px;font-weight:700;color:'+(sk?'#3730a3':'#0f766e')+(t.big&&t.mid?';cursor:zoom-in':'')+'"'+(t.big&&t.mid?' data-b="'+esc(t.big)+'" data-m="'+esc(t.mid)+'" title="두 번 누르면 이 계정과목만 보기" ondblclick="_bkCatPick(event,this,1)"':'')+'>'+(t.big?esc(t.mid||''):'')+'</td>';
+    h+='<td style="padding:4px 6px">'+_bkEvThumbs(t)+'</td>';
     h+='<td style="padding:6px;white-space:nowrap">'+_bkEvBtn(t)+'<button class="btn btn-s" style="background:#1d4ed8;color:#fff" onclick="_bkEdit(\''+t._a+'\',\''+t._k+'\')">✏️</button>'+(' <button class="btn btn-s" style="background:#dc2626;color:#fff" onclick="_bkTxDel(\''+t._a+'\',\''+t._k+'\')">✕</button>')+'</td></tr>';
   });
-  if(!V.length) h+='<tr><td colspan="11" style="padding:16px;text-align:center;color:#64748b">해당하는 거래가 없어요</td></tr>';
+  if(!V.length) h+='<tr><td colspan="12" style="padding:16px;text-align:center;color:#64748b">해당하는 거래가 없어요</td></tr>';
   h+='</tbody></table></div>'+(V.length>500?'<div class="mut" style="font-size:12px;margin-top:6px">최근 500건만 보여요 — 연도나 검색으로 좁혀 보세요</div>':'');
   return h;
 }
