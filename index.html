@@ -13359,6 +13359,59 @@ function _fbCopyAcct(btn){
   var fallback=function(){ try{ var t=document.createElement("textarea"); t.value=txt; t.style.position="fixed"; t.style.opacity="0"; document.body.appendChild(t); t.select(); document.execCommand("copy"); document.body.removeChild(t); done(); }catch(e){ prompt("아래 계좌번호를 길게 눌러 복사하세요", txt); } };
   if(navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(txt).then(done, fallback); else fallback();
 }
+// 회비 조회 요약 — 낸 돈을 오래된 달부터 채워서(먼저 낸 돈은 밀린 달부터) 달마다 납부/미납 판단
+// 연도별: 이월(작년까지 남은 돈) · 그 해 낼 돈 · 그 해 낸 돈 · 연말 남은 돈 / 미납 시작 달 / 선납 달
+function _fbPubSummary(m,P,now,st){
+  var amt=_fbAmt(), end=(m.endYm&&m.endYm<now)?m.endYm:now, fm2=function(n){ return fm(Math.abs(n)); };
+  var yL=function(ym){ return ym.slice(0,4)+"년 "+(+ym.slice(5,7))+"월"; };
+  var paidAll=_fbSumPaid(P,"",now), rem=paidAll, cov={}, months=[], from="", nUn=0, unSum=0;
+  for(var ym=st; ym<=end; ym=_ymAdd(ym,1)){ months.push(ym); var c=Math.min(amt,rem); rem-=c; cov[ym]=c; if(c<amt){ if(!from) from=ym; nUn++; unSum+=amt-c; } }
+  var pre=[]; if(rem>=amt){ var ym2=_ymAdd(end,1); while(rem>=amt && !(m.endYm&&ym2>m.endYm)){ pre.push(ym2); cov[ym2]=amt; rem-=amt; ym2=_ymAdd(ym2,1); } }
+  var bal=paidAll-_fbDue(m,"",now), y0=+st.slice(0,4), y1=+now.slice(0,4);
+  var box=function(t,v,c){ return '<div style="flex:1;min-width:120px;background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:10px;text-align:center"><div style="font-size:12px;color:#64748b;font-weight:700">'+t+'</div><div style="font-size:19px;font-weight:900;color:'+c+'">'+v+'</div></div>'; };
+  var h='<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:12px;margin-bottom:14px">';
+  h+='<div style="font-weight:800;margin-bottom:8px">📊 한눈에 보기</div><div style="display:flex;gap:8px;flex-wrap:wrap">';
+  h+=box('월 회비', fm(amt)+'원', '#0f172a');
+  h+=box('미납 시작', from?yL(from)+'부터':'없음', from?'#dc2626':'#15803d');
+  h+=box('밀린 달', nUn?nUn+'개월':'0개월', nUn?'#dc2626':'#15803d');
+  h+=box('현재 남은 금액', bal<0?'미납 '+fm2(bal)+'원':bal>0?'선납 '+fm2(bal)+'원':'0원', bal<0?'#dc2626':bal>0?'#15803d':'#1d4ed8');
+  h+='</div>';
+  // 왜 이 금액인지 한 줄 설명
+  var yNow=now.slice(0,4), cyPrev=(+yNow-1)+"-12", cCarry=(+yNow>y0)?_fbSumPaid(P,"",cyPrev)-_fbDue(m,"",cyPrev):0;
+  var cDue=_fbDue(m,yNow+"-01",now), cPd=_fbSumPaid(P,yNow+"-01",now);
+  var why='지금까지 낼 돈 <b>'+fm(_fbDue(m,"",now))+'원</b> ('+yL(st)+'부터 '+_fbDue(m,"",now)/amt+'개월 × '+fm(amt)+'원) 중 <b>'+fm(paidAll)+'원</b>을 내셨어요.';
+  if(+yNow>y0) why+='<br>작년까지 '+(cCarry<0?'<b style="color:#dc2626">미납 '+fm2(cCarry)+'원</b>이 넘어왔고':cCarry>0?'<b style="color:#15803d">선납 '+fm2(cCarry)+'원</b>이 넘어왔고':'남은 금액 없이 넘어왔고')+', 올해는 '+fm(cDue)+'원 중 '+fm(cPd)+'원을 내셨어요.';
+  if(from) why+='<br><b style="color:#dc2626">'+yL(from)+'분부터</b> 회비가 덜 들어왔어요 (낸 돈은 오래된 달부터 채워서 계산해요).';
+  h+='<div style="margin-top:10px;font-size:13.5px;line-height:1.7;color:#334155;background:#fff;border:1px dashed #cbd5e1;border-radius:8px;padding:8px 10px">'+why+'</div>';
+  if(pre.length) h+='<div style="margin-top:8px;font-size:13px;color:#166534;font-weight:700">💚 미리 낸 달: '+yL(pre[0])+(pre.length>1?' ~ '+yL(pre[pre.length-1]):'')+' ('+pre.length+'개월)</div>';
+  h+='</div>';
+  // 연도별 표
+  h+='<div style="font-weight:800;margin:4px 0 6px">📅 연도별</div><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px;text-align:right">';
+  h+='<tr style="background:#f1f5f9;color:#334155"><th style="padding:7px;text-align:left">연도</th><th style="padding:7px">이월</th><th style="padding:7px">낼 돈</th><th style="padding:7px">낸 돈</th><th style="padding:7px">그해 말 남은 금액</th></tr>';
+  var sg=function(n){ return n<0?'<b style="color:#dc2626">미납 '+fm2(n)+'</b>':n>0?'<b style="color:#15803d">선납 '+fm2(n)+'</b>':'<span style="color:#64748b">0</span>'; };
+  for(var y=y1;y>=y0;y--){
+    var prevEnd=(y-1)+"-12", ys=y+"-01", ye=(String(y)===now.slice(0,4))?now:y+"-12";
+    var carry=_fbSumPaid(P,"",prevEnd)-_fbDue(m,"",prevEnd), due=_fbDue(m,ys,ye), pd=_fbSumPaid(P,ys,ye), endB=carry+pd-due;
+    h+='<tr style="border-top:1px solid #e2e8f0"><td style="padding:7px;text-align:left;font-weight:800;white-space:nowrap">'+y+'년</td><td style="padding:7px">'+(y===y0?'<span style="color:#cbd5e1">-</span>':sg(carry))+'</td><td style="padding:7px">'+fm(due)+'</td><td style="padding:7px">'+fm(pd)+'</td><td style="padding:7px">'+sg(endB)+'</td></tr>';
+  }
+  h+='</table></div><div style="font-size:11.5px;color:#64748b;margin:4px 0 12px;line-height:1.5">· 이월 = 전년도 말에 남아 있던 금액 (미납이면 다음 해로 넘어가요)<br>· 그해 말 남은 금액 = 이월 + 그해 낸 돈 − 그해 낼 돈</div>';
+  // 달별 (오래된 달부터 채운 결과)
+  for(var yy=y1;yy>=y0;yy--){
+    if(yy===y1) h+='<div style="font-size:11.5px;color:#64748b;margin:6px 0 2px">아래 달별 칸은 <b>지금까지 낸 돈 전체</b>를 오래된 달부터 채운 결과예요. 그래서 나중에 낸 돈으로 예전 밀린 달이 채워지면 그 달도 ✓로 바뀌어요.</div>';
+    h+='<div style="font-weight:800;margin:10px 0 6px">'+yy+'년 달별</div><div style="display:grid;grid-template-columns:repeat(6,1fr);gap:4px">';
+    for(var mo=1;mo<=12;mo++){
+      var k2=yy+"-"+String(mo).padStart(2,"0"), inR=k2>=st && k2<=end, c2=cov[k2]||0, isPre=pre.indexOf(k2)>=0;
+      var bg='#fafafa', col='#cbd5e1', t2='';
+      if(isPre){ bg='#dcfce7'; col='#166534'; t2='선납'; }
+      else if(inR && c2>=amt){ bg='#dcfce7'; col='#166534'; t2='✓ 납부'; }
+      else if(inR && c2>0){ bg='#fef3c7'; col='#92400e'; t2='−'+fm(amt-c2); }
+      else if(inR){ bg='#fee2e2'; col='#b91c1c'; t2='미납'; }
+      h+='<div style="border-radius:6px;padding:6px 2px;text-align:center;font-size:12px;background:'+bg+';color:'+col+'"><div style="font-weight:700">'+mo+'월</div><div style="font-weight:800">'+t2+'</div></div>';
+    }
+    h+='</div>';
+  }
+  return h;
+}
 function _fbPubShow(k){
   var m=Object.assign({_k:k},FB.mems[k]), now=_ymNow(), P=(_fbPaid()[k])||{};
   var due=_fbDue(m,"",now), paid=_fbSumPaid(P,"",now), bal=paid-due;
@@ -13372,14 +13425,7 @@ function _fbPubShow(k){
       :'<div style="font-size:30px;font-weight:900;color:#1d4ed8">✅ 완납</div>')
     +'<div style="font-size:13px;color:#475569;margin-top:4px">지금까지 낼 돈 '+fm(due)+'원 · 낸 돈 '+fm(paid)+'원</div></div>';
   if(bal<0 && FB.cfg.acct) h+='<div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:15px">🏦 입금 계좌: <b>'+esc(FB.cfg.acct)+'</b></div>';
-  for(var y=y1;y>=y0;y--){
-    h+='<div style="font-weight:800;margin:10px 0 6px">'+y+'년</div><div style="display:grid;grid-template-columns:repeat(6,1fr);gap:4px">';
-    for(var mo=1;mo<=12;mo++){
-      var ym=y+"-"+String(mo).padStart(2,"0"), v=P[ym]||0, inRange=ym>=st && ym<=now && !(m.endYm&&ym>m.endYm);
-      h+='<div style="border-radius:6px;padding:6px 2px;text-align:center;font-size:12px;background:'+(v?'#dcfce7':inRange?'#f1f5f9':'#fafafa')+';color:'+(v?'#166534':inRange?'#475569':'#cbd5e1')+'"><div style="font-weight:700">'+mo+'월</div><div style="font-weight:800">'+(v?fm(v):(inRange?'-':''))+'</div></div>';
-    }
-    h+='</div>';
-  }
+  h+=_fbPubSummary(m,P,now,st);
   var L=_fbTxList().filter(function(t){ return _fbTxMem(t)===k; }).reverse();
   h+='<div style="font-weight:800;margin:16px 0 6px">입금 내역 ('+L.length+'건)</div><div style="max-height:40vh;overflow:auto;border:1px solid #e2e8f0;border-radius:8px">'
     +(L.length?L.map(function(t){ return '<div style="display:flex;justify-content:space-between;padding:8px 10px;border-bottom:1px solid #f1f5f9;font-size:15px"><span>'+esc(String(t.dt).slice(0,10))+'</span><b>'+fm(t.inA)+'원</b></div>'; }).join(''):'<div style="padding:12px;color:#94a3b8">입금 내역이 없어요</div>')+'</div>';
