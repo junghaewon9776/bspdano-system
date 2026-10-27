@@ -19607,7 +19607,8 @@ function dReport(){
   h+='<div style="font-size:13px;color:#155e75;font-weight:700;margin-bottom:4px">마) '+(RPT_SHOW==="settle"?"▲":"▼")+'</div>';
   h+='<h3 style="margin:0 0 8px">📊 정산보고서</h3>';
   h+='<div class="mut" style="font-size:12px;margin-bottom:10px">총 수입·지출 요약 + 그래프 + 세부 내역</div>';
-  h+='<button class="btn" style="background:#0891b2;color:#fff;width:100%" onclick="event.stopPropagation();rptSettlePrint()">🖨️ 인쇄 / PDF</button>';
+  h+='<div style="display:flex;gap:6px"><button class="btn" style="background:#0891b2;color:#fff;flex:1" onclick="event.stopPropagation();rptSettlePrint()">🖨️ 인쇄 / PDF</button>';
+  h+='<button class="btn" style="background:#15803d;color:#fff;flex:1" onclick="event.stopPropagation();rptSettleExcel()">📥 엑셀 다운로드</button></div>';
   h+='</div>';
 
   h+='</div>';
@@ -20170,6 +20171,120 @@ function rptSettlePrint(){
   var w=window.open('','_blank','width=800,height=900');
   w.document.write(html);
   w.document.close();
+}
+
+// 📥 정산보고서 엑셀 — 인쇄본과 같은 짜임(제목·요약·종류별 현황·수입/지출 내역) + 세부내역 시트 2개
+async function rptSettleExcel(){
+  var d=_settleData(), bal=d.incTotal-d.expTotal;
+  showLoading("엑셀 만드는 중...");
+  var EJ; try{ EJ=await _loadExcelJS(); }catch(e){ hideLoading(); toast(e.message,true); return; }
+  var wb=new EJ.Workbook();
+  var money='#,##0;[Red]-#,##0;"-"';
+  var thin={style:"thin",color:{argb:"FFCBD5E1"}}, border={top:thin,left:thin,bottom:thin,right:thin};
+  var fill=function(c){ return {type:"pattern",pattern:"solid",fgColor:{argb:"FF"+c}}; };
+  var ws=wb.addWorksheet("정산보고서",{pageSetup:{paperSize:9,orientation:"portrait",fitToPage:true,fitToWidth:1,fitToHeight:0,margins:{left:0.4,right:0.4,top:0.5,bottom:0.5,header:0.2,footer:0.2}}});
+  ws.columns=[{width:12},{width:14},{width:16},{width:24},{width:14},{width:16}];
+  var N=6, row=1;
+  var cell=function(r,c){ return ws.getCell(r,c); };
+  var merge=function(r,c1,c2){ if(c2>c1) ws.mergeCells(r,c1,r,c2); return cell(r,c1); };
+  // 제목
+  var t=merge(row,1,N); t.value=SYS_NAME+" 정산보고서"; t.font={size:18,bold:true,color:{argb:"FF0F172A"}}; t.alignment={horizontal:"center",vertical:"middle"}; ws.getRow(row).height=30; row++;
+  var st=merge(row,1,N); st.value=(SYS_PARENT?SYS_PARENT+" · ":"")+"작성일 "+today(); st.font={size:10,color:{argb:"FF475569"}}; st.alignment={horizontal:"center"}; row+=2;
+  // 요약 상자 3개 (총 수입 / 총 지출 / 잔액)
+  var boxes=[["총 수입",d.incTotal,"16A34A","F0FDF4"],["총 지출",d.expTotal,"DC2626","FEF2F2"],["잔 액",bal,bal>=0?"2563EB":"DC2626",bal>=0?"EFF6FF":"FEF2F2"]];
+  boxes.forEach(function(b,i){
+    var c1=i*2+1, c2=c1+1, bd={style:"medium",color:{argb:"FF"+b[2]}};
+    var l=merge(row,c1,c2); l.value=b[0]; l.font={bold:true,size:11,color:{argb:"FF"+b[2]}}; l.alignment={horizontal:"center",vertical:"middle"};
+    var v=merge(row+1,c1,c2); v.value=b[1]; v.numFmt='#,##0"원";[Red]-#,##0"원";"0원"'; v.font={bold:true,size:16,color:{argb:"FF"+b[2]}}; v.alignment={horizontal:"center",vertical:"middle"};
+    [row,row+1].forEach(function(r){ [c1,c2].forEach(function(c){ var x=cell(r,c); x.fill=fill(b[3]); x.border={top:r===row?bd:undefined,bottom:r===row+1?bd:undefined,left:c===c1?bd:undefined,right:c===c2?bd:undefined}; }); });
+  });
+  ws.getRow(row).height=20; ws.getRow(row+1).height=30; row+=3;
+
+  var section=function(title,color){ var s=merge(row,1,N); s.value=title; s.font={bold:true,size:12,color:{argb:"FF"+color}}; s.border={bottom:{style:"medium",color:{argb:"FF"+color}}}; ws.getRow(row).height=22; row++; };
+  // 표 한 줄: spans = [[시작열,끝열,값,종류]] 종류: "money" | "txt" | "date"
+  var line=function(spans,kind,head){
+    spans.forEach(function(sp){
+      var c=merge(row,sp[0],sp[1]); c.value=sp[2];
+      for(var k=sp[0];k<=sp[1];k++){ var x=cell(row,k); x.border=border; if(head) x.fill=fill(head); else if(kind==="tot") x.fill=fill("E2E8F0"); }
+      if(head){ c.font={bold:true,color:{argb:"FFFFFFFF"}}; c.alignment={horizontal:"center",vertical:"middle"}; }
+      else {
+        if(sp[3]==="money"){ c.numFmt=money; c.alignment={horizontal:"right"}; }
+        else c.alignment={horizontal:sp[3]==="date"?"center":"left",wrapText:true,vertical:"middle"};
+        if(kind==="tot") c.font={bold:true};
+      }
+    });
+    row++;
+  };
+
+  // 📊 종류별 현황
+  var allTp={};
+  Object.keys(d.incByTp).forEach(function(k){ allTp[k]=allTp[k]||{inc:0,exp:0}; allTp[k].inc=d.incByTp[k]; });
+  Object.keys(d.expByTp).forEach(function(k){ allTp[k]=allTp[k]||{inc:0,exp:0}; allTp[k].exp=d.expByTp[k]; });
+  var tpKeys=Object.keys(allTp);
+  section("📊 수입·지출 종류별 현황","0891B2");
+  line([[1,2,"종류"],[3,3,"수입"],[4,4,"지출"],[5,6,"차액 (수입−지출)"]],"",  "0E7490");
+  var tpStart=row;
+  if(!tpKeys.length) line([[1,6,"데이터 없음","txt"]]);
+  tpKeys.forEach(function(k){ var v=allTp[k]; line([[1,2,k,"txt"],[3,3,v.inc,"money"],[4,4,v.exp,"money"],[5,6,v.inc-v.exp,"money"]]); });
+  if(tpKeys.length){
+    var tpEnd=row-1;
+    // 막대(데이터 막대) — 인쇄본 그래프 대신
+    ws.addConditionalFormatting({ref:"C"+tpStart+":C"+tpEnd,rules:[{type:"dataBar",cfvo:[{type:"num",value:0},{type:"max"}],color:{argb:"FF86EFAC"}}]});
+    ws.addConditionalFormatting({ref:"D"+tpStart+":D"+tpEnd,rules:[{type:"dataBar",cfvo:[{type:"num",value:0},{type:"max"}],color:{argb:"FFFCA5A5"}}]});
+    line([[1,2,"합계","txt"],[3,3,d.incTotal,"money"],[4,4,d.expTotal,"money"],[5,6,bal,"money"]],"tot");
+  }
+  row++;
+  // 💰 수입 내역
+  section("💰 수입 내역 ("+d.incRows.length+"건)","16A34A");
+  line([[1,1,"날짜"],[2,2,"종류"],[3,4,"적요"],[5,5,"결제수단"],[6,6,"금액"]],"","15803D");
+  if(!d.incRows.length) line([[1,6,"입금 내역 없음","txt"]]);
+  d.incRows.forEach(function(r){ line([[1,1,r.dt||"","date"],[2,2,r.tp,"txt"],[3,4,r.ds,"txt"],[5,5,r.pay,"txt"],[6,6,r.am,"money"]]); });
+  if(d.incRows.length) line([[1,5,"합계","txt"],[6,6,d.incTotal,"money"]],"tot");
+  row++;
+  // 💸 지출 내역
+  section("💸 지출 내역 ("+d.expRows.length+"건)","DC2626");
+  line([[1,1,"날짜"],[2,2,"구분"],[3,3,"종류"],[4,5,"내역"],[6,6,"금액"]],"","B91C1C");
+  if(!d.expRows.length) line([[1,6,"지출 내역 없음","txt"]]);
+  d.expRows.forEach(function(r){ line([[1,1,r.dt||"","date"],[2,2,r.src,"txt"],[3,3,r.tp,"txt"],[4,5,r.ds,"txt"],[6,6,r.am,"money"]]); });
+  if(d.expRows.length) line([[1,5,"합계","txt"],[6,6,d.expTotal,"money"]],"tot");
+  row++;
+  var ft=merge(row,1,N); ft.value=(SYS_ORG||"")+" · 본 정산보고서는 시스템 등록 자료 기준으로 자동 생성되었습니다."; ft.font={size:9,color:{argb:"FF94A3B8"}}; ft.alignment={horizontal:"center"};
+
+  // 세부내역 시트 공통 — 머리줄 고정 + 거르기(필터) + 합계
+  var detail=function(name,head,widths,rows,moneyCols,sumCols,totLabel,headColor){
+    var w=wb.addWorksheet(name,{views:[{state:"frozen",ySplit:1}],pageSetup:{paperSize:9,orientation:"landscape",fitToPage:true,fitToWidth:1,fitToHeight:0}});
+    w.columns=widths.map(function(x){ return {width:x}; });
+    var hr=w.addRow(head); hr.height=20;
+    hr.eachCell(function(c){ c.font={bold:true,color:{argb:"FFFFFFFF"}}; c.fill=fill(headColor); c.alignment={horizontal:"center",vertical:"middle"}; c.border=border; });
+    rows.forEach(function(v,i){
+      var r=w.addRow(v);
+      r.eachCell({includeEmpty:true},function(c,ci){ c.border=border; if(moneyCols.indexOf(ci)>=0){ c.numFmt=money; c.alignment={horizontal:"right"}; } if(i%2===1) c.fill=fill("F8FAFC"); });
+    });
+    w.autoFilter={from:{row:1,column:1},to:{row:1,column:head.length}};
+    if(rows.length){
+      var tv=head.map(function(){ return ""; }); tv[1]=totLabel;
+      sumCols.forEach(function(ci){ var col=String.fromCharCode(64+ci); tv[ci-1]={formula:"SUBTOTAL(9,"+col+"2:"+col+(rows.length+1)+")"}; });
+      var tr=w.addRow(tv);
+      tr.eachCell({includeEmpty:true},function(c,ci){ c.font={bold:true}; c.fill=fill("E2E8F0"); c.border=border; if(moneyCols.indexOf(ci)>=0){ c.numFmt=money; c.alignment={horizontal:"right"}; } });
+    }
+  };
+  // 지출 세부: 구매(결제 완료만 — 결산서 집행 기준) + 기타 지출
+  var ex=[];
+  (purs||[]).forEach(function(p){ if(_isPre(p)) return; ex.push([p.dt||"","구매",p.gwan||"",p.expTp||"",p.expMid||"",p.it||"",pn(p.qt)||"",pn(p.un)||"",pn(p.tot),p.vendor||"",(typeof payN==="function"?payN(p.payM):p.payM)||"",p.incTp||"",p.ar||""]); });
+  (exps||[]).forEach(function(e){ ex.push([e.dt||"","지출",e.gwan||"",e.expTp||"",e.expMid||"",e.ds||e.nm||"","","",pn(e.am),"","",e.incTp||"",e.ar||""]); });
+  ex.sort(function(a,b){ return String(a[0]).localeCompare(String(b[0])); });
+  ex=ex.map(function(v,i){ return [i+1].concat(v); });
+  detail("지출 세부내역",["No","날짜","구분","관","세출 대분류","세출 중분류","내역(물품명·적요)","수량","단가","금액","거래처","결제수단","재원","부서"],
+    [5,11,7,14,16,16,30,7,11,13,16,10,14,10],ex,[8,9,10],[10],"합계 (거르기 하면 보이는 줄만)","B91C1C");
+  // 수입 세부
+  var inR=d.incRows.map(function(r,i){ return [i+1,r.dt||"",r.tp,r.ds,r.pay,r.am]; });
+  detail("수입 세부내역",["No","날짜","종류","적요","결제수단","금액"],[5,11,18,34,12,14],inR,[6],[6],"합계 (거르기 하면 보이는 줄만)","15803D");
+
+  var buf=await wb.xlsx.writeBuffer();
+  var a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([buf],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}));
+  a.download="정산보고서_"+(typeof CUR_EVT!=="undefined"&&CUR_EVT&&CUR_EVT.nm?String(CUR_EVT.nm).replace(/[\\\/:*?"<>|]/g,"_")+"_":"")+today().replace(/-/g,"")+".xlsx";
+  document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); },3000);
+  hideLoading(); toast("📥 정산보고서 엑셀 받았어요");
 }
 
 // ===== 내 정보 (비밀번호 변경) — 비관리자용 =====
