@@ -6164,6 +6164,8 @@ function _dashChecks(){
   var it=function(n,lb,sub,js,col){ items.push('<div onclick="'+js+'" style="flex:1 1 170px;cursor:pointer;background:'+(n?'#fef2f2':'#f0fdf4')+';border:2px solid '+(n?col:'#86efac')+';border-radius:10px;padding:9px 12px"><div style="font-size:12px;font-weight:700;color:'+(n?col:'#166534')+'">'+lb+'</div><div style="font-size:20px;font-weight:900;color:'+(n?col:'#16a34a')+'">'+(n?n+'건':'✅ 없음')+'</div><div style="font-size:11px;color:#64748b">'+sub+'</div></div>'); };
   it(nInc,'💼 재원(지원금) 안 고른 구매','눌러서 바로 찾기',"PUR_F={gwan:'',expTp:'',expMid:'',miss:'',inc:'__none__'};CTAB='pur';mkTabs();draw()",'#dc2626');
   it(nSub,'💼 세입 대·중분류 빈 구매','대분류나 중분류 중 하나라도 비어 있음',"PUR_F={gwan:'',expTp:'',expMid:'',miss:'',inc:'__nosub__'};CTAB='pur';mkTabs();draw()",'#ea580c');
+  var nNoCard=(purs||[]).filter(function(p){ return !_isPre(p) && !String(p.card||"").trim(); }).length;
+  it(nNoCard,'💳 카드/통장 안 고른 구매','결제 완료인데 카드 칸이 빔 — 카드 잔액에서 빠져 있어요',"PUR_F={gwan:'',expTp:'',expMid:'',miss:'',inc:'__nocard__'};CTAB='pur';mkTabs();draw()",'#dc2626');
   it(nCls,'🏷 관·항·목 빈 구매','세출 분류 안 고른 것',"PUR_F={gwan:'',expTp:'',expMid:'',miss:'any',inc:''};CTAB='pur';mkTabs();draw()",'#b45309');
   it(oldPre,'⏳ 30일 넘은 결제 전','계약만 하고 아직 결제 안 함 (전체 결제 전 '+nPre+'건)',"CTAB='pur';mkTabs();draw()",'#7c3aed');
   if(nExpNoInc) it(nExpNoInc,'💼 재원 안 고른 기타 지출','예산관리 > 지출 내역',"CTAB='exp';mkTabs();draw()",'#dc2626');
@@ -6856,6 +6858,7 @@ function dPur(){
     fp=fp.filter(function(p){
       if(PUR_F.inc==="__none__")  return !p.incTp;
       if(PUR_F.inc==="__nosub__") return !p.incTp || !p.incSub;
+      if(PUR_F.inc==="__nocard__") return !_isPre(p) && !String(p.card||"").trim();
       return (p.incTp||"")===PUR_F.inc;
     });
   }
@@ -6936,6 +6939,8 @@ function dPur(){
     h+='<option value="">💼 재원(세입) 전체'+(incNone?' — ⚠ 미선택 '+incNone+'건':'')+'</option>';
     h+='<option value="__none__"'+(PUR_F.inc==="__none__"?" selected":"")+'>⚠ 재원(세입 대분류) 안 고른 것 ('+incNone+'건)</option>';
     h+='<option value="__nosub__"'+(PUR_F.inc==="__nosub__"?" selected":"")+'>⚠ 세입 대분류·중분류 중 하나라도 빈 것 ('+incNoSub+'건)</option>';
+    var noCard=purs.filter(function(p){return !_isPre(p)&&!String(p.card||"").trim();}).length;
+    h+='<option value="__nocard__"'+(PUR_F.inc==="__nocard__"?" selected":"")+'>💳 카드/통장 안 고른 결제 완료 건 ('+noCard+'건) — 카드 잔액에서 빠져 있음</option>';
     Object.keys(allInc).sort().forEach(function(t){ h+='<option value="'+esc(t)+'"'+(PUR_F.inc===t?" selected":"")+'>'+esc(t)+'</option>'; });
     h+='</select>';
     if(PUR_F.gwan||PUR_F.expTp||PUR_F.expMid||PUR_F.miss||PUR_F.inc){
@@ -8785,9 +8790,14 @@ function _refreshPurCardByInc(prefix){
   var sub=(document.getElementById(prefix+"IncSub")||{}).value||"";
   var cardEl=document.getElementById(prefix+"Card");
   if(!cardEl) return;
-  cardEl.innerHTML=purCardOpts("", tp, sub);
-  // 카드 바뀌었으니 결제방법도 초기화
-  if(prefix==="p") onPurCardChg();
+  // 이미 고른 카드/통장은 그대로 둠 — 예전엔 재원(세입 분류)만 바꿔도 카드 칸이 비워져서, 저장하면 그 건이 카드 잔액에서 빠졌음
+  var prev=cardEl.value||"";
+  cardEl.innerHTML=purCardOpts(prev, tp, sub);
+  if(prev && cardEl.value!==prev){
+    var o=document.createElement("option"); o.value=prev; o.textContent=prev+" (지금 선택)"; o.selected=true; cardEl.appendChild(o);
+  }
+  // 카드가 실제로 바뀐 경우에만 결제방법 초기화
+  if(prefix==="p" && cardEl.value!==prev) onPurCardChg();
 }
 function togglePurMgmtVisible(){
   var no=document.getElementById("pNoMgmt").checked;
