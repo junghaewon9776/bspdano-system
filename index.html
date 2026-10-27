@@ -19567,6 +19567,9 @@ function dReport(){
   h+='<div class="mut" style="margin-top:6px;font-size:12px;color:#166534">입력된 세입/세출/구매 데이터를 기반으로 결산서를 자동 생성합니다. 엑셀 파일로 다운로드됩니다.</div>';
   h+='</div>';
 
+  // 📊 행사 재정 한눈에 (판)
+  h+=_rptFinGlance();
+
   // 4개 리포트 카드
   h+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;margin-top:12px">';
 
@@ -19637,6 +19640,86 @@ function dReport(){
   else if(RPT_SHOW==="expSrc") h+=_rptExpSrcPreview();
   else if(RPT_SHOW==="settle") h+=_rptSettlePreview();
 
+  return h;
+}
+
+// ===== 📊 행사 재정 한눈에 — 결산서 탭 맨 위 =====
+// 들어온 돈(입금) · 쓴 돈(결제 완료) · 결제 전 · 남은 돈 + 재원별 · 세출 대분류별 · 월별 흐름
+function _rptFinGlance(){
+  var incPlan=0, incAct=0, expPlan=0, expAct=0, pre=0;
+  var src={}, mon={};
+  var S=function(k){ k=k||"(재원 미지정)"; return src[k]||(src[k]={plan:0,inA:0,used:0,pre:0}); };
+  var M=function(dt){ var k=String(dt||"").slice(0,7)||"(날짜 없음)"; return mon[k]||(mon[k]={inA:0,out:0}); };
+  (inc||[]).forEach(function(r){ var a=pn(r.am); incPlan+=a; S(r.tp).plan+=a; });
+  (dpst||[]).forEach(function(d){ var a=pn(d.am); incAct+=a; S(d.incTp).inA+=a; M(d.dt).inA+=a; });
+  (expBG||[]).forEach(function(r){ if(!r.mid) expPlan+=pn(r.planAm); });
+  (purs||[]).forEach(function(p){ var a=pn(p.tot);
+    if(_isPre(p)){ pre+=a; S(p.incTp).pre+=a; return; }
+    expAct+=a; S(p.incTp).used+=a; M(p.dt).out+=a; });
+  (exps||[]).forEach(function(e){ var a=pn(e.am); expAct+=a; S(e.incTp).used+=a; M(e.dt).out+=a; });
+  var cash=incAct-expAct, fin=cash-pre, bLeft=expPlan-expAct-pre;
+  var pct=function(a,b){ return b>0?Math.round(a/b*1000)/10:0; };
+  var won=function(v){ return fmu(v)+'원'; };
+  var evNm=(typeof CUR_EVT!=="undefined"&&CUR_EVT&&CUR_EVT.nm)?CUR_EVT.nm:"";
+
+  var h='<div class="card" style="margin-top:12px;border:2px solid #0f766e">';
+  h+='<h3 style="margin:0 0 10px;color:#0f766e">📊 행사 재정 한눈에'+(evNm?' <span style="font-size:13px;color:#475569;font-weight:600">· '+esc(evNm)+'</span>':'')+'</h3>';
+  // 큰 숫자 4개
+  var tile=function(lb,v,sub,col,bg){ return '<div style="flex:1 1 160px;background:'+bg+';border:2px solid '+col+';border-radius:10px;padding:10px 12px"><div style="font-size:12px;font-weight:700;color:'+col+'">'+lb+'</div><div style="font-size:21px;font-weight:900;color:'+col+';margin-top:2px">'+v+'</div><div style="font-size:11.5px;color:#475569;margin-top:2px">'+sub+'</div></div>'; };
+  h+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">';
+  h+=tile('💰 들어온 돈 (입금)', won(incAct), '세입 계획 '+won(incPlan)+' 중 '+pct(incAct,incPlan)+'%', '#15803d', '#f0fdf4');
+  h+=tile('💸 쓴 돈 (결제 완료)', won(expAct), '세출 예산 '+won(expPlan)+' 중 '+pct(expAct,expPlan)+'%', '#b91c1c', '#fef2f2');
+  h+=tile('⏳ 결제 전 (계약)', won(pre), '아직 안 나간 돈 — 나갈 예정', pre?'#b45309':'#64748b', pre?'#fffbeb':'#f8fafc');
+  h+=tile('🏦 남은 돈', (cash<0?'⚠ ':'')+won(cash), '결제 다 하면 '+(fin<0?'<b style="color:#b91c1c">'+won(fin)+' (부족)</b>':won(fin)), cash<0?'#b91c1c':'#1d4ed8', cash<0?'#fef2f2':'#eff6ff');
+  h+='</div>';
+  // 진행 막대 2개
+  var bar=function(lb,a,b,extra,col){
+    var w=b>0?Math.min(100,a/b*100):0, w2=b>0?Math.min(100-w,(extra||0)/b*100):0;
+    return '<div style="margin-bottom:9px"><div style="display:flex;justify-content:space-between;font-size:12.5px;font-weight:700;margin-bottom:3px"><span>'+lb+'</span><span>'+pct(a,b)+'%'+(extra?' <span style="color:#b45309">(+결제 전 '+pct(extra,b)+'%)</span>':'')+'</span></div>'
+      +'<div style="height:12px;background:#e2e8f0;border-radius:6px;overflow:hidden;display:flex"><div style="width:'+w+'%;background:'+col+'"></div><div style="width:'+w2+'%;background:#f59e0b"></div></div></div>';
+  };
+  h+=bar('세입 달성 (계획 대비 입금)', incAct, incPlan, 0, '#16a34a');
+  h+=bar('예산 집행 (예산 대비 쓴 돈)', expAct, expPlan, pre, '#2563eb');
+  h+='<div style="font-size:12px;color:#475569;margin-bottom:12px">예산 남은 가용: <b style="color:'+(bLeft<0?'#b91c1c':'#1d4ed8')+'">'+(bLeft<0?'⚠ ':'')+won(bLeft)+'</b> (예산 − 쓴 돈 − 결제 전)</div>';
+
+  // 재원별 — 어느 돈(보조금·자부담 등)을 얼마나 썼나
+  var sk=Object.keys(src).filter(function(k){ var v=src[k]; return v.plan||v.inA||v.used||v.pre; });
+  if(sk.length){
+    h+='<div style="font-size:13px;font-weight:800;color:#334155;margin:4px 0 6px">💼 재원별 사용 (어느 돈을 얼마나 썼나)</div>';
+    h+='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12.5px;min-width:520px"><thead><tr style="background:#0f766e;color:#fff">'
+      +'<th style="padding:6px;text-align:left">재원</th><th style="padding:6px;text-align:right">계획</th><th style="padding:6px;text-align:right">입금</th><th style="padding:6px;text-align:right">쓴 돈</th><th style="padding:6px;text-align:right">결제 전</th><th style="padding:6px;text-align:right">남은 돈</th><th style="padding:6px;width:22%">사용률</th></tr></thead><tbody>';
+    var T={plan:0,inA:0,used:0,pre:0};
+    sk.forEach(function(k,i){
+      var v=src[k], left=v.inA-v.used-v.pre, base=Math.max(v.inA,v.plan,v.used+v.pre,1);
+      ['plan','inA','used','pre'].forEach(function(f){ T[f]+=v[f]; });
+      h+='<tr style="border-bottom:1px solid #e2e8f0'+(i%2?';background:#f8fafc':'')+'"><td style="padding:6px;font-weight:700">'+esc(k)+'</td>'
+        +'<td style="padding:6px;text-align:right">'+fmu(v.plan)+'</td><td style="padding:6px;text-align:right;color:#15803d;font-weight:700">'+fmu(v.inA)+'</td>'
+        +'<td style="padding:6px;text-align:right;color:#b91c1c;font-weight:700">'+fmu(v.used)+'</td><td style="padding:6px;text-align:right;color:#b45309">'+fmu(v.pre)+'</td>'
+        +'<td style="padding:6px;text-align:right;font-weight:800;color:'+(left<0?'#b91c1c':'#1d4ed8')+'">'+(left<0?'⚠ ':'')+fmu(left)+'</td>'
+        +'<td style="padding:6px"><div style="height:9px;background:#e2e8f0;border-radius:5px;overflow:hidden;display:flex"><div style="width:'+(v.used/base*100)+'%;background:#dc2626"></div><div style="width:'+(v.pre/base*100)+'%;background:#f59e0b"></div></div></td></tr>';
+    });
+    var tl=T.inA-T.used-T.pre;
+    h+='<tr style="background:#e2e8f0;font-weight:800"><td style="padding:6px">합계</td><td style="padding:6px;text-align:right">'+fmu(T.plan)+'</td><td style="padding:6px;text-align:right">'+fmu(T.inA)+'</td><td style="padding:6px;text-align:right">'+fmu(T.used)+'</td><td style="padding:6px;text-align:right">'+fmu(T.pre)+'</td><td style="padding:6px;text-align:right;color:'+(tl<0?'#b91c1c':'#1d4ed8')+'">'+fmu(tl)+'</td><td></td></tr>';
+    h+='</tbody></table></div>';
+    h+='<div style="font-size:11.5px;color:#64748b;margin:4px 0 12px">재원은 구매·지출 등록 때 고른 「재원」 기준이에요. 안 고른 건 (재원 미지정)으로 모여요.</div>';
+  }
+
+  // 월별 흐름 — 들어온 돈 / 쓴 돈
+  var mk=Object.keys(mon).sort();
+  if(mk.length){
+    var mx=1; mk.forEach(function(k){ mx=Math.max(mx,mon[k].inA,mon[k].out); });
+    h+='<div style="font-size:13px;font-weight:800;color:#334155;margin:4px 0 6px">📅 월별 흐름 <span style="font-size:11.5px;font-weight:600"><span style="color:#16a34a">■ 들어온 돈</span> <span style="color:#dc2626">■ 쓴 돈</span></span></div>';
+    mk.forEach(function(k){
+      var v=mon[k];
+      h+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;font-size:12px"><span style="min-width:62px;font-weight:700">'+esc(k)+'</span><div style="flex:1">'
+        +'<div style="display:flex;align-items:center;gap:6px"><div style="height:8px;width:'+Math.max(v.inA?1:0,v.inA/mx*100)+'%;background:#16a34a;border-radius:4px"></div><span style="color:#15803d;white-space:nowrap">'+(v.inA?fmu(v.inA):'')+'</span></div>'
+        +'<div style="display:flex;align-items:center;gap:6px;margin-top:2px"><div style="height:8px;width:'+Math.max(v.out?1:0,v.out/mx*100)+'%;background:#dc2626;border-radius:4px"></div><span style="color:#b91c1c;white-space:nowrap">'+(v.out?fmu(v.out):'')+'</span></div>'
+        +'</div></div>';
+    });
+  }
+  h+='</div>';
+  // 세출 대분류별 (대시보드와 같은 막대)
+  h+='<div style="margin-top:12px">'+_dashExpBars()+'</div>';
   return h;
 }
 
