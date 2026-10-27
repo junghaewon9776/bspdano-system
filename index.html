@@ -6152,6 +6152,56 @@ function _dashMoney(){
   h+='</div></div>';
   return h;
 }
+// ── 대시보드: 확인 필요 (빠뜨린 것 바로 찾기) ──
+function _dashChecks(){
+  var invs={}; (purs||[]).forEach(function(p){ var k=p.inv||p.id; (invs[k]=invs[k]||[]).push(p); });
+  var nInc=0, nSub=0, nCls=0;
+  (purs||[]).forEach(function(p){ if(!p.incTp) nInc++; if(!p.incTp||!p.incSub) nSub++; if(!p.gwan||!p.expTp||!p.expMid) nCls++; });
+  var nPre=0, oldPre=0, lim=new Date(Date.now()-30*86400000).toISOString().slice(0,10);
+  Object.keys(invs).forEach(function(k){ var p=invs[k][0]; if(_isPre(p)){ nPre++; if(p.dt && p.dt<lim) oldPre++; } });
+  var nExpNoInc=(exps||[]).filter(function(e){ return !e.incTp; }).length;
+  var items=[];
+  var it=function(n,lb,sub,js,col){ items.push('<div onclick="'+js+'" style="flex:1 1 170px;cursor:pointer;background:'+(n?'#fef2f2':'#f0fdf4')+';border:2px solid '+(n?col:'#86efac')+';border-radius:10px;padding:9px 12px"><div style="font-size:12px;font-weight:700;color:'+(n?col:'#166534')+'">'+lb+'</div><div style="font-size:20px;font-weight:900;color:'+(n?col:'#16a34a')+'">'+(n?n+'건':'✅ 없음')+'</div><div style="font-size:11px;color:#64748b">'+sub+'</div></div>'); };
+  it(nInc,'💼 재원(지원금) 안 고른 구매','눌러서 바로 찾기',"PUR_F={gwan:'',expTp:'',expMid:'',miss:'',inc:'__none__'};CTAB='pur';mkTabs();draw()",'#dc2626');
+  it(nSub,'💼 세입 대·중분류 빈 구매','대분류나 중분류 중 하나라도 비어 있음',"PUR_F={gwan:'',expTp:'',expMid:'',miss:'',inc:'__nosub__'};CTAB='pur';mkTabs();draw()",'#ea580c');
+  it(nCls,'🏷 관·항·목 빈 구매','세출 분류 안 고른 것',"PUR_F={gwan:'',expTp:'',expMid:'',miss:'any',inc:''};CTAB='pur';mkTabs();draw()",'#b45309');
+  it(oldPre,'⏳ 30일 넘은 결제 전','계약만 하고 아직 결제 안 함 (전체 결제 전 '+nPre+'건)',"CTAB='pur';mkTabs();draw()",'#7c3aed');
+  if(nExpNoInc) it(nExpNoInc,'💼 재원 안 고른 기타 지출','예산관리 > 지출 내역',"CTAB='exp';mkTabs();draw()",'#dc2626');
+  return '<div class="card" style="margin-bottom:12px"><h3 style="margin-bottom:8px">🔎 확인 필요 <span style="font-size:12px;color:#64748b;font-weight:400">— 누르면 그 목록으로 가요</span></h3><div style="display:flex;gap:8px;flex-wrap:wrap">'+items.join('')+'</div></div>';
+}
+// ── 대시보드: 최근 거래 / 큰 금액 순위 ──
+function _dashRecentTop(){
+  var invs={}, order=[];
+  (purs||[]).forEach(function(p){ var k=p.inv||p.id; if(!invs[k]){ invs[k]={rows:[],tot:0}; order.push(k); } invs[k].rows.push(p); invs[k].tot+=pn(p.tot); });
+  var tx=[];
+  order.forEach(function(k){ var g=invs[k], p=g.rows[0];
+    tx.push({kind:'pur', dt:p.dt||'', nm:(p.it||'(물품명 없음)')+(g.rows.length>1?' 외 '+(g.rows.length-1)+'건':''), who:p.vendor||p.ar||'', am:-g.tot, pre:_isPre(p), noInc:!p.incTp, tp:p.expTp||''}); });
+  (exps||[]).forEach(function(e){ tx.push({kind:'exp', dt:e.dt||'', nm:e.ds||e.nm||'(적요 없음)', who:e.ar||'', am:-pn(e.am), noInc:!e.incTp, tp:e.expTp||''}); });
+  (dpst||[]).forEach(function(d){ tx.push({kind:'in', dt:d.dt||'', nm:d.ds||d.incTp||'입금', who:d.incTp||'', am:pn(d.am)}); });
+  var go={pur:"CTAB='pur';mkTabs();draw()", exp:"CTAB='exp';mkTabs();draw()", 'in':"CTAB='inc';mkTabs();draw()"};
+  var badge=function(t){
+    if(t.kind==='in') return '<span style="background:#dcfce7;color:#166534;border-radius:4px;padding:1px 5px;font-size:10.5px;font-weight:700">입금</span>';
+    var b=t.kind==='pur'?'<span style="background:#dbeafe;color:#1e40af;border-radius:4px;padding:1px 5px;font-size:10.5px;font-weight:700">구매</span>':'<span style="background:#ede9fe;color:#5b21b6;border-radius:4px;padding:1px 5px;font-size:10.5px;font-weight:700">지출</span>';
+    if(t.pre) b+=' <span style="background:#fef3c7;color:#92400e;border-radius:4px;padding:1px 5px;font-size:10.5px;font-weight:700">결제 전</span>';
+    if(t.noInc) b+=' <span style="background:#fee2e2;color:#991b1b;border-radius:4px;padding:1px 5px;font-size:10.5px;font-weight:700">재원 없음</span>';
+    return b;
+  };
+  var row=function(t,i,rank){
+    return '<div onclick="'+go[t.kind]+'" style="display:flex;gap:8px;align-items:center;padding:7px 4px;border-bottom:1px solid #f1f5f9;cursor:pointer;font-size:12.5px">'
+      +(rank?'<b style="min-width:22px;text-align:center;color:'+(i<3?'#b45309':'#64748b')+'">'+(i+1)+'</b>':'<span style="min-width:74px;color:#475569">'+esc(String(t.dt).slice(0,10))+'</span>')
+      +'<div style="flex:1;min-width:0"><div style="font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(t.nm)+'</div><div style="font-size:11px;color:#64748b">'+badge(t)+(t.who?' '+esc(t.who):'')+(rank&&t.dt?' · '+esc(String(t.dt).slice(0,10)):'')+(t.tp?' · '+esc(t.tp):'')+'</div></div>'
+      +'<b style="white-space:nowrap;color:'+(t.am<0?'#b91c1c':'#15803d')+'">'+(t.am<0?'−':'+')+fmu(Math.abs(t.am))+'원</b></div>';
+  };
+  var recent=tx.slice().sort(function(a,b){ return String(b.dt).localeCompare(String(a.dt)); }).slice(0,10);
+  var top=tx.filter(function(t){ return t.am<0; }).sort(function(a,b){ return a.am-b.am; }).slice(0,10);
+  var card=function(title,sub,list,rank){
+    return '<div class="card" style="margin:0"><h3 style="margin-bottom:4px">'+title+'</h3><div style="font-size:11.5px;color:#64748b;margin-bottom:6px">'+sub+'</div>'
+      +(list.length?list.map(function(t,i){ return row(t,i,rank); }).join(''):'<div class="mut" style="padding:12px;text-align:center">아직 없어요</div>')+'</div>';
+  };
+  return '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px;margin-bottom:12px">'
+    +card('🕘 최근 거래','구매(명세서 단위)·기타 지출·입금 — 날짜 최근 10건',recent,false)
+    +card('🏆 큰 금액 순위','나간 돈 큰 순서 10건 (결제 전 포함, 명세서 단위)',top,true)+'</div>';
+}
 // 세출 대분류별: 사용(진한색) + 결제 전(주황) 막대, 남은 가용
 function _dashExpBars(){
   var rows=_dashBudgetRows().filter(function(r){ return r.plan||r.used||r.pre; });
@@ -6190,6 +6240,7 @@ function dDash(){
   h+=periodBar();
   h+='<div class="exbar">'+(isA()?'<button class="btn-out btn-tp" onclick="tmplAll()">📋 전체 양식 다운로드</button> <button class="btn-out btn-ex" onclick="expAll()">전체 엑셀 내보내기</button> <button class="btn-out btn-im" onclick="impClick(\'all\')">전체 엑셀 가져오기</button> ':'')+unitBar()+'</div>';
   if(isA()) h+=_dashMoney();
+  if(isA()) h+=_dashChecks()+_dashRecentTop();
   // 상단 요약 카드: 예산집행 / 우리 구매만 (전체 활동/수거량/증빙사진은 구 시스템 잔재라 제거)
   h+='<div class="g4" style="margin-bottom:12px">';
   if(isA()){
@@ -6618,7 +6669,7 @@ var PUR_SEL={};          // {invId: true}
 var PUR_SHOW_UNPRT=false;// 미발행만 보기
 var PUR_SHOW_UNSIGN=false;// 미서명만 보기
 var purAr="all";         // 구매 탭 부서 필터 (관리자만 유효)
-var PUR_F={gwan:"",expTp:"",expMid:"",miss:""}; // 세출 필터 (miss: "gwan"/"expTp"/"expMid"/"any")
+var PUR_F={gwan:"",expTp:"",expMid:"",miss:"",inc:""}; // 세출 필터 (miss: "gwan"/"expTp"/"expMid"/"any") · inc: 재원(세입 대분류) "__none__"=안 고른 것 "__nosub__"=대·중 하나라도 빔
 // 🔍 분류 이름 누르면 구매 목록에서 그 분류만 보기 (예산관리·결산서에서)
 var _GPC=[], _GPCK={};
 function _gpc(tp,mid,nomid,label,style){
@@ -6800,6 +6851,14 @@ function dPur(){
       return true;
     });
   }
+  // 재원(세입) 필터 — 지원금 등 안 고른 건 찾기
+  if(PUR_F.inc){
+    fp=fp.filter(function(p){
+      if(PUR_F.inc==="__none__")  return !p.incTp;
+      if(PUR_F.inc==="__nosub__") return !p.incTp || !p.incSub;
+      return (p.incTp||"")===PUR_F.inc;
+    });
+  }
   var pdf=getDF("pur");
   if(pdf.f)fp=fp.filter(function(p){return (_isPre(p)&&!p.dt)||inRange(p.dt,pdf.f,pdf.t)});
   // 명세서 단위로 그룹화 (inv 기준) — 대표행(첫 물품)의 prtD/signU 사용
@@ -6870,8 +6929,17 @@ function dPur(){
     h+='<option value="expTp"'+(PUR_F.miss==="expTp"?" selected":"")+'>항(대분류) 미지정</option>';
     h+='<option value="expMid"'+(PUR_F.miss==="expMid"?" selected":"")+'>목(중분류) 미지정</option>';
     h+='</select>';
-    if(PUR_F.gwan||PUR_F.expTp||PUR_F.expMid||PUR_F.miss){
-      h+='<button class="btn btn-s btn-out" onclick="PUR_F={gwan:\'\',expTp:\'\',expMid:\'\',miss:\'\'};draw()">필터 해제</button>';
+    // 재원(세입 대분류) 필터 — 지원금 안 고른 건 빠르게 찾기
+    var incNone=purs.filter(function(p){return !p.incTp;}).length, incNoSub=purs.filter(function(p){return !p.incTp||!p.incSub;}).length, allInc={};
+    purs.forEach(function(p){ if(p.incTp) allInc[p.incTp]=true; });
+    h+='<select class="in" style="padding:6px;border:1px solid '+(incNone?'#dc2626':'#ddd')+';border-radius:6px;font-size:12px;'+(incNone?'background:#fef2f2;font-weight:700;color:#991b1b':'')+'" onchange="PUR_F.inc=this.value;draw()">';
+    h+='<option value="">💼 재원(세입) 전체'+(incNone?' — ⚠ 미선택 '+incNone+'건':'')+'</option>';
+    h+='<option value="__none__"'+(PUR_F.inc==="__none__"?" selected":"")+'>⚠ 재원(세입 대분류) 안 고른 것 ('+incNone+'건)</option>';
+    h+='<option value="__nosub__"'+(PUR_F.inc==="__nosub__"?" selected":"")+'>⚠ 세입 대분류·중분류 중 하나라도 빈 것 ('+incNoSub+'건)</option>';
+    Object.keys(allInc).sort().forEach(function(t){ h+='<option value="'+esc(t)+'"'+(PUR_F.inc===t?" selected":"")+'>'+esc(t)+'</option>'; });
+    h+='</select>';
+    if(PUR_F.gwan||PUR_F.expTp||PUR_F.expMid||PUR_F.miss||PUR_F.inc){
+      h+='<button class="btn btn-s btn-out" onclick="PUR_F={gwan:\'\',expTp:\'\',expMid:\'\',miss:\'\',inc:\'\'};draw()">필터 해제</button>';
     }
     // 필터된 합계 + 집행률 + 첨부/발행/서명 상태
     var filterTot=0; fp.forEach(function(p){ if(!_isPre(p)) filterTot+=pn(p.tot); });
@@ -19692,7 +19760,8 @@ function _rptFinGlance(){
     sk.forEach(function(k,i){
       var v=src[k], left=v.inA-v.used-v.pre, base=Math.max(v.inA,v.plan,v.used+v.pre,1);
       ['plan','inA','used','pre'].forEach(function(f){ T[f]+=v[f]; });
-      h+='<tr style="border-bottom:1px solid #e2e8f0'+(i%2?';background:#f8fafc':'')+'"><td style="padding:6px;font-weight:700">'+esc(k)+'</td>'
+      var noSrc=(k==="(재원 미지정)");
+      h+='<tr style="border-bottom:1px solid #e2e8f0'+(i%2?';background:#f8fafc':'')+(noSrc?';cursor:pointer':'')+'"'+(noSrc?' onclick="PUR_F.inc=\'__none__\';CTAB=\'pur\';mkTabs();draw()" title="눌러서 재원 안 고른 구매 보기"':'')+'><td style="padding:6px;font-weight:700">'+esc(k)+(noSrc?' <span style="font-size:11px;color:#dc2626">→ 찾기</span>':'')+'</td>'
         +'<td style="padding:6px;text-align:right">'+fmu(v.plan)+'</td><td style="padding:6px;text-align:right;color:#15803d;font-weight:700">'+fmu(v.inA)+'</td>'
         +'<td style="padding:6px;text-align:right;color:#b91c1c;font-weight:700">'+fmu(v.used)+'</td><td style="padding:6px;text-align:right;color:#b45309">'+fmu(v.pre)+'</td>'
         +'<td style="padding:6px;text-align:right;font-weight:800;color:'+(left<0?'#b91c1c':'#1d4ed8')+'">'+(left<0?'⚠ ':'')+fmu(left)+'</td>'
