@@ -2297,8 +2297,8 @@ function dModManager(){
       h+='<button onclick="_modMoveOrder(\''+esc(d.key)+'\',-1)" title="위로" '+(di===0?'disabled ':'')+'style="font-size:14px;padding:4px 9px;border:none;border-radius:5px;background:#475569;color:#fff;font-weight:800;cursor:pointer'+(di===0?';opacity:.3':'')+'">▲</button>';
       h+='<button onclick="_modMoveOrder(\''+esc(d.key)+'\',1)" title="아래로" '+(di===defs.length-1?'disabled ':'')+'style="font-size:14px;padding:4px 9px;border:none;border-radius:5px;background:#475569;color:#fff;font-weight:800;cursor:pointer'+(di===defs.length-1?';opacity:.3':'')+'">▼</button>';
       h+='<button class="btn btn-s" onclick="popModDef(\''+esc(d.key)+'\')" style="font-size:11px">✏️ 수정</button>';
-      h+='<button class="btn btn-s" onclick="cloneModDef(\''+esc(d.key)+'\')" style="font-size:11px;color:#2563eb">📋 복제</button>';
-      h+='<button class="btn btn-s" onclick="delModDef(\''+esc(d.key)+'\')" style="font-size:11px;color:#dc2626">🗑 삭제</button>';
+      h+='<button class="btn btn-s" onclick="cloneModDef(\''+esc(d.key)+'\')" style="background:#fff;border:1.5px solid currentColor;font-size:11px;color:#2563eb">📋 복제</button>';
+      h+='<button class="btn btn-s" onclick="delModDef(\''+esc(d.key)+'\')" style="background:#fff;border:1.5px solid currentColor;font-size:11px;color:#dc2626">🗑 삭제</button>';
       h+='</div></div>';
 
       // 컬럼 미리보기
@@ -2397,7 +2397,7 @@ function popModDef(keyOrIdx){
   h+='<div style="border-top:2px solid #e2e8f0;padding-top:14px;margin-top:20px;margin-bottom:8px">';
   h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">';
   h+='<span style="font-size:14px;font-weight:700">📋 컬럼 정의</span>';
-  h+='<button class="btn btn-s" onclick="_modDefAddCol()" style="font-size:11px;color:#2563eb">➕ 컬럼 추가</button>';
+  h+='<button class="btn btn-s" onclick="_modDefAddCol()" style="background:#fff;border:1.5px solid currentColor;font-size:11px;color:#2563eb">➕ 컬럼 추가</button>';
   h+='</div>';
   h+='<div id="mdf_cols_area">';
   h+=_renderModDefCols();
@@ -5052,11 +5052,11 @@ function _qzUpdateUI(){
     if(_bm){
       var _adj=0; try{ _adj=parseFloat(localStorage.getItem('_mlSizeAdj')||'0')||0; }catch(e){}
       h+='<label style="display:inline-flex;align-items:center;gap:3px;font-size:11px;background:#f1f5f9;color:#475569;padding:4px 8px;border-radius:6px" title="장마다 아래로 밀리면 + , 위로 밀리면 − 로 0.05mm씩 조절해 딱 맞추세요">'
-        +'라벨길이보정 <button onclick="_qzAdjSize(-0.5)" style="border:none;background:#94a3b8;color:#fff;border-radius:4px;width:30px;height:22px;cursor:pointer;font-weight:800" title="크게 줄임">−−</button>'
+        +'라벨길이보정 <button onclick="_qzAdjSize(-0.5)" style="border:none;background:#475569;color:#fff;border-radius:4px;width:30px;height:22px;cursor:pointer;font-weight:800" title="크게 줄임">−−</button>'
         +'<button onclick="_qzAdjSize(-0.05)" style="border:none;background:#cbd5e1;border-radius:4px;width:22px;height:22px;cursor:pointer;font-weight:800">−</button>'
         +'<b style="min-width:54px;text-align:center">'+(_adj>0?'+':'')+_adj.toFixed(2)+'mm</b>'
         +'<button onclick="_qzAdjSize(0.05)" style="border:none;background:#cbd5e1;border-radius:4px;width:22px;height:22px;cursor:pointer;font-weight:800">+</button>'
-        +'<button onclick="_qzAdjSize(0.5)" style="border:none;background:#94a3b8;color:#fff;border-radius:4px;width:30px;height:22px;cursor:pointer;font-weight:800" title="크게 늘림">++</button></label>';
+        +'<button onclick="_qzAdjSize(0.5)" style="border:none;background:#475569;color:#fff;border-radius:4px;width:30px;height:22px;cursor:pointer;font-weight:800" title="크게 늘림">++</button></label>';
     }
   }
   box.innerHTML=h;
@@ -5107,7 +5107,7 @@ function popModLabelLayout(key){
   h+='</div>';
   h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px">';
   h+='<div><button class="btn" style="background:#ef4444;color:#fff;font-size:12px" onclick="_mllReset()">🔄 기본 배치로 초기화</button>';
-  h+=' <button class="btn" style="background:#94a3b8;color:#fff;font-size:12px" onclick="_mllClearLayout()">자동 배치로 되돌리기</button></div>';
+  h+=' <button class="btn" style="background:#475569;color:#fff;font-size:12px" onclick="_mllClearLayout()">자동 배치로 되돌리기</button></div>';
   h+='<div><button class="btn" style="background:#64748b;color:#fff" onclick="closePopup()">취소</button> <button class="btn btn-b" style="background:#6366f1;color:#fff;font-weight:700" onclick="_mllSave()">💾 저장</button></div>';
   h+='</div></div>';
   openPopup(h,Math.max(620,cW+250));

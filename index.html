@@ -70,7 +70,7 @@ td{padding:8px;border-bottom:1px solid #eee;font-size:12px;vertical-align:middle
 .pst-ok{background:#dcfce7;color:#166534}.pst-pr{background:#ede9fe;color:#6d28d9}.pst-no{background:#fee2e2;color:#b91c1c}
 .tag-o{background:#ffedd5;color:#ea580c}.tag-r{background:#fee2e2;color:#dc2626}
 .tag-p{background:#f3e8ff;color:#7c3aed}
-.btn{border:none;border-radius:6px;padding:7px 14px;cursor:pointer;font-size:12px;font-weight:600;color:#fff;font-family:inherit}
+.btn{border:none;border-radius:6px;padding:7px 14px;cursor:pointer;font-size:12px;font-weight:600;color:#fff;background:#475569;font-family:inherit}
 .btn-b{background:#2563eb}.btn-r{background:#dc2626}.btn-g{background:#16a34a}
 .btn-s{padding:3px 8px;font-size:10px}
 .btn-out{background:#fff;border:1.5px solid #2563eb;color:#2563eb;border-radius:6px;padding:5px 12px;cursor:pointer;font-size:11px;font-weight:600;font-family:inherit}
@@ -488,7 +488,7 @@ label{display:block;font-size:10px;color:#999;margin-bottom:3px}
 <!-- firebase-storage 제거: 구글 드라이브 프록시로 대체 -->
 <script src="firebase-config.js"></script>
 <script src="common.js?v=20261024sec2"></script>
-<script src="mod-engine.js?v=20261026shift"></script>
+<script src="mod-engine.js?v=20261027btn"></script>
 <script src="sec-auth.js?v=20261024sec2"></script>
 
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" onerror="console.warn('XLSX CDN load failed')"></script>
@@ -2474,7 +2474,7 @@ function dApstat(){
       var pct=tot? Math.round(ok*100/tot):0;
       var badge=isRequired
         ?'<span style="font-size:10px;background:#dc2626;color:#fff;padding:1px 5px;border-radius:3px;margin-left:4px">필수</span>'
-        :'<span style="font-size:10px;background:#94a3b8;color:#fff;padding:1px 5px;border-radius:3px;margin-left:4px">선택</span>';
+        :'<span style="font-size:10px;background:#475569;color:#fff;padding:1px 5px;border-radius:3px;margin-left:4px">선택</span>';
       return '<div style="padding:10px;border:1px solid #e5e7eb;border-radius:6px;background:#fff">'
         +'<div style="font-size:12px;color:#64748b">'+ic+' '+label+badge+'</div>'
         +'<div style="display:flex;align-items:baseline;gap:4px;margin-top:2px"><span style="font-size:18px;font-weight:700;color:#16a34a">'+ok+'</span><span style="color:#94a3b8">/ '+tot+'</span><span style="flex:1"></span><span style="font-size:12px;color:#dc2626">미제출 '+ng+'</span></div>'
@@ -22378,7 +22378,7 @@ function dLinkTabs(){
       h+='<button onclick="toggleLinkCat('+ci+')" style="padding:4px 12px;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;'+(cat.hidden?'background:#fecaca;color:#dc2626':'background:#bbf7d0;color:#16a34a')+'">'+(cat.hidden?'❌ OFF':'✅ ON')+'</button></div>';
       h+='<div style="display:flex;gap:6px">';
       h+='<button class="btn btn-s" onclick="popLinkCat('+ci+')" style="font-size:11px">✏️ 수정</button>';
-      h+='<button class="btn btn-s" onclick="delLinkCat('+ci+')" style="font-size:11px;color:#dc2626">🗑 삭제</button>';
+      h+='<button class="btn btn-s" onclick="delLinkCat('+ci+')" style="background:#fff;border:1.5px solid currentColor;font-size:11px;color:#dc2626">🗑 삭제</button>';
       h+='</div></div>';
       var items=cat.items||[];
       if(items.length){
@@ -22390,7 +22390,7 @@ function dLinkTabs(){
           h+='<td style="padding:6px 8px;max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#2563eb;font-size:11px">'+esc(it.url||"")+'</td>';
           h+='<td style="padding:6px 8px;text-align:right">';
           h+='<button class="btn btn-s" onclick="popLinkItem('+ci+','+ii+')" style="font-size:11px">✏️</button> ';
-          h+='<button class="btn btn-s" onclick="delLinkItem('+ci+','+ii+')" style="font-size:11px;color:#dc2626">🗑</button>';
+          h+='<button class="btn btn-s" onclick="delLinkItem('+ci+','+ii+')" style="background:#fff;border:1.5px solid currentColor;font-size:11px;color:#dc2626">🗑</button>';
           if(ii>0) h+=' <button class="btn btn-s" onclick="moveLinkItem('+ci+','+ii+',-1)" style="font-size:11px">▲</button>';
           if(ii<items.length-1) h+=' <button class="btn btn-s" onclick="moveLinkItem('+ci+','+ii+',1)" style="font-size:11px">▼</button>';
           h+='</td></tr>';
@@ -22399,7 +22399,7 @@ function dLinkTabs(){
       } else {
         h+='<div style="color:#94a3b8;font-size:12px;padding:8px">항목 없음</div>';
       }
-      h+='<button class="btn btn-s" onclick="popLinkItem('+ci+',-1)" style="margin-top:8px;font-size:12px;color:#2563eb">➕ 항목 추가</button>';
+      h+='<button class="btn btn-s" onclick="popLinkItem('+ci+',-1)" style="background:#fff;border:1.5px solid currentColor;margin-top:8px;font-size:12px;color:#2563eb">➕ 항목 추가</button>';
       h+='</div>';
     });
   }
@@ -22892,7 +22892,7 @@ function popNotice(){
   h+='<div id="nCostBox" style="display:none;padding:10px;background:#fef3c7;border-radius:8px;font-size:12px;color:#78350f">';
   h+='<span id="nCostTxt">-</span></div>';
   h+='</div>';
-  h+='<div style="text-align:right;margin-top:14px"><button class="btn" style="background:#94a3b8;color:#fff" onclick="closePopup()">취소</button> <button class="btn btn-b" onclick="addNotice()">등록 및 발송</button></div>';
+  h+='<div style="text-align:right;margin-top:14px"><button class="btn" style="background:#475569;color:#fff" onclick="closePopup()">취소</button> <button class="btn btn-b" onclick="addNotice()">등록 및 발송</button></div>';
   openPopup(h,660);
 }
 function _incChange(){
@@ -23398,7 +23398,7 @@ function edNotice(id){
   h+='<div id="nCostBox" style="display:none;padding:10px;background:#fef3c7;border-radius:8px;font-size:12px;color:#78350f">';
   h+='<span id="nCostTxt">-</span></div>';
   h+='</div>';
-  h+='<div style="text-align:right;margin-top:14px"><button class="btn" style="background:#94a3b8;color:#fff" onclick="closePopup()">취소</button> <button class="btn btn-b" onclick="updNotice(\''+id+'\')">저장 및 발송</button></div>';
+  h+='<div style="text-align:right;margin-top:14px"><button class="btn" style="background:#475569;color:#fff" onclick="closePopup()">취소</button> <button class="btn btn-b" onclick="updNotice(\''+id+'\')">저장 및 발송</button></div>';
   openPopup(h,660);
 }
 async function updNotice(id){
@@ -23502,7 +23502,7 @@ async function showDbInfo(){
   h+='<div style="display:flex;gap:6px;flex-wrap:wrap">';
   h+='<button class="btn btn-b" onclick="_cpyDbUrl()">📋 URL 복사</button>';
   h+='<a href="'+esc(r.url)+'" target="_blank" class="btn" style="background:#16a34a;color:#fff;text-decoration:none">↗ 스프레드 열기</a>';
-  h+='<button class="btn" style="background:#94a3b8;color:#fff;margin-left:auto" onclick="closePopup()">닫기</button>';
+  h+='<button class="btn" style="background:#475569;color:#fff;margin-left:auto" onclick="closePopup()">닫기</button>';
   h+='</div>';
   h+='<div style="margin-top:12px;padding:10px;background:#fff7ed;border-radius:8px;font-size:11px;color:#9a3412">💡 <b>이 URL이 진짜 앱 DB입니다.</b> 브라우저에서 열려있는 다른 스프레드가 있다면 그건 DB가 아닐 수 있어요. 여기 표시된 URL을 클릭해서 열어야 맞는 시트에서 작업하게 됩니다.</div>';
   openPopup(h,680);
@@ -23541,7 +23541,7 @@ async function popLabels(){
   h+='<div><label>일반자 이름 (예: 단원, 반원, 회원, 일반)</label><input type="text" id="lblMem" value="'+esc(mem)+'" maxlength="10" placeholder="단원"></div>';
   h+='</div>';
   h+='<div style="margin-top:14px;text-align:right">';
-  h+='<button class="btn" style="background:#94a3b8;color:#fff" onclick="closePopup()">취소</button> ';
+  h+='<button class="btn" style="background:#475569;color:#fff" onclick="closePopup()">취소</button> ';
   h+='<button class="btn btn-b" onclick="saveLabels()">💾 저장</button>';
   h+='</div>';
   openPopup(h,640);
@@ -23615,7 +23615,7 @@ function _renderGroupsModal(){
     });
     h+='</tbody></table></div>';
   }
-  h+='<div style="margin-top:14px;text-align:right"><button class="btn" style="background:#94a3b8;color:#fff" onclick="closePopup();draw()">닫기</button></div>';
+  h+='<div style="margin-top:14px;text-align:right"><button class="btn" style="background:#475569;color:#fff" onclick="closePopup();draw()">닫기</button></div>';
   openPopup(h,720);
 }
 async function addGroupX(){
@@ -23715,7 +23715,7 @@ async function checkSmsCfg(){
   h+='<button class="btn" style="background:#059669;color:#fff" onclick="_fixCfgLabels()">🔄 A열 자동 정리</button>';
   if(missing.length)h+='<span style="color:#dc2626;font-weight:700">⚠️ 누락: '+missing.length+'개</span>';
   else h+='<span style="color:#16a34a;font-weight:700">✅ 모든 키 입력됨</span>';
-  h+='<button class="btn" style="background:#94a3b8;color:#fff;margin-left:auto" onclick="closePopup()">닫기</button>';
+  h+='<button class="btn" style="background:#475569;color:#fff;margin-left:auto" onclick="closePopup()">닫기</button>';
   h+='</div>';
   h+='<div style="margin-top:10px;padding:10px;background:#fef3c7;border-radius:8px;font-size:11px;color:#78350f">💡 <b>사용법:</b> "🔄 A열 자동 정리"를 누르면 7개의 필요한 키 이름이 A열에 자동 추가됩니다. 이미 있으면 건들지 않음. 그 다음 Config 시트에서 각 키 옆 <b>B열에만 값을 입력</b>하면 됩니다.</div>';
   openPopup(h,720);
