@@ -17,6 +17,11 @@ function _thNorm(t){
   if(!_thOk(o.c1)) o.c1 = TH_DEF.c1; if(!_thOk(o.c2)) o.c2 = TH_DEF.c2; if(o.bar && !_thOk(o.bar)) o.bar = "";
   if(!/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+\/=]+$/.test(String(o.photo || ""))) o.photo = "";
   o.dim = Math.max(0, Math.min(85, Number(o.dim) || 0)); o.pat = o.pat !== false;
+  o.pfit = o.pfit === "size" ? "size" : "cover";
+  o.pz = Math.max(20, Math.min(200, Number(o.pz) || 100));
+  o.px = Math.max(0, Math.min(100, o.px == null || o.px === "" ? 50 : Number(o.px)));
+  o.py = Math.max(0, Math.min(100, o.py == null || o.py === "" ? 50 : Number(o.py)));
+  if(o.fill && !_thOk(o.fill)) o.fill = "";
   o.slogan = String(o.slogan || "").slice(0, 60);
   o.title = String(o.title || "").slice(0, 40); o.sub = String(o.sub || "").slice(0, 60);
   if(o.box && !_thOk(o.box)) o.box = ""; if(o.pt && !_thOk(o.pt)) o.pt = "";
@@ -24,10 +29,12 @@ function _thNorm(t){
   return o;
 }
 // 로그인 배경 (base 는 index.html 기본 CSS 그대로 → "")
+// 사진이 화면보다 작을 때 남는 곳 색
+function _thFill(t){ return (t.mode === "photo" && t.fill) ? t.fill : TH_B.c2; }
 function _thBg(t){
   var pat = t.pat;
   if(t.mode === "color") return (pat ? (TH_B.sky ? "var(--thSky) center bottom/100% auto no-repeat," : "") + "var(--thGrid)," : "") + "linear-gradient(160deg," + t.c1 + "," + t.c2 + ")";
-  if(t.mode === "photo" && t.photo){ var d = (t.dim / 100).toFixed(2); return (pat ? "var(--thGrid)," : "") + "linear-gradient(rgba(0,0,0," + d + "),rgba(0,0,0," + d + ")),url(" + t.photo + ") center/cover no-repeat"; }
+  if(t.mode === "photo" && t.photo){ var d = (t.dim / 100).toFixed(2); return (pat ? "var(--thGrid)," : "") + "linear-gradient(rgba(0,0,0," + d + "),rgba(0,0,0," + d + ")),url(" + t.photo + ") " + t.px + "% " + t.py + "%/" + (t.pfit === "size" ? t.pz + "% auto" : "cover") + " no-repeat"; }
   return "";
 }
 function _thEsc(s){ return String(s == null ? "" : s).replace(/[&<>"']/g, function(c){ return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
@@ -61,7 +68,7 @@ var TH_LAST = null;
 function _thApply(t){
   t = _thNorm(t); TH_LAST = t;
   var css = "", bg = _thBg(t);
-  if(bg) css += "#loginPage{background:" + bg + "!important;background-color:" + TH_B.c2 + "!important}";
+  if(bg) css += "#loginPage{background:" + bg + "!important;background-color:" + _thFill(t) + "!important}";
   if(t.bar) css += ".topBar{background:var(--thGrid)," + t.bar + "!important}.cat-btn.on{background:" + t.bar + "!important}#loginBtn{background:" + t.bar + "!important}";
   css += _thBoxCss(t);
   var st = document.getElementById("thStyle");
@@ -123,6 +130,18 @@ function dTheme(){
       h += '<label style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;border:3px dashed #94a3b8;border-radius:8px;cursor:pointer;min-height:90px;color:#334155;font-weight:800;font-size:13px;background:#f8fafc">➕ 새 사진 올리기<span style="font-weight:400;font-size:11px;color:#64748b">자동으로 줄여서 보관</span><input type="file" accept="image/*" style="display:none" onchange="thPhoto(this)"></label>';
       h += '</div>';
     }
+    if(t.photo){
+      var S = function(k, lab, min, max, v, unit, hint){ return '<label style="display:block;margin-top:6px;font-size:13px">' + lab + ' <b id="thV_' + k + '">' + v + unit + '</b>' + (hint ? ' <span class="mut" style="font-size:12px">' + hint + '</span>' : '') + '<input type="range" min="' + min + '" max="' + max + '" value="' + v + '" oninput="document.getElementById(\'thV_' + k + '\').textContent=this.value+\'' + unit + '\';thSet(\'' + k + '\',Number(this.value))" style="width:100%"></label>'; };
+      h += '<div style="margin-top:12px;padding:10px;border:1px solid #e5e7eb;border-radius:8px;background:#f8fafc"><div style="font-size:13px;font-weight:700;margin-bottom:6px">🔍 사진 크기 · 위치 <span class="mut" style="font-weight:400;font-size:12px">— 실제 로그인 화면에도 그대로 적용</span></div>';
+      h += '<div style="display:flex;gap:6px;flex-wrap:wrap">' + B(t.pfit === "cover" ? "#1e3a8a" : "#94a3b8", "🖼 화면 꽉 채우기", "TH_ED.pfit=\'cover\';draw()", "padding:5px 10px") + B(t.pfit === "size" ? "#1e3a8a" : "#94a3b8", "🔍 크기 직접 정하기", "TH_ED.pfit=\'size\';draw()", "padding:5px 10px") + '</div>';
+      if(t.pfit === "size"){
+        h += S("pz", "사진 크기", 20, 200, t.pz, "%", "100% = 화면 너비만큼 · 줄이면 작게");
+        h += '<label style="display:flex;align-items:center;gap:8px;margin-top:6px;font-size:13px">사진 밖 남는 곳 색 <input type="color" value="' + (t.fill || TH_B.c2) + '" oninput="thSet(\'fill\',this.value)"></label>';
+      }
+      h += S("px", "가로 위치", 0, 100, t.px, "%", "0 = 왼쪽 · 100 = 오른쪽");
+      h += S("py", "세로 위치", 0, 100, t.py, "%", "0 = 위 · 100 = 아래");
+      h += '<div style="margin-top:6px">' + B("#64748b", "↺ 크기·위치 처음대로", "TH_ED.pfit=\'cover\';TH_ED.pz=100;TH_ED.px=50;TH_ED.py=50;TH_ED.fill=\'\';draw()", "padding:4px 10px;font-size:12px") + '</div></div>';
+    }
     h += '<label style="display:block;margin-top:10px;font-size:13px">사진 어둡게 <b id="thDimV">' + t.dim + '%</b> <span class="mut" style="font-size:12px">— 글씨가 잘 보이게</span><input type="range" min="0" max="85" value="' + t.dim + '" oninput="document.getElementById(\'thDimV\').textContent=this.value+\'%\';thSet(\'dim\',this.value)" style="width:100%"></label>';
     if(!t.photo) h += '<div style="margin-top:6px;font-size:12.5px;color:#92400e">⚠️ 사진을 골라 주세요 (없으면 기본 배경으로 보여요)</div>';
   }
@@ -151,7 +170,7 @@ function _thPrevInner(t, opt){
   var bg = _thBg(t) || (TH_B.sky ? "var(--hsSky) center bottom/100% auto no-repeat,var(--hsGrid),radial-gradient(ellipse at 30% 20%,rgba(255,214,160,.18),transparent 60%),linear-gradient(160deg,#7c4a21,#5b3416 55%,#3b220e)" : "linear-gradient(135deg," + TH_B.c1 + "," + TH_B.c2 + ")");
   var bar = t.bar || TH_B.bar;
   var h = (opt.full ? '<div style="display:flex;flex-direction:column;height:100%">' : '') + '<div style="background:' + (TH_B.sky ? "var(--thGrid)," : "") + bar + ';color:#fff;padding:8px 12px;font-size:13px;font-weight:700;flex:0 0 auto">' + esc((typeof SYS_ICON !== "undefined" ? SYS_ICON : "") + " " + (typeof SYS_NAME !== "undefined" ? SYS_NAME : "")) + ' <span style="font-weight:400;opacity:.8;font-size:11px">— 상단바</span></div>';
-  h += '<div style="' + (opt.full ? "flex:1;min-height:0;" : "aspect-ratio:16/9;min-height:190px;") + 'overflow:hidden;display:flex;align-items:center;justify-content:center;background:' + bg + ';background-color:' + TH_B.c2 + '">';
+  h += '<div style="' + (opt.full ? "flex:1;min-height:0;" : "aspect-ratio:16/9;min-height:190px;") + 'overflow:hidden;display:flex;align-items:center;justify-content:center;background:' + bg + ';background-color:' + _thFill(t) + '">';
   var bxc = t.box ? _thRgb(t.box) : [255, 253, 249], dk = t.box && _thDark(t.box), pc = t.pt || TH_B.accent;
   h += '<div style="background:rgba(' + bxc.join(",") + ',' + (t.boxOp / 100) + ');border-radius:12px;padding:18px 20px;width:' + (opt.full ? 340 : 220) + 'px;max-width:88%;transform:scale(' + (opt.scale || 0.68) + ');box-shadow:0 10px 30px rgba(0,0,0,.35);border-top:5px solid ' + pc + ';text-align:center"><div style="font-weight:800;color:' + (t.pt || TH_B.bar) + ';font-size:14px">' + esc(t.title || (typeof SYS_TITLE !== "undefined" ? SYS_TITLE : (typeof SYS_NAME !== "undefined" ? SYS_NAME : "") + " 관리시스템")) + '</div>';
   h += '<div style="font-size:10px;color:' + (dk ? "#cbd5e1" : "#888") + ';margin:2px 0 6px">' + esc(t.sub || (typeof SYS_LOGIN_SUB !== "undefined" ? SYS_LOGIN_SUB : "로그인 화면")) + '</div>' + (t.slogan ? '<div style="font-size:12px;font-weight:700;color:' + (t.pt || "#92400e") + ';margin-bottom:8px">' + esc(t.slogan) + '</div>' : '');
