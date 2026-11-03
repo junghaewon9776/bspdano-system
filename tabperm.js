@@ -104,6 +104,7 @@ function _tpAllTabs(){
     { c: "⚙️ 시스템", t: [["notice", "공지"], ["acct", "계정관리"], ["myinfo", "내 정보"], ["evtMgr", W + "관리"], ["forms", "폼 관리"], ["linkTabs", "🔗 연동 탭"], ["modMgr", "📦 모듈 관리"], ["tabPerm", "🙈 계정별 탭 권한"]] }
   ];
   if(typeof dTheme === "function") L[L.length - 1].t.push(["theme", "🎨 화면 꾸미기"]);
+  if(typeof dKids === "function") L.push({ c: "👦 아이들", t: [["kids", "공부 기록"]] });
   if(typeof _modDefs !== "undefined" && _modDefs){ var m = Object.keys(_modDefs).map(function(k){ var d = _modDefs[k]; return ["mod_" + k, (d.icon ? d.icon + " " : "") + (d.label || k)]; }); if(m.length) L.push({ c: "📦 커스텀 모듈", t: m }); }
   if(typeof _getCustomTabs === "function"){ try { var ct = []; _getCustomTabs().forEach(function(cat){ (cat.items || []).forEach(function(it, ii){ ct.push(["ct_" + cat.id + "_" + ii, (cat.label || "") + " › " + (it.label || "")]); }); }); if(ct.length) L.push({ c: "🔗 연동 탭", t: ct }); } catch(e){} }
   if(typeof FIELD_MENU !== "undefined" && FIELD_MENU === "on") L.push({ c: "📍 현장", t: [["field_layout", "축제 배치도"], ["field_monitor", "본부 모니터링"], ["field_admin", "코스 관리"], ["field_today", "오늘의 운영"]] });
