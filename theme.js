@@ -118,11 +118,15 @@ function thPhoto(inp){
   rd.onload = function(){
     var img = new Image();
     img.onload = function(){
-      var W = 1600, r = Math.min(1, W / img.width), cv = document.createElement("canvas");
+      // 큰 모니터에서도 선명하게: 가로 2560까지, WebP(되는 기기) 고화질 → 안 되면 JPEG
+      var W = 2560, r = Math.min(1, W / img.width), cv = document.createElement("canvas");
       cv.width = Math.round(img.width * r); cv.height = Math.round(img.height * r);
-      cv.getContext("2d").drawImage(img, 0, 0, cv.width, cv.height);
-      var q = 0.78, d = cv.toDataURL("image/jpeg", q);
-      while(d.length > 600000 && q > 0.35){ q -= 0.1; d = cv.toDataURL("image/jpeg", q); }   // DB 에 넣기 좋게 600KB 아래로
+      var g2 = cv.getContext("2d"); g2.imageSmoothingQuality = "high"; g2.drawImage(img, 0, 0, cv.width, cv.height);
+      var MAX = 1300000, q = 0.92, d = cv.toDataURL("image/webp", q), fmt = d.indexOf("data:image/webp") === 0 ? "image/webp" : "image/jpeg";
+      if(fmt !== "image/webp") d = cv.toDataURL(fmt, q);
+      while(d.length > MAX && q > 0.5){ q -= 0.06; d = cv.toDataURL(fmt, q); }
+      // 원본이 이미 알맞은 크기면 다시 압축하지 않고 그대로 (화질 그대로)
+      if(r === 1 && /^data:image\/(jpeg|png|webp);base64,/.test(rd.result) && rd.result.length <= MAX) d = rd.result;
       // 작은 미리보기 (목록용)
       var tw = 320, tr = tw / cv.width, tc = document.createElement("canvas"); tc.width = tw; tc.height = Math.round(cv.height * tr);
       tc.getContext("2d").drawImage(cv, 0, 0, tc.width, tc.height);
