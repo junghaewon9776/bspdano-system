@@ -115,7 +115,7 @@ function dTheme(){
       ids.forEach(function(id){
         var p = TH_LIB[id], on = t.photoId === id;
         h += '<div style="position:relative;border:3px solid ' + (on ? "#16a34a" : "#e5e7eb") + ';border-radius:8px;overflow:hidden;cursor:pointer;background:#000" onclick="thUse(\'' + id + '\')" title="' + esc(p.nm || "") + '">';
-        h += '<img src="' + p.thumb + '" alt="" style="display:block;width:100%;aspect-ratio:16/9;object-fit:cover">';
+        h += '<img src="' + p.thumb + '" alt="" style="display:block;width:100%;aspect-ratio:16/9;object-fit:contain;background:#000">';
         if(on) h += '<span style="position:absolute;left:4px;top:4px;background:#16a34a;color:#fff;font-size:11px;font-weight:800;padding:2px 6px;border-radius:5px">✅ 고름</span>';
         h += '<button class="btn" style="position:absolute;right:4px;top:4px;background:#b91c1c;color:#fff;padding:2px 7px;font-size:12px" onclick="event.stopPropagation();thDelPhoto(\'' + id + '\')" title="지우기">🗑</button>';
         h += '<div style="font-size:11px;color:#fff;background:rgba(0,0,0,.55);padding:2px 5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(p.nm || "사진") + '</div></div>';
@@ -142,21 +142,43 @@ function dTheme(){
   h += '<div style="font-weight:700;margin:16px 0 6px">④ 상단바 · 버튼 색</div><label style="font-size:13px"><input type="checkbox" ' + (t.bar ? "checked" : "") + ' onchange="TH_ED.bar=this.checked?TH_B.bar:\'\';draw()"> 직접 고르기</label>' + (t.bar ? ' <input type="color" value="' + t.bar + '" oninput="thSet(\'bar\',this.value)" style="margin-left:8px">' : ' <span class="mut" style="font-size:12px">(기본색)</span>');
   h += '</div>';
   // 오른쪽: 미리보기
-  h += '<div class="card"><div style="font-weight:700;margin-bottom:8px">👀 미리보기</div><div id="thPrev" style="border-radius:10px;overflow:hidden;border:1px solid #e5e7eb">' + _thPrevInner(t) + '</div><div class="mut" style="font-size:12px;margin-top:6px">저장 전까지는 여기서만 바뀌어요.</div></div>';
+  h += '<div class="card"><div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:8px"><b style="margin-right:auto">👀 미리보기</b>' + B("#475569", "➖", "thZoom(-1)", "padding:4px 12px") + '<b id="thZoomV" style="min-width:46px;text-align:center;font-size:13px">' + Math.round(TH_ZOOM * 100) + '%</b>' + B("#475569", "➕", "thZoom(1)", "padding:4px 12px") + B("#1e3a8a", "🖥 크게 보기", "thFull('pc')", "padding:4px 10px") + B("#0f766e", "📱 폰으로 보기", "thFull('phone')", "padding:4px 10px") + '</div><div id="thPrevWrap" style="overflow:auto;max-height:75vh;border-radius:10px;border:1px solid #e5e7eb"><div id="thPrev" style="width:' + Math.round(TH_ZOOM * 100) + '%">' + _thPrevInner(t) + '</div></div><div class="mut" style="font-size:12px;margin-top:6px">저장 전까지는 여기서만 바뀌어요.</div></div>';
   h += '</div>';
   return h;
 }
-function _thPrevInner(t){
+function _thPrevInner(t, opt){
+  opt = opt || {};
   var bg = _thBg(t) || (TH_B.sky ? "var(--hsSky) center bottom/100% auto no-repeat,var(--hsGrid),radial-gradient(ellipse at 30% 20%,rgba(255,214,160,.18),transparent 60%),linear-gradient(160deg,#7c4a21,#5b3416 55%,#3b220e)" : "linear-gradient(135deg," + TH_B.c1 + "," + TH_B.c2 + ")");
   var bar = t.bar || TH_B.bar;
-  var h = '<div style="background:' + (TH_B.sky ? "var(--thGrid)," : "") + bar + ';color:#fff;padding:8px 12px;font-size:13px;font-weight:700">' + esc((typeof SYS_ICON !== "undefined" ? SYS_ICON : "") + " " + (typeof SYS_NAME !== "undefined" ? SYS_NAME : "")) + ' <span style="font-weight:400;opacity:.8;font-size:11px">— 상단바</span></div>';
-  h += '<div style="height:300px;display:flex;align-items:center;justify-content:center;background:' + bg + ';background-color:' + TH_B.c2 + '">';
+  var h = (opt.full ? '<div style="display:flex;flex-direction:column;height:100%">' : '') + '<div style="background:' + (TH_B.sky ? "var(--thGrid)," : "") + bar + ';color:#fff;padding:8px 12px;font-size:13px;font-weight:700;flex:0 0 auto">' + esc((typeof SYS_ICON !== "undefined" ? SYS_ICON : "") + " " + (typeof SYS_NAME !== "undefined" ? SYS_NAME : "")) + ' <span style="font-weight:400;opacity:.8;font-size:11px">— 상단바</span></div>';
+  h += '<div style="' + (opt.full ? "flex:1;min-height:0;" : "aspect-ratio:16/9;min-height:190px;") + 'overflow:hidden;display:flex;align-items:center;justify-content:center;background:' + bg + ';background-color:' + TH_B.c2 + '">';
   var bxc = t.box ? _thRgb(t.box) : [255, 253, 249], dk = t.box && _thDark(t.box), pc = t.pt || TH_B.accent;
-  h += '<div style="background:rgba(' + bxc.join(",") + ',' + (t.boxOp / 100) + ');border-radius:12px;padding:18px 20px;width:220px;box-shadow:0 10px 30px rgba(0,0,0,.35);border-top:5px solid ' + pc + ';text-align:center"><div style="font-weight:800;color:' + (t.pt || TH_B.bar) + ';font-size:14px">' + esc(t.title || (typeof SYS_TITLE !== "undefined" ? SYS_TITLE : (typeof SYS_NAME !== "undefined" ? SYS_NAME : "") + " 관리시스템")) + '</div>';
+  h += '<div style="background:rgba(' + bxc.join(",") + ',' + (t.boxOp / 100) + ');border-radius:12px;padding:18px 20px;width:' + (opt.full ? 340 : 220) + 'px;max-width:88%;transform:scale(' + (opt.scale || 0.68) + ');box-shadow:0 10px 30px rgba(0,0,0,.35);border-top:5px solid ' + pc + ';text-align:center"><div style="font-weight:800;color:' + (t.pt || TH_B.bar) + ';font-size:14px">' + esc(t.title || (typeof SYS_TITLE !== "undefined" ? SYS_TITLE : (typeof SYS_NAME !== "undefined" ? SYS_NAME : "") + " 관리시스템")) + '</div>';
   h += '<div style="font-size:10px;color:' + (dk ? "#cbd5e1" : "#888") + ';margin:2px 0 6px">' + esc(t.sub || (typeof SYS_LOGIN_SUB !== "undefined" ? SYS_LOGIN_SUB : "로그인 화면")) + '</div>' + (t.slogan ? '<div style="font-size:12px;font-weight:700;color:' + (t.pt || "#92400e") + ';margin-bottom:8px">' + esc(t.slogan) + '</div>' : '');
   var ib = dk ? "background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.25)" : "border:1px solid #ddd";
-  h += '<div style="height:24px;' + ib + ';border-radius:6px;margin:6px 0"></div><div style="height:24px;' + ib + ';border-radius:6px;margin:6px 0"></div><div style="height:28px;border-radius:6px;background:' + (t.pt || t.bar || TH_B.accent) + ';color:' + (t.pt && !_thDark(t.pt) ? "#111" : "#fff") + ';font-size:12px;font-weight:700;line-height:28px">로그인</div></div></div>';
+  h += '<div style="height:24px;' + ib + ';border-radius:6px;margin:6px 0"></div><div style="height:24px;' + ib + ';border-radius:6px;margin:6px 0"></div><div style="height:28px;border-radius:6px;background:' + (t.pt || t.bar || TH_B.accent) + ';color:' + (t.pt && !_thDark(t.pt) ? "#111" : "#fff") + ';font-size:12px;font-weight:700;line-height:28px">로그인</div></div></div>' + (opt.full ? '</div>' : '');
   return h;
+}
+// 🔍 미리보기 확대·축소 + 크게 보기(컴퓨터 화면 / 폰 화면 그대로)
+var TH_ZOOM = 1;
+function thZoom(d){
+  TH_ZOOM = Math.max(0.5, Math.min(3, Math.round((TH_ZOOM + d * 0.25) * 100) / 100));
+  var p = document.getElementById("thPrev"), v = document.getElementById("thZoomV");
+  if(p){ p.style.width = Math.round(TH_ZOOM * 100) + "%"; p.innerHTML = _thPrevInner(_thNorm(TH_ED)); }
+  if(v) v.textContent = Math.round(TH_ZOOM * 100) + "%";
+}
+function thFull(mode){
+  var t = _thNorm(TH_ED), old = document.getElementById("thFullBox"); if(old) old.remove();
+  var o = document.createElement("div"); o.id = "thFullBox";
+  o.style.cssText = "position:fixed;inset:0;z-index:99999;background:#111;display:flex;flex-direction:column";
+  var bar = '<div style="display:flex;gap:8px;align-items:center;padding:8px 12px;background:#0f172a;color:#fff;flex:0 0 auto"><b style="margin-right:auto">👀 ' + (mode === "phone" ? "📱 폰 화면" : "🖥 컴퓨터 화면") + ' 미리보기 <span style="font-weight:400;font-size:12px;opacity:.75">(저장 전)</span></b>'
+    + '<button class="btn" style="background:' + (mode === "pc" ? "#2563eb" : "#475569") + ';color:#fff" onclick="thFull(\'pc\')">🖥 컴퓨터</button><button class="btn" style="background:' + (mode === "phone" ? "#2563eb" : "#475569") + ';color:#fff" onclick="thFull(\'phone\')">📱 폰</button>'
+    + '<button class="btn" style="background:#b91c1c;color:#fff" onclick="document.getElementById(\'thFullBox\').remove()">✕ 닫기</button></div>';
+  var stage = mode === "phone"
+    ? '<div style="flex:1;display:flex;align-items:center;justify-content:center;padding:12px;overflow:auto"><div style="width:min(390px,92vw);aspect-ratio:9/19.5;max-height:calc(100vh - 90px);border:10px solid #000;border-radius:34px;overflow:hidden;box-shadow:0 0 0 2px #444">' + _thPrevInner(t, { full: true, scale: 0.86 }) + '</div></div>'
+    : '<div style="flex:1;overflow:hidden">' + _thPrevInner(t, { full: true, scale: 1 }) + '</div>';
+  o.innerHTML = bar + stage; document.body.appendChild(o);
+  o.addEventListener("keydown", function(e){ if(e.key === "Escape") o.remove(); });
 }
 function thSet(k, v){ TH_ED[k] = v; var p = document.getElementById("thPrev"); if(p) p.innerHTML = _thPrevInner(_thNorm(TH_ED)); }
 function thPhoto(inp){
