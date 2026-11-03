@@ -138,6 +138,7 @@ function dTheme(){
         h += S("pz", "사진 크기", 20, 200, t.pz, "%", "100% = 화면 너비만큼 · 줄이면 작게");
         h += '<label style="display:flex;align-items:center;gap:8px;margin-top:6px;font-size:13px">사진 밖 남는 곳 색 <input type="color" value="' + (t.fill || TH_B.c2) + '" oninput="thSet(\'fill\',this.value)"></label>';
       }
+      if(t.pfit === "cover") h += '<div class="mut" style="font-size:12px;margin-top:6px">↓ 꽉 채우기에서는 화면에서 잘리는 쪽(주로 폰)에서 움직여요 — 아래 📱 작은 화면으로 확인</div>';
       h += S("px", "가로 위치", 0, 100, t.px, "%", "0 = 왼쪽 · 100 = 오른쪽");
       h += S("py", "세로 위치", 0, 100, t.py, "%", "0 = 위 · 100 = 아래");
       h += '<div style="margin-top:6px">' + B("#64748b", "↺ 크기·위치 처음대로", "TH_ED.pfit=\'cover\';TH_ED.pz=100;TH_ED.px=50;TH_ED.py=50;TH_ED.fill=\'\';draw()", "padding:4px 10px;font-size:12px") + '</div></div>';
@@ -161,7 +162,9 @@ function dTheme(){
   h += '<div style="font-weight:700;margin:16px 0 6px">④ 상단바 · 버튼 색</div><label style="font-size:13px"><input type="checkbox" ' + (t.bar ? "checked" : "") + ' onchange="TH_ED.bar=this.checked?TH_B.bar:\'\';draw()"> 직접 고르기</label>' + (t.bar ? ' <input type="color" value="' + t.bar + '" oninput="thSet(\'bar\',this.value)" style="margin-left:8px">' : ' <span class="mut" style="font-size:12px">(기본색)</span>');
   h += '</div>';
   // 오른쪽: 미리보기
-  h += '<div class="card"><div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:8px"><b style="margin-right:auto">👀 미리보기</b>' + B("#475569", "➖", "thZoom(-1)", "padding:4px 12px") + '<b id="thZoomV" style="min-width:46px;text-align:center;font-size:13px">' + Math.round(TH_ZOOM * 100) + '%</b>' + B("#475569", "➕", "thZoom(1)", "padding:4px 12px") + B("#1e3a8a", "🖥 크게 보기", "thFull('pc')", "padding:4px 10px") + B("#0f766e", "📱 폰으로 보기", "thFull('phone')", "padding:4px 10px") + '</div><div id="thPrevWrap" style="overflow:auto;max-height:75vh;border-radius:10px;border:1px solid #e5e7eb"><div id="thPrev" style="width:' + Math.round(TH_ZOOM * 100) + '%">' + _thPrevInner(t) + '</div></div><div class="mut" style="font-size:12px;margin-top:6px">저장 전까지는 여기서만 바뀌어요.</div></div>';
+  h += '<div class="card"><div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:8px"><b style="margin-right:auto">👀 미리보기</b>' + B("#475569", "➖", "thZoom(-1)", "padding:4px 12px") + '<b id="thZoomV" style="min-width:46px;text-align:center;font-size:13px">' + Math.round(TH_ZOOM * 100) + '%</b>' + B("#475569", "➕", "thZoom(1)", "padding:4px 12px") + B("#1e3a8a", "🖥 크게 보기", "thFull('pc')", "padding:4px 10px") + B("#0f766e", "📱 폰으로 보기", "thFull('phone')", "padding:4px 10px") + '</div><div id="thPrevWrap" style="overflow:auto;max-height:75vh;border-radius:10px;border:1px solid #e5e7eb"><div id="thPrev" style="width:' + Math.round(TH_ZOOM * 100) + '%">' + _thPrevInner(t) + '</div></div>'
+    + '<div style="display:flex;gap:10px;align-items:flex-start;margin-top:8px"><div id="thPrevPhone" style="flex:0 0 118px;aspect-ratio:9/19.5;border:5px solid #000;border-radius:16px;overflow:hidden">' + _thPrevInner(t, { full: true, scale: 0.34 }) + '</div>'
+    + '<div class="mut" style="font-size:12px;line-height:1.6">📱 폰에서 보이는 모습이에요.<br>컴퓨터 화면은 사진과 모양이 비슷해서 <b>「꽉 채우기」일 땐 가로·세로 위치가 거의 안 움직여요.</b> 폰처럼 세로로 긴 화면에서 <b>어느 부분을 보여 줄지</b> 정하는 거라 여기 폰 화면에서 바뀌어요.<br>컴퓨터에서도 옮기고 싶으면 「🔍 크기 직접 정하기」로 크기를 바꿔 주세요.</div></div><div class="mut" style="font-size:12px;margin-top:6px">저장 전까지는 여기서만 바뀌어요.</div></div>';
   h += '</div>';
   return h;
 }
@@ -199,7 +202,7 @@ function thFull(mode){
   o.innerHTML = bar + stage; document.body.appendChild(o);
   o.addEventListener("keydown", function(e){ if(e.key === "Escape") o.remove(); });
 }
-function thSet(k, v){ TH_ED[k] = v; var p = document.getElementById("thPrev"); if(p) p.innerHTML = _thPrevInner(_thNorm(TH_ED)); }
+function thSet(k, v){ TH_ED[k] = v; var p = document.getElementById("thPrev"); if(p) p.innerHTML = _thPrevInner(_thNorm(TH_ED)); var pp = document.getElementById("thPrevPhone"); if(pp) pp.innerHTML = _thPrevInner(_thNorm(TH_ED), { full: true, scale: 0.34 }); }
 function thPhoto(inp){
   var f = inp.files && inp.files[0]; if(!f) return;
   var rd = new FileReader();
