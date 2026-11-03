@@ -71,7 +71,23 @@ function dTheme(){
     h += '</div>';
   }
   if(t.mode === "photo"){
-    h += '<div style="margin-top:12px;font-size:13px"><input type="file" accept="image/*" onchange="thPhoto(this)"> <span class="mut" style="font-size:12px">현장·회사 사진 (자동으로 줄여서 저장)</span></div>';
+    // 🖼 등록해 둔 사진들 — 눌러서 고르기 · 🗑 지우기 · ➕ 새로 올리기
+    if(!TH_LIB){ _thLibLoad(); h += '<div class="mut" style="margin-top:12px;font-size:13px">📡 등록한 사진 불러오는 중...</div>'; }
+    else {
+      var ids = Object.keys(TH_LIB).sort(function(a, b){ return String(TH_LIB[b].at || "").localeCompare(String(TH_LIB[a].at || "")); });
+      h += '<div style="font-size:13px;font-weight:700;margin:12px 0 6px">🖼 등록한 사진 <span class="mut" style="font-weight:400;font-size:12px">' + ids.length + '장 · 눌러서 고르기</span></div>';
+      h += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px">';
+      ids.forEach(function(id){
+        var p = TH_LIB[id], on = t.photoId === id;
+        h += '<div style="position:relative;border:3px solid ' + (on ? "#16a34a" : "#e5e7eb") + ';border-radius:8px;overflow:hidden;cursor:pointer;background:#000" onclick="thUse(\'' + id + '\')" title="' + esc(p.nm || "") + '">';
+        h += '<img src="' + p.thumb + '" alt="" style="display:block;width:100%;aspect-ratio:16/9;object-fit:cover">';
+        if(on) h += '<span style="position:absolute;left:4px;top:4px;background:#16a34a;color:#fff;font-size:11px;font-weight:800;padding:2px 6px;border-radius:5px">✅ 고름</span>';
+        h += '<button class="btn" style="position:absolute;right:4px;top:4px;background:#b91c1c;color:#fff;padding:2px 7px;font-size:12px" onclick="event.stopPropagation();thDelPhoto(\'' + id + '\')" title="지우기">🗑</button>';
+        h += '<div style="font-size:11px;color:#fff;background:rgba(0,0,0,.55);padding:2px 5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(p.nm || "사진") + '</div></div>';
+      });
+      h += '<label style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;border:3px dashed #94a3b8;border-radius:8px;cursor:pointer;min-height:90px;color:#334155;font-weight:800;font-size:13px;background:#f8fafc">➕ 새 사진 올리기<span style="font-weight:400;font-size:11px;color:#64748b">자동으로 줄여서 보관</span><input type="file" accept="image/*" style="display:none" onchange="thPhoto(this)"></label>';
+      h += '</div>';
+    }
     h += '<label style="display:block;margin-top:10px;font-size:13px">사진 어둡게 <b id="thDimV">' + t.dim + '%</b> <span class="mut" style="font-size:12px">— 글씨가 잘 보이게</span><input type="range" min="0" max="85" value="' + t.dim + '" oninput="document.getElementById(\'thDimV\').textContent=this.value+\'%\';thSet(\'dim\',this.value)" style="width:100%"></label>';
     if(!t.photo) h += '<div style="margin-top:6px;font-size:12.5px;color:#92400e">⚠️ 사진을 골라 주세요 (없으면 기본 배경으로 보여요)</div>';
   }
@@ -107,7 +123,15 @@ function thPhoto(inp){
       cv.getContext("2d").drawImage(img, 0, 0, cv.width, cv.height);
       var q = 0.78, d = cv.toDataURL("image/jpeg", q);
       while(d.length > 600000 && q > 0.35){ q -= 0.1; d = cv.toDataURL("image/jpeg", q); }   // DB 에 넣기 좋게 600KB 아래로
-      TH_ED.photo = d; draw(); toast("사진 넣었어요 (" + Math.round(d.length / 1024) + "KB) — 저장을 눌러야 적용돼요");
+      // 작은 미리보기 (목록용)
+      var tw = 320, tr = tw / cv.width, tc = document.createElement("canvas"); tc.width = tw; tc.height = Math.round(cv.height * tr);
+      tc.getContext("2d").drawImage(cv, 0, 0, tc.width, tc.height);
+      var id = "p" + Date.now().toString(36), meta = { thumb: tc.toDataURL("image/jpeg", 0.7), nm: String(f.name || "사진").replace(/\.[^.]+$/, "").slice(0, 40), at: new Date().toISOString() };
+      showLoading("사진 보관하는 중...");
+      Promise.all([fbDb.ref("/phData/_themeFull/" + id).set(d), fbDb.ref("/phData/_theme/" + id).set(meta)]).then(function(){
+        hideLoading(); TH_LIB = TH_LIB || {}; TH_LIB[id] = meta; TH_FULL[id] = d;
+        TH_ED.photo = d; TH_ED.photoId = id; draw(); toast("🖼 사진 등록했어요 (" + Math.round(d.length / 1024) + "KB) — 💾 저장을 눌러야 로그인 화면에 적용돼요");
+      }).catch(function(e){ hideLoading(); toast("사진 보관 실패: " + e.message, true); });
     };
     img.onerror = function(){ toast("이 사진은 열 수 없어요 — 다른 사진(jpg/png)으로 해 주세요", true); };
     img.src = rd.result;
@@ -124,5 +148,45 @@ function thSave(){
     try { localStorage.setItem(TH_KEY, JSON.stringify(t)); } catch(e){}
     toast("🎨 저장했어요 — 모두에게 적용돼요"); draw();
   }).catch(function(e){ hideLoading(); toast("저장 실패: " + e.message, true); });
+}
+// 🖼 사진 보관함 — /phData/_theme/{id} = {thumb, nm, at} (목록용 작은 그림) · /phData/_themeFull/{id} = 큰 사진
+//   (/main 은 모두가 늘 받아 오는 곳이라 무거운 사진은 여기 따로 둠)
+var TH_LIB = null, TH_FULL = {}, TH_LIB_LOADING = false;
+function _thLibLoad(){
+  if(TH_LIB_LOADING) return; TH_LIB_LOADING = true;
+  fbDb.ref("/phData/_theme").once("value").then(function(s){
+    TH_LIB = s.val() || {}; TH_LIB_LOADING = false;
+    // 예전에 저장해 둔 지금 사진(보관함에 없는 것)은 보관함에도 넣어 둠
+    if(TH && TH.photo && (!TH.photoId || !TH_LIB[TH.photoId])){
+      var id = "p" + Date.now().toString(36), img = new Image();
+      img.onload = function(){
+        var tc = document.createElement("canvas"); tc.width = 320; tc.height = Math.round(img.height * 320 / img.width); tc.getContext("2d").drawImage(img, 0, 0, tc.width, tc.height);
+        var meta = { thumb: tc.toDataURL("image/jpeg", 0.7), nm: "지금 쓰는 사진", at: new Date().toISOString() };
+        Promise.all([fbDb.ref("/phData/_themeFull/" + id).set(TH.photo), fbDb.ref("/phData/_theme/" + id).set(meta)]).then(function(){
+          TH_LIB[id] = meta; TH_FULL[id] = TH.photo; TH.photoId = id; if(TH_ED && TH_ED.photo === TH.photo) TH_ED.photoId = id;
+          fbDb.ref("/main/PubTheme/photoId").set(id).catch(function(){});
+          if(CTAB === "theme") draw();
+        }).catch(function(){});
+      };
+      img.src = TH.photo;
+    }
+    if(CTAB === "theme") draw();
+  }).catch(function(e){ TH_LIB_LOADING = false; TH_LIB = {}; toast("사진 목록을 못 읽었어요: " + e.message, true); });
+}
+function thUse(id){
+  var go = function(d){ TH_FULL[id] = d; TH_ED.photo = d; TH_ED.photoId = id; draw(); toast("🖼 골랐어요 — 💾 저장을 눌러야 로그인 화면에 적용돼요"); };
+  if(TH_FULL[id]) return go(TH_FULL[id]);
+  showLoading("사진 불러오는 중...");
+  fbDb.ref("/phData/_themeFull/" + id).once("value").then(function(s){ hideLoading(); if(!s.val()) return toast("사진을 찾을 수 없어요", true); go(s.val()); })
+    .catch(function(e){ hideLoading(); toast("불러오기 실패: " + e.message, true); });
+}
+function thDelPhoto(id){
+  var inUse = TH && TH.photoId === id && TH.mode === "photo";
+  if(!confirm((TH_LIB[id] && TH_LIB[id].nm ? "「" + TH_LIB[id].nm + "」 " : "") + "사진을 지울까요?" + (inUse ? "\n\n⚠️ 지금 로그인 화면에 쓰는 사진이에요. 지워도 다른 걸 골라 저장하기 전까지는 그대로 보여요." : ""))) return;
+  Promise.all([fbDb.ref("/phData/_theme/" + id).remove(), fbDb.ref("/phData/_themeFull/" + id).remove()]).then(function(){
+    delete TH_LIB[id]; delete TH_FULL[id];
+    if(TH_ED && TH_ED.photoId === id && !inUse){ TH_ED.photoId = ""; TH_ED.photo = ""; }
+    toast("🗑 사진 지웠어요"); draw();
+  }).catch(function(e){ toast("지우기 실패: " + e.message, true); });
 }
 function thReset(){ if(!confirm("처음 화면 색으로 되돌릴까요? (저장을 눌러야 적용돼요)")) return; TH_ED = _thNorm({}); draw(); }
