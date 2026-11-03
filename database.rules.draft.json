@@ -92,6 +92,10 @@
     "secure": {
       ".read": false,
       ".write": false
+    },
+    "phData": {
+      ".read": "auth != null && auth.token.sys === 'dano'",
+      ".write": "auth != null && auth.token.sys === 'dano'"
     }
   }
 }
