@@ -127,7 +127,7 @@ function dTabPerm(){
   h += '<tr style="background:#f5f0e8"><th rowspan="2" style="padding:6px 8px;text-align:left;position:sticky;left:0;background:#f5f0e8;min-width:170px;border-right:2px solid #d6d3d1">계정</th>';
   cols.forEach(function(g){ h += '<th colspan="' + g.t.length + '" style="padding:5px;border-left:2px solid #d6d3d1;white-space:nowrap">' + esc(g.c) + '</th>'; });
   h += '</tr><tr style="background:#faf7f2">';
-  cols.forEach(function(g){ g.t.forEach(function(t, i){ h += '<th style="padding:4px 3px;font-weight:600;font-size:11px;' + (i === 0 ? "border-left:2px solid #d6d3d1;" : "") + 'vertical-align:bottom"><div style="writing-mode:vertical-rl;transform:rotate(180deg);white-space:nowrap;max-height:120px;margin:0 auto">' + esc(t[1]) + '</div><button class="btn btn-s" style="background:#475569;color:#fff;padding:1px 4px;font-size:10px;margin-top:3px" title="모든 계정 같이 바꾸기 (✏️→👁→🚫)" onclick="tpCol(\'' + t[0] + '\')">⇅</button></th>'; }); });
+  cols.forEach(function(g){ g.t.forEach(function(t, i){ h += '<th style="padding:4px 3px;font-weight:600;font-size:11px;' + (i === 0 ? "border-left:2px solid #d6d3d1;" : "") + 'vertical-align:bottom"><div style="writing-mode:vertical-rl;text-orientation:upright;letter-spacing:-1px;white-space:nowrap;max-height:120px;margin:0 auto">' + esc(t[1]) + '</div><button class="btn btn-s" style="background:#475569;color:#fff;padding:1px 4px;font-size:10px;margin-top:3px" title="모든 계정 같이 바꾸기 (✏️→👁→🚫)" onclick="tpCol(\'' + t[0] + '\')">⇅</button></th>'; }); });
   h += '</tr></thead><tbody>';
   ids.forEach(function(id){
     var u = US[id], sup = u.r === "super";
