@@ -34,7 +34,13 @@ function _thFill(t){ return (t.mode === "photo" && t.fill) ? t.fill : TH_B.c2; }
 function _thBg(t){
   var pat = t.pat;
   if(t.mode === "color") return (pat ? (TH_B.sky ? "var(--thSky) center bottom/100% auto no-repeat," : "") + "var(--thGrid)," : "") + "linear-gradient(160deg," + t.c1 + "," + t.c2 + ")";
-  if(t.mode === "photo" && t.photo){ var d = (t.dim / 100).toFixed(2); return (pat ? "var(--thGrid)," : "") + "linear-gradient(rgba(0,0,0," + d + "),rgba(0,0,0," + d + ")),url(" + t.photo + ") " + t.px + "% " + t.py + "%/" + (t.pfit === "size" ? t.pz + "% auto" : "cover") + " no-repeat"; }
+  if(t.mode === "photo" && t.photo){
+    var d = (t.dim / 100).toFixed(2), dimL = "linear-gradient(rgba(0,0,0," + d + "),rgba(0,0,0," + d + "))";
+    if(t.pfit !== "size") return (pat ? "var(--thGrid)," : "") + dimL + ",url(" + t.photo + ") " + t.px + "% " + t.py + "%/cover no-repeat";
+    // 크기 직접: 작게 하면 남는 곳 — 색을 안 골랐으면 같은 사진을 어둡게 깔아 자연스럽게
+    var back = t.fill ? "" : ",linear-gradient(rgba(0,0,0,.62),rgba(0,0,0,.62)),url(" + t.photo + ") center/cover no-repeat";
+    return (pat ? "var(--thGrid)," : "") + dimL + ",url(" + t.photo + ") " + t.px + "% " + t.py + "%/" + t.pz + "% auto no-repeat" + back;
+  }
   return "";
 }
 function _thEsc(s){ return String(s == null ? "" : s).replace(/[&<>"']/g, function(c){ return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
@@ -136,7 +142,7 @@ function dTheme(){
       h += '<div style="display:flex;gap:6px;flex-wrap:wrap">' + B(t.pfit === "cover" ? "#1e3a8a" : "#94a3b8", "🖼 화면 꽉 채우기", "TH_ED.pfit=\'cover\';draw()", "padding:5px 10px") + B(t.pfit === "size" ? "#1e3a8a" : "#94a3b8", "🔍 크기 직접 정하기", "TH_ED.pfit=\'size\';draw()", "padding:5px 10px") + '</div>';
       if(t.pfit === "size"){
         h += S("pz", "사진 크기", 20, 200, t.pz, "%", "100% = 화면 너비만큼 · 줄이면 작게");
-        h += '<label style="display:flex;align-items:center;gap:8px;margin-top:6px;font-size:13px">사진 밖 남는 곳 색 <input type="color" value="' + (t.fill || TH_B.c2) + '" oninput="thSet(\'fill\',this.value)"></label>';
+        h += '<div style="display:flex;align-items:center;gap:8px;margin-top:6px;font-size:13px;flex-wrap:wrap">사진 밖 남는 곳 ' + B(!t.fill ? "#1e3a8a" : "#94a3b8", "🖼 같은 사진 어둡게 깔기", "TH_ED.fill=\'\';draw()", "padding:4px 10px;font-size:12px") + '<label style="display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border:2px solid ' + (t.fill ? "#1e3a8a" : "#cbd5e1") + ';border-radius:6px">🎨 색으로 <input type="color" value="' + (t.fill || "#1a1410") + '" oninput="TH_ED.fill=this.value;thSet(\'fill\',this.value)" onchange="draw()"></label></div>';
       }
       if(t.pfit === "cover") h += '<div class="mut" style="font-size:12px;margin-top:6px">↓ 꽉 채우기에서는 화면에서 잘리는 쪽(주로 폰)에서 움직여요 — 아래 📱 작은 화면으로 확인</div>';
       h += S("px", "가로 위치", 0, 100, t.px, "%", "0 = 왼쪽 · 100 = 오른쪽");
