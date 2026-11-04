@@ -81,8 +81,26 @@ function _thApply(t){
   if(!st){ st = document.createElement("style"); st.id = "thStyle"; document.head.appendChild(st); }
   st.textContent = css;
   // 다 만든 CSS 를 이 기기에 기억 → 다음에 열 때 index.html <head> 가 그림 그리기 전에 바로 씌움 (파란 화면 안 보이게)
-  try { localStorage.setItem(TH_KEY + "_css", css); } catch(e){}
+  _thStoreCss(css, t);
   _thLoginTexts(t);
+}
+// 기억하기 — 4개 시스템이 같은 주소(github.io)라 저장공간(약 5MB)을 같이 씀
+//   ① 예전 방식으로 사진까지 넣어 둔 설정은 사진만 빼서 자리 만들기 ② 그래도 모자라면 작은 사진으로
+function _thStoreCss(css, t){
+  ["hs_theme", "th_bsp", "th_dano", "th_gamun"].forEach(function(k){
+    try { var j = localStorage.getItem(k); if(j && j.length > 20000){ var o = JSON.parse(j); o.photo = ""; localStorage.setItem(k, JSON.stringify(o)); } } catch(e){}
+  });
+  try { localStorage.setItem(TH_KEY + "_css", css); return; } catch(e){}
+  try { localStorage.removeItem(TH_KEY + "_css"); } catch(e){}
+  if(t.mode === "photo" && t.photo){
+    var img = new Image();
+    img.onload = function(){
+      var w = Math.min(800, img.width), cv = document.createElement("canvas"); cv.width = w; cv.height = Math.round(img.height * w / img.width);
+      cv.getContext("2d").drawImage(img, 0, 0, cv.width, cv.height);
+      try { localStorage.setItem(TH_KEY + "_css", css.split(t.photo).join(cv.toDataURL("image/jpeg", 0.6))); } catch(e){}
+    };
+    img.src = t.photo;
+  } else { try { localStorage.setItem(TH_KEY + "_css", css); } catch(e){} }
 }
 // 로그인 화면 글자 (한 줄 문구 · 제목 · 작은 글)
 function _thLoginTexts(t){
