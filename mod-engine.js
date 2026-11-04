@@ -1625,7 +1625,7 @@ function popModSheet(key){
 
   var h='<div class="pop-head"><h3>📊 '+esc(def.label)+' 시트 편집</h3></div>';
   h+='<div style="padding:12px 14px">';
-  h+='<div style="font-size:11px;color:#64748b;margin-bottom:8px;line-height:1.6">셀을 직접 수정하거나, 엑셀에서 영역을 복사(Ctrl+C)해 첫 칸 클릭 후 붙여넣기(Ctrl+V)하면 여러 칸이 한 번에 채워집니다. · <b style="color:#16a34a">저장</b>을 눌러야 반영됩니다.</div>';
+  h+='<div style="font-size:11px;color:#64748b;margin-bottom:8px;line-height:1.6"><b>⠿ 손잡이를 끌면 행 순서가 바뀌어요.</b> 셀을 직접 수정하거나, 엑셀에서 영역을 복사(Ctrl+C)해 첫 칸 클릭 후 붙여넣기(Ctrl+V)하면 여러 칸이 한 번에 채워집니다. · <b style="color:#16a34a">저장</b>을 눌러야 반영됩니다.</div>';
   h+='<div style="overflow:auto;max-height:60vh;border:1px solid #e2e8f0;border-radius:8px">';
   h+='<table id="msh_table" style="border-collapse:collapse;font-size:13px;white-space:nowrap;min-width:100%">';
   h+='<thead><tr style="background:#f1f5f9;position:sticky;top:0;z-index:2">';
@@ -1643,13 +1643,13 @@ function popModSheet(key){
   h+='<div><button class="btn" style="background:#64748b;color:#fff" onclick="closePopup()">취소</button> <button class="btn btn-b" style="background:#16a34a" onclick="_mshSave()">💾 저장</button></div>';
   h+='</div></div>';
   openPopup(h, Math.min(960, 320+cols.length*130));
-  setTimeout(function(){ _mshBindPaste(); _mshUpdateCnt(); },50);
+  setTimeout(function(){ _mshBindPaste(); _mshBindDrag(); _mshUpdateCnt(); },50);
 }
 
 function _mshRowHtml(cols,row,rIdx){
   row=row||{};
   var h='<tr data-id="'+esc(row._id||'')+'">';
-  h+='<td style="padding:0;border:1px solid #e2e8f0;text-align:center;color:#94a3b8;font-size:11px;background:#f8fafc;position:sticky;left:0;width:30px"><span class="msh_rownum">'+(rIdx+1)+'</span></td>';
+  h+='<td style="padding:0;border:1px solid #e2e8f0;text-align:center;color:#94a3b8;font-size:11px;background:#f8fafc;position:sticky;left:0;width:30px"><span class="msh_drag" title="끌어서 순서 바꾸기" style="cursor:grab;touch-action:none;user-select:none;display:block;padding:6px 2px;color:#64748b;font-size:13px">⠿ <span class="msh_rownum">'+(rIdx+1)+'</span></span></td>';
   cols.forEach(function(c,ci){
     var v=_mshCellShow(c,row[c.key]);
     h+='<td style="padding:0;border:1px solid #e2e8f0"><input class="msh_cell" data-r="'+rIdx+'" data-ci="'+ci+'" data-key="'+esc(c.key)+'" value="'+esc(v)+'" style="border:none;outline:none;padding:6px 9px;width:100%;min-width:110px;font-size:13px;background:transparent;box-sizing:border-box" onfocus="this.style.background=\'#eff6ff\'" onblur="this.style.background=\'transparent\'"></td>';
@@ -1683,6 +1683,26 @@ function _mshUpdateCnt(){
 }
 
 // 엑셀 영역 붙여넣기 (\t=열, \n=행)
+// ⠿ 끌어서 행 순서 바꾸기 (마우스·손가락 둘 다) — 저장하면 이 순서대로
+function _mshBindDrag(){
+  var tbody=document.getElementById('msh_tbody'); if(!tbody) return;
+  var drag=null;
+  tbody.addEventListener('pointerdown', function(e){
+    var hd=e.target.closest&&e.target.closest('.msh_drag'); if(!hd) return;
+    var tr=hd.closest('tr'); if(!tr) return;
+    e.preventDefault(); try{ hd.setPointerCapture(e.pointerId); }catch(x){}
+    drag={tr:tr, hd:hd}; tr.style.background='#fef9c3'; tr.style.outline='2px solid #f59e0b'; hd.style.cursor='grabbing';
+  });
+  var place=function(x,y){
+    var el=document.elementFromPoint(x, y), over=el&&el.closest?el.closest('#msh_tbody tr'):null;
+    if(!over||over===drag.tr) return;
+    var r=over.getBoundingClientRect();
+    if(y<r.top+r.height/2) tbody.insertBefore(drag.tr, over); else tbody.insertBefore(drag.tr, over.nextSibling);
+  };
+  tbody.addEventListener('pointermove', function(e){ if(!drag) return; e.preventDefault(); place(e.clientX, e.clientY); });
+  var end=function(e){ if(!drag) return; if(e&&e.type==='pointerup') place(e.clientX, e.clientY); drag.tr.style.background=''; drag.tr.style.outline=''; drag.hd.style.cursor='grab'; drag=null; _mshRenumber(); };
+  tbody.addEventListener('pointerup', end); tbody.addEventListener('pointercancel', end);
+}
 function _mshBindPaste(){
   var table=document.getElementById('msh_table'); if(!table) return;
   table.addEventListener('paste', function(e){
