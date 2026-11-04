@@ -90,17 +90,21 @@ function _thStoreCss(css, t){
   ["hs_theme", "th_bsp", "th_dano", "th_gamun"].forEach(function(k){
     try { var j = localStorage.getItem(k); if(j && j.length > 20000){ var o = JSON.parse(j); o.photo = ""; localStorage.setItem(k, JSON.stringify(o)); } } catch(e){}
   });
-  try { localStorage.setItem(TH_KEY + "_css", css); return; } catch(e){}
-  try { localStorage.removeItem(TH_KEY + "_css"); } catch(e){}
-  if(t.mode === "photo" && t.photo){
+  // 사진이 크면 처음 화면용으로는 가벼운 사본(가로 1280)만 기억 — 진짜 사진은 1초 안에 서버에서 와서 바꿔 씀
+  if(t.mode === "photo" && t.photo && t.photo.length > 250000){
     var img = new Image();
     img.onload = function(){
-      var w = Math.min(800, img.width), cv = document.createElement("canvas"); cv.width = w; cv.height = Math.round(img.height * w / img.width);
-      cv.getContext("2d").drawImage(img, 0, 0, cv.width, cv.height);
-      try { localStorage.setItem(TH_KEY + "_css", css.split(t.photo).join(cv.toDataURL("image/jpeg", 0.6))); } catch(e){}
+      var put = function(w, q){
+        var cv = document.createElement("canvas"); w = Math.min(w, img.width); cv.width = w; cv.height = Math.round(img.height * w / img.width);
+        cv.getContext("2d").drawImage(img, 0, 0, cv.width, cv.height);
+        try { localStorage.setItem(TH_KEY + "_css", css.split(t.photo).join(cv.toDataURL("image/jpeg", q))); return true; } catch(e){ return false; }
+      };
+      if(!put(1280, 0.75) && !put(640, 0.6)) { try { localStorage.removeItem(TH_KEY + "_css"); } catch(e){} }
     };
     img.src = t.photo;
-  } else { try { localStorage.setItem(TH_KEY + "_css", css); } catch(e){} }
+    return;
+  }
+  try { localStorage.setItem(TH_KEY + "_css", css); } catch(e){ try { localStorage.removeItem(TH_KEY + "_css"); } catch(x){} }
 }
 // 로그인 화면 글자 (한 줄 문구 · 제목 · 작은 글)
 function _thLoginTexts(t){
