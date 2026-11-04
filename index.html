@@ -284,6 +284,7 @@ label{display:block;font-size:10px;color:#999;margin-bottom:3px}
   <div id="loginBox">
     <h1>🎎 법성포단오제 보존회 관리시스템</h1>
     <p>2026 법성포단오제 | 축제 참가자·운영 통합 관리</p>
+    <script>/* 🎨 꾸민 로그인 제목·작은 글 바로 (깜빡임 없게) */(function(){try{var j=localStorage.getItem("th_dano");if(!j)return;var t=JSON.parse(j),b=document.getElementById("loginBox"),h=b.querySelector("h1"),q=b.querySelector("p");if(t.title&&h){var im=h.querySelector("img");h.innerHTML=im?im.outerHTML:"";h.appendChild(document.createTextNode(t.title));h.setAttribute("data-th","1");}if(t.sub&&q){q.textContent=t.sub;q.setAttribute("data-th","1");}}catch(e){}})();</script>
     <label>아이디</label>
     <input type="text" id="lId" placeholder="아이디" autocomplete="username">
     <label>비밀번호</label>
@@ -650,8 +651,8 @@ function nowKST(full){ var d=new Date(); var s=todayKST()+" "+("0"+d.getHours())
 document.addEventListener("DOMContentLoaded", function(){
   try{
     document.title = SYS_TITLE;
-    var lh=document.querySelector("#loginBox h1"); if(lh) lh.textContent=SYS_ICON+" "+SYS_TITLE;
-    var lp=document.querySelector("#loginBox p");  if(lp) lp.textContent=SYS_LOGIN_SUB;
+    var lh=document.querySelector("#loginBox h1"); if(lh && !lh.getAttribute("data-th")) lh.textContent=SYS_ICON+" "+SYS_TITLE;
+    var lp=document.querySelector("#loginBox p");  if(lp && !lp.getAttribute("data-th")) lp.textContent=SYS_LOGIN_SUB;
     var mh=document.querySelector(".topBar h2");  if(mh) mh.textContent=SYS_ICON+" "+SYS_TITLE;
     var ms=document.querySelector(".topBar small"); if(ms) ms.textContent=SYS_SUBTITLE;
     if (window.IS_FEE_MODE) { _fbPubInit(); return; }
