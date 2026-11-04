@@ -90,6 +90,14 @@ function _thStoreCss(css, t){
   ["hs_theme", "th_bsp", "th_dano", "th_gamun"].forEach(function(k){
     try { var j = localStorage.getItem(k); if(j && j.length > 20000){ var o = JSON.parse(j); o.photo = ""; localStorage.setItem(k, JSON.stringify(o)); } } catch(e){}
   });
+  // 배경 대표색 (몇 글자) — 사진을 못 기억할 만큼 저장공간이 꽉 차도 파란색 대신 이 색이 먼저 보이게
+  try { localStorage.setItem(TH_KEY + "_col", t.mode === "color" ? t.c2 : (t.mode === "photo" ? _thFill(t) : "")); } catch(e){}
+  if(t.mode === "photo" && t.photo){
+    var im0 = new Image();
+    im0.onload = function(){ try { var cv = document.createElement("canvas"); cv.width = cv.height = 1; var g = cv.getContext("2d"); g.drawImage(im0, 0, 0, 1, 1); var d = g.getImageData(0, 0, 1, 1).data;
+      localStorage.setItem(TH_KEY + "_col", "#" + [d[0], d[1], d[2]].map(function(x){ return ("0" + x.toString(16)).slice(-2); }).join("")); } catch(e){} };
+    im0.src = t.photo;
+  }
   // 사진이 크면 처음 화면용으로는 가벼운 사본(가로 1280)만 기억 — 진짜 사진은 1초 안에 서버에서 와서 바꿔 씀
   if(t.mode === "photo" && t.photo && t.photo.length > 250000){
     var img = new Image();
@@ -99,7 +107,7 @@ function _thStoreCss(css, t){
         cv.getContext("2d").drawImage(img, 0, 0, cv.width, cv.height);
         try { localStorage.setItem(TH_KEY + "_css", css.split(t.photo).join(cv.toDataURL("image/jpeg", q))); return true; } catch(e){ return false; }
       };
-      if(!put(1280, 0.75) && !put(640, 0.6)) { try { localStorage.removeItem(TH_KEY + "_css"); } catch(e){} }
+      if(!put(1280, 0.75) && !put(640, 0.6) && !put(240, 0.5)) { try { localStorage.removeItem(TH_KEY + "_css"); } catch(e){} }
     };
     img.src = t.photo;
     return;
