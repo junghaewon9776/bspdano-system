@@ -80,24 +80,38 @@ function _thApply(t){
   var st = document.getElementById("thStyle");
   if(!st){ st = document.createElement("style"); st.id = "thStyle"; document.head.appendChild(st); }
   st.textContent = css;
+  // 다 만든 CSS 를 이 기기에 기억 → 다음에 열 때 index.html <head> 가 그림 그리기 전에 바로 씌움 (파란 화면 안 보이게)
+  try { localStorage.setItem(TH_KEY + "_css", css); } catch(e){}
+  _thLoginTexts(t);
+}
+// 로그인 화면 글자 (한 줄 문구 · 제목 · 작은 글)
+function _thLoginTexts(t){
   var box = document.getElementById("loginBox"), sl = document.getElementById("lgSlogan");
   if(box && !sl){ sl = document.createElement("div"); sl.id = "lgSlogan"; sl.style.cssText = "text-align:center;font-size:14px;font-weight:700;color:#92400e;margin:-14px 0 18px;letter-spacing:.5px"; var p = box.querySelector("p"); if(p) p.parentNode.insertBefore(sl, p.nextSibling); }
   if(sl){ sl.textContent = t.slogan || ""; sl.style.display = t.slogan ? "" : "none"; }
   _thTexts(t);
 }
+// 이 기기에 설정 기억 — 사진은 CSS 쪽에만 (같은 주소의 저장공간이 작아서 두 번 안 넣음)
+function _thCache(t){ try { localStorage.setItem(TH_KEY, JSON.stringify(Object.assign({}, t, { photo: "" }))); } catch(e){} }
 // 처음 열 때: 지난번 설정(이 기기) 먼저 → DB 에서 최신
+var TH_PEND = null;
 (function(){
-  try { var c = localStorage.getItem(TH_KEY); if(c) _thApply(JSON.parse(c)); } catch(e){}
+  try {
+    var cj = localStorage.getItem(TH_KEY), cc = localStorage.getItem(TH_KEY + "_css");
+    if(cc){   // 배경·색은 <head> 에서 이미 씌움 — 여기선 글자만 (DOM 준비 뒤)
+      var st = document.getElementById("thStyle"); if(!st){ st = document.createElement("style"); st.id = "thStyle"; document.head.appendChild(st); } st.textContent = cc;
+      if(cj) TH_PEND = _thNorm(JSON.parse(cj));
+    } else if(cj) _thApply(JSON.parse(cj));   // 예전 방식으로 기억해 둔 것
+  } catch(e){}
   function load(){
     if(typeof fbDb === "undefined") return;
     fbDb.ref("/main/PubTheme").once("value").then(function(s){
-      TH = _thNorm(s.val()); _thApply(TH);
-      try { localStorage.setItem(TH_KEY, JSON.stringify(TH)); } catch(e){}
+      TH = _thNorm(s.val()); _thApply(TH); _thCache(TH);
     }).catch(function(){});
   }
   if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", load); else load();
   // 시스템이 로그인 제목을 다시 써도 꾸민 이름이 이기게 한 번 더
-  document.addEventListener("DOMContentLoaded", function(){ setTimeout(function(){ if(TH_LAST) _thApply(TH_LAST); }, 0); });
+  document.addEventListener("DOMContentLoaded", function(){ setTimeout(function(){ if(TH_LAST) _thApply(TH_LAST); else if(TH_PEND) _thLoginTexts(TH_PEND); }, 0); });
 })();
 
 // ── 설정 화면 ──
@@ -246,7 +260,7 @@ function thSave(){
   showLoading("저장 중...");
   fbDb.ref("/main/PubTheme").set(t).then(function(){
     hideLoading(); TH = t; TH_ED = _thNorm(t); _thApply(t);
-    try { localStorage.setItem(TH_KEY, JSON.stringify(t)); } catch(e){}
+    _thCache(t);
     toast("🎨 저장했어요 — 모두에게 적용돼요"); draw();
   }).catch(function(e){ hideLoading(); toast("저장 실패: " + e.message, true); });
 }
