@@ -144,6 +144,19 @@ var TH_PEND = null;
   document.addEventListener("DOMContentLoaded", function(){ setTimeout(function(){ if(TH_LAST) _thApply(TH_LAST); else if(TH_PEND) _thLoginTexts(TH_PEND); }, 0); });
 })();
 
+// 이 기기 저장공간 확인 — 새로고침 때 파란 화면이 보이면 여기서 원인 확인 (같은 주소 github.io 를 여러 시스템이 같이 씀)
+function _thStoreInfo(){
+  try {
+    var css = localStorage.getItem(TH_KEY + "_css") || "", tot = 0, L = [];
+    for(var i = 0; i < localStorage.length; i++){ var k = localStorage.key(i), v = localStorage.getItem(k) || ""; tot += k.length + v.length; L.push([k, v.length]); }
+    L.sort(function(a, b){ return b[1] - a[1]; });
+    var mb = function(n){ return (n / 1048576 * 2).toFixed(2) + "MB"; };   // 글자당 2바이트
+    var ok = css.length > 0;
+    return '<div style="margin-top:8px;padding:8px 10px;border-radius:8px;font-size:12px;background:' + (ok ? '#f0fdf4;border:1px solid #86efac' : '#fef2f2;border:1px solid #fca5a5') + '">'
+      + (ok ? '✅ 이 기기는 처음 화면 배경을 기억하고 있어요 (' + Math.round(css.length / 1024) + 'KB) — 새로고침해도 바로 보여요' : '⚠️ 이 기기는 처음 화면 배경을 아직 기억 못 했어요 — 새로고침 때 잠깐 다른 색이 보일 수 있어요')
+      + '<br><span style="color:#64748b">이 기기 저장공간 사용: 약 ' + mb(tot) + ' / 약 10MB · 큰 것: ' + L.slice(0, 3).map(function(x){ return esc(x[0]) + ' ' + mb(x[1]); }).join(', ') + '</span></div>';
+  } catch(e){ return '<div style="margin-top:8px;font-size:12px;color:#b91c1c">⚠️ 이 기기 저장공간을 못 읽었어요: ' + esc(e.message || e) + '</div>'; }
+}
 // ── 설정 화면 ──
 function dTheme(){
   if(!TH_ED) TH_ED = _thNorm(TH);
@@ -151,7 +164,7 @@ function dTheme(){
   var R = function(v, label){ return '<label style="display:inline-flex;align-items:center;gap:5px;padding:8px 12px;border:2px solid ' + (t.mode === v ? TH_B.accent : "#e5e7eb") + ';border-radius:8px;cursor:pointer;background:' + (t.mode === v ? "#f8fafc" : "#fff") + ';font-weight:700"><input type="radio" name="thMode" ' + (t.mode === v ? "checked" : "") + ' onchange="TH_ED.mode=\'' + v + '\';draw()"> ' + label + '</label>'; };
   var h = '<div class="card" style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px"><strong style="font-size:18px">🎨 화면 꾸미기</strong>';
   h += '<div style="display:flex;gap:6px">' + B("#16a34a", "💾 저장 (모두에게 적용)", "thSave()") + B("#475569", "↺ 처음 색으로", "thReset()") + '</div></div>';
-  h += '<div class="mut" style="font-size:12.5px;margin-top:4px">로그인 화면 배경 · 문구 · 상단바 색을 바꿔요. 저장하면 이 시스템을 여는 모든 사람에게 보여요.</div></div>';
+  h += '<div class="mut" style="font-size:12.5px;margin-top:4px">로그인 화면 배경 · 문구 · 상단바 색을 바꿔요. 저장하면 이 시스템을 여는 모든 사람에게 보여요.</div>' + _thStoreInfo() + '</div>';
   h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:10px">';
   // 왼쪽: 고르기
   h += '<div class="card"><div style="font-weight:700;margin-bottom:8px">① 로그인 화면 배경</div><div style="display:flex;gap:8px;flex-wrap:wrap">' + R("base", TH_B.label) + R("color", "🎨 색 고르기") + R("photo", "🖼 사진") + '</div>';
