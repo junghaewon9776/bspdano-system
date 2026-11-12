@@ -36,8 +36,8 @@ function _danoCheckSession() {
       localStorage.removeItem('danoAuth');
     } catch (e) { localStorage.removeItem('danoAuth'); }
   }
-  // 2) 단오시스템 메인 세션(cleanFarm_auth_v1)이 있으면 그대로 사용
-  var m = localStorage.getItem('cleanFarm_auth_v1');
+  // 2) 단오시스템 메인 세션(cleanFarm_auth_v1_dano — 단오 것만. 예전 공용 이름은 청년회·가문굴비 로그인도 통과됐음)이 있으면 그대로 사용
+  var m = localStorage.getItem('cleanFarm_auth_v1_dano');
   if (m) {
     try {
       var md = JSON.parse(m);
