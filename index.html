@@ -13802,6 +13802,8 @@ function _fbTxView(){
     if(FB_TXF==="fee") return !!t._mk; if(FB_TXF==="unk") return Number(t.inA)>0 && !t.kind && !t._mk; if(FB_TXF==="out") return Number(t.out)>0; if(FB_TXF==="warn") return t._warn; if(FB_TXF==="nocat") return !t.big && !t._mk; return true; });
   if(FB_TXQ) h+='<div style="font-size:13px;font-weight:700;color:#0f766e;margin-bottom:6px">🔍 「'+esc(FB_TXQ)+'」 '+V.length+'건 · 입금 '+fm(V.reduce(function(a,t){return a+(Number(t.inA)||0);},0))+'원 · 출금 '+fm(V.reduce(function(a,t){return a+(Number(t.out)||0);},0))+'원 <a href="javascript:void 0" onclick="FB_TXQ=String();draw()">✕ 지우기</a></div>';
   var opts=_fbMemList().map(function(m){ return '<option value="'+m._k+'">'+esc(m.nm)+'</option>'; }).join('');
+  h+=_bkViewTog();
+  if(_bkCardOn()) return h+_fbTxCards(V,_sameN,opts);
   h+='<div style="overflow-x:auto;max-height:65vh;overflow-y:auto"><table style="width:100%;border-collapse:collapse;font-size:14px;min-width:760px"><thead style="position:sticky;top:0"><tr style="background:#1e293b;color:#fff"><th style="padding:7px">날짜</th><th style="padding:7px;text-align:left">입금자 / 적요</th><th style="padding:7px;text-align:right">입금</th><th style="padding:7px;text-align:right">출금</th><th style="padding:7px;text-align:right">잔액</th><th style="padding:7px;text-align:left">구분</th><th></th></tr></thead><tbody>';
   V.slice(0,400).forEach(function(t){
     var warn=(t.bal!=null&&t.bal!==""&&Math.abs(Number(t.bal)-t._run)>=1);
@@ -13854,6 +13856,33 @@ function _fbTxEditSave(k){
   _fbRef('tx/'+k).update(u).then(function(){ closePopup2(); var mk=_fbTxMem(Object.assign({},FB.tx[k],u)); toast("💾 고쳤어요"+(mk?" · "+FB.mems[mk].nm+" "+dt.slice(0,7)+" 회비":"")); });
 }
 // ▲▼ 같은 날짜 안에서 순서 바꾸기 (목록은 최근이 위 — ▲=더 나중, ▼=더 먼저)
+// 💵 회비 탭 거래 — 📱 카드 (입출금과 같은 📋/📱 고르기)
+function _fbTxCards(V, sameN, opts){
+  var h='', W=V.slice(0,400), lastD='', wk=['일','월','화','수','목','금','토'];
+  var day={}; W.forEach(function(t){ var d=String(t.dt).slice(0,10), x=day[d]||(day[d]={i:0,o:0}); x.i+=Number(t.inA)||0; x.o+=Number(t.out)||0; });
+  var mb='border:1px solid #94a3b8;background:#fff;color:#334155;border-radius:4px;width:22px;height:20px;font-size:10px;cursor:pointer;padding:0;line-height:1';
+  var fl=function(lb,v,st){ return '<span style="font-size:11.5px;color:#94a3b8;font-weight:700;padding-top:2px">'+lb+'</span><span style="min-width:0;overflow-wrap:anywhere;'+(st||'font-size:13.5px;color:#334155')+'">'+esc(v||'')+'</span>'; };
+  W.forEach(function(t){
+    var d=String(t.dt).slice(0,10), inA=Number(t.inA)||0, out=Number(t.out)||0, k=t._k;
+    if(d!==lastD){ lastD=d; var dd=new Date(d+"T00:00:00"), x=day[d];
+      h+='<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin:12px 2px 5px;padding-bottom:3px;border-bottom:2px solid #cbd5e1"><b style="font-size:14px;color:#0f172a">'+d.slice(5,7).replace(/^0/,'')+'월 '+d.slice(8,10).replace(/^0/,'')+'일 <span style="color:#64748b;font-weight:600;font-size:12.5px">'+(isNaN(dd)?'':wk[dd.getDay()]+'요일')+' · '+d.slice(0,4)+'</span></b><span style="font-size:12px;white-space:nowrap">'+(x.i?'<b style="color:#166534">+'+fm(x.i)+'</b> ':'')+(x.o?'<b style="color:#b91c1c">−'+fm(x.o)+'</b>':'')+'</span></div>'; }
+    var amt=inA?'<b style="color:#166534">+'+fm(inA)+'</b>':(out<0?'<b style="color:#7c3aed">↩ −'+fm(-out)+'</b>':(out?'<b style="color:#b91c1c">−'+fm(out)+'</b>':''));
+    var mv=(sameN[d]||0)>1?'<button title="같은 날 안에서 위로" onclick="_fbTxMove(\''+k+'\',true)" style="'+mb+'">▲</button><button title="같은 날 안에서 아래로" onclick="_fbTxMove(\''+k+'\',false)" style="'+mb+'">▼</button>':'';
+    var kind = t._mk ? '<span style="background:#dcfce7;color:#166534;font-weight:800;padding:1px 7px;border-radius:5px;font-size:11.5px">회비 · '+esc(FB.mems[t._mk].nm)+'</span>'+(t.memK?'':' <span style="font-size:10.5px;color:#64748b">자동</span>')
+      : (inA>0 ? (t.kind==="other"?'<span style="color:#64748b;font-size:11.5px">회비 아님</span>':'<select onchange="_fbTxSetMem(\''+k+'\',this.value)" style="padding:3px;border:2px solid #f59e0b;border-radius:6px;font-size:13px;max-width:150px"><option value="">❓ 회원 고르기</option><option value="__other">회비 아님 (기타 입금)</option>'+opts+'</select>') : '');
+    if((t._mk&&t.memK)||t.kind==="other") kind+=' <a href="javascript:void 0" onclick="_fbTxSetMem(\''+k+'\',\'\')" style="font-size:11px">되돌리기</a>';
+    var cat=t.big?'<span style="font-size:11.5px;background:#e0f2fe;color:#075985;font-weight:700;padding:1px 7px;border-radius:5px">'+esc(t.big)+(t.mid?' › '+esc(t.mid):'')+'</span>':(t._mk?'':'<span style="font-size:11.5px;background:#fef3c7;color:#92400e;font-weight:700;padding:1px 7px;border-radius:5px;border:1px solid #f59e0b">❓ 계정과목 넣기</span>');
+    h+='<div onclick="if(!/^(INPUT|BUTTON|A|SELECT|OPTION|LABEL|IMG)$/.test(event.target.tagName))_bkEdit(\'_fee\',\''+k+'\')" style="background:#fff;border:1px solid '+(t._warn?'#fca5a5':'#e2e8f0')+';border-left:4px solid '+(inA?'#16a34a':(out<0?'#7c3aed':'#dc2626'))+';border-radius:9px;padding:8px 10px;margin-bottom:6px;cursor:pointer">';
+    h+='<div style="display:flex;align-items:flex-start;gap:8px">'+(mv?'<div style="display:flex;flex-direction:column;gap:3px;flex:none">'+mv+'</div>':'');
+    h+='<div style="flex:1;min-width:0"><div style="display:flex;gap:8px;align-items:flex-start"><div style="flex:1;min-width:0;display:grid;grid-template-columns:auto minmax(0,1fr);gap:1px 8px;align-items:baseline">'+fl('적요(통장) :',t.nm,'font-size:15px;font-weight:800;color:#0f172a')+(t.memo?fl('메모 :',t.memo):'')+'</div>';
+    h+='<div style="text-align:right;white-space:nowrap;flex:none"><div style="font-size:16px">'+amt+'</div><div style="font-size:11.5px;color:'+(t._warn?'#dc2626;font-weight:800':'#64748b')+'">잔액 '+fm(t._run)+(t._warn?' ⚠':'')+'</div></div></div>';
+    h+='<div style="display:flex;flex-wrap:wrap;gap:5px;align-items:center;margin-top:5px">'+kind+cat+'<span style="margin-left:auto;display:inline-flex;gap:4px;align-items:center">'+_bkEvBtn(Object.assign({_a:BK_FEE},t))+'<button class="btn btn-s" style="background:#dc2626;color:#fff;padding:2px 7px" onclick="_fbTxDel(\''+k+'\')">✕</button></span></div>';
+    h+='</div></div></div>';
+  });
+  if(!W.length) h+='<div style="padding:16px;text-align:center;color:#64748b">해당하는 거래가 없어요</div>';
+  if(V.length>400) h+='<div class="mut" style="font-size:12px;margin-top:6px">최근 400건만 보여요</div>';
+  return '<div style="font-size:12px;color:#64748b;margin-bottom:2px">카드를 누르면 고치는 창이 떠요</div>'+h;
+}
 function _fbTxMove(k, up){
   var t=FB.tx[k]; if(!t) return;
   var G=_fbTxList().filter(function(x){ return String(x.dt).slice(0,10)===String(t.dt).slice(0,10); });
