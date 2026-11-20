@@ -14264,11 +14264,11 @@ function _bkForm(ak,k){
   var cm=function(v){ return (v===null||v===undefined||v==="")?"":_cm(String(v)); }, star='<span style="color:#dc2626">*</span>';
   var lab=function(s){ return '<label style="font-weight:800;font-size:14px">'+s+'</label>'; };
   var h='<h3>'+(t?'✏️ 거래 고치기':'＋ 거래 등록')+' <button class="close-x" onclick="closePopup2()">&times;</button></h3>';
-  h+='<div style="display:grid;grid-template-columns:110px 1fr;gap:9px 10px;align-items:center;font-size:14px">';
+  h+='<div style="display:grid;grid-template-columns:auto minmax(0,1fr);gap:9px 8px;align-items:center;font-size:14px">';
   h+=lab('통장 '+star)+(t?'<div style="font-weight:800">'+esc(_bkAcct(ak).nm)+'</div>':'<select id="bkF_ak" onchange="window._BKF.ak=this.value;_bkFormNmDL()" style="padding:9px;font-weight:800">'+A.map(function(a){ return '<option value="'+a._k+'"'+(a._k===ak?' selected':'')+'>'+(a.fee?'💰 ':'🏦 ')+esc(a.nm)+'</option>'; }).join('')+'</select>');
   h+=lab('날짜 '+star)+'<input type="date" id="bkF_dt" value="'+esc(t?String(t.dt).slice(0,10):today())+'" onclick="try{this.showPicker()}catch(e){}" style="padding:9px;cursor:pointer">';
-  var iob=function(v,lb,col){ var on=io===v; return '<button type="button" id="bkF_io_'+v+'" onclick="_bkFormIo(\''+v+'\')" style="flex:1;border:2px solid '+col+';border-radius:8px;padding:9px;font-size:15px;font-weight:900;cursor:pointer;background:'+(on?col:'#fff')+';color:'+(on?'#fff':col)+'">'+lb+'</button>'; };
-  h+=lab('구분 '+star)+'<div style="display:flex;gap:8px"><input type="hidden" id="bkF_io" value="'+io+'">'+iob("out","💸 출금 (나간 돈)","#b91c1c")+iob("in","💵 입금 (들어온 돈)","#166534")+iob("ref","↩ 환불·취소","#7c3aed")+'</div><div id="bkF_refHint" style="grid-column:2;font-size:12.5px;color:#6d28d9;margin-top:-4px;display:'+(io==="ref"?"block":"none")+'">결제했다가 돌려받은 돈 — <b>원래 결제와 같은 대분류·계정과목</b>으로 넣으면 그 지출에서 빠져요 (예: 264,000 결제 → 264,000 환불·취소 → 240,000 결제 = 지출 240,000)'+'</div>';
+  var iob=function(v,lb,col){ var on=io===v; return '<button type="button" id="bkF_io_'+v+'" onclick="_bkFormIo(\''+v+'\')" style="flex:1 1 0;min-width:0;border:2px solid '+col+';border-radius:8px;padding:6px 3px;font-size:13px;line-height:1.2;white-space:normal;word-break:keep-all;font-weight:900;cursor:pointer;background:'+(on?col:'#fff')+';color:'+(on?'#fff':col)+'">'+lb+'</button>'; };
+  h+=lab('구분 '+star)+'<div style="display:flex;gap:5px;min-width:0"><input type="hidden" id="bkF_io" value="'+io+'">'+iob("out","💸 출금<div style=\"font-size:11px;font-weight:700\">나간 돈</div>","#b91c1c")+iob("in","💵 입금<div style=\"font-size:11px;font-weight:700\">들어온 돈</div>","#166534")+iob("ref","↩ 환불·취소<div style=\"font-size:11px;font-weight:700\">돌려받은 돈</div>","#7c3aed")+'</div><div id="bkF_refHint" style="grid-column:2;font-size:12.5px;color:#6d28d9;margin-top:-4px;display:'+(io==="ref"?"block":"none")+'">결제했다가 돌려받은 돈 — <b>원래 결제와 같은 대분류·계정과목</b>으로 넣으면 그 지출에서 빠져요 (예: 264,000 결제 → 264,000 환불·취소 → 240,000 결제 = 지출 240,000)'+'</div>';
   h+=lab('금액 '+star)+'<input id="bkF_amt" inputmode="numeric" value="'+cm(amt)+'" oninput="this.value=_cm(this.value)" placeholder="0" style="padding:9px;font-size:18px;font-weight:900;text-align:right">';
   h+=lab('대분류 '+star)+'<select id="bkF_big" onchange="_bkBigChg(\'bkF_\')" style="padding:9px;font-weight:800;border:2px solid #0f766e">'+_bkBigOpts(big)+'</select>';
   h+=lab('계정과목 '+star)+'<select id="bkF_mid" onchange="_bkMidChg(\'bkF_\')" style="padding:9px;font-weight:800;border:2px solid #0f766e">'+_bkMidOpts(big,mid)+'</select>';
@@ -15362,6 +15362,8 @@ function _bkAcctView(ak){
   window._BK_VIS=V.slice(0,500).map(function(t){ return t._a+"|"+t._k; });
   var allOn=window._BK_VIS.length&&window._BK_VIS.every(function(pk){ return BK_PICK[pk]; });
   h+='<div id="bkPickBar" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;min-height:30px;margin-bottom:4px">'+_bkPickBarHtml()+'</div>';
+  h+=_bkViewTog();
+  if(_bkCardOn()){ h+=_bkCards(V,sameDay); return h; }
   h+='<div style="overflow-x:auto;max-height:65vh;overflow-y:auto"><table style="width:100%;border-collapse:collapse;font-size:14px;min-width:1160px"><thead style="position:sticky;top:0;z-index:1"><tr style="background:#1e293b;color:#fff"><th style="padding:7px;width:30px"><input type="checkbox" title="보이는 거래 모두 고르기" '+(allOn?'checked':'')+' onchange="_bkPickAll(this.checked)" style="width:18px;height:18px"></th><th style="padding:7px">날짜</th><th style="padding:7px;text-align:left">적요</th><th style="padding:7px;text-align:left">거래처</th><th style="padding:7px;text-align:left">내용</th><th style="padding:7px;text-align:right">입금</th><th style="padding:7px;text-align:right">출금</th><th style="padding:7px;text-align:right">잔액</th><th style="padding:7px;text-align:left">대분류</th><th style="padding:7px;text-align:left">계정과목</th><th style="padding:7px;text-align:left">증빙</th><th></th></tr></thead><tbody>';
   V.slice(0,500).forEach(function(t,vi){
     var sk=_bkSkip(t.big);
@@ -15380,6 +15382,41 @@ function _bkAcctView(ak){
   if(!V.length) h+='<tr><td colspan="12" style="padding:16px;text-align:center;color:#64748b">해당하는 거래가 없어요</td></tr>';
   h+='</tbody></table></div>'+(V.length>500?'<div class="mut" style="font-size:12px;margin-top:6px">최근 500건만 보여요 — 연도나 검색으로 좁혀 보세요</div>':'');
   return h;
+}
+// 📋 표 / 📱 카드 — 고른 것 기억, 처음엔 폰이면 카드
+function _bkCardOn(){ var v=""; try{ v=localStorage.getItem("dano_bkView")||""; }catch(e){} return v ? v==="card" : (window.innerWidth<760 || !!(window.matchMedia&&matchMedia("(pointer:coarse)").matches)); }
+function _bkViewSet(v){ try{ localStorage.setItem("dano_bkView",v); }catch(e){} draw(); }
+function _bkViewTog(){
+  var c=_bkCardOn(), b=function(on,lb,v){ return '<button onclick="_bkViewSet(\''+v+'\')" style="border:1.5px solid #1d4ed8;padding:4px 10px;font-size:12.5px;font-weight:800;cursor:pointer;background:'+(on?'#1d4ed8':'#fff')+';color:'+(on?'#fff':'#1d4ed8')+';border-radius:'+(v==='table'?'8px 0 0 8px':'0 8px 8px 0')+'">'+lb+'</button>'; };
+  return '<div style="display:flex;justify-content:flex-end;margin:0 0 6px"><span style="display:inline-flex">'+b(!c,'📋 표','table')+b(c,'📱 카드','card')+'</span></div>';
+}
+function _bkCards(V,sameDay){
+  var h='', W=V.slice(0,500), lastD='';
+  // 날짜별 입금·출금 합계
+  var day={}; W.forEach(function(t){ var d=String(t.dt).slice(0,10), x=day[d]||(day[d]={i:0,o:0}); x.i+=Number(t.inA)||0; x.o+=Number(t.out)||0; });
+  var wk=['일','월','화','수','목','금','토'];
+  W.forEach(function(t,vi){
+    var d=String(t.dt).slice(0,10), sk=_bkSkip(t.big), pk=t._a+"|"+t._k, inA=Number(t.inA)||0, out=Number(t.out)||0;
+    if(d!==lastD){ lastD=d; var dd=new Date(d+"T00:00:00"), x=day[d];
+      h+='<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin:12px 2px 5px;padding-bottom:3px;border-bottom:2px solid #cbd5e1"><b style="font-size:14px;color:#0f172a">'+d.slice(5,7).replace(/^0/,'')+'월 '+d.slice(8,10).replace(/^0/,'')+'일 <span style="color:#64748b;font-weight:600;font-size:12.5px">'+(isNaN(dd)?'':wk[dd.getDay()]+'요일')+' · '+d.slice(0,4)+'</span></b><span style="font-size:12px;white-space:nowrap">'+(x.i?'<b style="color:#166534">+'+fm(x.i)+'</b> ':'')+(x.o?'<b style="color:#b91c1c">−'+fm(x.o)+'</b>':'')+'</span></div>'; }
+    var amt=inA?'<b style="color:#166534">+'+fm(inA)+'</b>':(out<0?'<b style="color:#7c3aed">↩ −'+fm(-out)+'</b>':(out?'<b style="color:#b91c1c">−'+fm(out)+'</b>':''));
+    var mb='border:1px solid #94a3b8;background:#fff;color:#334155;border-radius:4px;width:22px;height:20px;font-size:10px;cursor:pointer;padding:0;line-height:1';
+    var mv=(sameDay&&sameDay[d]>1)?'<button title="같은 날 안에서 위로" onclick="_bkTxMove(\''+t._a+'\',\''+t._k+'\',true)" style="'+mb+'">▲</button><button title="같은 날 안에서 아래로" onclick="_bkTxMove(\''+t._a+'\',\''+t._k+'\',false)" style="'+mb+'">▼</button>':'';
+    var fl=function(lb,v,st){ return '<span style="font-size:11.5px;color:#94a3b8;font-weight:700;padding-top:2px">'+lb+'</span><span style="min-width:0;overflow-wrap:anywhere;'+(st||'font-size:13.5px;color:#334155')+'">'+esc(v||'')+'</span>'; };
+    var cat=t.big?'<span style="background:'+(sk?'#e0e7ff;color:#3730a3':'#dcfce7;color:#166534')+';font-weight:800;padding:1px 7px;border-radius:5px;font-size:11.5px">'+esc(t.big)+(t.mid?' › '+esc(t.mid):'')+'</span>':'<span style="background:#fef3c7;color:#92400e;font-weight:800;padding:1px 7px;border-radius:5px;border:1px solid #f59e0b;font-size:11.5px">❓ 분류 넣기</span>';
+    var noEv=out>0 && !(t.ev||[]).length && !sk;
+    h+='<div onclick="if(!/^(INPUT|BUTTON|A|SELECT|LABEL|IMG)$/.test(event.target.tagName))_bkEdit(\''+t._a+'\',\''+t._k+'\')" style="background:'+(sk?'#f8fafc':'#fff')+';border:1px solid '+(t._warn?'#fca5a5':'#e2e8f0')+';border-left:4px solid '+(inA?'#16a34a':(out<0?'#7c3aed':'#dc2626'))+';border-radius:9px;padding:8px 10px;margin-bottom:6px;cursor:pointer">';
+    h+='<div style="display:flex;align-items:flex-start;gap:8px"><div style="display:flex;flex-direction:column;align-items:center;gap:3px;flex:none"><input type="checkbox" class="bkPk" data-pk="'+esc(pk)+'" '+(BK_PICK[pk]?'checked':'')+' onclick="_bkPickClick(event,this,'+vi+')" style="width:17px;height:17px;margin:2px 0 0">'+mv+'</div>';
+    h+='<div style="flex:1;min-width:0"><div style="display:flex;gap:8px;align-items:flex-start"><div style="flex:1;min-width:0;display:grid;grid-template-columns:auto minmax(0,1fr);gap:1px 8px;align-items:baseline">'+fl('적요 :',t.nm,'font-size:15px;font-weight:800;color:#0f172a')+fl('거래처 :',t.vendor)+fl('내용 :',t.desc)+'</div>';
+    h+='<div style="text-align:right;white-space:nowrap;flex:none"><div style="font-size:16px">'+amt+'</div><div style="font-size:11.5px;color:'+(t._warn?'#dc2626;font-weight:800':'#64748b')+'">잔액 '+fm(t._run)+(t._warn?' ⚠':'')+'</div></div></div>';
+
+    if(t.memo) h+='<div style="font-size:12px;color:#64748b">📝 '+esc(t.memo)+'</div>';
+    h+='<div style="display:flex;flex-wrap:wrap;gap:5px;align-items:center;margin-top:5px">'+cat+(noEv?'<span style="font-size:11px;color:#b45309;font-weight:800">📎 증빙 없음</span>':'')+'<span style="margin-left:auto;display:inline-flex;gap:4px;align-items:center">'+_bkEvThumbs(t)+_bkEvBtn(t)+'<button class="btn btn-s" style="background:#dc2626;color:#fff;padding:2px 7px" onclick="_bkTxDel(\''+t._a+'\',\''+t._k+'\')">✕</button></span></div>';
+    h+='</div></div></div>';
+  });
+  if(!W.length) h+='<div style="padding:16px;text-align:center;color:#64748b">해당하는 거래가 없어요</div>';
+  if(V.length>500) h+='<div class="mut" style="font-size:12px;margin-top:6px">최근 500건만 보여요 — 연도나 검색으로 좁혀 보세요</div>';
+  return '<div style="font-size:12px;color:#64748b;margin-bottom:2px">카드를 누르면 고치는 창이 떠요</div>'+h;
 }
 function _bkQIn(el){ if(_bkQC) return; clearTimeout(_bkQT); _bkQT=setTimeout(function(){ BK_Q=el.value; var pos=el.selectionStart; draw(); var e2=document.getElementById("bkQ"); if(e2){ e2.focus(); try{ e2.setSelectionRange(pos,pos); }catch(x){} } },250); }
 function _bkPickBarHtml(){
