@@ -2238,3 +2238,34 @@ function _apiBuildGalleryZip(p) {
     processNext(0);
   });
 }
+
+/* ── 인쇄 창 마지막 빈 종이 막기 (2026-11-23)
+   크롬 확장(Grammarly 등)이 인쇄 창 body 끝에 칸을 붙이면 ".pg:last-child" 규칙이 안 먹어
+   마지막 장 뒤에 빈 종이가 나옴 → 새 창에 쓰는 HTML에 자동으로 막는 코드를 넣는다. */
+(function(){
+  if(window.__pgFixOn) return; window.__pgFixOn = 1;
+  var ST = '<style id="__pgfix">@media print{html,body{height:auto!important;min-height:0!important}'
+    + 'grammarly-desktop-integration,grammarly-extension,grammarly-popups{display:none!important}}</style>';
+  var SC = '<scr' + 'ipt id="__pgfixjs">(function(){function real(e){var t=e.tagName;return t&&t!=="SCRIPT"&&t!=="STYLE"&&t!=="LINK"&&t.indexOf("-")<0&&getComputedStyle(e).display!=="none";}'
+    + 'function fx(){try{var b=document.body;if(!b)return;var hs=b.querySelectorAll("*");for(var i=0;i<hs.length;i++){if(hs[i].tagName.indexOf("-")>0&&hs[i].parentNode===b)hs[i].style.setProperty("display","none","important");}'
+    + 'var el=b;while(el){var k=el.lastElementChild;while(k&&!real(k))k=k.previousElementSibling;if(!k)break;k.style.setProperty("break-after","auto","important");k.style.setProperty("page-break-after","auto","important");k.style.setProperty("margin-bottom","0","important");el=k;}}catch(e){}}'
+    + 'window.addEventListener("beforeprint",fx);if(window.matchMedia){try{window.matchMedia("print").addListener(function(m){if(m.matches)fx();});}catch(e){}}fx();setTimeout(fx,300);})();</scr' + 'ipt>';
+  var o = window.open;
+  window.open = function(u){
+    var w = o.apply(window, arguments);
+    try{
+      if(w && (!u || u === "about:blank")){
+        var d = w.document, ow = d.write, oc = d.close, sH = 0, sB = 0;
+        d.write = function(){
+          var h = Array.prototype.join.call(arguments, "");
+          if(!sH && /<\/head>/i.test(h)){ h = h.replace(/<\/head>/i, ST + "</head>"); sH = 1; }
+          if(!sB && /<\/body>/i.test(h)){ h = h.replace(/<\/body>(?![\s\S]*<\/body>)/i, SC + "</body>"); sB = 1; }
+          return ow.call(d, h);
+        };
+        d.writeln = function(){ return d.write(Array.prototype.join.call(arguments, "") + "\n"); };
+        d.close = function(){ if(!sB){ sB = 1; ow.call(d, (sH ? "" : ST) + SC); } return oc.call(d); };
+      }
+    }catch(e){}
+    return w;
+  };
+})();
